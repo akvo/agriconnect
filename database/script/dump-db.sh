@@ -1,0 +1,1 @@
+docker compose exec -T db bash -c 'pg_dump --user akvo --clean --create --format plain agriconnect' > /docker-entrypoint-initdb.d/001-init.sql; echo "Dumped database to /docker-entrypoint-initdb.d/001-init.sql"'
