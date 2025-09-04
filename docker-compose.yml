@@ -1,40 +1,39 @@
 version: "3.9"
 services:
   mainnetwork:
-    image: alpine:3.14
+    image: alpine:3.14.0
     command: ["tail", "-f", "/dev/null"]
   db:
-    image: postgres:13-alpine
+    ports:
+      - 5432:5432
+    image: postgres:17-alpine
     volumes:
       - ./database/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
       - pg-data:/var/lib/postgresql/data
       - ./database/script:/script:ro
     environment:
       - POSTGRES_PASSWORD=password
-    ports:
-      - 5432:5432
   backend:
-    image: python:3.9
-    working_dir: /app
-    command: ["./start.sh"]
-    volumes:
-      - ./backend:/app:delegated
-    environment:
-      - DB_SCHEMA=agriconnect
-      - DB_USER=akvo
-      - DB_PASSWORD=password
-      - DB_HOST=db
-      - DEBUG=True
-      - SECRET_KEY=secret
     depends_on:
       - db
-  frontend:
-    image: akvo/akvo-node-18-alpine:20250306.055839.23cadbd
-    command: ["./start.sh"]
-    volumes:
-      - ./frontend:/app:delegated
+    network_mode: service:mainnetwork
+    image: python:3.10.7
+    environment:
+      - DATABASE_URL=postgresql://akvo:password@db:5432/agriconnect
+      - SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+      - CLIENT_ID=test
+      - CLIENT_SECRET=test
+    command: ["tail","-f", "/dev/null"]
     working_dir: /app
+    volumes:
+      - ./backend:/app:delegated
+  frontend:
     depends_on:
       - backend
+    image: akvo/akvo-node-18-alpine:20250306.055839.23cadbd
+    command: ["./start.sh"]
+    working_dir: /app
+    volumes:
+      - ./frontend:/app:delegated
 volumes:
   pg-data:

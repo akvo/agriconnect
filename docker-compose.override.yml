@@ -1,16 +1,14 @@
+---
 version: "3.9"
 services:
   mainnetwork:
     ports:
+      - 3000:3000
       - 8000:8000
       - 5050:5050
-      - 3000:3000
-  backend:
-    network_mode: service:mainnetwork
-  frontend:
-    network_mode: service:mainnetwork
   pgadmin:
-    image: dpage/pgadmin4:5.7
+    network_mode: service:mainnetwork
+    image: dpage/pgadmin4:9.7.0
     environment:
       - PGADMIN_LISTEN_PORT=5050
       - PGADMIN_DEFAULT_EMAIL=dev@akvo.org
@@ -20,6 +18,9 @@ services:
       - pg-admin-data:/var/lib/pgadmin
     depends_on:
       - db
+  frontend:
     network_mode: service:mainnetwork
+  backend:
+    command: ["./dev.sh"]
 volumes:
   pg-admin-data:

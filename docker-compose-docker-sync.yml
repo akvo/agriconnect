@@ -1,0 +1,9 @@
+---
+version: "3.9"
+services:
+  frontend:
+    volumes:
+      - agriconnect-docker-sync:/app/node_modules:nocopy
+volumes:
+  agriconnect-docker-sync:
+    external: true
