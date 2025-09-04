@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-export default function UserList({ users, loading, onEditUser, onDeleteUser, currentUser }) {
+export default function UserList({
+  users,
+  loading,
+  onEditUser,
+  onDeleteUser,
+  currentUser,
+}) {
   const getUserTypeLabel = (userType) => {
     switch (userType) {
-      case 'admin':
-        return 'Administrator';
-      case 'eo':
-        return 'Extension Officer';
+      case "admin":
+        return "Administrator";
+      case "eo":
+        return "Extension Officer";
       default:
         return userType;
     }
@@ -14,12 +20,12 @@ export default function UserList({ users, loading, onEditUser, onDeleteUser, cur
 
   const getUserTypeBadgeColor = (userType) => {
     switch (userType) {
-      case 'admin':
-        return 'bg-purple-100 text-purple-800';
-      case 'eo':
-        return 'bg-blue-100 text-blue-800';
+      case "admin":
+        return "bg-purple-100 text-purple-800";
+      case "eo":
+        return "bg-blue-100 text-blue-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -35,11 +41,23 @@ export default function UserList({ users, loading, onEditUser, onDeleteUser, cur
   if (users.length === 0) {
     return (
       <div className="p-8 text-center">
-        <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        <svg
+          className="h-12 w-12 text-gray-400 mx-auto mb-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1}
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+          />
         </svg>
         <h3 className="text-lg font-medium text-gray-900">No users found</h3>
-        <p className="mt-1 text-gray-500">Try adjusting your search criteria or create a new user.</p>
+        <p className="mt-1 text-gray-500">
+          Try adjusting your search criteria or create a new user.
+        </p>
       </div>
     );
   }
@@ -79,7 +97,9 @@ export default function UserList({ users, loading, onEditUser, onDeleteUser, cur
                     </div>
                   </div>
                   <div className="ml-4">
-                    <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {user.full_name}
+                    </div>
                     <div className="text-sm text-gray-500">ID: #{user.id}</div>
                   </div>
                 </div>
@@ -89,15 +109,21 @@ export default function UserList({ users, loading, onEditUser, onDeleteUser, cur
                 <div className="text-sm text-gray-500">{user.phone_number}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getUserTypeBadgeColor(user.user_type)}`}>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getUserTypeBadgeColor(user.user_type)}`}
+                >
                   {getUserTypeLabel(user.user_type)}
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  user.is_active === 'true' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  {user.is_active === 'true' ? 'Active' : 'Inactive'}
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    user.is_active === "true"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  {user.is_active === "true" ? "Active" : "Inactive"}
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

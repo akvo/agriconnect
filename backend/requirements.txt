@@ -10,3 +10,6 @@ pytest==7.4.3
 pytest-asyncio==0.21.1
 flake8==7.0.0
 black==23.12.1
+coveralls==4.0.1
+coverage==7.10.6
+gevent==25.8.2

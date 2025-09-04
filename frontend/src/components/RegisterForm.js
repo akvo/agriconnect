@@ -1,47 +1,50 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
-    email: '',
-    phone_number: '',
-    password: '',
-    confirmPassword: '',
-    full_name: '',
-    user_type: 'eo' // default to extension officer
+    email: "",
+    phone_number: "",
+    password: "",
+    confirmPassword: "",
+    full_name: "",
+    user_type: "eo", // default to extension officer
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     // Validate password length
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError("Password must be at least 8 characters long");
       return;
     }
 
     // Validate phone number format
-    if (!formData.phone_number.startsWith('+') || formData.phone_number.length < 10) {
-      setError('Phone number must start with + and be at least 10 characters');
+    if (
+      !formData.phone_number.startsWith("+") ||
+      formData.phone_number.length < 10
+    ) {
+      setError("Phone number must start with + and be at least 10 characters");
       return;
     }
 
@@ -49,20 +52,22 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
 
     const { confirmPassword, ...registrationData } = formData;
     const result = await register(registrationData);
-    
+
     if (result.success) {
       onSuccess?.(result.user);
     } else {
       setError(result.error);
     }
-    
+
     setLoading(false);
   };
 
   return (
     <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Register for AgriConnect</h2>
-      
+      <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
+        Register for AgriConnect
+      </h2>
+
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
@@ -71,7 +76,10 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="full_name"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Full Name
           </label>
           <input
@@ -87,7 +95,10 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Email
           </label>
           <input
@@ -103,7 +114,10 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         </div>
 
         <div>
-          <label htmlFor="phone_number" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="phone_number"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Phone Number
           </label>
           <input
@@ -116,11 +130,16 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
             placeholder="+1234567890"
           />
-          <p className="text-xs text-gray-500 mt-1">Must start with + and country code</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Must start with + and country code
+          </p>
         </div>
 
         <div>
-          <label htmlFor="user_type" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="user_type"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             User Type
           </label>
           <select
@@ -137,7 +156,10 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Password
           </label>
           <input
@@ -150,11 +172,16 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
             placeholder="Enter your password"
           />
-          <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters long</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Must be at least 8 characters long
+          </p>
         </div>
 
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="confirmPassword"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Confirm Password
           </label>
           <input
@@ -174,13 +201,13 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
           disabled={loading}
           className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? 'Creating account...' : 'Create Account'}
+          {loading ? "Creating account..." : "Create Account"}
         </button>
       </form>
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
-          Already have an account?{' '}
+          Already have an account?{" "}
           <button
             onClick={onSwitchToLogin}
             className="text-green-600 hover:text-green-700 font-medium"

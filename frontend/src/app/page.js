@@ -1,34 +1,36 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import LoginForm from '../components/LoginForm';
-import RegisterForm from '../components/RegisterForm';
-import Dashboard from '../components/Dashboard';
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import LoginForm from "../components/LoginForm";
+import RegisterForm from "../components/RegisterForm";
+import Dashboard from "../components/Dashboard";
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'register'
-  const [successMessage, setSuccessMessage] = useState('');
+  const [currentView, setCurrentView] = useState("login"); // 'login', 'register'
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleLoginSuccess = () => {
     // User state will be updated by AuthContext, component will re-render
-    setSuccessMessage('Login successful! Welcome to AgriConnect.');
+    setSuccessMessage("Login successful! Welcome to AgriConnect.");
   };
 
   const handleRegisterSuccess = (userData) => {
-    setSuccessMessage(`Registration successful! Please log in with your credentials.`);
-    setCurrentView('login');
+    setSuccessMessage(
+      `Registration successful! Please log in with your credentials.`
+    );
+    setCurrentView("login");
   };
 
   const handleSwitchToRegister = () => {
-    setCurrentView('register');
-    setSuccessMessage('');
+    setCurrentView("register");
+    setSuccessMessage("");
   };
 
   const handleSwitchToLogin = () => {
-    setCurrentView('login');
-    setSuccessMessage('');
+    setCurrentView("login");
+    setSuccessMessage("");
   };
 
   if (loading) {
@@ -63,13 +65,13 @@ export default function Home() {
         )}
 
         {/* Authentication Forms */}
-        {currentView === 'login' ? (
-          <LoginForm 
+        {currentView === "login" ? (
+          <LoginForm
             onSuccess={handleLoginSuccess}
             onSwitchToRegister={handleSwitchToRegister}
           />
         ) : (
-          <RegisterForm 
+          <RegisterForm
             onSuccess={handleRegisterSuccess}
             onSwitchToLogin={handleSwitchToLogin}
           />
@@ -78,7 +80,8 @@ export default function Home() {
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-500">
-            AgriConnect © 2025. Connecting farmers with agricultural extension services.
+            AgriConnect © 2025. Connecting farmers with agricultural extension
+            services.
           </p>
         </div>
       </div>

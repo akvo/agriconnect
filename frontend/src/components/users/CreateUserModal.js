@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import api from '../../lib/api';
+import { useState } from "react";
+import api from "../../lib/api";
 
 export default function CreateUserModal({ onClose, onUserCreated }) {
   const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    phone_number: '',
-    user_type: 'eo'
+    full_name: "",
+    email: "",
+    phone_number: "",
+    user_type: "eo",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,9 +17,9 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -29,11 +29,11 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
     setError(null);
 
     try {
-      const response = await api.post('/admin/users/', formData);
+      const response = await api.post("/admin/users/", formData);
       setCreatedUser(response.data.user);
       setTemporaryPassword(response.data.temporary_password);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create user');
+      setError(err.response?.data?.detail || "Failed to create user");
     } finally {
       setLoading(false);
     }
@@ -50,21 +50,46 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
         <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
           <div className="mt-3">
             <div className="flex items-center justify-center w-12 h-12 mx-auto bg-green-100 rounded-full mb-4">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              <svg
+                className="w-6 h-6 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M5 13l4 4L19 7"
+                ></path>
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 text-center mb-4">User Created Successfully!</h3>
-            
+            <h3 className="text-lg font-medium text-gray-900 text-center mb-4">
+              User Created Successfully!
+            </h3>
+
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
               <div className="flex">
-                <svg className="w-5 h-5 text-yellow-400 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                <svg
+                  className="w-5 h-5 text-yellow-400 mt-0.5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  ></path>
                 </svg>
                 <div>
-                  <h4 className="text-sm font-medium text-yellow-800">Important!</h4>
+                  <h4 className="text-sm font-medium text-yellow-800">
+                    Important!
+                  </h4>
                   <p className="text-sm text-yellow-700 mt-1">
-                    Please save this temporary password and share it securely with the user.
+                    Please save this temporary password and share it securely
+                    with the user.
                   </p>
                 </div>
               </div>
@@ -72,13 +97,17 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700">User Email</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  User Email
+                </label>
                 <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded border">
                   {createdUser.email}
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Temporary Password</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Temporary Password
+                </label>
                 <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded border">
                   {temporaryPassword}
                 </p>
@@ -104,14 +133,26 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
       <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
         <form onSubmit={handleSubmit}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Create New User</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              Create New User
+            </h3>
             <button
               type="button"
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                ></path>
               </svg>
             </button>
           </div>
@@ -124,7 +165,10 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="full_name"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Full Name *
               </label>
               <input
@@ -140,7 +184,10 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Email Address *
               </label>
               <input
@@ -156,7 +203,10 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
             </div>
 
             <div>
-              <label htmlFor="phone_number" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="phone_number"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Phone Number *
               </label>
               <input
@@ -169,11 +219,16 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 placeholder="+1234567890"
               />
-              <p className="mt-1 text-xs text-gray-500">Must start with + and be at least 10 characters</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Must start with + and be at least 10 characters
+              </p>
             </div>
 
             <div>
-              <label htmlFor="user_type" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="user_type"
+                className="block text-sm font-medium text-gray-700"
+              >
                 User Type *
               </label>
               <select
@@ -203,7 +258,7 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
               disabled={loading}
               className="flex-1 bg-green-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating...' : 'Create User'}
+              {loading ? "Creating..." : "Create User"}
             </button>
           </div>
         </form>
