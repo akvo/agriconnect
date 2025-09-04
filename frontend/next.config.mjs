@@ -5,20 +5,20 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: "/api",
+        destination: "http://localhost:8000",
+      },
+      {
         source: "/api/docs",
-        destination: "http://localhost:8000/api/docs/",
+        destination: "http://localhost:8000/api/docs",
       },
       {
-        source: "/api/schema",
-        destination: "http://localhost:8000/api/schema/",
+        source: "/openapi.json",
+        destination: "http://localhost:8000/openapi.json",
       },
       {
-        source: "/api/openapi.json",
-        destination: "http://localhost:8000/api/openapi.json",
-      },
-      {
-        source: "/api/:path((?!docs$)(?!schema$).*)",
-        destination: "http://localhost:8000/api/:path*",
+				source: "/api/:path*",
+				destination: "http://localhost:8000/api/:path*",
       },
     ];
   },
