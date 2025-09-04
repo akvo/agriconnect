@@ -1,0 +1,238 @@
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
+from fastapi import HTTPException, status
+from models.user import User
+from schemas.user import UserCreate, AdminUserCreate, UserUpdate
+from utils.auth import get_password_hash, verify_password
+import secrets
+import string
+
+
+class UserService:
+    @staticmethod
+    def create_user(db: Session, user_data: UserCreate) -> User:
+        # Check if user already exists
+        existing_user = (
+            db.query(User)
+            .filter(
+                (User.email == user_data.email)
+                | (User.phone_number == user_data.phone_number)
+            )
+            .first()
+        )
+
+        if existing_user:
+            if existing_user.email == user_data.email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered",
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Phone number already registered",
+                )
+
+        # Create new user
+        hashed_password = get_password_hash(user_data.password)
+        db_user = User(
+            email=user_data.email,
+            phone_number=user_data.phone_number,
+            hashed_password=hashed_password,
+            full_name=user_data.full_name,
+            user_type=user_data.user_type,
+        )
+
+        try:
+            db.add(db_user)
+            db.commit()
+            db.refresh(db_user)
+            return db_user
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User registration failed due to data conflict",
+            )
+
+    @staticmethod
+    def authenticate_user(db: Session, email: str, password: str) -> User:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+        if not verify_password(password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+        if user.is_active != "true":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account is inactive",
+            )
+        return user
+
+    @staticmethod
+    def get_user_by_email(db: Session, email: str) -> User:
+        return db.query(User).filter(User.email == email).first()
+
+    @staticmethod
+    def generate_temporary_password() -> str:
+        """Generate a temporary password for invited users"""
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        return "".join(secrets.choice(alphabet) for _ in range(12))
+
+    @staticmethod
+    def admin_create_user(
+        db: Session, user_data: AdminUserCreate
+    ) -> tuple[User, str]:
+        """Create user by admin with temporary password"""
+        # Check if user already exists
+        existing_user = (
+            db.query(User)
+            .filter(
+                (User.email == user_data.email)
+                | (User.phone_number == user_data.phone_number)
+            )
+            .first()
+        )
+
+        if existing_user:
+            if existing_user.email == user_data.email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered",
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Phone number already registered",
+                )
+
+        # Generate temporary password
+        temp_password = UserService.generate_temporary_password()
+        hashed_password = get_password_hash(temp_password)
+
+        # Create new user
+        db_user = User(
+            email=user_data.email,
+            phone_number=user_data.phone_number,
+            hashed_password=hashed_password,
+            full_name=user_data.full_name,
+            user_type=user_data.user_type,
+        )
+
+        try:
+            db.add(db_user)
+            db.commit()
+            db.refresh(db_user)
+            return db_user, temp_password
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User creation failed due to data conflict",
+            )
+
+    @staticmethod
+    def get_users_list(
+        db: Session, page: int = 1, size: int = 10, search: str = None
+    ) -> tuple[list[User], int]:
+        """Get paginated list of users with optional search"""
+        query = db.query(User)
+
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    User.full_name.ilike(search_term),
+                    User.email.ilike(search_term),
+                    User.phone_number.ilike(search_term),
+                )
+            )
+
+        total = query.count()
+        users = query.offset((page - 1) * size).limit(size).all()
+
+        return users, total
+
+    @staticmethod
+    def get_user_by_id(db: Session, user_id: int) -> User:
+        """Get user by ID"""
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+        return user
+
+    @staticmethod
+    def update_user(
+        db: Session, user_id: int, user_data: UserUpdate, current_user: User
+    ) -> User:
+        """Update user details"""
+        user = UserService.get_user_by_id(db, user_id)
+
+        # Check for conflicts if updating email or phone
+        if (
+            user_data.phone_number
+            and user_data.phone_number != user.phone_number
+        ):
+            existing_user = (
+                db.query(User)
+                .filter(
+                    User.phone_number == user_data.phone_number,
+                    User.id != user_id,
+                )
+                .first()
+            )
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Phone number already in use",
+                )
+
+        # Update fields
+        if user_data.full_name is not None:
+            user.full_name = user_data.full_name
+        if user_data.phone_number is not None:
+            user.phone_number = user_data.phone_number
+        if user_data.user_type is not None:
+            user.user_type = user_data.user_type
+
+        try:
+            db.commit()
+            db.refresh(user)
+            return user
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Update failed due to data conflict",
+            )
+
+    @staticmethod
+    def delete_user(db: Session, user_id: int, current_user: User) -> bool:
+        """Delete user (admin only, cannot delete self)"""
+        if current_user.id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete your own account",
+            )
+
+        user = UserService.get_user_by_id(db, user_id)
+
+        try:
+            db.delete(user)
+            db.commit()
+            return True
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete user",
+            )

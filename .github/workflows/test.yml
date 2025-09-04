@@ -1,0 +1,27 @@
+name: Build & Test
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feature*
+  pull_request:
+    branches:
+      - main
+      - develop
+      - feature*
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build and Test
+        env:
+          CI_COMMIT: ${{ env.COMMIT_SHORT_SHA }}
+          CI_BRANCH: ${{ github.ref_name }}
+          CI_PULL_REQUEST: ${{ env.PULL_REQUEST_EVENT }}
+          COMPOSE_INTERACTIVE_NO_CLI: 1
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: |
+          ./ci/build.sh

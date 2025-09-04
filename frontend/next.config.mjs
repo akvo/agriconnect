@@ -1,21 +1,25 @@
+import dotenv from "dotenv";
+
 /** @type {import('next').NextConfig} */
+const env = dotenv.config();
 
 const nextConfig = {
+  reactStrictMode: true,
+  trailingSlash: true,
   async rewrites() {
-    return [
-      {
-        source: "/api/docs",
-        destination: "http://localhost:8000/docs/",
-      },
-      {
-        source: "/api/openapi.json",
-        destination: "http://localhost:8000/api/openapi.json",
-      },
-      {
-        source: "/api/:path((?!openapi$)(?!docs$).*)",
-        destination: "http://localhost:8000/api/:path*",
-      },
-    ];
+    return {
+      beforeFiles: [
+        // Handle API routes before checking for pages/public files
+        {
+          source: "/api/:path*/",
+          destination: "http://localhost:8000/api/:path*/",
+        },
+        {
+          source: "/api/:path*",
+          destination: "http://localhost:8000/api/:path*",
+        },
+      ],
+    };
   },
 };
 

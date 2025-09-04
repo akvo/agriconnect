@@ -1,0 +1,31 @@
+---
+version: "3.9"
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - ./database/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - pg-data:/var/lib/postgresql/data
+      - ./database/script:/script:ro
+    command: "postgres -c 'shared_buffers=128MB' -c 'fsync=off' -c 'synchronous_commit=off' -c 'full_page_writes=off' -c 'max_connections=100' -c 'bgwriter_lru_maxpages=0' -c 'client_min_messages=warning'"
+    restart: always
+    ports:
+      - 5432:5432
+  backend:
+    image: eu.gcr.io/akvo-lumen/agriconnect/backend:latest
+    volumes:
+      - ./:/app:delegated
+    working_dir: /app/backend
+    command: ["tail", "-f", "/dev/null"]
+    environment:
+      - DATABASE_URL=postgresql://agriconnect:password@db:5432/agriconnect
+      - SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+      - CLIENT_ID=test
+      - CLIENT_SECRET=test
+      - COVERALLS_REPO_TOKEN=${COVERALLS_REPO_TOKEN:-}
+    depends_on:
+      - db
+volumes:
+  pg-data:
