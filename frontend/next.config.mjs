@@ -5,15 +5,15 @@ const nextConfig = {
     return [
       {
         source: "/api/docs",
-        destination: "http://backend:8000/api/docs/",
+        destination: "http://localhost:8000/docs/",
       },
       {
-        source: "/api/schema",
-        destination: "http://backend:8000/api/schema/",
+        source: "/api/openapi.json",
+        destination: "http://localhost:8000/api/openapi.json",
       },
       {
-        source: "/api/:path((?!docs$)(?!schema$).*)",
-        destination: "http://backend:8000/api/:path*",
+        source: "/api/:path((?!openapi$)(?!docs$).*)",
+        destination: "http://localhost:8000/api/:path*",
       },
     ];
   },
