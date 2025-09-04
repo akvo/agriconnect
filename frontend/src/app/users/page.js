@@ -6,6 +6,7 @@ import api from "../../lib/api";
 import UserList from "../../components/users/UserList";
 import CreateUserModal from "../../components/users/CreateUserModal";
 import EditUserModal from "../../components/users/EditUserModal";
+import HeaderNav from "../../components/HeaderNav";
 import { useRouter } from "next/navigation";
 
 export default function UsersPage() {
@@ -39,11 +40,9 @@ export default function UsersPage() {
 
     try {
       setLoading(true);
-      console.log("Fetching users...", { currentPage, pageSize, searchTerm });
       const response = await api.get(
         `/admin/users/?page=${currentPage}&size=${pageSize}${searchTerm ? `&search=${searchTerm}` : ""}`
       );
-      console.log("Users response:", response.data);
       setUsers(response.data.users);
       setTotalUsers(response.data.total);
       setTotalPages(Math.ceil(response.data.total / pageSize));
@@ -107,46 +106,27 @@ export default function UsersPage() {
 
   if (authLoading || (loading && users.length === 0)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading users...</p>
+      <div className="min-h-screen bg-gradient-brand flex items-center justify-center">
+        <div className="text-center animate-fade-in">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-200 border-t-primary-600 mx-auto mb-6"></div>
+            <div className="absolute inset-0 rounded-full bg-gradient-primary opacity-20 blur-lg animate-pulse"></div>
+          </div>
+          <p className="text-secondary-700 font-medium text-lg">Loading users...</p>
+          <p className="text-secondary-500 text-sm mt-2">Please wait while we fetch the user data</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <button
-                onClick={() => router.push("/")}
-                className="text-gray-500 hover:text-gray-700 mr-4"
-              >
-                ← Back to Dashboard
-              </button>
-              <h1 className="text-xl font-semibold text-gray-900">
-                User Management
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
-                Welcome, {user?.full_name}
-              </span>
-              <button
-                onClick={() => {}}
-                className="bg-red-600 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-brand">
+      <HeaderNav 
+        breadcrumbs={[
+          { label: "Dashboard", path: "/" },
+          { label: "User Management" }
+        ]} 
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -171,7 +151,7 @@ export default function UsersPage() {
               <div className="mt-4 sm:mt-0">
                 <button
                   onClick={handleCreateUser}
-                  className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                  className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"
                 >
                   Create User
                 </button>
@@ -186,7 +166,7 @@ export default function UsersPage() {
                   placeholder="Search users by name, email, or phone..."
                   value={searchTerm}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-green-500 focus:border-green-500 cursor-text"
                 />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg
@@ -228,7 +208,7 @@ export default function UsersPage() {
                       setCurrentPage((prev) => Math.max(prev - 1, 1))
                     }
                     disabled={currentPage === 1}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
                   >
                     Previous
                   </button>
@@ -237,7 +217,7 @@ export default function UsersPage() {
                       setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                     }
                     disabled={currentPage === totalPages}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
                   >
                     Next
                   </button>

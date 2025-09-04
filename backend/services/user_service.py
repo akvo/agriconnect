@@ -5,34 +5,51 @@ from fastapi import HTTPException, status
 from models.user import User
 from schemas.user import UserCreate, AdminUserCreate, UserUpdate
 from utils.auth import get_password_hash, verify_password
+from utils.constants import (
+    EMAIL_ALREADY_REGISTERED,
+    PHONE_ALREADY_REGISTERED,
+    PHONE_ALREADY_IN_USE,
+    INVALID_EMAIL_OR_PASSWORD,
+    USER_NOT_FOUND,
+    USER_ACCOUNT_INACTIVE,
+    USER_REGISTRATION_FAILED,
+    USER_CREATION_FAILED,
+    UPDATE_FAILED,
+    DELETE_FAILED,
+    CANNOT_DELETE_OWN_ACCOUNT,
+)
 import secrets
 import string
 
 
 class UserService:
     @staticmethod
-    def create_user(db: Session, user_data: UserCreate) -> User:
-        # Check if user already exists
+    def _check_user_exists(db: Session, email: str, phone_number: str) -> None:
+        """Check if user already exists by email or phone number and raise appropriate exception"""
         existing_user = (
             db.query(User)
             .filter(
-                (User.email == user_data.email)
-                | (User.phone_number == user_data.phone_number)
+                (User.email == email) | (User.phone_number == phone_number)
             )
             .first()
         )
 
         if existing_user:
-            if existing_user.email == user_data.email:
+            if existing_user.email == email:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email already registered",
+                    detail=EMAIL_ALREADY_REGISTERED,
                 )
             else:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Phone number already registered",
+                    detail=PHONE_ALREADY_REGISTERED,
                 )
+
+    @staticmethod
+    def create_user(db: Session, user_data: UserCreate) -> User:
+        # Check if user already exists
+        UserService._check_user_exists(db, user_data.email, user_data.phone_number)
 
         # Create new user
         hashed_password = get_password_hash(user_data.password)
@@ -53,7 +70,7 @@ class UserService:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User registration failed due to data conflict",
+                detail=USER_REGISTRATION_FAILED,
             )
 
     @staticmethod
@@ -62,17 +79,17 @@ class UserService:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
+                detail=INVALID_EMAIL_OR_PASSWORD,
             )
         if not verify_password(password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
+                detail=INVALID_EMAIL_OR_PASSWORD,
             )
         if user.is_active != "true":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User account is inactive",
+                detail=USER_ACCOUNT_INACTIVE,
             )
         return user
 
@@ -92,26 +109,7 @@ class UserService:
     ) -> tuple[User, str]:
         """Create user by admin with temporary password"""
         # Check if user already exists
-        existing_user = (
-            db.query(User)
-            .filter(
-                (User.email == user_data.email)
-                | (User.phone_number == user_data.phone_number)
-            )
-            .first()
-        )
-
-        if existing_user:
-            if existing_user.email == user_data.email:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email already registered",
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Phone number already registered",
-                )
+        UserService._check_user_exists(db, user_data.email, user_data.phone_number)
 
         # Generate temporary password
         temp_password = UserService.generate_temporary_password()
@@ -135,7 +133,7 @@ class UserService:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User creation failed due to data conflict",
+                detail=USER_CREATION_FAILED,
             )
 
     @staticmethod
@@ -166,7 +164,7 @@ class UserService:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=USER_NOT_FOUND
             )
         return user
 
@@ -193,7 +191,7 @@ class UserService:
             if existing_user:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Phone number already in use",
+                    detail=PHONE_ALREADY_IN_USE,
                 )
 
         # Update fields
@@ -212,7 +210,7 @@ class UserService:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Update failed due to data conflict",
+                detail=UPDATE_FAILED,
             )
 
     @staticmethod
@@ -221,7 +219,7 @@ class UserService:
         if current_user.id == user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete your own account",
+                detail=CANNOT_DELETE_OWN_ACCOUNT,
             )
 
         user = UserService.get_user_by_id(db, user_id)
@@ -234,5 +232,5 @@ class UserService:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete user",
+                detail=DELETE_FAILED,
             )

@@ -3,6 +3,33 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* AgriConnect Brand Colors */
+  --primary: 134 239 172;
+  --primary-foreground: 22 101 52;
+  --secondary: 34 197 94;
+  --accent: 59 130 246;
+  --muted: 248 250 252;
+  --border: 226 232 240;
+  --input: 241 245 249;
+  --card: 255 255 255;
+  --popover: 255 255 255;
+  --destructive: 239 68 68;
+  --warning: 251 146 60;
+  --success: 34 197 94;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  
+  /* Border Radius */
+  --radius: 0.75rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
 }
 
 @theme inline {
@@ -10,17 +37,138 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Custom Color Palette */
+  --color-primary-50: 240 253 244;
+  --color-primary-100: 220 252 231;
+  --color-primary-200: 187 247 208;
+  --color-primary-300: 134 239 172;
+  --color-primary-400: 74 222 128;
+  --color-primary-500: 34 197 94;
+  --color-primary-600: 22 163 74;
+  --color-primary-700: 21 128 61;
+  --color-primary-800: 22 101 52;
+  --color-primary-900: 20 83 45;
+  --color-primary-950: 5 46 22;
+  
+  --color-secondary-50: 248 250 252;
+  --color-secondary-100: 241 245 249;
+  --color-secondary-200: 226 232 240;
+  --color-secondary-300: 203 213 225;
+  --color-secondary-400: 148 163 184;
+  --color-secondary-500: 100 116 139;
+  --color-secondary-600: 71 85 105;
+  --color-secondary-700: 51 65 85;
+  --color-secondary-800: 30 41 59;
+  --color-secondary-900: 15 23 42;
+  --color-secondary-950: 2 6 23;
+  
+  --color-accent-50: 239 246 255;
+  --color-accent-100: 219 234 254;
+  --color-accent-200: 191 219 254;
+  --color-accent-300: 147 197 253;
+  --color-accent-400: 96 165 250;
+  --color-accent-500: 59 130 246;
+  --color-accent-600: 37 99 235;
+  --color-accent-700: 29 78 216;
+  --color-accent-800: 30 64 175;
+  --color-accent-900: 30 58 138;
+  --color-accent-950: 23 37 84;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --card: 3 7 18;
+    --popover: 3 7 18;
+    --border: 39 39 42;
+    --input: 39 39 42;
+    --muted: 24 24 27;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom utilities */
+.shadow-brand {
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgb(var(--color-primary-100));
+}
+
+.bg-gradient-brand {
+  background: linear-gradient(135deg, rgb(var(--color-primary-50)), rgb(var(--color-accent-50)));
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(135deg, rgb(var(--color-primary-500)), rgb(var(--color-primary-600)));
+}
+
+.bg-gradient-success {
+  background: linear-gradient(135deg, rgb(var(--color-primary-400)), rgb(var(--color-primary-500)));
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, rgb(var(--color-primary-600)), rgb(var(--color-accent-600)));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--duration-300) ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideUp var(--duration-300) ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn var(--duration-200) ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Custom focus styles */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500;
+}
+
+.focus-ring-accent {
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500;
 }

@@ -72,8 +72,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+    <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-brand border border-white/20 w-full max-w-[42rem] animate-scale-in p-8">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-gray-900">
             {showDetails ? "User Details" : "Edit User"}

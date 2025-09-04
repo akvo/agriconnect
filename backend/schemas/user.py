@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from datetime import datetime
 from models.user import UserType
+from utils.validators import validate_phone_number
 
 
 class UserCreate(BaseModel):
@@ -13,13 +14,8 @@ class UserCreate(BaseModel):
 
     @field_validator("phone_number")
     @classmethod
-    def validate_phone_number(cls, v):
-        # Basic phone number validation
-        if not v.startswith("+") or len(v) < 10:
-            raise ValueError(
-                "Phone number must start with + and be at least 10 characters"
-            )
-        return v
+    def validate_phone_number_field(cls, v):
+        return validate_phone_number(v)
 
     @field_validator("password")
     @classmethod
@@ -68,13 +64,8 @@ class AdminUserCreate(BaseModel):
 
     @field_validator("phone_number")
     @classmethod
-    def validate_phone_number(cls, v):
-        # Basic phone number validation
-        if not v.startswith("+") or len(v) < 10:
-            raise ValueError(
-                "Phone number must start with + and be at least 10 characters"
-            )
-        return v
+    def validate_phone_number_field(cls, v):
+        return validate_phone_number(v)
 
 
 class UserUpdate(BaseModel):
@@ -84,11 +75,9 @@ class UserUpdate(BaseModel):
 
     @field_validator("phone_number")
     @classmethod
-    def validate_phone_number(cls, v):
-        if v and (not v.startswith("+") or len(v) < 10):
-            raise ValueError(
-                "Phone number must start with + and be at least 10 characters"
-            )
+    def validate_phone_number_field(cls, v):
+        if v:
+            return validate_phone_number(v)
         return v
 
 

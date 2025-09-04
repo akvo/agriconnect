@@ -4,6 +4,7 @@ import os
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
+from utils.constants import COULD_NOT_VALIDATE_CREDENTIALS, WWW_AUTHENTICATE_HEADER
 
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
@@ -41,13 +42,13 @@ def verify_token(token: str) -> dict:
         if email is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail=COULD_NOT_VALIDATE_CREDENTIALS,
+                headers={"WWW-Authenticate": WWW_AUTHENTICATE_HEADER},
             )
         return payload
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail=COULD_NOT_VALIDATE_CREDENTIALS,
+            headers={"WWW-Authenticate": WWW_AUTHENTICATE_HEADER},
         )

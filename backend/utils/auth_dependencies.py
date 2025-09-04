@@ -5,6 +5,13 @@ from database import get_db
 from models.user import User, UserType
 from services.user_service import UserService
 from utils.auth import verify_token
+from utils.constants import (
+    INVALID_AUTH_CREDENTIALS,
+    USER_NOT_FOUND,
+    INACTIVE_USER,
+    ADMIN_ACCESS_REQUIRED,
+    WWW_AUTHENTICATE_HEADER,
+)
 
 security = HTTPBearer()
 
@@ -20,29 +27,29 @@ def get_current_user(
         if email is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail=INVALID_AUTH_CREDENTIALS,
+                headers={"WWW-Authenticate": WWW_AUTHENTICATE_HEADER},
             )
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail=INVALID_AUTH_CREDENTIALS,
+            headers={"WWW-Authenticate": WWW_AUTHENTICATE_HEADER},
         )
 
     user = UserService.get_user_by_email(db, email)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail=USER_NOT_FOUND,
+            headers={"WWW-Authenticate": WWW_AUTHENTICATE_HEADER},
         )
 
     if user.is_active != "true":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Inactive user",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail=INACTIVE_USER,
+            headers={"WWW-Authenticate": WWW_AUTHENTICATE_HEADER},
         )
 
     return user
@@ -53,6 +60,6 @@ def admin_required(current_user: User = Depends(get_current_user)) -> User:
     if current_user.user_type != UserType.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
+            detail=ADMIN_ACCESS_REQUIRED,
         )
     return current_user

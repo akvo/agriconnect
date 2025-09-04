@@ -46,12 +46,12 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
 
   if (createdUser && temporaryPassword) {
     return (
-      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-          <div className="mt-3">
-            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-green-100 rounded-full mb-4">
+      <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-brand border border-white/20 w-full max-w-[32rem] animate-scale-in p-8">
+          <div className="text-center">
+            <div className="flex items-center justify-center w-16 h-16 mx-auto bg-gradient-success rounded-2xl shadow-lg mb-6">
               <svg
-                className="w-6 h-6 text-green-600"
+                className="w-8 h-8 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -64,9 +64,10 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 ></path>
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 text-center mb-4">
-              User Created Successfully!
+            <h3 className="text-2xl font-bold text-secondary-900 mb-3">
+              User Created Successfully! 🎉
             </h3>
+            <p className="text-secondary-600 mb-6">The new user account has been created and is ready to use.</p>
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
               <div className="flex">
@@ -117,7 +118,7 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
             <div className="mt-6">
               <button
                 onClick={handleComplete}
-                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"
               >
                 Continue
               </button>
@@ -129,8 +130,8 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+    <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-brand border border-white/20 w-full max-w-[32rem] animate-scale-in p-8">
         <form onSubmit={handleSubmit}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-gray-900">
@@ -139,7 +140,7 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
             <button
               type="button"
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 cursor-pointer"
             >
               <svg
                 className="w-6 h-6"
@@ -249,14 +250,14 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              className="flex-1 bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 cursor-pointer transition-colors duration-200"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-green-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-green-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
             >
               {loading ? "Creating..." : "Create User"}
             </button>
