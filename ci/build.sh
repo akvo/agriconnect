@@ -38,9 +38,11 @@ backend_build() {
     docker build \
         --tag "${IMAGE_PREFIX}/backend:latest" \
         --tag "${IMAGE_PREFIX}/backend:${CI_COMMIT}" backend
+
+    dc -f docker-compose.test.yml -p backend-test run \
+        --rm \
+        backend ./run-qc.sh
 }
 
 backend_build
-frontend_build
-
-docker compose -f docker-compose.test.yml run -T backend ./check.sh
+# frontend_build
