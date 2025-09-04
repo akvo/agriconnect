@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./dc.sh exec backend find:*)",
+      "Bash(./dc.sh exec backend grep:*)",
+      "Bash(./dc.sh logs:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
