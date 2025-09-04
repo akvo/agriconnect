@@ -4,7 +4,7 @@ from routers import auth
 app = FastAPI(title="AgriConnect API", version="1.0.0")
 
 # Include routers
-app.include_router(auth.router)
+app.include_router(auth.router, prefix="/api")
 
 @app.get("/")
 def read_root():

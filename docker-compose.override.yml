@@ -22,5 +22,6 @@ services:
     network_mode: service:mainnetwork
   backend:
     command: ["./dev.sh"]
+    network_mode: service:mainnetwork
 volumes:
   pg-admin-data:
