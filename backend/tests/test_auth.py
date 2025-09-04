@@ -14,7 +14,7 @@ class TestUserRegistration:
             "user_type": "admin",
         }
 
-        response = client.post("/api/auth/register", json=user_data)
+        response = client.post("/api/auth/register/", json=user_data)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
@@ -36,7 +36,7 @@ class TestUserRegistration:
             "user_type": "eo",
         }
 
-        response = client.post("/api/auth/register", json=user_data)
+        response = client.post("/api/auth/register/", json=user_data)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
@@ -54,12 +54,12 @@ class TestUserRegistration:
         }
 
         # First registration
-        response1 = client.post("/api/auth/register", json=user_data)
+        response1 = client.post("/api/auth/register/", json=user_data)
         assert response1.status_code == status.HTTP_201_CREATED
 
         # Duplicate registration
         user_data["phone_number"] = f"+123456789{unique_id[2:4]}"
-        response2 = client.post("/api/auth/register", json=user_data)
+        response2 = client.post("/api/auth/register/", json=user_data)
         assert response2.status_code == status.HTTP_400_BAD_REQUEST
         assert "Email already registered" in response2.json()["detail"]
 
@@ -85,11 +85,11 @@ class TestUserRegistration:
         }
 
         # First registration
-        response1 = client.post("/api/auth/register", json=user_data1)
+        response1 = client.post("/api/auth/register/", json=user_data1)
         assert response1.status_code == status.HTTP_201_CREATED
 
         # Duplicate phone registration
-        response2 = client.post("/api/auth/register", json=user_data2)
+        response2 = client.post("/api/auth/register/", json=user_data2)
         assert response2.status_code == status.HTTP_400_BAD_REQUEST
         assert "Phone number already registered" in response2.json()["detail"]
 
@@ -103,7 +103,7 @@ class TestUserRegistration:
             "user_type": "admin",
         }
 
-        response = client.post("/api/auth/register", json=user_data)
+        response = client.post("/api/auth/register/", json=user_data)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_register_invalid_phone(self, client):
@@ -116,7 +116,7 @@ class TestUserRegistration:
             "user_type": "admin",
         }
 
-        response = client.post("/api/auth/register", json=user_data)
+        response = client.post("/api/auth/register/", json=user_data)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_register_short_password(self, client):
@@ -129,7 +129,7 @@ class TestUserRegistration:
             "user_type": "admin",
         }
 
-        response = client.post("/api/auth/register", json=user_data)
+        response = client.post("/api/auth/register/", json=user_data)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -146,7 +146,7 @@ class TestUserLogin:
             "user_type": "admin",
         }
 
-        register_response = client.post("/api/auth/register", json=user_data)
+        register_response = client.post("/api/auth/register/", json=user_data)
         assert register_response.status_code == status.HTTP_201_CREATED
 
         # Then login
@@ -171,7 +171,7 @@ class TestUserLogin:
             "password": "testpassword123",
         }
 
-        response = client.post("/api/auth/login", json=login_data)
+        response = client.post("/api/auth/login/", json=login_data)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid email or password" in response.json()["detail"]
 
@@ -187,7 +187,7 @@ class TestUserLogin:
             "user_type": "eo",
         }
 
-        register_response = client.post("/api/auth/register", json=user_data)
+        register_response = client.post("/api/auth/register/", json=user_data)
         assert register_response.status_code == status.HTTP_201_CREATED
 
         # Then try login with wrong password
@@ -196,6 +196,6 @@ class TestUserLogin:
             "password": "wrongpassword123",
         }
 
-        response = client.post("/api/auth/login", json=login_data)
+        response = client.post("/api/auth/login/", json=login_data)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid email or password" in response.json()["detail"]

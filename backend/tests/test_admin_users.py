@@ -25,7 +25,7 @@ class TestAdminUserManagement:
 
         # Login to get token
         login_response = client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             json={"email": "admin@test.com", "password": "testpass123"},
         )
         assert login_response.status_code == status.HTTP_200_OK
@@ -70,7 +70,7 @@ class TestAdminUserManagement:
 
         # Login to get token
         login_response = client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             json={"email": "admin2@test.com", "password": "testpass123"},
         )
         token = login_response.json()["access_token"]
@@ -120,7 +120,7 @@ class TestAdminUserManagement:
 
         # Login to get token
         login_response = client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             json={"email": "admin3@test.com", "password": "testpass123"},
         )
         token = login_response.json()["access_token"]
@@ -166,7 +166,7 @@ class TestAdminUserManagement:
 
         # Login
         login_response = client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             json={"email": "admin4@test.com", "password": "testpass123"},
         )
         token = login_response.json()["access_token"]
@@ -174,7 +174,7 @@ class TestAdminUserManagement:
         # Update user
         update_data = {"full_name": "Updated Name", "user_type": "admin"}
         response = client.put(
-            f"/api/admin/users/{target_user.id}",
+            f"/api/admin/users/{target_user.id}/",
             json=update_data,
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -209,14 +209,14 @@ class TestAdminUserManagement:
 
         # Login
         login_response = client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             json={"email": "admin5@test.com", "password": "testpass123"},
         )
         token = login_response.json()["access_token"]
 
         # Delete user
         response = client.delete(
-            f"/api/admin/users/{target_user.id}",
+            f"/api/admin/users/{target_user.id}/",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == status.HTTP_200_OK
@@ -239,14 +239,14 @@ class TestAdminUserManagement:
 
         # Login
         login_response = client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             json={"email": "admin6@test.com", "password": "testpass123"},
         )
         token = login_response.json()["access_token"]
 
         # Try to delete self
         response = client.delete(
-            f"/api/admin/users/{admin_user.id}",
+            f"/api/admin/users/{admin_user.id}/",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
