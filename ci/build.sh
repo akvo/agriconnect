@@ -41,7 +41,7 @@ backend_build() {
 
     dc -f docker-compose.test.yml -p backend-test run \
         --rm \
-        backend ./run-qc.sh
+        backend ./check.sh
 }
 
 backend_build
