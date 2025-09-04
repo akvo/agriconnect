@@ -3,9 +3,11 @@ from sqlalchemy.sql import func
 from database import Base
 import enum
 
+
 class UserType(enum.Enum):
     ADMIN = "admin"
     EXTENSION_OFFICER = "eo"
+
 
 class User(Base):
     __tablename__ = "users"

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../lib/api';
+import api from '../lib/api';
 
 const AuthContext = createContext({});
 
@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
     const savedUser = localStorage.getItem('user');
     
     if (token && savedUser) {
+      api.setToken(token);
       setUser(JSON.parse(savedUser));
     }
     setLoading(false);
@@ -22,11 +23,12 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await authAPI.login({ email, password });
+      const response = await api.post('/auth/login', { email, password });
       const { access_token, user: userData } = response.data;
       
       localStorage.setItem('token', access_token);
       localStorage.setItem('user', JSON.stringify(userData));
+      api.setToken(access_token);
       setUser(userData);
       
       return { success: true };
@@ -40,7 +42,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await authAPI.register(userData);
+      const response = await api.post('/auth/register', userData);
       return { success: true, user: response.data };
     } catch (error) {
       return { 
@@ -53,6 +55,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    api.setToken(null);
     setUser(null);
   };
 

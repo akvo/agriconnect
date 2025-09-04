@@ -4,18 +4,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
-# Set testing environment
-os.environ["TESTING"] = "true"
-
 from database import Base, get_db
 from main import app
+
+# Set testing environment
+os.environ["TESTING"] = "true"
 
 # Test database URL
 TEST_DATABASE_URL = "postgresql://akvo:password@db:5432/agriconnect_test"
 
 # Create test engine
 engine = create_engine(TEST_DATABASE_URL)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TestingSessionLocal = sessionmaker(
+    autocommit=False, autoflush=False, bind=engine
+)
+
 
 @pytest.fixture(scope="session")
 def test_db():
@@ -24,6 +27,7 @@ def test_db():
     yield
     # Drop tables
     Base.metadata.drop_all(bind=engine)
+
 
 @pytest.fixture
 def db_session(test_db):
@@ -34,6 +38,7 @@ def db_session(test_db):
         db.rollback()
         db.close()
 
+
 @pytest.fixture
 def client(db_session):
     def override_get_db():
@@ -41,7 +46,7 @@ def client(db_session):
             yield db_session
         finally:
             pass
-    
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
         yield test_client

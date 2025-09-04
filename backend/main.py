@@ -1,25 +1,26 @@
 from fastapi import FastAPI
-from routers import auth
+from routers import auth, admin_users
 
 app = FastAPI(
-        title="AgriConnect API",
-        version="1.0.0",
-        # documentation_url="/api/docs",  # Custom docs URL
-        description="API for AgriConnect Application",
-        contact={
-            "name": "AgriConnect Support",
-            "url": "https://www.agriconnect.com/support"
-            },
-        license_info={
-            "name": "GNU General Public License v3",
-            "url": "https://www.gnu.org/licenses/gpl-3.0.en.html",
-            },
-        redoc_url="/api/redoc",
-        docs_url="/api/docs"
+    title="AgriConnect API",
+    version="1.0.0",
+    description="API for AgriConnect Application",
+    ignore_trailing_slash=True,
+    contact={
+        "name": "AgriConnect Support",
+    },
+    license_info={
+        "name": "GNU General Public License v3",
+        "url": "https://www.gnu.org/licenses/gpl-3.0.en.html",
+    },
+    redoc_url="/api/redoc",
+    docs_url="/api/docs",
 )
 
 # Include routers
 app.include_router(auth.router, prefix="/api")
+app.include_router(admin_users.router, prefix="/api")
+
 
 @app.get("/")
 def read_root():

@@ -16,9 +16,13 @@ config = context.config
 
 # Set the SQLAlchemy URL dynamically
 if os.getenv("TESTING"):
-    database_url = os.getenv("DATABASE_URL", "postgresql://akvo:password@db:5432/agriconnect").replace("agriconnect", "agriconnect_test")
+    database_url = os.getenv(
+        "DATABASE_URL", "postgresql://akvo:password@db:5432/agriconnect"
+    ).replace("agriconnect", "agriconnect_test")
 else:
-    database_url = os.getenv("DATABASE_URL", "postgresql://akvo:password@db:5432/agriconnect")
+    database_url = os.getenv(
+        "DATABASE_URL", "postgresql://akvo:password@db:5432/agriconnect"
+    )
 
 config.set_main_option("sqlalchemy.url", database_url)
 

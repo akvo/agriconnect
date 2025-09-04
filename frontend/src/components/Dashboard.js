@@ -106,10 +106,10 @@ export default function Dashboard() {
             </button>
             
             {user?.user_type === 'admin' && (
-              <button className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-left hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+              <a href="/users" className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-left hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 block">
                 <div className="text-purple-600 font-medium">User Management</div>
                 <div className="text-sm text-gray-600 mt-1">Manage system users</div>
-              </button>
+              </a>
             )}
             
             <button className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">

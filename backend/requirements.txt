@@ -8,3 +8,5 @@ bcrypt==3.2.2
 python-multipart>=0.0.20
 pytest==7.4.3
 pytest-asyncio==0.21.1
+flake8==7.0.0
+black==23.12.1
