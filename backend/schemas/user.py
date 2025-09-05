@@ -86,6 +86,40 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class SelfUpdateRequest(BaseModel):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number_field(cls, v):
+        if v:
+            return validate_phone_number(v)
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v):
+        if v and len(v) < 8:
+            raise ValueError("New password must be at least 8 characters long")
+        return v
+
+    @classmethod
+    def validate_password_fields(cls, values):
+        current_password = values.get('current_password')
+        new_password = values.get('new_password')
+        
+        # If changing password, both fields are required
+        if new_password and not current_password:
+            raise ValueError("current_password is required when changing password")
+        if current_password and not new_password:
+            raise ValueError("new_password is required when providing current_password")
+        
+        return values
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

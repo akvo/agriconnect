@@ -10,7 +10,7 @@ import HeaderNav from "../../components/HeaderNav";
 import { useRouter } from "next/navigation";
 
 export default function UsersPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +21,7 @@ export default function UsersPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const pageSize = 10;
 
@@ -99,6 +100,17 @@ export default function UsersPage() {
     fetchUsers();
   };
 
+  const handleProfileClick = () => {
+    setShowProfileModal(true);
+  };
+
+  const handleProfileUpdate = () => {
+    setShowProfileModal(false);
+    if (refreshUser) {
+      refreshUser();
+    }
+  };
+
   // Don't render if not admin
   if (user && user.user_type !== "admin") {
     return null;
@@ -125,7 +137,8 @@ export default function UsersPage() {
         breadcrumbs={[
           { label: "Dashboard", path: "/" },
           { label: "User Management" }
-        ]} 
+        ]}
+        onProfileClick={handleProfileClick}
       />
 
       {/* Main Content */}
@@ -244,6 +257,17 @@ export default function UsersPage() {
             setSelectedUser(null);
           }}
           onUserUpdated={handleUserUpdated}
+          isSelfUpdate={selectedUser.id === user.id}
+        />
+      )}
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <EditUserModal
+          user={user}
+          onClose={() => setShowProfileModal(false)}
+          onUserUpdated={handleProfileUpdate}
+          isSelfUpdate={true}
         />
       )}
     </div>

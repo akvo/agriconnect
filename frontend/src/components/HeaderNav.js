@@ -3,16 +3,24 @@
 import { useAuth } from "../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
-export default function HeaderNav({ title = "Dashboard", breadcrumbs = null }) {
-  const { user, logout } = useAuth();
+export default function HeaderNav({ title = "Dashboard", breadcrumbs = null, onProfileClick }) {
+  const { user, logout, refreshUser } = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    if (confirm('Are you sure you want to log out?')) {
+      await logout();
+    }
   };
 
   const handleBreadcrumbClick = (path) => {
     router.push(path);
+  };
+
+  const handleProfileClick = () => {
+    if (onProfileClick) {
+      onProfileClick();
+    }
   };
 
   const getUserTypeLabel = (userType) => {
@@ -77,11 +85,15 @@ export default function HeaderNav({ title = "Dashboard", breadcrumbs = null }) {
                 {getUserTypeLabel(user?.user_type)}
               </p>
             </div>
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-primary shadow-md">
+            <button
+              onClick={handleProfileClick}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-primary shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer"
+              title="Edit Profile"
+            >
               <span className="text-sm font-bold text-white">
                 {user?.full_name?.charAt(0)?.toUpperCase()}
               </span>
-            </div>
+            </button>
             <button
               onClick={handleLogout}
               className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-lg hover:shadow-xl cursor-pointer"

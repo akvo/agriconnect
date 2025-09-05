@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import HeaderNav from "./HeaderNav";
+import EditUserModal from "./users/EditUserModal";
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const getUserTypeLabel = (userType) => {
     switch (userType) {
@@ -28,9 +31,20 @@ export default function Dashboard() {
     }
   };
 
+  const handleProfileClick = () => {
+    setShowProfileModal(true);
+  };
+
+  const handleProfileUpdate = () => {
+    setShowProfileModal(false);
+    if (refreshUser) {
+      refreshUser();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-brand">
-      <HeaderNav title="Dashboard" />
+      <HeaderNav title="Dashboard" onProfileClick={handleProfileClick} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -248,6 +262,16 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <EditUserModal
+          user={user}
+          onClose={() => setShowProfileModal(false)}
+          onUserUpdated={handleProfileUpdate}
+          isSelfUpdate={true}
+        />
+      )}
     </div>
   );
 }

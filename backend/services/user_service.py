@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 from fastapi import HTTPException, status
 from models.user import User
-from schemas.user import UserCreate, AdminUserCreate, UserUpdate
+from schemas.user import UserCreate, AdminUserCreate, UserUpdate, SelfUpdateRequest
 from utils.auth import get_password_hash, verify_password
 from utils.constants import (
     EMAIL_ALREADY_REGISTERED,
@@ -194,6 +194,13 @@ class UserService:
                     detail=PHONE_ALREADY_IN_USE,
                 )
 
+        # Prevent users from changing their own role
+        if user_data.user_type is not None and user.id == current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot change your own role"
+            )
+
         # Update fields
         if user_data.full_name is not None:
             user.full_name = user_data.full_name
@@ -233,4 +240,69 @@ class UserService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=DELETE_FAILED,
+            )
+
+    @staticmethod
+    def update_self(
+        db: Session, current_user: User, update_data: SelfUpdateRequest
+    ) -> User:
+        """Update current user's own account (excludes role changes)"""
+        # Validate password fields if provided
+        if update_data.new_password or update_data.current_password:
+            if not (update_data.new_password and update_data.current_password):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Both current_password and new_password are required for password change"
+                )
+            
+            # Verify current password
+            if not verify_password(update_data.current_password, current_user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Current password is incorrect"
+                )
+            
+            # Check if new password is different
+            if verify_password(update_data.new_password, current_user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="New password must be different from current password"
+                )
+
+        # Check phone number conflicts if updating
+        if (
+            update_data.phone_number
+            and update_data.phone_number != current_user.phone_number
+        ):
+            existing_user = (
+                db.query(User)
+                .filter(
+                    User.phone_number == update_data.phone_number,
+                    User.id != current_user.id,
+                )
+                .first()
+            )
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=PHONE_ALREADY_IN_USE,
+                )
+
+        # Update fields
+        if update_data.full_name is not None:
+            current_user.full_name = update_data.full_name
+        if update_data.phone_number is not None:
+            current_user.phone_number = update_data.phone_number
+        if update_data.new_password is not None:
+            current_user.hashed_password = get_password_hash(update_data.new_password)
+
+        try:
+            db.commit()
+            db.refresh(current_user)
+            return current_user
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=UPDATE_FAILED,
             )
