@@ -10,9 +10,10 @@ COVERAGE_PROCESS_START=./.coveragerc \
 echo "Coverage"
 coverage combine --rcfile=./.coveragerc
 coverage report -m --rcfile=./.coveragerc
+coverage xml --rcfile=./.coveragerc
 
 if [[ -n "${COVERALLS_REPO_TOKEN:-}" ]] ; then
-  coveralls
+  cd /app && coveralls
 fi
 
 flake8

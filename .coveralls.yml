@@ -1,0 +1,5 @@
+service_name: github-actions
+repo_token: ${COVERALLS_REPO_TOKEN}
+coverage_clover: backend/coverage.xml
+source_dirs:
+  - backend
