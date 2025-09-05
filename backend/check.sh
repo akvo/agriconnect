@@ -13,7 +13,7 @@ coverage report -m --rcfile=./.coveragerc
 coverage xml --rcfile=./.coveragerc
 
 if [[ -n "${COVERALLS_REPO_TOKEN:-}" ]] ; then
-  cd /app && COVERALLS_SERVICE_NAME=github-actions coveralls
+  cd /app/backend && COVERALLS_SERVICE_NAME=github-actions coveralls
 fi
 
 # flake8
