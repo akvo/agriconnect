@@ -251,3 +251,89 @@ class TestAdminUserManagement:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Cannot delete your own account" in response.json()["detail"]
+
+    def test_prevent_self_role_change(self, client):
+        """Test that users cannot change their own role"""
+        import uuid
+
+        unique_id = str(uuid.uuid4())[:8]
+        
+        # Register admin user
+        admin_data = {
+            "email": f"admin-self-role-{unique_id}@test.com",
+            "phone_number": f"+123456789{unique_id[:3]}",
+            "password": "testpass123",
+            "full_name": "Admin Seven",
+            "user_type": "admin",
+        }
+        register_response = client.post("/api/auth/register/", json=admin_data)
+        assert register_response.status_code == status.HTTP_201_CREATED
+        admin_user = register_response.json()
+
+        # Login
+        login_response = client.post(
+            "/api/auth/login",
+            json={"email": f"admin-self-role-{unique_id}@test.com", "password": "testpass123"},
+        )
+        assert login_response.status_code == status.HTTP_200_OK
+        token = login_response.json()["access_token"]
+
+        # Try to change own role from admin to eo
+        update_data = {"user_type": "eo"}
+        response = client.put(
+            f"/api/admin/users/{admin_user['id']}/",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "Cannot change your own role" in response.json()["detail"]
+
+    def test_admin_can_change_others_role(self, client):
+        """Test that admins can change other users' roles"""
+        import uuid
+
+        unique_id = str(uuid.uuid4())[:8]
+        
+        # Register admin user
+        admin_data = {
+            "email": f"admin-change-{unique_id}@test.com",
+            "phone_number": f"+123456789{unique_id[:3]}",
+            "password": "testpass123",
+            "full_name": "Admin Eight",
+            "user_type": "admin",
+        }
+        register_response = client.post("/api/auth/register/", json=admin_data)
+        assert register_response.status_code == status.HTTP_201_CREATED
+        admin_user = register_response.json()
+
+        # Register regular EO user
+        eo_data = {
+            "email": f"eo-change-{unique_id}@test.com",
+            "phone_number": f"+987654321{unique_id[:3]}",
+            "password": "testpass123",
+            "full_name": "Extension Officer Four",
+            "user_type": "eo",
+        }
+        register_response = client.post("/api/auth/register/", json=eo_data)
+        assert register_response.status_code == status.HTTP_201_CREATED
+        eo_user = register_response.json()
+
+        # Login as admin
+        login_response = client.post(
+            "/api/auth/login",
+            json={"email": f"admin-change-{unique_id}@test.com", "password": "testpass123"},
+        )
+        assert login_response.status_code == status.HTTP_200_OK
+        token = login_response.json()["access_token"]
+
+        # Admin changes EO user's role to admin
+        update_data = {"user_type": "admin"}
+        response = client.put(
+            f"/api/admin/users/{eo_user['id']}/",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        
+        updated_user = response.json()
+        assert updated_user["user_type"] == "admin"

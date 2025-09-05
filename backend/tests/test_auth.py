@@ -1,5 +1,6 @@
 import uuid
 from fastapi import status
+import pytest
 
 
 class TestUserRegistration:
@@ -57,9 +58,10 @@ class TestUserRegistration:
         response1 = client.post("/api/auth/register/", json=user_data)
         assert response1.status_code == status.HTTP_201_CREATED
 
-        # Duplicate registration
-        user_data["phone_number"] = f"+123456789{unique_id[2:4]}"
-        response2 = client.post("/api/auth/register/", json=user_data)
+        # Duplicate registration with same email but different phone
+        user_data_duplicate = user_data.copy()
+        user_data_duplicate["phone_number"] = f"+123456789{unique_id[2:4]}"
+        response2 = client.post("/api/auth/register/", json=user_data_duplicate)
         assert response2.status_code == status.HTTP_400_BAD_REQUEST
         assert "Email already registered" in response2.json()["detail"]
 
@@ -199,3 +201,197 @@ class TestUserLogin:
         response = client.post("/api/auth/login/", json=login_data)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Invalid email or password" in response.json()["detail"]
+
+
+class TestUserProfile:
+    @pytest.fixture
+    def authenticated_user_token(self, client):
+        """Create a user and return auth token"""
+        unique_id = str(uuid.uuid4())[:8]
+        user_data = {
+            "email": f"profile-{unique_id}@example.com",
+            "phone_number": f"+123456789{unique_id[:2]}",
+            "password": "testpassword123",
+            "full_name": "Profile User",
+            "user_type": "eo",
+        }
+
+        # Register user
+        register_response = client.post("/api/auth/register/", json=user_data)
+        assert register_response.status_code == status.HTTP_201_CREATED
+
+        # Login to get token
+        login_data = {
+            "email": f"profile-{unique_id}@example.com",
+            "password": "testpassword123",
+        }
+        login_response = client.post("/api/auth/login/", json=login_data)
+        assert login_response.status_code == status.HTTP_200_OK
+        
+        token = login_response.json()["access_token"]
+        user = login_response.json()["user"]
+        return {"token": token, "user": user}
+
+    def test_get_profile_success(self, client, authenticated_user_token):
+        """Test successful profile retrieval"""
+        headers = {"Authorization": f"Bearer {authenticated_user_token['token']}"}
+        
+        response = client.get("/api/auth/profile/", headers=headers)
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["email"] == authenticated_user_token["user"]["email"]
+        assert data["full_name"] == authenticated_user_token["user"]["full_name"]
+        assert data["phone_number"] == authenticated_user_token["user"]["phone_number"]
+        assert data["user_type"] == authenticated_user_token["user"]["user_type"]
+        assert "id" in data
+
+    def test_get_profile_unauthorized(self, client):
+        """Test profile retrieval without token"""
+        response = client.get("/api/auth/profile/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_update_profile_basic_info(self, client, authenticated_user_token):
+        """Test updating basic profile information"""
+        headers = {"Authorization": f"Bearer {authenticated_user_token['token']}"}
+        
+        update_data = {
+            "full_name": "Updated Profile User",
+            "phone_number": "+9876543210"
+        }
+        
+        response = client.put("/api/auth/profile/", json=update_data, headers=headers)
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["full_name"] == "Updated Profile User"
+        assert data["phone_number"] == "+9876543210"
+        assert data["email"] == authenticated_user_token["user"]["email"]  # Should remain unchanged
+
+    def test_update_profile_change_password(self, client, authenticated_user_token):
+        """Test changing password"""
+        headers = {"Authorization": f"Bearer {authenticated_user_token['token']}"}
+        
+        update_data = {
+            "current_password": "testpassword123",
+            "new_password": "newpassword456"
+        }
+        
+        response = client.put("/api/auth/profile/", json=update_data, headers=headers)
+        
+        assert response.status_code == status.HTTP_200_OK
+        
+        # Verify we can login with new password
+        login_data = {
+            "email": authenticated_user_token["user"]["email"],
+            "password": "newpassword456",
+        }
+        login_response = client.post("/api/auth/login/", json=login_data)
+        assert login_response.status_code == status.HTTP_200_OK
+
+    def test_update_profile_wrong_current_password(self, client, authenticated_user_token):
+        """Test password change with wrong current password"""
+        headers = {"Authorization": f"Bearer {authenticated_user_token['token']}"}
+        
+        update_data = {
+            "current_password": "wrongpassword",
+            "new_password": "newpassword456"
+        }
+        
+        response = client.put("/api/auth/profile/", json=update_data, headers=headers)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Current password is incorrect" in response.json()["detail"]
+
+    def test_update_profile_same_password(self, client, authenticated_user_token):
+        """Test changing password to same password"""
+        headers = {"Authorization": f"Bearer {authenticated_user_token['token']}"}
+        
+        update_data = {
+            "current_password": "testpassword123",
+            "new_password": "testpassword123"
+        }
+        
+        response = client.put("/api/auth/profile/", json=update_data, headers=headers)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "New password must be different from current password" in response.json()["detail"]
+
+    def test_update_profile_incomplete_password_change(self, client, authenticated_user_token):
+        """Test password change with missing fields"""
+        headers = {"Authorization": f"Bearer {authenticated_user_token['token']}"}
+        
+        # Only current password, no new password
+        update_data = {
+            "current_password": "testpassword123"
+        }
+        
+        response = client.put("/api/auth/profile/", json=update_data, headers=headers)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Both current_password and new_password are required" in response.json()["detail"]
+
+    def test_update_profile_duplicate_phone(self, client, authenticated_user_token):
+        """Test updating profile with duplicate phone number"""
+        # Create another user first
+        unique_id = str(uuid.uuid4())[:8]
+        other_user_data = {
+            "email": f"other-{unique_id}@example.com",
+            "phone_number": f"+987654321{unique_id[:1]}",
+            "password": "otherpassword123",
+            "full_name": "Other User",
+            "user_type": "admin",
+        }
+        
+        register_response = client.post("/api/auth/register/", json=other_user_data)
+        assert register_response.status_code == status.HTTP_201_CREATED
+        
+        # Try to update our user with the other user's phone
+        headers = {"Authorization": f"Bearer {authenticated_user_token['token']}"}
+        
+        update_data = {
+            "phone_number": other_user_data["phone_number"]
+        }
+        
+        response = client.put("/api/auth/profile/", json=update_data, headers=headers)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Phone number already in use" in response.json()["detail"]
+
+    def test_update_profile_combined_changes(self, client, authenticated_user_token):
+        """Test updating profile with both basic info and password"""
+        headers = {"Authorization": f"Bearer {authenticated_user_token['token']}"}
+        
+        update_data = {
+            "full_name": "Combined Update User",
+            "phone_number": "+5555555555",
+            "current_password": "testpassword123",
+            "new_password": "combinedpassword789"
+        }
+        
+        response = client.put("/api/auth/profile/", json=update_data, headers=headers)
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["full_name"] == "Combined Update User"
+        assert data["phone_number"] == "+5555555555"
+        
+        # Verify login with new password
+        login_data = {
+            "email": authenticated_user_token["user"]["email"],
+            "password": "combinedpassword789",
+        }
+        login_response = client.post("/api/auth/login/", json=login_data)
+        assert login_response.status_code == status.HTTP_200_OK
+
+    def test_update_profile_unauthorized(self, client):
+        """Test profile update without token"""
+        update_data = {
+            "full_name": "Unauthorized Update"
+        }
+        
+        response = client.put("/api/auth/profile/", json=update_data)
+        assert response.status_code == status.HTTP_403_FORBIDDEN

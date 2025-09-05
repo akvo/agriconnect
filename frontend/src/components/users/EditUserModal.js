@@ -3,15 +3,19 @@
 import { useState } from "react";
 import api from "../../lib/api";
 
-export default function EditUserModal({ user, onClose, onUserUpdated }) {
+export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpdate = false }) {
   const [formData, setFormData] = useState({
     full_name: user.full_name || "",
     phone_number: user.phone_number || "",
     user_type: user.user_type || "eo",
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showPasswordFields, setShowPasswordFields] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,20 +31,68 @@ export default function EditUserModal({ user, onClose, onUserUpdated }) {
     setError(null);
 
     try {
-      // Only send changed fields
-      const changedData = {};
-      Object.keys(formData).forEach((key) => {
-        if (formData[key] !== user[key]) {
-          changedData[key] = formData[key];
+      if (isSelfUpdate) {
+        // Handle self-update with password validation
+        if (showPasswordFields) {
+          if (!formData.current_password) {
+            setError("Current password is required");
+            setLoading(false);
+            return;
+          }
+          if (!formData.new_password) {
+            setError("New password is required");
+            setLoading(false);
+            return;
+          }
+          if (formData.new_password !== formData.confirm_password) {
+            setError("New passwords do not match");
+            setLoading(false);
+            return;
+          }
+          if (formData.new_password.length < 8) {
+            setError("New password must be at least 8 characters long");
+            setLoading(false);
+            return;
+          }
         }
-      });
 
-      if (Object.keys(changedData).length === 0) {
-        onClose();
-        return;
+        // Prepare self-update data
+        const updateData = {};
+        if (formData.full_name !== user.full_name) {
+          updateData.full_name = formData.full_name;
+        }
+        if (formData.phone_number !== user.phone_number) {
+          updateData.phone_number = formData.phone_number;
+        }
+        if (showPasswordFields && formData.current_password && formData.new_password) {
+          updateData.current_password = formData.current_password;
+          updateData.new_password = formData.new_password;
+        }
+
+        if (Object.keys(updateData).length === 0) {
+          onClose();
+          return;
+        }
+
+        await api.put("/auth/profile", updateData);
+      } else {
+        // Handle admin update (existing logic)
+        const changedData = {};
+        const fieldsToCheck = ['full_name', 'phone_number', 'user_type'];
+        fieldsToCheck.forEach((key) => {
+          if (formData[key] !== user[key]) {
+            changedData[key] = formData[key];
+          }
+        });
+
+        if (Object.keys(changedData).length === 0) {
+          onClose();
+          return;
+        }
+
+        await api.put(`/admin/users/${user.id}`, changedData);
       }
-
-      await api.put(`/admin/users/${user.id}`, changedData);
+      
       onUserUpdated();
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to update user");
@@ -76,7 +128,7 @@ export default function EditUserModal({ user, onClose, onUserUpdated }) {
       <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-brand border border-white/20 w-full max-w-[42rem] animate-scale-in p-8">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-gray-900">
-            {showDetails ? "User Details" : "Edit User"}
+            {showDetails ? (isSelfUpdate ? "Profile Details" : "User Details") : (isSelfUpdate ? "Edit Profile" : "Edit User")}
           </h3>
           <div className="flex items-center space-x-2">
             <button
@@ -267,17 +319,120 @@ export default function EditUserModal({ user, onClose, onUserUpdated }) {
                 >
                   User Type
                 </label>
-                <select
-                  id="user_type"
-                  name="user_type"
-                  value={formData.user_type}
-                  onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="eo">Extension Officer</option>
-                  <option value="admin">Administrator</option>
-                </select>
+                {isSelfUpdate ? (
+                  <div className="mt-1">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        user.user_type === "admin"
+                          ? "bg-purple-100 text-purple-800"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {getUserTypeLabel(user.user_type)}
+                    </span>
+                    <p className="mt-1 text-xs text-gray-500">
+                      User type cannot be changed by yourself
+                    </p>
+                  </div>
+                ) : (
+                  <select
+                    id="user_type"
+                    name="user_type"
+                    value={formData.user_type}
+                    onChange={handleChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="eo">Extension Officer</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                )}
               </div>
+
+              {isSelfUpdate && (
+                <div className="bg-gray-50 rounded-lg p-4 mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-medium text-gray-700">Change Password</h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPasswordFields(!showPasswordFields);
+                        if (showPasswordFields) {
+                          setFormData(prev => ({
+                            ...prev,
+                            current_password: "",
+                            new_password: "",
+                            confirm_password: "",
+                          }));
+                        }
+                      }}
+                      className="text-sm text-indigo-600 hover:text-indigo-500"
+                    >
+                      {showPasswordFields ? "Cancel" : "Change Password"}
+                    </button>
+                  </div>
+
+                  {showPasswordFields && (
+                    <div className="space-y-4">
+                      <div>
+                        <label
+                          htmlFor="current_password"
+                          className="block text-sm font-medium text-gray-700"
+                        >
+                          Current Password
+                        </label>
+                        <input
+                          type="password"
+                          id="current_password"
+                          name="current_password"
+                          value={formData.current_password}
+                          onChange={handleChange}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          placeholder="Enter current password"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="new_password"
+                          className="block text-sm font-medium text-gray-700"
+                        >
+                          New Password
+                        </label>
+                        <input
+                          type="password"
+                          id="new_password"
+                          name="new_password"
+                          value={formData.new_password}
+                          onChange={handleChange}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          placeholder="Enter new password"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Must be at least 8 characters long
+                        </p>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="confirm_password"
+                          className="block text-sm font-medium text-gray-700"
+                        >
+                          Confirm New Password
+                        </label>
+                        <input
+                          type="password"
+                          id="confirm_password"
+                          name="confirm_password"
+                          value={formData.confirm_password}
+                          onChange={handleChange}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          placeholder="Confirm new password"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex space-x-3">
@@ -293,7 +448,7 @@ export default function EditUserModal({ user, onClose, onUserUpdated }) {
                 disabled={loading}
                 className="flex-1 bg-green-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Updating..." : "Update User"}
+                {loading ? "Updating..." : (isSelfUpdate ? "Update Profile" : "Update User")}
               </button>
             </div>
           </form>
