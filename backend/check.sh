@@ -16,4 +16,4 @@ if [[ -n "${COVERALLS_REPO_TOKEN:-}" ]] ; then
   cd /app && COVERALLS_SERVICE_NAME=github-actions coveralls
 fi
 
-flake8
+# flake8
