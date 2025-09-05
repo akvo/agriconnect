@@ -3,7 +3,6 @@ branch = True
 omit = */__init__*
        */test*.py
        */alembic/*
-       */db/connection.py
        */source/*
 disable_warnings = no-data-collected
 # Required for parallel
@@ -14,7 +13,7 @@ concurrency = multiprocessing
 [paths]
 source =
     /app/backend
-    .
+    backend
 
 [report]
 precision = 1
