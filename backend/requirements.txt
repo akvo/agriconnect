@@ -13,3 +13,4 @@ black==23.12.1
 coveralls==4.0.1
 coverage==7.10.6
 gevent==25.8.2
+twilio==9.8.0

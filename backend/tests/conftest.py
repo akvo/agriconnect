@@ -36,6 +36,12 @@ def db_session(test_db):
         yield db
     finally:
         db.rollback()
+        # Clean up all tables after each test
+        from models import Customer, Message, User
+        db.query(Message).delete()
+        db.query(Customer).delete() 
+        db.query(User).delete()
+        db.commit()
         db.close()
 
 
