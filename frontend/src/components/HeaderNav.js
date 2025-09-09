@@ -2,6 +2,7 @@
 
 import { useAuth } from "../contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import { ArrowLeftEndOnRectangleIcon, ChevronRightIcon, CommandLineIcon } from "@heroicons/react/24/outline";
 
 export default function HeaderNav({ title = "Dashboard", breadcrumbs = null, onProfileClick }) {
   const { user, logout, refreshUser } = useAuth();
@@ -35,15 +36,12 @@ export default function HeaderNav({ title = "Dashboard", breadcrumbs = null, onP
   };
 
   return (
-    <header className="bg-white/90 backdrop-blur-md shadow-lg border-b border-white/20">
+    <header className="bg-white/90 backdrop-blur-md shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-primary shadow-lg">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v18m0-18l4 4m-4-4l-4 4m4 14l4-4m-4 4l-4-4"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
+            <div className="flex items-center justify-center w-12 h-12 bg-gradient-primary" style={{borderRadius: '5px'}}>
+              <CommandLineIcon className="w-7 h-7 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gradient">
@@ -54,9 +52,7 @@ export default function HeaderNav({ title = "Dashboard", breadcrumbs = null, onP
                   {breadcrumbs.map((crumb, index) => (
                     <div key={index} className="flex items-center">
                       {index > 0 && (
-                        <svg className="w-4 h-4 text-secondary-400 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
+                        <ChevronRightIcon className="w-4 h-4 text-secondary-400 mx-2" />
                       )}
                       {crumb.path ? (
                         <button
@@ -87,7 +83,7 @@ export default function HeaderNav({ title = "Dashboard", breadcrumbs = null, onP
             </div>
             <button
               onClick={handleProfileClick}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-primary shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer"
+              className="flex items-center justify-center w-10 h-10 bg-gradient-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer"              style={{borderRadius: '5px'}}
               title="Edit Profile"
             >
               <span className="text-sm font-bold text-white">
@@ -96,12 +92,10 @@ export default function HeaderNav({ title = "Dashboard", breadcrumbs = null, onP
             </button>
             <button
               onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-lg hover:shadow-xl cursor-pointer"
+              className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 cursor-pointer"              style={{borderRadius: '5px'}}
             >
               <div className="flex items-center">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                </svg>
+                <ArrowLeftEndOnRectangleIcon className="w-4 h-4 mr-2" />
                 Logout
               </div>
             </button>

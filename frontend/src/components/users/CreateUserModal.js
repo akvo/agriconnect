@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import api from "../../lib/api";
+import { CheckIcon, ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export default function CreateUserModal({ onClose, onUserCreated }) {
   const [formData, setFormData] = useState({
@@ -47,43 +48,19 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
   if (createdUser && temporaryPassword) {
     return (
       <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-brand border border-white/20 w-full max-w-[32rem] animate-scale-in p-8">
+        <div className="bg-white/90 backdrop-blur-md w-full max-w-[32rem] animate-scale-in p-8" style={{borderRadius: '5px', border: '1px solid rgb(191, 219, 254)'}}>
           <div className="text-center">
-            <div className="flex items-center justify-center w-16 h-16 mx-auto bg-gradient-success rounded-2xl shadow-lg mb-6">
-              <svg
-                className="w-8 h-8 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M5 13l4 4L19 7"
-                ></path>
-              </svg>
+            <div className="flex items-center justify-center w-16 h-16 mx-auto bg-gradient-success mb-6" style={{borderRadius: '5px'}}>
+              <CheckIcon className="w-8 h-8 text-white" />
             </div>
             <h3 className="text-2xl font-bold text-secondary-900 mb-3">
               User Created Successfully! 🎉
             </h3>
             <p className="text-secondary-600 mb-6">The new user account has been created and is ready to use.</p>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+            <div className="bg-yellow-50 border border-yellow-200 p-4 mb-4" style={{borderRadius: '5px'}}>
               <div className="flex">
-                <svg
-                  className="w-5 h-5 text-yellow-400 mt-0.5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  ></path>
-                </svg>
+                <ExclamationTriangleIcon className="w-5 h-5 text-yellow-400 mt-0.5 mr-2" />
                 <div>
                   <h4 className="text-sm font-medium text-yellow-800">
                     Important!
@@ -101,7 +78,7 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 <label className="block text-sm font-medium text-gray-700">
                   User Email
                 </label>
-                <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded border">
+                <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 border" style={{borderRadius: '5px'}}>
                   {createdUser.email}
                 </p>
               </div>
@@ -109,7 +86,7 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 <label className="block text-sm font-medium text-gray-700">
                   Temporary Password
                 </label>
-                <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded border">
+                <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 border" style={{borderRadius: '5px'}}>
                   {temporaryPassword}
                 </p>
               </div>
@@ -118,7 +95,8 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
             <div className="mt-6">
               <button
                 onClick={handleComplete}
-                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"
+                className="w-full bg-green-600 text-white py-2 px-4 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"
+                style={{borderRadius: '5px'}}
               >
                 Continue
               </button>
@@ -131,7 +109,7 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
 
   return (
     <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-brand border border-white/20 w-full max-w-[32rem] animate-scale-in p-8">
+      <div className="bg-white/90 backdrop-blur-md w-full max-w-[32rem] animate-scale-in p-8" style={{borderRadius: '5px', border: '1px solid rgb(191, 219, 254)'}}>
         <form onSubmit={handleSubmit}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-gray-900">
@@ -142,24 +120,12 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 cursor-pointer"
             >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
+              <XMarkIcon className="w-6 h-6" />
             </button>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+            <div className="bg-red-50 border border-red-200 p-3 mb-4" style={{borderRadius: '5px'}}>
               <div className="text-red-700 text-sm">{error}</div>
             </div>
           )}
@@ -179,7 +145,8 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 value={formData.full_name}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                style={{borderRadius: '5px'}}
                 placeholder="Enter full name"
               />
             </div>
@@ -198,7 +165,8 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                style={{borderRadius: '5px'}}
                 placeholder="user@example.com"
               />
             </div>
@@ -217,7 +185,8 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 value={formData.phone_number}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                style={{borderRadius: '5px'}}
                 placeholder="+1234567890"
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -238,7 +207,8 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 value={formData.user_type}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                style={{borderRadius: '5px'}}
               >
                 <option value="eo">Extension Officer</option>
                 <option value="admin">Administrator</option>
@@ -250,14 +220,16 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 cursor-pointer transition-colors duration-200"
+              className="flex-1 bg-white py-2 px-4 bg-gray-50 focus:bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 cursor-pointer transition-colors duration-200"
+              style={{borderRadius: '5px'}}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-green-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+              className="flex-1 bg-green-600 py-2 px-4 border border-transparent text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+              style={{borderRadius: '5px'}}
             >
               {loading ? "Creating..." : "Create User"}
             </button>
