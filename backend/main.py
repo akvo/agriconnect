@@ -15,15 +15,16 @@ app = FastAPI(
     },
     redoc_url="/api/redoc",
     docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
 )
 
 # Include routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(admin_users.router, prefix="/api")
-app.include_router(whatsapp.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
+app.include_router(whatsapp.router, prefix="/api")
 
 
-@app.get("/")
+@app.get("/api/health-check", tags=["health-check"])
 def read_root():
     return {"Status": "OK"}
