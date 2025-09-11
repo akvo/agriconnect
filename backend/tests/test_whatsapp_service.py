@@ -219,7 +219,7 @@ class TestWhatsAppService:
             {
                 "TWILIO_ACCOUNT_SID": "test_sid",
                 "TWILIO_AUTH_TOKEN": "test_token",
-                "TWILIO_WHATSAPP_NUMBER": "whatsapp:+1987654321",
+                "TWILIO_WHATSAPP_NUMBER": "+1987654321",
             },
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
@@ -239,7 +239,7 @@ class TestWhatsAppService:
                 service.send_message("+255123456789", "Test message")
 
                 mock_client_instance.messages.create.assert_called_once_with(
-                    from_="whatsapp:+1987654321",  # Custom number used
+                    from_="+1987654321",  # Custom number used
                     body="Test message",
                     to="whatsapp:+255123456789",
                 )

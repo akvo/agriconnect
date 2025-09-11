@@ -7,7 +7,7 @@ class WhatsAppService:
     def __init__(self):
         self.account_sid = os.getenv("TWILIO_ACCOUNT_SID")
         self.auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-        self.whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
+        self.whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER", "+14155238886")
         
         if not self.account_sid or not self.auth_token:
             raise ValueError("Twilio credentials not configured")
