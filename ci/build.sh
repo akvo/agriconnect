@@ -3,7 +3,7 @@
 
 set -exuo pipefail
 
-IMAGE_PREFIX="eu.gcr.io/akvo-lumen/agriconnect"
+IMAGE_PREFIX="eu.gcr.io/akvo-lumen/agriconnect2"
 CI_COMMIT=$(git rev-parse --short "$GITHUB_SHA")
 
 echo "CI_COMMIT=${CI_COMMIT}"

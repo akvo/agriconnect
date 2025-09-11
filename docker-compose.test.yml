@@ -14,7 +14,7 @@ services:
     ports:
       - 5432:5432
   backend:
-    image: eu.gcr.io/akvo-lumen/agriconnect/backend:latest
+    image: eu.gcr.io/akvo-lumen/agriconnect2/backend:latest
     volumes:
       - ./:/app:delegated
     working_dir: /app/backend
