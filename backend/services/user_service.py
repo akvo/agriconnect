@@ -1,3 +1,7 @@
+import secrets
+import string
+import uuid
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
@@ -18,8 +22,7 @@ from utils.constants import (
     DELETE_FAILED,
     CANNOT_DELETE_OWN_ACCOUNT,
 )
-import secrets
-import string
+from services.email_service import email_service
 
 
 class UserService:
@@ -86,7 +89,7 @@ class UserService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=INVALID_EMAIL_OR_PASSWORD,
             )
-        if user.is_active != "true":
+        if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=USER_ACCOUNT_INACTIVE,
@@ -98,37 +101,51 @@ class UserService:
         return db.query(User).filter(User.email == email).first()
 
     @staticmethod
-    def generate_temporary_password() -> str:
-        """Generate a temporary password for invited users"""
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-        return "".join(secrets.choice(alphabet) for _ in range(12))
+    def generate_invitation_token() -> str:
+        """Generate a secure invitation token"""
+        return str(uuid.uuid4())
 
     @staticmethod
-    def admin_create_user(
-        db: Session, user_data: AdminUserCreate
-    ) -> tuple[User, str]:
-        """Create user by admin with temporary password"""
+    async def admin_create_user(
+        db: Session, user_data: AdminUserCreate, invited_by_name: str = "Administrator"
+    ) -> tuple[User, bool]:
+        """Create user by admin with email invitation"""
         # Check if user already exists
         UserService._check_user_exists(db, user_data.email, user_data.phone_number)
 
-        # Generate temporary password
-        temp_password = UserService.generate_temporary_password()
-        hashed_password = get_password_hash(temp_password)
+        # Generate invitation token and expiration
+        invitation_token = UserService.generate_invitation_token()
+        invitation_expires_at = datetime.utcnow() + timedelta(days=7)
 
-        # Create new user
+        # Create new user with invitation
         db_user = User(
             email=user_data.email,
             phone_number=user_data.phone_number,
-            hashed_password=hashed_password,
+            hashed_password=None,  # No password until user accepts invitation
             full_name=user_data.full_name,
             user_type=user_data.user_type,
+            is_active=False,  # Inactive until invitation accepted
+            invitation_token=invitation_token,
+            invitation_sent_at=datetime.utcnow(),
+            invitation_expires_at=invitation_expires_at,
         )
 
         try:
             db.add(db_user)
             db.commit()
             db.refresh(db_user)
-            return db_user, temp_password
+            
+            # Send invitation email
+            email_sent = await email_service.send_invitation_email(
+                email=user_data.email,
+                full_name=user_data.full_name,
+                invitation_token=invitation_token,
+                user_type=user_data.user_type.value,
+                invited_by_name=invited_by_name
+            )
+            
+            return db_user, email_sent
+            
         except IntegrityError:
             db.rollback()
             raise HTTPException(
@@ -157,6 +174,119 @@ class UserService:
         users = query.offset((page - 1) * size).limit(size).all()
 
         return users, total
+
+    @staticmethod
+    def verify_invitation_token(db: Session, invitation_token: str) -> tuple[bool, bool, User]:
+        """
+        Verify invitation token validity and expiration
+        
+        Returns:
+            tuple: (is_valid, is_expired, user_or_none)
+        """
+        user = db.query(User).filter(User.invitation_token == invitation_token).first()
+        
+        if not user:
+            return False, False, None
+        
+        if user.is_active:
+            return False, False, user  # Already activated
+        
+        # Handle timezone-aware comparison
+        current_time = datetime.utcnow()
+        if user.invitation_expires_at.tzinfo is not None:
+            # If invitation_expires_at is timezone-aware, make current_time timezone-aware
+            from datetime import timezone
+            current_time = current_time.replace(tzinfo=timezone.utc)
+        
+        is_expired = current_time > user.invitation_expires_at
+        return True, is_expired, user
+
+    @staticmethod
+    def accept_invitation(db: Session, invitation_token: str, password: str) -> User:
+        """Accept invitation and activate user account"""
+        is_valid, is_expired, user = UserService.verify_invitation_token(db, invitation_token)
+        
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid invitation token"
+            )
+        
+        if is_expired:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation token has expired"
+            )
+        
+        if user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account is already activated"
+            )
+        
+        try:
+            # Set password and activate account
+            user.hashed_password = get_password_hash(password)
+            user.is_active = True
+            user.password_set_at = datetime.utcnow()
+            user.invitation_token = None  # Clear token after use
+            
+            db.commit()
+            db.refresh(user)
+            return user
+            
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to activate account"
+            )
+
+    @staticmethod
+    async def resend_invitation(
+        db: Session, user_id: int, invited_by_name: str = "Administrator"
+    ) -> bool:
+        """Resend invitation email to user"""
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=USER_NOT_FOUND
+            )
+        
+        if user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account is already active"
+            )
+        
+        try:
+            # Generate new invitation token and expiration
+            user.invitation_token = UserService.generate_invitation_token()
+            user.invitation_sent_at = datetime.utcnow()
+            user.invitation_expires_at = datetime.utcnow() + timedelta(days=7)
+            
+            db.commit()
+            db.refresh(user)
+            
+            # Send invitation email
+            email_sent = await email_service.send_invitation_email(
+                email=user.email,
+                full_name=user.full_name,
+                invitation_token=user.invitation_token,
+                user_type=user.user_type.value,
+                invited_by_name=invited_by_name
+            )
+            
+            return email_sent
+            
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to resend invitation"
+            )
 
     @staticmethod
     def get_user_by_id(db: Session, user_id: int) -> User:

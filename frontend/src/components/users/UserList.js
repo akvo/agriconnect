@@ -1,19 +1,18 @@
 "use client";
 
-import { 
+import {
   UsersIcon,
-  UserIcon, 
-  AtSymbolIcon,
-  PhoneIcon,
+  UserIcon,
   ClipboardDocumentListIcon,
   CheckCircleIcon,
   XCircleIcon,
+  ClockIcon,
   EllipsisVerticalIcon,
   PencilIcon,
   TrashIcon,
   Cog6ToothIcon,
   BookOpenIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 
 export default function UserList({
@@ -21,6 +20,7 @@ export default function UserList({
   loading,
   onEditUser,
   onDeleteUser,
+  onResendInvitation,
   currentUser,
 }) {
   const getUserTypeLabel = (userType) => {
@@ -53,7 +53,9 @@ export default function UserList({
           <div className="absolute inset-0 rounded-[5px] bg-gradient-primary opacity-20 blur-lg animate-pulse"></div>
         </div>
         <p className="text-secondary-700 font-medium">Loading users...</p>
-        <p className="text-secondary-500 text-sm mt-1">Please wait while we fetch the user data</p>
+        <p className="text-secondary-500 text-sm mt-1">
+          Please wait while we fetch the user data
+        </p>
       </div>
     );
   }
@@ -83,12 +85,6 @@ export default function UserList({
             </th>
             <th className="px-8 py-5 text-left text-xs font-bold text-secondary-700 uppercase tracking-wider">
               <div className="flex items-center">
-                <AtSymbolIcon className="w-4 h-4 mr-2 text-secondary-500" />
-                Contact
-              </div>
-            </th>
-            <th className="px-8 py-5 text-left text-xs font-bold text-secondary-700 uppercase tracking-wider">
-              <div className="flex items-center">
                 <ClipboardDocumentListIcon className="w-4 h-4 mr-2 text-secondary-500" />
                 Type
               </div>
@@ -109,33 +105,20 @@ export default function UserList({
         </thead>
         <tbody className="bg-white divide-y divide-gray-100">
           {users.map((user, index) => (
-            <tr key={user.id} className="hover:bg-primary-50/50 transition-all duration-200 group animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+            <tr
+              key={user.id}
+              className="hover:bg-primary-50/50 transition-all duration-200 group animate-fade-in"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
               <td className="px-8 py-6 whitespace-nowrap">
                 <div className="flex items-center">
-                  <div className="h-12 w-12 flex-shrink-0">
-                    <div className="h-12 w-12 rounded-[5px] bg-gradient-primary  flex items-center justify-center group- transition-all duration-200">
-                      <span className="text-lg font-bold text-white">
-                        {user.full_name?.charAt(0)?.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
                   <div className="ml-4">
                     <div className="text-base font-bold text-secondary-900">
                       {user.full_name}
                     </div>
-                    <div className="text-sm text-secondary-500 font-medium">ID: #{user.id}</div>
-                  </div>
-                </div>
-              </td>
-              <td className="px-8 py-6 whitespace-nowrap">
-                <div className="space-y-1">
-                  <div className="text-sm font-semibold text-secondary-900 flex items-center">
-                    <AtSymbolIcon className="w-4 h-4 mr-2 text-secondary-400" />
-                    {user.email}
-                  </div>
-                  <div className="text-sm text-secondary-600 flex items-center">
-                    <PhoneIcon className="w-4 h-4 mr-2 text-secondary-400" />
-                    {user.phone_number}
+                    <div className="text-sm text-secondary-500 font-medium flex items-center">
+                      {user.email}
+                    </div>
                   </div>
                 </div>
               </td>
@@ -148,27 +131,47 @@ export default function UserList({
                   ) : (
                     <BookOpenIcon className="w-4 h-4 mr-2 flex-shrink-0" />
                   )}
-                  <span className="leading-none">{getUserTypeLabel(user.user_type)}</span>
+                  <span className="leading-none">
+                    {getUserTypeLabel(user.user_type)}
+                  </span>
                 </span>
               </td>
               <td className="px-8 py-6 whitespace-nowrap">
                 <span
                   className={`inline-flex items-center px-4 py-2 rounded-[5px] text-sm font-bold  ${
-                    user.is_active === "true"
+                    user.is_active
                       ? "bg-primary-100 text-primary-800 border border-primary-200"
-                      : "bg-red-100 text-red-800 border border-red-200"
+                      : user.password_set_at
+                        ? "bg-red-100 text-red-800 border border-red-200"
+                        : "bg-yellow-100 text-yellow-800 border border-yellow-200"
                   }`}
                 >
-                  {user.is_active === "true" ? (
+                  {user.is_active ? (
                     <CheckCircleIcon className="w-4 h-4 mr-2" />
-                  ) : (
+                  ) : user.password_set_at ? (
                     <XCircleIcon className="w-4 h-4 mr-2" />
+                  ) : (
+                    <ClockIcon className="w-4 h-4 mr-2" />
                   )}
-                  {user.is_active === "true" ? "Active" : "Inactive"}
+                  {user.is_active
+                    ? "Active"
+                    : user.password_set_at
+                      ? "Inactive"
+                      : "Pending"}
                 </span>
               </td>
               <td className="px-8 py-6 whitespace-nowrap text-right">
                 <div className="flex items-center justify-end space-x-3">
+                  {!user.is_active && !user.password_set_at && (
+                    <button
+                      onClick={() => onResendInvitation?.(user)}
+                      className="bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
+                      title="Resend invitation email"
+                    >
+                      <ArrowPathIcon className="w-4 h-4 mr-1" />
+                      Resend
+                    </button>
+                  )}
                   <button
                     onClick={() => onEditUser(user)}
                     className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200    flex items-center cursor-pointer"

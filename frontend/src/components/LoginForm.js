@@ -12,7 +12,7 @@ import {
   ArrowPathIcon
 } from "@heroicons/react/24/outline";
 
-export default function LoginForm({ onSuccess, onSwitchToRegister }) {
+export default function LoginForm({ onSuccess }) {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -133,20 +133,9 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
       </form>
 
       <div className="mt-8 text-center">
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-secondary-200"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-white text-secondary-500 font-medium">Don&apos;t have an account?</span>
-          </div>
-        </div>
-        <button
-          onClick={onSwitchToRegister}
-          className="mt-4 text-primary-600 hover:text-primary-700 font-semibold text-sm transition-colors duration-200 hover:underline cursor-pointer"
-        >
-          Create your account here
-        </button>
+        <p className="text-sm text-secondary-500 font-medium">
+          Access is by invitation only. Contact your administrator for access.
+        </p>
       </div>
     </div>
   );

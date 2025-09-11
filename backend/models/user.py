@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean
 from sqlalchemy.sql import func
 from database import Base
 import enum
@@ -15,9 +15,13 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     phone_number = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=True)
     user_type = Column(Enum(UserType), nullable=False)
     full_name = Column(String, nullable=False)
-    is_active = Column(String, default="true")
+    is_active = Column(Boolean, default=False, nullable=False)
+    invitation_token = Column(String, unique=True, nullable=True)
+    invitation_sent_at = Column(DateTime(timezone=True), nullable=True)
+    invitation_expires_at = Column(DateTime(timezone=True), nullable=True)
+    password_set_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

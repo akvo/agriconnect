@@ -1,13 +1,13 @@
 "use client";
 
-import { 
-  UserIcon, 
+import {
+  UserIcon,
   PhoneIcon,
   GlobeAltIcon,
   ClockIcon,
   PencilIcon,
   TrashIcon,
-  UsersIcon
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 import DataTable from "../common/DataTable";
 
@@ -15,29 +15,25 @@ export default function CustomerList({
   customers,
   loading,
   onEditCustomer,
-  onDeleteCustomer
+  onDeleteCustomer,
 }) {
   const columns = [
     {
       title: "Customer",
-      icon: UserIcon
-    },
-    {
-      title: "Contact",
-      icon: PhoneIcon
+      icon: UserIcon,
     },
     {
       title: "Language",
-      icon: GlobeAltIcon
+      icon: GlobeAltIcon,
     },
     {
       title: "Created",
-      icon: ClockIcon
+      icon: ClockIcon,
     },
     {
       title: "Actions",
-      align: "right"
-    }
+      align: "right",
+    },
   ];
 
   const getLanguageLabel = (language) => {
@@ -64,10 +60,10 @@ export default function CustomerList({
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   };
 
@@ -75,25 +71,15 @@ export default function CustomerList({
     <>
       <td className="px-8 py-6 whitespace-nowrap">
         <div className="flex items-center">
-          <div className="h-12 w-12 flex-shrink-0">
-            <div className="h-12 w-12 rounded-[5px] bg-gradient-primary flex items-center justify-center group-hover:shadow-lg transition-all duration-200">
-              <span className="text-lg font-bold text-white">
-                {customer.full_name?.charAt(0)?.toUpperCase() || customer.phone_number?.charAt(-4) || 'C'}
-              </span>
-            </div>
-          </div>
           <div className="ml-4">
             <div className="text-base font-bold text-secondary-900">
-              {customer.full_name || 'Unnamed Customer'}
+              {customer.full_name || "Unnamed Customer"}
             </div>
-            <div className="text-sm text-secondary-500 font-medium">ID: #{customer.id}</div>
+            <div className="text-sm font-semibold text-secondary-900 flex items-center">
+              <PhoneIcon className="w-4 h-4 mr-2 text-secondary-400" />
+              {customer.phone_number}
+            </div>
           </div>
-        </div>
-      </td>
-      <td className="px-8 py-6 whitespace-nowrap">
-        <div className="text-sm font-semibold text-secondary-900 flex items-center">
-          <PhoneIcon className="w-4 h-4 mr-2 text-secondary-400" />
-          {customer.phone_number}
         </div>
       </td>
       <td className="px-8 py-6 whitespace-nowrap">
@@ -101,7 +87,9 @@ export default function CustomerList({
           className={`inline-flex items-center px-4 py-2 rounded-[5px] text-sm font-bold ${getLanguageBadgeColor(customer.language)}`}
         >
           <GlobeAltIcon className="w-4 h-4 mr-2 flex-shrink-0" />
-          <span className="leading-none">{getLanguageLabel(customer.language)}</span>
+          <span className="leading-none">
+            {getLanguageLabel(customer.language)}
+          </span>
         </span>
       </td>
       <td className="px-8 py-6 whitespace-nowrap">

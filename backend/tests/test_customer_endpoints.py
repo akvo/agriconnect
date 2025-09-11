@@ -15,7 +15,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         db_session.add(admin)
         db_session.commit()
@@ -59,7 +60,8 @@ class TestCustomerEndpoints:
             phone_number="+255888888888",
             hashed_password="hashed",
             user_type=UserType.EXTENSION_OFFICER,
-            full_name="Extension Officer"
+            full_name="Extension Officer",
+            is_active=True
         )
         db_session.add(eo)
         db_session.commit()
@@ -77,7 +79,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         customer = Customer(
             phone_number="+255123456789",
@@ -103,7 +106,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         db_session.add(admin)
         db_session.commit()
@@ -121,7 +125,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         customer = Customer(
             phone_number="+255123456789",
@@ -160,7 +165,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         db_session.add(admin)
         db_session.commit()
@@ -185,7 +191,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         customer = Customer(
             phone_number="+255123456789",
@@ -218,7 +225,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         customer = Customer(
             phone_number="+255123456789",
@@ -246,7 +254,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         db_session.add(admin)
         db_session.commit()
@@ -268,7 +277,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         db_session.add(admin)
         db_session.commit()
@@ -302,7 +312,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         db_session.add(admin)
         db_session.commit()
@@ -332,7 +343,8 @@ class TestCustomerEndpoints:
             phone_number="+255999999999",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         existing_customer = Customer(
             phone_number="+255123456789",

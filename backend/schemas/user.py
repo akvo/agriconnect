@@ -33,7 +33,9 @@ class UserResponse(BaseModel):
     phone_number: str
     full_name: str
     user_type: UserType
-    is_active: str
+    is_active: bool
+    invitation_status: Optional[str] = None
+    password_set_at: Optional[datetime] = None
 
 
 class UserDetailResponse(BaseModel):
@@ -44,7 +46,11 @@ class UserDetailResponse(BaseModel):
     phone_number: str
     full_name: str
     user_type: UserType
-    is_active: str
+    is_active: bool
+    invitation_token: Optional[str] = None
+    invitation_sent_at: Optional[datetime] = None
+    invitation_expires_at: Optional[datetime] = None
+    password_set_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -124,3 +130,30 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+# New invitation-related schemas
+class AcceptInvitationRequest(BaseModel):
+    invitation_token: str
+    password: str
+    
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+
+class InvitationStatusResponse(BaseModel):
+    valid: bool
+    expired: bool
+    user_info: Optional[dict] = None
+    error_message: Optional[str] = None
+
+
+class AdminUserCreateResponse(BaseModel):
+    message: str
+    user: UserResponse
+    invitation_sent: bool
+    invitation_url: Optional[str] = None

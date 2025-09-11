@@ -112,6 +112,25 @@ export default function UsersPage() {
     }
   };
 
+  const handleResendInvitation = async (user) => {
+    if (!window.confirm(`Resend invitation to ${user.full_name}?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await api.post(`/admin/users/${user.id}/resend-invitation`);
+      
+      setError(null);
+      alert(response.data.message || "Invitation resent successfully!");
+      fetchUsers(); // Refresh the user list
+    } catch (err) {
+      setError(`Failed to resend invitation: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Don't render if not admin
   if (user && user.user_type !== "admin") {
     return null;
@@ -195,6 +214,7 @@ export default function UsersPage() {
             loading={loading}
             onEditUser={handleEditUser}
             onDeleteUser={handleDeleteUser}
+            onResendInvitation={handleResendInvitation}
             currentUser={user}
           />
 

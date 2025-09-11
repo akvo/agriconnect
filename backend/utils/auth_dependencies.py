@@ -45,7 +45,7 @@ def get_current_user(
             headers={"WWW-Authenticate": WWW_AUTHENTICATE_HEADER},
         )
 
-    if user.is_active != "true":
+    if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=INACTIVE_USER,
