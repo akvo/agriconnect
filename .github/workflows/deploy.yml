@@ -111,22 +111,22 @@ jobs:
           namespace-name: "agriconnect2-namespace"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
 
-      - name: Rollout Frontend
-        uses: ./composite-actions/.github/actions/k8s-rollout
-        with:
-          app-name: "agriconnect2"
-          deployment-name: "frontend-deployment"
-          container-name: "frontend"
-          cluster-name: "test"
-          namespace-name: "agriconnect2-namespace"
-          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
-
       - name: Rollout Backend
         uses: ./composite-actions/.github/actions/k8s-rollout
         with:
           app-name: "agriconnect2"
           deployment-name: "backend-deployment"
           container-name: "backend"
+          cluster-name: "test"
+          namespace-name: "agriconnect2-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Frontend
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "agriconnect2"
+          deployment-name: "frontend-deployment"
+          container-name: "frontend"
           cluster-name: "test"
           namespace-name: "agriconnect2-namespace"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
