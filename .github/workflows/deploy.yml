@@ -56,7 +56,7 @@ jobs:
         with:
           app-name: "agriconnect2"
           service-name: "backend"
-          dockerfile-location: "backend/Dockerfile.prod"
+          dockerfile-location: "backend/Dockerfile"
           cluster-name: "test"
 
       - name: Docker Push Nginx
