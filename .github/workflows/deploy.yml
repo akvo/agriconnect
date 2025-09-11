@@ -21,7 +21,7 @@ jobs:
           repository: akvo/composite-actions
           token: ${{ secrets.GH_PAT }}
           path: composite-actions
-          ref: 0.0.7
+          ref: 0.0.10
 
       - name: Prepare Frontend Build
         run: |
