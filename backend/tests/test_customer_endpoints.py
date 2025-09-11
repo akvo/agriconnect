@@ -262,6 +262,111 @@ class TestCustomerEndpoints:
         assert response.status_code == 404
         assert "Customer not found" in response.json()["detail"]
 
+    def test_create_customer(self, client: TestClient, db_session: Session):
+        admin = User(
+            email="admin@test.com",
+            phone_number="+255999999999",
+            hashed_password="hashed",
+            user_type=UserType.ADMIN,
+            full_name="Admin User"
+        )
+        db_session.add(admin)
+        db_session.commit()
+        
+        token = create_access_token(data={"sub": admin.email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        customer_data = {
+            "phone_number": "+255123456789",
+            "full_name": "New Customer",
+            "language": "en"
+        }
+        
+        response = client.post(
+            "/api/customers/",
+            json=customer_data,
+            headers=headers
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["phone_number"] == "+255123456789"
+        assert data["full_name"] == "New Customer"
+        assert data["language"] == "en"
+        assert "id" in data
+        assert "created_at" in data
+
+    def test_create_customer_minimal_data(self, client: TestClient, db_session: Session):
+        admin = User(
+            email="admin@test.com",
+            phone_number="+255999999999",
+            hashed_password="hashed",
+            user_type=UserType.ADMIN,
+            full_name="Admin User"
+        )
+        db_session.add(admin)
+        db_session.commit()
+        
+        token = create_access_token(data={"sub": admin.email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        customer_data = {
+            "phone_number": "+255987654321"
+        }
+        
+        response = client.post(
+            "/api/customers/",
+            json=customer_data,
+            headers=headers
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["phone_number"] == "+255987654321"
+        assert data["full_name"] is None
+        assert data["language"] == "en"  # Default value
+
+    def test_create_customer_duplicate_phone(self, client: TestClient, db_session: Session):
+        admin = User(
+            email="admin@test.com",
+            phone_number="+255999999999",
+            hashed_password="hashed",
+            user_type=UserType.ADMIN,
+            full_name="Admin User"
+        )
+        existing_customer = Customer(
+            phone_number="+255123456789",
+            full_name="Existing Customer"
+        )
+        db_session.add_all([admin, existing_customer])
+        db_session.commit()
+        
+        token = create_access_token(data={"sub": admin.email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        customer_data = {
+            "phone_number": "+255123456789",
+            "full_name": "Duplicate Customer"
+        }
+        
+        response = client.post(
+            "/api/customers/",
+            json=customer_data,
+            headers=headers
+        )
+        
+        assert response.status_code == 400
+        assert "Customer with this phone number already exists" in response.json()["detail"]
+
+    def test_create_customer_unauthorized(self, client: TestClient):
+        customer_data = {
+            "phone_number": "+255123456789",
+            "full_name": "New Customer"
+        }
+        
+        response = client.post("/api/customers/", json=customer_data)
+        assert response.status_code == 403
+
     def test_customer_endpoints_require_authentication(self, client: TestClient, db_session: Session):
         customer = Customer(phone_number="+255123456789")
         db_session.add(customer)
@@ -269,6 +374,7 @@ class TestCustomerEndpoints:
         
         # All endpoints should require authentication
         endpoints = [
+            ("POST", "/api/customers/"),
             ("GET", "/api/customers/"),
             ("GET", f"/api/customers/{customer.id}"),
             ("PUT", f"/api/customers/{customer.id}"),
@@ -280,5 +386,7 @@ class TestCustomerEndpoints:
                 response = client.get(endpoint)
             elif method == "PUT":
                 response = client.put(endpoint, json={"full_name": "Test"})
+            elif method == "POST":
+                response = client.post(endpoint, json={"phone_number": "+255999888777"})
             
             assert response.status_code == 403, f"Endpoint {method} {endpoint} should require auth"
