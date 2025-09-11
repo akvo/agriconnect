@@ -33,56 +33,68 @@ const API = () => {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
-      
+
       if (error.response?.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
-        
+
         // Don't try to refresh if this is already a refresh request
-        if (originalRequest.url?.includes('/auth/refresh') || originalRequest.url?.includes('/auth/login')) {
-          if (typeof window !== 'undefined' && window.clearUserSession) {
+        if (
+          originalRequest.url?.includes("/auth/refresh") ||
+          originalRequest.url?.includes("/auth/login")
+        ) {
+          if (typeof window !== "undefined" && window.clearUserSession) {
             window.clearUserSession();
           }
-          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-            window.location.href = '/';
+          if (
+            typeof window !== "undefined" &&
+            !window.location.pathname.includes("/login")
+          ) {
+            window.location.href = "/";
           }
           return Promise.reject(error);
         }
-        
+
         // Try to refresh the access token
         try {
-          if (typeof window !== 'undefined' && window.refreshAccessToken) {
+          if (typeof window !== "undefined" && window.refreshAccessToken) {
             const newAccessToken = await window.refreshAccessToken();
-            
+
             // Update the original request with new token
             if (originalRequest.headers) {
               originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             }
-            
+
             // Retry the original request
             return axiosInstance(originalRequest);
           }
         } catch (refreshError) {
           // Refresh failed, clear user session and redirect
-          if (typeof window !== 'undefined' && window.clearUserSession) {
+          if (typeof window !== "undefined" && window.clearUserSession) {
             window.clearUserSession();
           }
-          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-            window.location.href = '/';
+          if (
+            typeof window !== "undefined" &&
+            !window.location.pathname.includes("/login")
+          ) {
+            window.location.href = "/";
           }
           return Promise.reject(refreshError);
         }
       }
-      
+
       // For other 401/403 errors or if refresh is not available, clear session
       if (error.response?.status === 401 || error.response?.status === 403) {
-        if (typeof window !== 'undefined' && window.clearUserSession) {
+        if (typeof window !== "undefined" && window.clearUserSession) {
           window.clearUserSession();
         }
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          window.location.href = '/';
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.includes("/login")
+        ) {
+          window.location.href = "/";
         }
       }
-      
+
       return Promise.reject(error);
     }
   );

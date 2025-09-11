@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { 
-  UserIcon, 
-  LockClosedIcon, 
+import {
+  UserIcon,
+  LockClosedIcon,
   ExclamationCircleIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  KeyIcon
+  KeyIcon,
 } from "@heroicons/react/24/outline";
 
-export default function AcceptInvitationForm({ invitationToken, userInfo, onSuccess }) {
+export default function AcceptInvitationForm({
+  invitationToken,
+  userInfo,
+  onSuccess,
+}) {
   const [formData, setFormData] = useState({
     password: "",
     confirmPassword: "",
@@ -65,7 +69,7 @@ export default function AcceptInvitationForm({ invitationToken, userInfo, onSucc
         if (window.setUserSession) {
           window.setUserSession(data.user, data.access_token);
         }
-        
+
         onSuccess?.(data.user);
       } else {
         setError(data.detail || "Failed to accept invitation");
@@ -78,19 +82,30 @@ export default function AcceptInvitationForm({ invitationToken, userInfo, onSucc
   };
 
   return (
-    <div className="w-full bg-white/80 backdrop-blur-md p-8 shadow-lg" style={{borderRadius: '5px'}}>
+    <div
+      className="w-full bg-white/80 backdrop-blur-md p-8 shadow-lg"
+      style={{ borderRadius: "5px" }}
+    >
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-primary mb-4" style={{borderRadius: '5px'}}>
+        <div
+          className="inline-flex items-center justify-center w-16 h-16 bg-gradient-primary mb-4"
+          style={{ borderRadius: "5px" }}
+        >
           <KeyIcon className="w-8 h-8 text-white" />
         </div>
         <h2 className="text-2xl font-bold text-secondary-900 mb-2">
           Set Your Password
         </h2>
-        <p className="text-secondary-600">Create a secure password to complete your account setup</p>
+        <p className="text-secondary-600">
+          Create a secure password to complete your account setup
+        </p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 mb-6 animate-scale-in" style={{borderRadius: '5px'}}>
+        <div
+          className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 mb-6 animate-scale-in"
+          style={{ borderRadius: "5px" }}
+        >
           <div className="flex items-center">
             <ExclamationCircleIcon className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" />
             <span className="text-sm font-medium">{error}</span>
@@ -100,13 +115,21 @@ export default function AcceptInvitationForm({ invitationToken, userInfo, onSucc
 
       {/* User Info Display */}
       {userInfo && (
-        <div className="bg-gray-50 p-4 mb-6 border border-gray-200" style={{borderRadius: '5px'}}>
+        <div
+          className="bg-gray-50 p-4 mb-6 border border-gray-200"
+          style={{ borderRadius: "5px" }}
+        >
           <div className="flex items-center">
             <UserIcon className="w-5 h-5 text-secondary-600 mr-3" />
             <div>
-              <p className="font-semibold text-secondary-900">{userInfo.full_name}</p>
+              <p className="font-semibold text-secondary-900">
+                {userInfo.full_name}
+              </p>
               <p className="text-sm text-secondary-600">
-                {userInfo.email} • {userInfo.user_type === 'admin' ? 'Administrator' : 'Extension Officer'}
+                {userInfo.email} •{" "}
+                {userInfo.user_type === "admin"
+                  ? "Administrator"
+                  : "Extension Officer"}
               </p>
             </div>
           </div>
@@ -130,7 +153,7 @@ export default function AcceptInvitationForm({ invitationToken, userInfo, onSucc
               onChange={handleChange}
               required
               className="w-full px-4 py-3 pl-11 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
-              style={{borderRadius: '5px'}}
+              style={{ borderRadius: "5px" }}
               placeholder="••••••••"
             />
             <LockClosedIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-secondary-400" />
@@ -156,7 +179,7 @@ export default function AcceptInvitationForm({ invitationToken, userInfo, onSucc
               onChange={handleChange}
               required
               className="w-full px-4 py-3 pl-11 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
-              style={{borderRadius: '5px'}}
+              style={{ borderRadius: "5px" }}
               placeholder="••••••••"
             />
             <LockClosedIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-secondary-400" />
@@ -167,7 +190,7 @@ export default function AcceptInvitationForm({ invitationToken, userInfo, onSucc
           type="submit"
           disabled={loading}
           className="w-full bg-gradient-primary text-white py-3 px-6 font-semibold text-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transform transition-all duration-200"
-          style={{borderRadius: '5px'}}
+          style={{ borderRadius: "5px" }}
         >
           {loading ? (
             <div className="flex items-center justify-center">
@@ -184,14 +207,18 @@ export default function AcceptInvitationForm({ invitationToken, userInfo, onSucc
       </form>
 
       <div className="mt-8 text-center">
-        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3" style={{borderRadius: '5px'}}>
+        <div
+          className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3"
+          style={{ borderRadius: "5px" }}
+        >
           <div className="flex items-center justify-center mb-2">
             <CheckCircleIcon className="w-5 h-5 text-blue-600 mr-2" />
             <span className="font-medium text-sm">Secure Account Setup</span>
           </div>
           <p className="text-xs">
-            Your password will be encrypted and stored securely. After setting your password, 
-            you'll be automatically logged in to AgriConnect.
+            Your password will be encrypted and stored securely. After setting
+            your password, you&apos;ll be automatically logged in to
+            AgriConnect.
           </p>
         </div>
       </div>
