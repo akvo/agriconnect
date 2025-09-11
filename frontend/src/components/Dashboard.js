@@ -71,21 +71,25 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <button className="group bg-gradient-to-br from-primary-50 to-primary-100 p-6 text-left hover:from-primary-100 hover:to-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md" style={{borderRadius: '5px'}}>
+            <a
+              href="/customers"
+              className="group bg-gradient-to-br from-green-50 to-green-100 p-6 text-left hover:from-green-100 hover:to-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
+              style={{borderRadius: '5px'}}
+            >
               <div className="flex items-center mb-4">
-                <div className="flex items-center justify-center w-10 h-10 bg-gradient-primary mr-3" style={{borderRadius: '5px'}}>
+                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 mr-3" style={{borderRadius: '5px'}}>
                   <BuildingStorefrontIcon className="w-5 h-5 text-white" />
                 </div>
-                <div className="text-primary-700 font-bold text-lg">Customer Management</div>
+                <div className="text-green-700 font-bold text-lg">Customer Management</div>
               </div>
               <div className="text-secondary-600 text-sm leading-relaxed">
                 View and manage customer information, track interactions, and customer support
               </div>
-              <div className="mt-4 flex items-center text-primary-600 text-sm font-semibold group-hover:text-primary-700">
+              <div className="mt-4 flex items-center text-green-600 text-sm font-semibold group-hover:text-green-700">
                 <span>Manage Customers</span>
                 <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
               </div>
-            </button>
+            </a>
 
             {user?.user_type === "admin" && (
               <a
@@ -109,17 +113,17 @@ export default function Dashboard() {
               </a>
             )}
 
-            <button className="group bg-gradient-to-br from-accent-50 to-accent-100 p-6 text-left hover:from-accent-100 hover:to-accent-200 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md" style={{borderRadius: '5px'}}>
+            <button className="group bg-gradient-to-br from-orange-50 to-orange-100 p-6 text-left hover:from-orange-100 hover:to-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md" style={{borderRadius: '5px'}}>
               <div className="flex items-center mb-4">
-                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 mr-3" style={{borderRadius: '5px'}}>
+                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 mr-3" style={{borderRadius: '5px'}}>
                   <ChartBarIcon className="w-5 h-5 text-white" />
                 </div>
-                <div className="text-accent-700 font-bold text-lg">Reports</div>
+                <div className="text-orange-700 font-bold text-lg">Reports</div>
               </div>
               <div className="text-secondary-600 text-sm leading-relaxed">
                 View detailed activity reports, analytics, and system insights
               </div>
-              <div className="mt-4 flex items-center text-accent-600 text-sm font-semibold group-hover:text-accent-700">
+              <div className="mt-4 flex items-center text-orange-600 text-sm font-semibold group-hover:text-orange-700">
                 <span>View Reports</span>
                 <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
               </div>
