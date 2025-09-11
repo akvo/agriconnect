@@ -8,6 +8,7 @@ import CreateUserModal from "../../components/users/CreateUserModal";
 import EditUserModal from "../../components/users/EditUserModal";
 import HeaderNav from "../../components/HeaderNav";
 import { useRouter } from "next/navigation";
+import { MagnifyingGlassIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 
 export default function UsersPage() {
   const { user, loading: authLoading, refreshUser } = useAuth();
@@ -121,8 +122,8 @@ export default function UsersPage() {
       <div className="min-h-screen bg-gradient-brand flex items-center justify-center">
         <div className="text-center animate-fade-in">
           <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-200 border-t-primary-600 mx-auto mb-6"></div>
-            <div className="absolute inset-0 rounded-full bg-gradient-primary opacity-20 blur-lg animate-pulse"></div>
+            <ArrowPathIcon className="animate-spin h-16 w-16 text-primary-600 mx-auto mb-6" />
+            <div className="absolute inset-0 bg-gradient-primary opacity-20 blur-lg animate-pulse" style={{borderRadius: '5px'}}></div>
           </div>
           <p className="text-secondary-700 font-medium text-lg">Loading users...</p>
           <p className="text-secondary-500 text-sm mt-2">Please wait while we fetch the user data</p>
@@ -144,14 +145,14 @@ export default function UsersPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+          <div className="bg-red-50 border border-red-200 p-4 mb-6" style={{borderRadius: '5px'}}>
             <div className="text-red-700">{error}</div>
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-white shadow-lg" style={{borderRadius: '5px'}}>
           {/* Header with search and create button */}
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-600">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-lg font-medium text-gray-900">
@@ -164,7 +165,7 @@ export default function UsersPage() {
               <div className="mt-4 sm:mt-0">
                 <button
                   onClick={handleCreateUser}
-                  className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"
+                  className="bg-green-600 text-white px-4 py-2 text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"                  style={{borderRadius: '5px'}}
                 >
                   Create User
                 </button>
@@ -179,21 +180,10 @@ export default function UsersPage() {
                   placeholder="Search users by name, email, or phone..."
                   value={searchTerm}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-green-500 focus:border-green-500 cursor-text"
+                  className="block w-full pl-10 pr-3 py-2 bg-gray-50 leading-5 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:bg-white cursor-text"                  style={{borderRadius: '5px'}}
                 />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg
-                    className="h-5 w-5 text-gray-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
                 </div>
               </div>
             </div>
@@ -210,7 +200,7 @@ export default function UsersPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-200">
+            <div className="px-6 py-4 border-t border-gray-600">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-700">
                   Showing page {currentPage} of {totalPages}
@@ -221,7 +211,8 @@ export default function UsersPage() {
                       setCurrentPage((prev) => Math.max(prev - 1, 1))
                     }
                     disabled={currentPage === 1}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+                    className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+                    style={{borderRadius: '5px'}}
                   >
                     Previous
                   </button>
@@ -230,7 +221,8 @@ export default function UsersPage() {
                       setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                     }
                     disabled={currentPage === totalPages}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+                    className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+                    style={{borderRadius: '5px'}}
                   >
                     Next
                   </button>

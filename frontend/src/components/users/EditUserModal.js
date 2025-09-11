@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import api from "../../lib/api";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 
 export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpdate = false }) {
   const [formData, setFormData] = useState({
@@ -125,7 +126,7 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
 
   return (
     <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-brand border border-white/20 w-full max-w-[42rem] animate-scale-in p-8">
+      <div className="bg-white/90 backdrop-blur-md w-full max-w-[42rem] animate-scale-in p-8" style={{borderRadius: '5px', border: '1px solid rgb(191, 219, 254)'}}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-gray-900">
             {showDetails ? (isSelfUpdate ? "Profile Details" : "User Details") : (isSelfUpdate ? "Edit Profile" : "Edit User")}
@@ -143,26 +144,14 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600"
             >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
+              <XMarkIcon className="w-6 h-6" />
             </button>
           </div>
         </div>
 
         {showDetails ? (
           <div className="space-y-4">
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 p-4" style={{borderRadius: '5px'}}>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -175,11 +164,12 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                     Status
                   </label>
                   <span
-                    className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    className={`mt-1 inline-flex items-center px-2.5 py-0.5 text-xs font-medium ${
                       user.is_active === "true"
                         ? "bg-green-100 text-green-800"
                         : "bg-red-100 text-red-800"
                     }`}
+                    style={{borderRadius: '5px'}}
                   >
                     {user.is_active === "true" ? "Active" : "Inactive"}
                   </span>
@@ -209,11 +199,12 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                     User Type
                   </label>
                   <span
-                    className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    className={`mt-1 inline-flex items-center px-2.5 py-0.5 text-xs font-medium ${
                       user.user_type === "admin"
                         ? "bg-purple-100 text-purple-800"
                         : "bg-blue-100 text-blue-800"
                     }`}
+                    style={{borderRadius: '5px'}}
                   >
                     {getUserTypeLabel(user.user_type)}
                   </span>
@@ -239,7 +230,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
             <div className="flex justify-end">
               <button
                 onClick={onClose}
-                className="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                className="bg-gray-600 text-white py-2 px-4 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                style={{borderRadius: '5px'}}
               >
                 Close
               </button>
@@ -248,7 +240,7 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
         ) : (
           <form onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+              <div className="bg-red-50 border border-red-200 p-3 mb-4" style={{borderRadius: '5px'}}>
                 <div className="text-red-700 text-sm">{error}</div>
               </div>
             )}
@@ -267,7 +259,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                   name="full_name"
                   value={formData.full_name}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  style={{borderRadius: '5px'}}
                   placeholder="Enter full name"
                 />
               </div>
@@ -284,7 +277,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                   id="email"
                   value={user.email}
                   disabled
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 cursor-not-allowed"
+                  className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white bg-gray-50 cursor-not-allowed"
+                  style={{borderRadius: '5px'}}
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Email cannot be changed
@@ -304,7 +298,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                   name="phone_number"
                   value={formData.phone_number}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  style={{borderRadius: '5px'}}
                   placeholder="+1234567890"
                 />
                 <p className="mt-1 text-xs text-gray-500">
@@ -322,11 +317,12 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                 {isSelfUpdate ? (
                   <div className="mt-1">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium ${
                         user.user_type === "admin"
                           ? "bg-purple-100 text-purple-800"
                           : "bg-blue-100 text-blue-800"
                       }`}
+                      style={{borderRadius: '5px'}}
                     >
                       {getUserTypeLabel(user.user_type)}
                     </span>
@@ -340,7 +336,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                     name="user_type"
                     value={formData.user_type}
                     onChange={handleChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    style={{borderRadius: '5px'}}
                   >
                     <option value="eo">Extension Officer</option>
                     <option value="admin">Administrator</option>
@@ -349,7 +346,7 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
               </div>
 
               {isSelfUpdate && (
-                <div className="bg-gray-50 rounded-lg p-4 mt-4">
+                <div className="bg-gray-50 p-4 mt-4" style={{borderRadius: '5px'}}>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-medium text-gray-700">Change Password</h4>
                     <button
@@ -386,7 +383,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                           name="current_password"
                           value={formData.current_password}
                           onChange={handleChange}
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          style={{borderRadius: '5px'}}
                           placeholder="Enter current password"
                         />
                       </div>
@@ -404,7 +402,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                           name="new_password"
                           value={formData.new_password}
                           onChange={handleChange}
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          style={{borderRadius: '5px'}}
                           placeholder="Enter new password"
                         />
                         <p className="mt-1 text-xs text-gray-500">
@@ -425,7 +424,8 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
                           name="confirm_password"
                           value={formData.confirm_password}
                           onChange={handleChange}
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                          style={{borderRadius: '5px'}}
                           placeholder="Confirm new password"
                         />
                       </div>
@@ -439,14 +439,16 @@ export default function EditUserModal({ user, onClose, onUserUpdated, isSelfUpda
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                className="flex-1 bg-white py-2 px-4 bg-gray-50 focus:bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                style={{borderRadius: '5px'}}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-green-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-green-600 py-2 px-4 border border-transparent text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{borderRadius: '5px'}}
               >
                 {loading ? "Updating..." : (isSelfUpdate ? "Update Profile" : "Update User")}
               </button>
