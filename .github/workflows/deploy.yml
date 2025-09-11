@@ -99,7 +99,7 @@ jobs:
           repository: akvo/composite-actions
           token: ${{ secrets.GH_PAT }}
           path: composite-actions
-          ref: 0.0.7
+          ref: 0.0.10
 
       - name: Rollout Nginx
         uses: ./composite-actions/.github/actions/k8s-rollout
