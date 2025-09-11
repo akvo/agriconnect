@@ -36,7 +36,8 @@ class TestMessageModel:
             phone_number="+255987654321",
             hashed_password="hashed",
             user_type=UserType.ADMIN,
-            full_name="Admin User"
+            full_name="Admin User",
+            is_active=True
         )
         db_session.add_all([customer, user])
         db_session.commit()
@@ -99,7 +100,8 @@ class TestMessageModel:
             phone_number="+255987654321",
             hashed_password="hashed",
             user_type=UserType.EXTENSION_OFFICER,
-            full_name="Extension Officer"
+            full_name="Extension Officer",
+            is_active=True
         )
         db_session.add_all([customer, user])
         db_session.commit()

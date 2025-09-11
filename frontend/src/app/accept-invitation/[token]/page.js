@@ -32,8 +32,7 @@ export default function AcceptInvitationPage() {
 
     const verifyInvitation = async () => {
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const response = await fetch(`${API_BASE_URL}/api/auth/verify-invitation/${token}`);
+        const response = await fetch(`/api/auth/verify-invitation/${token}`);
         const data = await response.json();
 
         if (response.ok) {

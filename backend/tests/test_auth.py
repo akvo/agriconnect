@@ -11,16 +11,23 @@ class TestUserLogin:
         from schemas.user import UserCreate
 
         unique_id = str(uuid.uuid4())[:8]
-        user_data = UserCreate(
+        # Create user directly for testing (bypass invitation system)
+        from models.user import User
+        from passlib.context import CryptContext
+        
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        user = User(
             email=f"login-{unique_id}@example.com",
             phone_number=f"+123456789{unique_id[:3]}",
-            password="testpassword123",
+            hashed_password=pwd_context.hash("testpassword123"),
             full_name="Login User",
             user_type=UserType.ADMIN,
+            is_active=True
         )
-
-        # Create user using service
-        user = UserService.create_user(db_session, user_data)
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
 
         # Test login
         login_data = {"email": user.email, "password": "testpassword123"}
@@ -46,16 +53,23 @@ class TestUserLogin:
         from schemas.user import UserCreate
 
         unique_id = str(uuid.uuid4())[:8]
-        user_data = UserCreate(
+        # Create user directly for testing (bypass invitation system)
+        from models.user import User
+        from passlib.context import CryptContext
+        
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        user = User(
             email=f"wrong-pass-{unique_id}@example.com",
             phone_number=f"+123456789{unique_id[:3]}",
-            password="correctpassword",
+            hashed_password=pwd_context.hash("correctpassword"),
             full_name="Wrong Pass User",
             user_type=UserType.ADMIN,
+            is_active=True
         )
-
-        # Create user using service
-        user = UserService.create_user(db_session, user_data)
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
 
         # Test login with wrong password
         login_data = {"email": user.email, "password": "wrongpassword"}
@@ -72,16 +86,23 @@ def authenticated_user_token(client, db_session):
     from schemas.user import UserCreate
 
     unique_id = str(uuid.uuid4())[:8]
-    user_data = UserCreate(
+    # Create user directly for testing (bypass invitation system)
+    from models.user import User
+    from passlib.context import CryptContext
+    
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    
+    user = User(
         email=f"auth-{unique_id}@example.com",
         phone_number=f"+123456789{unique_id[:3]}",
-        password="testpassword123",
+        hashed_password=pwd_context.hash("testpassword123"),
         full_name="Authenticated User",
         user_type=UserType.ADMIN,
+        is_active=True
     )
-
-    # Create user using service
-    user = UserService.create_user(db_session, user_data)
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
 
     # Login to get token
     login_response = client.post(
@@ -204,14 +225,22 @@ class TestUserProfile:
 
         # Create another user with a phone number
         unique_id = str(uuid.uuid4())[:8]
-        other_user_data = UserCreate(
+        # Create another user directly for testing
+        from models.user import User
+        from passlib.context import CryptContext
+        
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        other_user = User(
             email=f"other-{unique_id}@example.com",
             phone_number="+1111111111",
-            password="testpassword123",
+            hashed_password=pwd_context.hash("testpassword123"),
             full_name="Other User",
             user_type=UserType.EXTENSION_OFFICER,
+            is_active=True
         )
-        UserService.create_user(db_session, other_user_data)
+        db_session.add(other_user)
+        db_session.commit()
 
         token = authenticated_user_token["token"]
 

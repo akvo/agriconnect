@@ -74,7 +74,7 @@ def get_user_detail(
     return UserDetailResponse.model_validate(user)
 
 
-@router.put("/{user_id}/", response_model=UserResponse)
+@router.put("/{user_id}", response_model=UserResponse)
 def update_user(
     user_id: int,
     user_data: UserUpdate,
@@ -86,7 +86,7 @@ def update_user(
     return UserResponse.model_validate(user)
 
 
-@router.delete("/{user_id}/")
+@router.delete("/{user_id}")
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
@@ -97,7 +97,7 @@ def delete_user(
     return {"message": "User deleted successfully"}
 
 
-@router.post("/{user_id}/resend-invitation/")
+@router.post("/{user_id}/resend-invitation")
 async def resend_invitation(
     user_id: int,
     db: Session = Depends(get_db),

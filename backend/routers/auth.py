@@ -23,7 +23,7 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
 
-@router.post("/login/", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse)
 def login_user(login_data: LoginRequest, response: Response, db: Session = Depends(get_db)):
     """Login user and return access token with httpOnly refresh token cookie"""
     user = UserService.authenticate_user(
@@ -60,7 +60,7 @@ def login_user(login_data: LoginRequest, response: Response, db: Session = Depen
     )
 
 
-@router.post("/refresh/", response_model=dict)
+@router.post("/refresh", response_model=dict)
 def refresh_token(refresh_token: str = Cookie(None), db: Session = Depends(get_db)):
     """Refresh access token using the httpOnly refresh token cookie"""
     if not refresh_token:
@@ -92,7 +92,7 @@ def refresh_token(refresh_token: str = Cookie(None), db: Session = Depends(get_d
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.post("/logout/")
+@router.post("/logout")
 def logout_user(response: Response):
     """Logout user by clearing the refresh token cookie"""
     response.delete_cookie(
@@ -105,13 +105,13 @@ def logout_user(response: Response):
     return {"message": "Logged out successfully"}
 
 
-@router.get("/profile/", response_model=UserResponse)
+@router.get("/profile", response_model=UserResponse)
 def get_profile(current_user: User = Depends(get_current_user)):
     """Get current user's profile"""
     return UserResponse.model_validate(current_user)
 
 
-@router.put("/profile/", response_model=UserResponse)
+@router.put("/profile", response_model=UserResponse)
 def update_profile(
     update_data: SelfUpdateRequest, 
     current_user: User = Depends(get_current_user),
@@ -159,7 +159,7 @@ def verify_invitation(invitation_token: str, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/accept-invitation/", response_model=TokenResponse)
+@router.post("/accept-invitation", response_model=TokenResponse)
 def accept_invitation(
     request: AcceptInvitationRequest, 
     response: Response,

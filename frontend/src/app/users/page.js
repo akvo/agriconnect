@@ -119,28 +119,13 @@ export default function UsersPage() {
 
     try {
       setLoading(true);
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const token = localStorage.getItem("access_token");
+      const response = await api.post(`/admin/users/${user.id}/resend-invitation`);
       
-      const response = await fetch(`${API_BASE_URL}/api/admin/users/${user.id}/resend-invitation/`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setError(null);
-        alert(data.message || "Invitation resent successfully!");
-        fetchUsers(); // Refresh the user list
-      } else {
-        throw new Error(data.detail || "Failed to resend invitation");
-      }
+      setError(null);
+      alert(response.data.message || "Invitation resent successfully!");
+      fetchUsers(); // Refresh the user list
     } catch (err) {
-      setError(`Failed to resend invitation: ${err.message}`);
+      setError(`Failed to resend invitation: ${err.response?.data?.detail || err.message}`);
     } finally {
       setLoading(false);
     }

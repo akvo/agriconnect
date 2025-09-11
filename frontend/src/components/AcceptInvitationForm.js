@@ -46,8 +46,7 @@ export default function AcceptInvitationForm({ invitationToken, userInfo, onSucc
     setLoading(true);
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${API_BASE_URL}/api/auth/accept-invitation/`, {
+      const response = await fetch(`/api/auth/accept-invitation`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

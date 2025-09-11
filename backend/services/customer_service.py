@@ -43,7 +43,10 @@ class CustomerService:
             return None
         
         for key, value in kwargs.items():
-            if hasattr(customer, key) and value is not None:
+            if hasattr(customer, key):
+                # Handle empty strings as None for optional fields like full_name
+                if key == 'full_name' and value == '':
+                    value = None
                 setattr(customer, key, value)
         
         self.db.commit()
