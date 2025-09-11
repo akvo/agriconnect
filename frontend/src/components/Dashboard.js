@@ -56,34 +56,47 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
         {/* Quick Actions */}
-        <div className="bg-white/80 backdrop-blur-md p-8 animate-slide-up" style={{borderRadius: '5px'}}>
+        <div
+          className="bg-white/80 backdrop-blur-md p-8 animate-slide-up"
+          style={{ borderRadius: "5px" }}
+        >
           <div className="flex items-center mb-6">
-            <div className="flex items-center justify-center w-12 h-12 bg-gradient-success mr-4" style={{borderRadius: '5px'}}>
+            <div
+              className="flex items-center justify-center w-12 h-12 bg-gradient-success mr-4"
+              style={{ borderRadius: "5px" }}
+            >
               <BoltIcon className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-secondary-900">
                 Quick Actions
               </h2>
-              <p className="text-secondary-600">Access key features and tools</p>
+              <p className="text-secondary-600">
+                Access key features and tools
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <a
               href="/customers"
               className="group bg-gradient-to-br from-green-50 to-green-100 p-6 text-left hover:from-green-100 hover:to-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
-              style={{borderRadius: '5px'}}
+              style={{ borderRadius: "5px" }}
             >
               <div className="flex items-center mb-4">
-                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 mr-3" style={{borderRadius: '5px'}}>
+                <div
+                  className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 mr-3"
+                  style={{ borderRadius: "5px" }}
+                >
                   <BuildingStorefrontIcon className="w-5 h-5 text-white" />
                 </div>
-                <div className="text-green-700 font-bold text-lg">Customer Management</div>
+                <div className="text-green-700 font-bold text-lg">
+                  Customer Management
+                </div>
               </div>
               <div className="text-secondary-600 text-sm leading-relaxed">
-                View and manage customer information, track interactions, and customer support
+                View and manage customer information, track interactions, and
+                customer support
               </div>
               <div className="mt-4 flex items-center text-green-600 text-sm font-semibold group-hover:text-green-700">
                 <span>Manage Customers</span>
@@ -95,13 +108,18 @@ export default function Dashboard() {
               <a
                 href="/users"
                 className="group bg-gradient-to-br from-purple-50 to-purple-100 p-6 text-left hover:from-purple-100 hover:to-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
-                style={{borderRadius: '5px'}}
+                style={{ borderRadius: "5px" }}
               >
                 <div className="flex items-center mb-4">
-                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 mr-3" style={{borderRadius: '5px'}}>
+                  <div
+                    className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 mr-3"
+                    style={{ borderRadius: "5px" }}
+                  >
                     <UsersIcon className="w-5 h-5 text-white" />
                   </div>
-                  <div className="text-purple-700 font-bold text-lg">User Management</div>
+                  <div className="text-purple-700 font-bold text-lg">
+                    User Management
+                  </div>
                 </div>
                 <div className="text-secondary-600 text-sm leading-relaxed">
                   Create, edit, and manage system users and their permissions
@@ -113,9 +131,15 @@ export default function Dashboard() {
               </a>
             )}
 
-            <button className="group bg-gradient-to-br from-orange-50 to-orange-100 p-6 text-left hover:from-orange-100 hover:to-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md" style={{borderRadius: '5px'}}>
+            <button
+              className="group bg-gradient-to-br from-orange-50 to-orange-100 p-6 text-left hover:from-orange-100 hover:to-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md"
+              style={{ borderRadius: "5px" }}
+            >
               <div className="flex items-center mb-4">
-                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 mr-3" style={{borderRadius: '5px'}}>
+                <div
+                  className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 mr-3"
+                  style={{ borderRadius: "5px" }}
+                >
                   <ChartBarIcon className="w-5 h-5 text-white" />
                 </div>
                 <div className="text-orange-700 font-bold text-lg">Reports</div>
@@ -132,16 +156,25 @@ export default function Dashboard() {
         </div>
 
         {/* Welcome Message based on user type */}
-        <div className="mt-8 bg-gradient-brand p-8 animate-scale-in" style={{borderRadius: '5px'}}>
+        <div
+          className="mt-8 bg-gradient-brand p-8 animate-scale-in"
+          style={{ borderRadius: "5px" }}
+        >
           <div className="flex items-start space-x-4">
-            <div className="flex items-center justify-center w-16 h-16 bg-gradient-primary flex-shrink-0" style={{borderRadius: '5px'}}>
+            <div
+              className="flex items-center justify-center w-16 h-16 bg-gradient-primary flex-shrink-0"
+              style={{ borderRadius: "5px" }}
+            >
               <SparklesIcon className="w-8 h-8 text-white" />
             </div>
             <div className="flex-1">
               <h3 className="text-2xl font-bold text-secondary-900 mb-3">
                 Welcome to AgriConnect, {user?.full_name}! 🌱
               </h3>
-              <div className="bg-white/60 backdrop-blur-sm p-4" style={{borderRadius: '5px'}}>
+              <div
+                className="bg-white/60 backdrop-blur-sm p-4"
+                style={{ borderRadius: "5px" }}
+              >
                 <p className="text-secondary-700 leading-relaxed">
                   {user?.user_type === "admin"
                     ? "As an administrator, you have comprehensive access to manage the entire system, oversee user accounts, and coordinate all agricultural extension activities. Your role is crucial in ensuring seamless operations and supporting extension officers in their mission to help farmers."
@@ -150,8 +183,8 @@ export default function Dashboard() {
                 <div className="mt-4 flex items-center text-primary-700">
                   <BoltIcon className="w-5 h-5 mr-2" />
                   <span className="font-semibold text-sm">
-                    {user?.user_type === "admin" 
-                      ? "Empowering agricultural communities through technology" 
+                    {user?.user_type === "admin"
+                      ? "Empowering agricultural communities through technology"
                       : "Making a difference in sustainable agriculture"}
                   </span>
                 </div>

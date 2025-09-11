@@ -9,7 +9,11 @@
       "Bash(./dc.sh down:*)",
       "Bash(./dc.sh up:*)",
       "Bash(./dc.sh ps:*)",
-      "Bash(./dc.sh restart:*)"
+      "Bash(./dc.sh restart:*)",
+      "Bash(./dc.sh:*)",
+      "Bash(docker build:*)",
+      "Bash(find:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

@@ -30,13 +30,13 @@ export const AuthProvider = ({ children }) => {
     // Try to refresh token on app start
     const tryRefreshToken = async () => {
       const savedUser = localStorage.getItem("user");
-      
+
       if (savedUser) {
         try {
           // Try to refresh the access token using the httpOnly cookie
           const response = await api.post("/auth/refresh");
           const { access_token } = response.data;
-          
+
           // Set the access token in memory
           api.setToken(access_token);
           setAccessToken(access_token);
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
 
   // Make functions available globally for API interceptor
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       window.clearUserSession = clearUserSession;
       window.setUserSession = setUserSession;
       window.refreshAccessToken = async () => {
@@ -89,7 +89,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-
   const logout = async () => {
     try {
       // Call backend logout to clear httpOnly cookie
@@ -98,13 +97,13 @@ export const AuthProvider = ({ children }) => {
       // Even if backend call fails, clear frontend state
       console.error("Logout error:", error);
     }
-    
+
     // Clear frontend state
     clearUserSession();
-    
+
     // Redirect to home/login page
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
     }
   };
 
@@ -113,11 +112,11 @@ export const AuthProvider = ({ children }) => {
       // Get current user data from backend (using the current access token)
       const response = await api.get("/auth/profile");
       const userData = response.data;
-      
+
       // Update user in localStorage and state
       localStorage.setItem("user", JSON.stringify(userData));
       setUser(userData);
-      
+
       return userData;
     } catch (error) {
       console.error("Failed to refresh user data:", error);
