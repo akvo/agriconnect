@@ -89,17 +89,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (userData) => {
-    try {
-      const response = await api.post("/auth/register", userData);
-      return { success: true, user: response.data };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || "Registration failed",
-      };
-    }
-  };
 
   const logout = async () => {
     try {
@@ -141,7 +130,6 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
-    register,
     logout,
     refreshUser,
   };

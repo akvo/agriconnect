@@ -252,23 +252,23 @@ class TestAdminUserManagement:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Cannot delete your own account" in response.json()["detail"]
 
-    def test_prevent_self_role_change(self, client):
+    def test_prevent_self_role_change(self, client, db_session):
         """Test that users cannot change their own role"""
         import uuid
+        from services.user_service import UserService
+        from schemas.user import UserCreate
 
         unique_id = str(uuid.uuid4())[:8]
         
-        # Register admin user
-        admin_data = {
-            "email": f"admin-self-role-{unique_id}@test.com",
-            "phone_number": f"+123456789{unique_id[:3]}",
-            "password": "testpass123",
-            "full_name": "Admin Seven",
-            "user_type": "admin",
-        }
-        register_response = client.post("/api/auth/register/", json=admin_data)
-        assert register_response.status_code == status.HTTP_201_CREATED
-        admin_user = register_response.json()
+        # Create admin user using service
+        admin_data = UserCreate(
+            email=f"admin-self-role-{unique_id}@test.com",
+            phone_number=f"+123456789{unique_id[:3]}",
+            password="testpass123",
+            full_name="Admin Seven",
+            user_type=UserType.ADMIN,
+        )
+        admin_user = UserService.create_user(db_session, admin_data)
 
         # Login
         login_response = client.post(
@@ -281,42 +281,40 @@ class TestAdminUserManagement:
         # Try to change own role from admin to eo
         update_data = {"user_type": "eo"}
         response = client.put(
-            f"/api/admin/users/{admin_user['id']}/",
+            f"/api/admin/users/{admin_user.id}/",
             json=update_data,
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "Cannot change your own role" in response.json()["detail"]
 
-    def test_admin_can_change_others_role(self, client):
+    def test_admin_can_change_others_role(self, client, db_session):
         """Test that admins can change other users' roles"""
         import uuid
+        from services.user_service import UserService
+        from schemas.user import UserCreate
 
         unique_id = str(uuid.uuid4())[:8]
         
-        # Register admin user
-        admin_data = {
-            "email": f"admin-change-{unique_id}@test.com",
-            "phone_number": f"+123456789{unique_id[:3]}",
-            "password": "testpass123",
-            "full_name": "Admin Eight",
-            "user_type": "admin",
-        }
-        register_response = client.post("/api/auth/register/", json=admin_data)
-        assert register_response.status_code == status.HTTP_201_CREATED
-        admin_user = register_response.json()
+        # Create admin user using service
+        admin_data = UserCreate(
+            email=f"admin-change-{unique_id}@test.com",
+            phone_number=f"+123456789{unique_id[:3]}",
+            password="testpass123",
+            full_name="Admin Eight",
+            user_type=UserType.ADMIN,
+        )
+        admin_user = UserService.create_user(db_session, admin_data)
 
-        # Register regular EO user
-        eo_data = {
-            "email": f"eo-change-{unique_id}@test.com",
-            "phone_number": f"+987654321{unique_id[:3]}",
-            "password": "testpass123",
-            "full_name": "Extension Officer Four",
-            "user_type": "eo",
-        }
-        register_response = client.post("/api/auth/register/", json=eo_data)
-        assert register_response.status_code == status.HTTP_201_CREATED
-        eo_user = register_response.json()
+        # Create regular EO user using service
+        eo_data = UserCreate(
+            email=f"eo-change-{unique_id}@test.com",
+            phone_number=f"+987654321{unique_id[:3]}",
+            password="testpass123",
+            full_name="Extension Officer Four",
+            user_type=UserType.EXTENSION_OFFICER,
+        )
+        eo_user = UserService.create_user(db_session, eo_data)
 
         # Login as admin
         login_response = client.post(
@@ -329,7 +327,7 @@ class TestAdminUserManagement:
         # Admin changes EO user's role to admin
         update_data = {"user_type": "admin"}
         response = client.put(
-            f"/api/admin/users/{eo_user['id']}/",
+            f"/api/admin/users/{eo_user.id}/",
             json=update_data,
             headers={"Authorization": f"Bearer {token}"},
         )

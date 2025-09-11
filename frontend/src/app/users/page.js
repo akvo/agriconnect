@@ -112,6 +112,40 @@ export default function UsersPage() {
     }
   };
 
+  const handleResendInvitation = async (user) => {
+    if (!window.confirm(`Resend invitation to ${user.full_name}?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const token = localStorage.getItem("access_token");
+      
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${user.id}/resend-invitation/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setError(null);
+        alert(data.message || "Invitation resent successfully!");
+        fetchUsers(); // Refresh the user list
+      } else {
+        throw new Error(data.detail || "Failed to resend invitation");
+      }
+    } catch (err) {
+      setError(`Failed to resend invitation: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Don't render if not admin
   if (user && user.user_type !== "admin") {
     return null;
@@ -195,6 +229,7 @@ export default function UsersPage() {
             loading={loading}
             onEditUser={handleEditUser}
             onDeleteUser={handleDeleteUser}
+            onResendInvitation={handleResendInvitation}
             currentUser={user}
           />
 

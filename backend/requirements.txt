@@ -14,3 +14,4 @@ coveralls==4.0.1
 coverage==7.10.6
 gevent==25.8.2
 twilio==9.8.0
+fastapi-mail==1.4.1

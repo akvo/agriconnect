@@ -3,13 +3,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import LoginForm from "../components/LoginForm";
-import RegisterForm from "../components/RegisterForm";
 import Dashboard from "../components/Dashboard";
 import { ArrowPathIcon, SparklesIcon, CheckCircleIcon, CommandLineIcon } from "@heroicons/react/24/outline";
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const [currentView, setCurrentView] = useState("login"); // 'login', 'register'
+  const [currentView, setCurrentView] = useState("login");
   const [successMessage, setSuccessMessage] = useState("");
 
   const handleLoginSuccess = () => {
@@ -17,22 +16,6 @@ export default function Home() {
     setSuccessMessage("Login successful! Welcome to AgriConnect.");
   };
 
-  const handleRegisterSuccess = (userData) => {
-    setSuccessMessage(
-      `Registration successful! Please log in with your credentials.`
-    );
-    setCurrentView("login");
-  };
-
-  const handleSwitchToRegister = () => {
-    setCurrentView("register");
-    setSuccessMessage("");
-  };
-
-  const handleSwitchToLogin = () => {
-    setCurrentView("login");
-    setSuccessMessage("");
-  };
 
   if (loading) {
     return (
@@ -86,17 +69,9 @@ export default function Home() {
 
         {/* Authentication Forms */}
         <div className="animate-fade-in">
-          {currentView === "login" ? (
-            <LoginForm
-              onSuccess={handleLoginSuccess}
-              onSwitchToRegister={handleSwitchToRegister}
-            />
-          ) : (
-            <RegisterForm
-              onSuccess={handleRegisterSuccess}
-              onSwitchToLogin={handleSwitchToLogin}
-            />
-          )}
+          <LoginForm
+            onSuccess={handleLoginSuccess}
+          />
         </div>
 
         {/* Footer */}

@@ -8,6 +8,7 @@ import {
   ClipboardDocumentListIcon,
   CheckCircleIcon,
   XCircleIcon,
+  ClockIcon,
   EllipsisVerticalIcon,
   PencilIcon,
   TrashIcon,
@@ -21,6 +22,7 @@ export default function UserList({
   loading,
   onEditUser,
   onDeleteUser,
+  onResendInvitation,
   currentUser,
 }) {
   const getUserTypeLabel = (userType) => {
@@ -154,21 +156,35 @@ export default function UserList({
               <td className="px-8 py-6 whitespace-nowrap">
                 <span
                   className={`inline-flex items-center px-4 py-2 rounded-[5px] text-sm font-bold  ${
-                    user.is_active === "true"
+                    user.is_active
                       ? "bg-primary-100 text-primary-800 border border-primary-200"
-                      : "bg-red-100 text-red-800 border border-red-200"
+                      : user.password_set_at
+                      ? "bg-red-100 text-red-800 border border-red-200"
+                      : "bg-yellow-100 text-yellow-800 border border-yellow-200"
                   }`}
                 >
-                  {user.is_active === "true" ? (
+                  {user.is_active ? (
                     <CheckCircleIcon className="w-4 h-4 mr-2" />
-                  ) : (
+                  ) : user.password_set_at ? (
                     <XCircleIcon className="w-4 h-4 mr-2" />
+                  ) : (
+                    <ClockIcon className="w-4 h-4 mr-2" />
                   )}
-                  {user.is_active === "true" ? "Active" : "Inactive"}
+                  {user.is_active ? "Active" : user.password_set_at ? "Inactive" : "Pending Invitation"}
                 </span>
               </td>
               <td className="px-8 py-6 whitespace-nowrap text-right">
                 <div className="flex items-center justify-end space-x-3">
+                  {!user.is_active && !user.password_set_at && (
+                    <button
+                      onClick={() => onResendInvitation?.(user)}
+                      className="bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
+                      title="Resend invitation email"
+                    >
+                      <ArrowPathIcon className="w-4 h-4 mr-1" />
+                      Resend
+                    </button>
+                  )}
                   <button
                     onClick={() => onEditUser(user)}
                     className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200    flex items-center cursor-pointer"

@@ -84,10 +84,20 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Temporary Password
+                  Invitation Status
                 </label>
-                <p className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 border" style={{borderRadius: '5px'}}>
-                  {temporaryPassword}
+                <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-2 border" style={{borderRadius: '5px'}}>
+                  {temporaryPassword.includes("http") ? (
+                    <>
+                      ✅ Invitation sent successfully!<br />
+                      <span className="text-xs text-gray-600 font-mono">{temporaryPassword}</span>
+                    </>
+                  ) : (
+                    <>
+                      ⚠️ User created but invitation email failed to send<br />
+                      <span className="text-xs text-gray-600">Admin can resend invitation from user list</span>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
