@@ -1,12 +1,8 @@
-FROM node:18-alpine
+FROM akvo/akvo-node-18-alpine:20250306.055839.23cadbd
 
 WORKDIR /app
 
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
-
 COPY . .
-RUN yarn build
 
 EXPOSE 3000
 

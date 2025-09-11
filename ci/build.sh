@@ -45,4 +45,4 @@ backend_build() {
 }
 
 backend_build
-# frontend_build
+frontend_build
