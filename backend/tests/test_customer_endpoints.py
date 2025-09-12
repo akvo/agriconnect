@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models.customer import Customer, CustomerLanguage
 from models.user import User, UserType
+from models.message import Message, MessageFrom
 from utils.auth import create_access_token
 
 
@@ -390,6 +391,7 @@ class TestCustomerEndpoints:
             ("GET", "/api/customers/"),
             ("GET", f"/api/customers/{customer.id}"),
             ("PUT", f"/api/customers/{customer.id}"),
+            ("DELETE", f"/api/customers/{customer.id}"),
             ("GET", "/api/customers/phone/+255123456789")
         ]
         
@@ -400,5 +402,157 @@ class TestCustomerEndpoints:
                 response = client.put(endpoint, json={"full_name": "Test"})
             elif method == "POST":
                 response = client.post(endpoint, json={"phone_number": "+255999888777"})
+            elif method == "DELETE":
+                response = client.delete(endpoint)
             
             assert response.status_code == 403, f"Endpoint {method} {endpoint} should require auth"
+
+    def test_delete_customer(self, client: TestClient, db_session: Session):
+        # Create admin and customer
+        admin = User(
+            email="admin@test.com",
+            phone_number="+255999999999",
+            hashed_password="hashed",
+            user_type=UserType.ADMIN,
+            full_name="Admin User",
+            is_active=True
+        )
+        customer = Customer(
+            phone_number="+255123456789",
+            full_name="John Farmer"
+        )
+        db_session.add_all([admin, customer])
+        db_session.commit()
+        
+        token = create_access_token(data={"sub": admin.email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = client.delete(f"/api/customers/{customer.id}", headers=headers)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "Customer and associated messages deleted successfully" in data["message"]
+        
+        # Verify customer is deleted from database
+        deleted_customer = db_session.query(Customer).filter(Customer.id == customer.id).first()
+        assert deleted_customer is None
+
+    def test_delete_customer_with_messages(self, client: TestClient, db_session: Session):
+        # Create admin, user, customer, and messages
+        admin = User(
+            email="admin@test.com",
+            phone_number="+255999999999",
+            hashed_password="hashed",
+            user_type=UserType.ADMIN,
+            full_name="Admin User",
+            is_active=True
+        )
+        user = User(
+            email="user@test.com",
+            phone_number="+255888888888",
+            hashed_password="hashed",
+            user_type=UserType.EXTENSION_OFFICER,
+            full_name="EO User",
+            is_active=True
+        )
+        customer = Customer(
+            phone_number="+255123456789",
+            full_name="John Farmer"
+        )
+        db_session.add_all([admin, user, customer])
+        db_session.commit()
+        
+        # Create messages associated with the customer
+        message1 = Message(
+            message_sid="MSG001",
+            customer_id=customer.id,
+            user_id=user.id,
+            body="Hello from customer",
+            from_source=MessageFrom.CUSTOMER
+        )
+        message2 = Message(
+            message_sid="MSG002",
+            customer_id=customer.id,
+            user_id=user.id,
+            body="Response from user",
+            from_source=MessageFrom.USER
+        )
+        db_session.add_all([message1, message2])
+        db_session.commit()
+        
+        customer_id = customer.id
+        message1_id = message1.id
+        message2_id = message2.id
+        
+        token = create_access_token(data={"sub": admin.email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = client.delete(f"/api/customers/{customer_id}", headers=headers)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "Customer and associated messages deleted successfully" in data["message"]
+        
+        # Verify customer is deleted from database
+        deleted_customer = db_session.query(Customer).filter(Customer.id == customer_id).first()
+        assert deleted_customer is None
+        
+        # Verify messages are also deleted (cascade delete)
+        deleted_message1 = db_session.query(Message).filter(Message.id == message1_id).first()
+        deleted_message2 = db_session.query(Message).filter(Message.id == message2_id).first()
+        assert deleted_message1 is None
+        assert deleted_message2 is None
+
+    def test_delete_customer_not_found(self, client: TestClient, db_session: Session):
+        admin = User(
+            email="admin@test.com",
+            phone_number="+255999999999",
+            hashed_password="hashed",
+            user_type=UserType.ADMIN,
+            full_name="Admin User",
+            is_active=True
+        )
+        db_session.add(admin)
+        db_session.commit()
+        
+        token = create_access_token(data={"sub": admin.email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = client.delete("/api/customers/999", headers=headers)
+        assert response.status_code == 404
+        assert "Customer not found" in response.json()["detail"]
+
+    def test_delete_customer_unauthorized(self, client: TestClient, db_session: Session):
+        customer = Customer(
+            phone_number="+255123456789",
+            full_name="John Farmer"
+        )
+        db_session.add(customer)
+        db_session.commit()
+        
+        # Test without token
+        response = client.delete(f"/api/customers/{customer.id}")
+        assert response.status_code == 403
+
+    def test_delete_customer_forbidden_for_non_admin(self, client: TestClient, db_session: Session):
+        # Create EO user and customer
+        eo = User(
+            email="eo@test.com",
+            phone_number="+255888888888",
+            hashed_password="hashed",
+            user_type=UserType.EXTENSION_OFFICER,
+            full_name="Extension Officer",
+            is_active=True
+        )
+        customer = Customer(
+            phone_number="+255123456789",
+            full_name="John Farmer"
+        )
+        db_session.add_all([eo, customer])
+        db_session.commit()
+        
+        token = create_access_token(data={"sub": eo.email})
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = client.delete(f"/api/customers/{customer.id}", headers=headers)
+        assert response.status_code == 403

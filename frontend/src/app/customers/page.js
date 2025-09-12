@@ -6,6 +6,7 @@ import api from "../../lib/api";
 import CustomerList from "../../components/customers/CustomerList";
 import CreateCustomerModal from "../../components/customers/CreateCustomerModal";
 import EditCustomerModal from "../../components/customers/EditCustomerModal";
+import DeleteCustomerModal from "../../components/customers/DeleteCustomerModal";
 import EditUserModal from "../../components/users/EditUserModal";
 import HeaderNav from "../../components/HeaderNav";
 import { useRouter } from "next/navigation";
@@ -23,6 +24,7 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
@@ -92,16 +94,18 @@ export default function CustomersPage() {
     setShowEditModal(true);
   };
 
-  const handleDeleteCustomer = async (customerId) => {
-    if (!confirm("Are you sure you want to delete this customer?")) {
-      return;
-    }
+  const handleDeleteCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setShowDeleteModal(true);
+  };
 
+  const handleDeleteConfirmed = async (customerId) => {
     try {
       await api.delete(`/customers/${customerId}`);
       fetchCustomers(); // Refresh the list
     } catch (err) {
       alert(err.response?.data?.detail || "Failed to delete customer");
+      throw err; // Re-throw to let the modal handle the error state
     }
   };
 
@@ -252,6 +256,17 @@ export default function CustomersPage() {
             setSelectedCustomer(null);
           }}
           onCustomerUpdated={handleCustomerUpdated}
+        />
+      )}
+
+      {showDeleteModal && selectedCustomer && (
+        <DeleteCustomerModal
+          customer={selectedCustomer}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setSelectedCustomer(null);
+          }}
+          onDeleteConfirmed={handleDeleteConfirmed}
         />
       )}
 

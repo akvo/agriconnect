@@ -80,3 +80,18 @@ class CustomerService:
         
         return CustomerLanguage.EN
 
+    def delete_customer(self, customer_id: int) -> bool:
+        """Delete a customer and all associated messages."""
+        customer = self.db.query(Customer).filter(Customer.id == customer_id).first()
+        if not customer:
+            return False
+        
+        try:
+            # Delete the customer (messages will be cascaded if configured)
+            self.db.delete(customer)
+            self.db.commit()
+            return True
+        except Exception:
+            self.db.rollback()
+            return False
+

@@ -102,3 +102,19 @@ async def get_customer_by_phone(
         raise HTTPException(status_code=404, detail="Customer not found")
     
     return customer
+
+
+@router.delete("/{customer_id}")
+async def delete_customer(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(admin_required)
+):
+    """Delete customer and all associated messages (admin only)."""
+    customer_service = CustomerService(db)
+    success = customer_service.delete_customer(customer_id)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    return {"message": "Customer and associated messages deleted successfully"}
