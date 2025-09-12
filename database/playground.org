@@ -81,14 +81,12 @@ ON m.customer_id = c.id;
 #+end_src
 
 #+RESULTS: Customer Message
-| body  |   phone_number | created_at                   |
-|-------+----------------+------------------------------|
-| Hello | +6285743333004 | 2025-09-11 08:40:21.53049+00 |
+| body | phone_number | created_at |
+|------+--------------+------------|
 
 #+NAME: Delete Customer
 #+begin_src sql
-TRUNCATE TABLE messages;
-TRUNCATE TABLE customers;
+TRUNCATE TABLE customers CASCADE;
 #+end_src
 
 #+RESULTS: Delete Customer
