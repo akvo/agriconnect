@@ -57,7 +57,7 @@ class TestWhatsAppService:
         ):
             with patch("services.whatsapp_service.Client"):
                 service = WhatsAppService()
-                assert service.whatsapp_number == "+14155238886"
+                assert service.whatsapp_number == "whatsapp:+14155238886"
 
     def test_send_message_success(self):
         with patch.dict(
@@ -91,7 +91,7 @@ class TestWhatsAppService:
                 }
 
                 mock_client_instance.messages.create.assert_called_once_with(
-                    from_="+14155238886",
+                    from_="whatsapp:+14155238886",
                     body="Test message",
                     to="whatsapp:+255123456789",
                 )
@@ -239,7 +239,148 @@ class TestWhatsAppService:
                 service.send_message("+255123456789", "Test message")
 
                 mock_client_instance.messages.create.assert_called_once_with(
-                    from_="+1987654321",  # Custom number used
+                    from_="whatsapp:+1987654321",  # Custom number used
                     body="Test message",
                     to="whatsapp:+255123456789",
+                )
+
+    def test_send_template_message_success(self):
+        with patch.dict(
+            os.environ,
+            {
+                "TWILIO_ACCOUNT_SID": "test_sid",
+                "TWILIO_AUTH_TOKEN": "test_token",
+            },
+        ):
+            with patch("services.whatsapp_service.Client") as mock_client:
+                mock_message = Mock()
+                mock_message.sid = "SM123"
+                mock_message.status = "sent"
+                mock_message.to = "whatsapp:+255123456789"
+                mock_message.body = "Hello John, welcome to AgriConnect!"
+
+                mock_client_instance = Mock()
+                mock_client_instance.messages.create.return_value = (
+                    mock_message
+                )
+                mock_client.return_value = mock_client_instance
+
+                service = WhatsAppService()
+                result = service.send_template_message(
+                    "+255123456789", "HXabc123def456", {"1": "John"}
+                )
+
+                assert result == {
+                    "sid": "SM123",
+                    "status": "sent",
+                    "to": "whatsapp:+255123456789",
+                    "body": "Hello John, welcome to AgriConnect!",
+                }
+
+                mock_client_instance.messages.create.assert_called_once_with(
+                    from_="whatsapp:+14155238886",
+                    to="whatsapp:+255123456789",
+                    content_sid="HXabc123def456",
+                    content_variables={"1": "John"},
+                )
+
+    def test_send_template_message_twilio_error(self):
+        with patch.dict(
+            os.environ,
+            {
+                "TWILIO_ACCOUNT_SID": "test_sid",
+                "TWILIO_AUTH_TOKEN": "test_token",
+            },
+        ):
+            with patch("services.whatsapp_service.Client") as mock_client:
+                mock_client_instance = Mock()
+                mock_client_instance.messages.create.side_effect = Exception(
+                    "Invalid content SID"
+                )
+                mock_client.return_value = mock_client_instance
+
+                service = WhatsAppService()
+
+                with pytest.raises(
+                    Exception,
+                    match="Failed to send WhatsApp template message: Invalid content SID",
+                ):
+                    service.send_template_message(
+                        "+255123456789", "invalid_sid", {"1": "John"}
+                    )
+
+    def test_send_template_message_custom_whatsapp_number(self):
+        with patch.dict(
+            os.environ,
+            {
+                "TWILIO_ACCOUNT_SID": "test_sid",
+                "TWILIO_AUTH_TOKEN": "test_token",
+                "TWILIO_WHATSAPP_NUMBER": "whatsapp:+1987654321",
+            },
+        ):
+            with patch("services.whatsapp_service.Client") as mock_client:
+                mock_message = Mock()
+                mock_message.sid = "SM456"
+                mock_message.status = "sent"
+                mock_message.to = "whatsapp:+255123456789"
+                mock_message.body = "Broadcast message"
+
+                mock_client_instance = Mock()
+                mock_client_instance.messages.create.return_value = (
+                    mock_message
+                )
+                mock_client.return_value = mock_client_instance
+
+                service = WhatsAppService()
+                service.send_template_message(
+                    "+255123456789",
+                    "HXbroadcast789",
+                    {"1": "AgriConnect Updates"},
+                )
+
+                mock_client_instance.messages.create.assert_called_once_with(
+                    from_="whatsapp:+1987654321",  # Custom number used
+                    to="whatsapp:+255123456789",
+                    content_sid="HXbroadcast789",
+                    content_variables={"1": "AgriConnect Updates"},
+                )
+
+    def test_send_template_message_multiple_variables(self):
+        with patch.dict(
+            os.environ,
+            {
+                "TWILIO_ACCOUNT_SID": "test_sid",
+                "TWILIO_AUTH_TOKEN": "test_token",
+            },
+        ):
+            with patch("services.whatsapp_service.Client") as mock_client:
+                mock_message = Mock()
+                mock_message.sid = "SM789"
+                mock_message.status = "sent"
+                mock_message.to = "whatsapp:+255123456789"
+                mock_message.body = "Hello John, you have 5 unread messages"
+
+                mock_client_instance = Mock()
+                mock_client_instance.messages.create.return_value = (
+                    mock_message
+                )
+                mock_client.return_value = mock_client_instance
+
+                service = WhatsAppService()
+                result = service.send_template_message(
+                    "+255123456789", "HXreconnect123", {"1": "John", "2": "5"}
+                )
+
+                assert result == {
+                    "sid": "SM789",
+                    "status": "sent",
+                    "to": "whatsapp:+255123456789",
+                    "body": "Hello John, you have 5 unread messages",
+                }
+
+                mock_client_instance.messages.create.assert_called_once_with(
+                    from_="whatsapp:+14155238886",
+                    to="whatsapp:+255123456789",
+                    content_sid="HXreconnect123",
+                    content_variables={"1": "John", "2": "5"},
                 )
