@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy.orm import Session
-from models.customer import Customer, CustomerLanguage
+
+from models.customer import Customer
 from models.message import Message, MessageFrom
 from models.user import User, UserType
 
@@ -15,7 +16,7 @@ class TestMessageModel:
             message_sid="SM12345678",
             customer_id=customer.id,
             body="Hello, I need help with farming",
-            from_source=MessageFrom.CUSTOMER
+            from_source=MessageFrom.CUSTOMER,
         )
         db_session.add(message)
         db_session.commit()
@@ -37,7 +38,7 @@ class TestMessageModel:
             hashed_password="hashed",
             user_type=UserType.ADMIN,
             full_name="Admin User",
-            is_active=True
+            is_active=True,
         )
         db_session.add_all([customer, user])
         db_session.commit()
@@ -47,7 +48,7 @@ class TestMessageModel:
             customer_id=customer.id,
             user_id=user.id,
             body="How can we help you today?",
-            from_source=MessageFrom.USER
+            from_source=MessageFrom.USER,
         )
         db_session.add(message)
         db_session.commit()
@@ -66,7 +67,7 @@ class TestMessageModel:
             message_sid="SM_AI_001",
             customer_id=customer.id,
             body="Based on your location, here are some crop recommendations...",
-            from_source=MessageFrom.LLM
+            from_source=MessageFrom.LLM,
         )
         db_session.add(message)
         db_session.commit()
@@ -76,7 +77,9 @@ class TestMessageModel:
         assert message.user_id is None
 
     def test_message_customer_relationship(self, db_session: Session):
-        customer = Customer(phone_number="+255123456789", full_name="John Farmer")
+        customer = Customer(
+            phone_number="+255123456789", full_name="John Farmer"
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -84,7 +87,7 @@ class TestMessageModel:
             message_sid="SM12345678",
             customer_id=customer.id,
             body="Test message",
-            from_source=MessageFrom.CUSTOMER
+            from_source=MessageFrom.CUSTOMER,
         )
         db_session.add(message)
         db_session.commit()
@@ -101,7 +104,7 @@ class TestMessageModel:
             hashed_password="hashed",
             user_type=UserType.EXTENSION_OFFICER,
             full_name="Extension Officer",
-            is_active=True
+            is_active=True,
         )
         db_session.add_all([customer, user])
         db_session.commit()
@@ -111,7 +114,7 @@ class TestMessageModel:
             customer_id=customer.id,
             user_id=user.id,
             body="Let me help you with that",
-            from_source=MessageFrom.USER
+            from_source=MessageFrom.USER,
         )
         db_session.add(message)
         db_session.commit()
@@ -129,13 +132,13 @@ class TestMessageModel:
             message_sid="SM12345678",
             customer_id=customer.id,
             body="First message",
-            from_source=MessageFrom.CUSTOMER
+            from_source=MessageFrom.CUSTOMER,
         )
         message2 = Message(
             message_sid="SM12345678",  # Same message_sid
             customer_id=customer.id,
             body="Second message",
-            from_source=MessageFrom.CUSTOMER
+            from_source=MessageFrom.CUSTOMER,
         )
 
         db_session.add(message1)
@@ -154,13 +157,13 @@ class TestMessageModel:
             message_sid="SM1",
             customer_id=customer.id,
             body="First message",
-            from_source=MessageFrom.CUSTOMER
+            from_source=MessageFrom.CUSTOMER,
         )
         message2 = Message(
             message_sid="SM2",
             customer_id=customer.id,
             body="Second message",
-            from_source=MessageFrom.CUSTOMER
+            from_source=MessageFrom.CUSTOMER,
         )
         db_session.add_all([message1, message2])
         db_session.commit()

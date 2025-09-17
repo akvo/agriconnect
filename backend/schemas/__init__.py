@@ -1,4 +1,7 @@
-from .user import UserCreate, UserResponse, LoginRequest, TokenResponse
-from .customer import CustomerCreate, CustomerUpdate, CustomerResponse
+from .customer import CustomerCreate, CustomerResponse, CustomerUpdate
+from .user import LoginRequest, TokenResponse, UserCreate, UserResponse
 
-__all__ = ["UserCreate", "UserResponse", "LoginRequest", "TokenResponse", "CustomerCreate", "CustomerUpdate", "CustomerResponse"]
+__all__ = [
+    "UserCreate", "UserResponse", "LoginRequest", "TokenResponse",
+    "CustomerCreate", "CustomerUpdate", "CustomerResponse"
+]

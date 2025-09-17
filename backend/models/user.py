@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean
-from sqlalchemy.sql import func
-from database import Base
 import enum
+
+from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, String
+from sqlalchemy.sql import func
+
+from database import Base
 
 
 class UserType(enum.Enum):

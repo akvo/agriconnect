@@ -1,29 +1,30 @@
 import uuid
-from fastapi import status
+
 import pytest
+from fastapi import status
+
 from models.user import UserType
 
 
 class TestUserLogin:
     def test_login_success(self, client, db_session):
         """Test successful user login"""
-        from services.user_service import UserService
-        from schemas.user import UserCreate
 
         unique_id = str(uuid.uuid4())[:8]
         # Create user directly for testing (bypass invitation system)
-        from models.user import User
         from passlib.context import CryptContext
-        
+
+        from models.user import User
+
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        
+
         user = User(
             email=f"login-{unique_id}@example.com",
             phone_number=f"+123456789{unique_id[:3]}",
             hashed_password=pwd_context.hash("testpassword123"),
             full_name="Login User",
             user_type=UserType.ADMIN,
-            is_active=True
+            is_active=True,
         )
         db_session.add(user)
         db_session.commit()
@@ -41,7 +42,10 @@ class TestUserLogin:
 
     def test_login_invalid_email(self, client):
         """Test login with non-existent email"""
-        login_data = {"email": "nonexistent@example.com", "password": "password123"}
+        login_data = {
+            "email": "nonexistent@example.com",
+            "password": "password123",
+        }
         response = client.post("/api/auth/login/", json=login_data)
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -49,23 +53,22 @@ class TestUserLogin:
 
     def test_login_wrong_password(self, client, db_session):
         """Test login with wrong password"""
-        from services.user_service import UserService
-        from schemas.user import UserCreate
 
         unique_id = str(uuid.uuid4())[:8]
         # Create user directly for testing (bypass invitation system)
-        from models.user import User
         from passlib.context import CryptContext
-        
+
+        from models.user import User
+
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        
+
         user = User(
             email=f"wrong-pass-{unique_id}@example.com",
             phone_number=f"+123456789{unique_id[:3]}",
             hashed_password=pwd_context.hash("correctpassword"),
             full_name="Wrong Pass User",
             user_type=UserType.ADMIN,
-            is_active=True
+            is_active=True,
         )
         db_session.add(user)
         db_session.commit()
@@ -82,23 +85,22 @@ class TestUserLogin:
 @pytest.fixture
 def authenticated_user_token(client, db_session):
     """Create a user and return authentication token"""
-    from services.user_service import UserService
-    from schemas.user import UserCreate
 
     unique_id = str(uuid.uuid4())[:8]
     # Create user directly for testing (bypass invitation system)
-    from models.user import User
     from passlib.context import CryptContext
-    
+
+    from models.user import User
+
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    
+
     user = User(
         email=f"auth-{unique_id}@example.com",
         phone_number=f"+123456789{unique_id[:3]}",
         hashed_password=pwd_context.hash("testpassword123"),
         full_name="Authenticated User",
         user_type=UserType.ADMIN,
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.commit()
@@ -111,7 +113,7 @@ def authenticated_user_token(client, db_session):
     )
     assert login_response.status_code == status.HTTP_200_OK
     token = login_response.json()["access_token"]
-    
+
     return {"token": token, "user": user}
 
 
@@ -141,7 +143,7 @@ class TestUserProfile:
 
         update_data = {
             "full_name": "Updated Name",
-            "phone_number": "+9876543210"
+            "phone_number": "+9876543210",
         }
         response = client.put(
             "/api/auth/profile/",
@@ -154,13 +156,15 @@ class TestUserProfile:
         assert data["full_name"] == "Updated Name"
         assert data["phone_number"] == "+9876543210"
 
-    def test_update_profile_change_password(self, client, authenticated_user_token):
+    def test_update_profile_change_password(
+        self, client, authenticated_user_token
+    ):
         """Test changing password"""
         token = authenticated_user_token["token"]
 
         update_data = {
             "current_password": "testpassword123",
-            "new_password": "newpassword123"
+            "new_password": "newpassword123",
         }
         response = client.put(
             "/api/auth/profile/",
@@ -170,13 +174,15 @@ class TestUserProfile:
 
         assert response.status_code == status.HTTP_200_OK
 
-    def test_update_profile_wrong_current_password(self, client, authenticated_user_token):
+    def test_update_profile_wrong_current_password(
+        self, client, authenticated_user_token
+    ):
         """Test changing password with wrong current password"""
         token = authenticated_user_token["token"]
 
         update_data = {
             "current_password": "wrongpassword",
-            "new_password": "newpassword123"
+            "new_password": "newpassword123",
         }
         response = client.put(
             "/api/auth/profile/",
@@ -187,13 +193,15 @@ class TestUserProfile:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Current password is incorrect" in response.json()["detail"]
 
-    def test_update_profile_same_password(self, client, authenticated_user_token):
+    def test_update_profile_same_password(
+        self, client, authenticated_user_token
+    ):
         """Test changing to same password"""
         token = authenticated_user_token["token"]
 
         update_data = {
             "current_password": "testpassword123",
-            "new_password": "testpassword123"
+            "new_password": "testpassword123",
         }
         response = client.put(
             "/api/auth/profile/",
@@ -204,7 +212,9 @@ class TestUserProfile:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "New password must be different" in response.json()["detail"]
 
-    def test_update_profile_incomplete_password_change(self, client, authenticated_user_token):
+    def test_update_profile_incomplete_password_change(
+        self, client, authenticated_user_token
+    ):
         """Test incomplete password change (missing current_password)"""
         token = authenticated_user_token["token"]
 
@@ -216,28 +226,32 @@ class TestUserProfile:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Both current_password and new_password are required for password change" in response.json()["detail"]
+        assert (
+            "Both current_password and new_password are required for password change"
+            in response.json()["detail"]
+        )
 
-    def test_update_profile_duplicate_phone(self, client, authenticated_user_token, db_session):
+    def test_update_profile_duplicate_phone(
+        self, client, authenticated_user_token, db_session
+    ):
         """Test updating to duplicate phone number"""
-        from services.user_service import UserService
-        from schemas.user import UserCreate
 
         # Create another user with a phone number
         unique_id = str(uuid.uuid4())[:8]
         # Create another user directly for testing
-        from models.user import User
         from passlib.context import CryptContext
-        
+
+        from models.user import User
+
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        
+
         other_user = User(
             email=f"other-{unique_id}@example.com",
             phone_number="+1111111111",
             hashed_password=pwd_context.hash("testpassword123"),
             full_name="Other User",
             user_type=UserType.EXTENSION_OFFICER,
-            is_active=True
+            is_active=True,
         )
         db_session.add(other_user)
         db_session.commit()
@@ -255,14 +269,16 @@ class TestUserProfile:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Phone number already in use" in response.json()["detail"]
 
-    def test_update_profile_combined_changes(self, client, authenticated_user_token):
+    def test_update_profile_combined_changes(
+        self, client, authenticated_user_token
+    ):
         """Test updating profile and password together"""
         token = authenticated_user_token["token"]
 
         update_data = {
             "full_name": "Combined Update",
             "current_password": "testpassword123",
-            "new_password": "combinedpassword123"
+            "new_password": "combinedpassword123",
         }
         response = client.put(
             "/api/auth/profile/",

@@ -1,29 +1,30 @@
-from fastapi import APIRouter, Depends, HTTPException, Form
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Form, HTTPException
 from sqlalchemy.orm import Session
+
 from database import get_db
+from models.message import Message, MessageFrom
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
-from models.message import Message, MessageFrom
-from typing import Annotated
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
 
 @router.post("/webhook")
 async def whatsapp_webhook(
-    From: Annotated[str, Form()],
-    Body: Annotated[str, Form()],
-    MessageSid: Annotated[str, Form()],
-    db: Session = Depends(get_db),
+        From: Annotated[str, Form()],
+        Body: Annotated[str, Form()],
+        MessageSid: Annotated[str, Form()],
+        db: Session = Depends(get_db),
 ):
     print("TEST")
     """Handle incoming WhatsApp messages from Twilio."""
     try:
         phone_number = From.replace("whatsapp:", "")
 
-        existing_message = (
-            db.query(Message).filter(Message.message_sid == MessageSid).first()
-        )
+        existing_message = (db.query(Message).filter(
+            Message.message_sid == MessageSid).first())
         if existing_message:
             return {
                 "status": "success",
@@ -34,16 +35,11 @@ async def whatsapp_webhook(
 
         customer = customer_service.get_or_create_customer(phone_number, Body)
         if not customer:
-            raise HTTPException(
-                status_code=500, detail="Failed to create or retrieve customer"
-            )
+            raise HTTPException(status_code=500,
+                                detail="Failed to create or retrieve customer")
 
-        is_new_customer = (
-            db.query(Message)
-            .filter(Message.customer_id == customer.id)
-            .count()
-            == 0
-        )
+        is_new_customer = (db.query(Message).filter(
+            Message.customer_id == customer.id).count() == 0)
 
         message = Message(
             message_sid=MessageSid,
@@ -58,9 +54,8 @@ async def whatsapp_webhook(
             try:
                 whatsapp_service = WhatsAppService()
                 language_code = customer.language.value
-                whatsapp_service.send_welcome_message(
-                    phone_number, language_code
-                )
+                whatsapp_service.send_welcome_message(phone_number,
+                                                      language_code)
             except Exception as welcome_error:
                 print(f"Failed to send welcome message: {welcome_error}")
 

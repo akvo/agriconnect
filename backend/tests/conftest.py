@@ -1,8 +1,9 @@
-import pytest
 import os
+
+import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from fastapi.testclient import TestClient
 
 from database import Base, get_db
 from main import app
@@ -38,8 +39,9 @@ def db_session(test_db):
         db.rollback()
         # Clean up all tables after each test
         from models import Customer, Message, User
+
         db.query(Message).delete()
-        db.query(Customer).delete() 
+        db.query(Customer).delete()
         db.query(User).delete()
         db.commit()
         db.close()

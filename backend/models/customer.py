@@ -1,8 +1,10 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum
+import enum
+
+from sqlalchemy import Column, DateTime, Enum, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
 from database import Base
-import enum
 
 
 class CustomerLanguage(enum.Enum):
@@ -19,5 +21,7 @@ class Customer(Base):
     language = Column(Enum(CustomerLanguage), default=CustomerLanguage.EN)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    messages = relationship("Message", back_populates="customer", cascade="all, delete-orphan")
+
+    messages = relationship("Message",
+                            back_populates="customer",
+                            cascade="all, delete-orphan")

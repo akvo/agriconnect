@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, EmailStr, field_validator
+
 from models.user import UserType
 from utils.validators import validate_phone_number
 
@@ -116,13 +118,15 @@ class SelfUpdateRequest(BaseModel):
     def validate_password_fields(cls, values):
         current_password = values.get('current_password')
         new_password = values.get('new_password')
-        
+
         # If changing password, both fields are required
         if new_password and not current_password:
-            raise ValueError("current_password is required when changing password")
+            raise ValueError(
+                "current_password is required when changing password")
         if current_password and not new_password:
-            raise ValueError("new_password is required when providing current_password")
-        
+            raise ValueError(
+                "new_password is required when providing current_password")
+
         return values
 
 
@@ -136,7 +140,7 @@ class TokenResponse(BaseModel):
 class AcceptInvitationRequest(BaseModel):
     invitation_token: str
     password: str
-    
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v):

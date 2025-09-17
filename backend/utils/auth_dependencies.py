@@ -1,15 +1,16 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
+
 from database import get_db
 from models.user import User, UserType
 from services.user_service import UserService
 from utils.auth import verify_token
 from utils.constants import (
+    ADMIN_ACCESS_REQUIRED,
+    INACTIVE_USER,
     INVALID_AUTH_CREDENTIALS,
     USER_NOT_FOUND,
-    INACTIVE_USER,
-    ADMIN_ACCESS_REQUIRED,
     WWW_AUTHENTICATE_HEADER,
 )
 
@@ -17,8 +18,8 @@ security = HTTPBearer()
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        db: Session = Depends(get_db),
 ) -> User:
     """Get current authenticated user"""
     try:

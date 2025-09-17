@@ -1,15 +1,14 @@
 import pytest
 from sqlalchemy.orm import Session
+
 from models.customer import Customer, CustomerLanguage
-from models.message import Message, MessageFrom
 from services.customer_service import CustomerService
 
 
 class TestCustomerModel:
     def test_create_customer(self, db_session: Session):
         customer = Customer(
-            phone_number="+255123456789",
-            language=CustomerLanguage.EN
+            phone_number="+255123456789", language=CustomerLanguage.EN
         )
         db_session.add(customer)
         db_session.commit()
@@ -25,7 +24,7 @@ class TestCustomerModel:
         customer = Customer(
             phone_number="+255987654321",
             full_name="John Farmer",
-            language=CustomerLanguage.SW
+            language=CustomerLanguage.SW,
         )
         db_session.add(customer)
         db_session.commit()
@@ -37,10 +36,10 @@ class TestCustomerModel:
     def test_unique_phone_constraint(self, db_session: Session):
         customer1 = Customer(phone_number="+255111111111")
         customer2 = Customer(phone_number="+255111111111")
-        
+
         db_session.add(customer1)
         db_session.commit()
-        
+
         db_session.add(customer2)
         with pytest.raises(Exception):  # Should raise IntegrityError
             db_session.commit()
@@ -67,12 +66,16 @@ class TestCustomerService:
 
     def test_create_customer(self, db_session: Session):
         service = CustomerService(db_session)
-        customer = service.create_customer("+255123456789", CustomerLanguage.SW)
+        customer = service.create_customer(
+            "+255123456789", CustomerLanguage.SW
+        )
 
         assert customer.phone_number == "+255123456789"
         assert customer.language == CustomerLanguage.SW
 
-    def test_create_customer_duplicate_returns_existing(self, db_session: Session):
+    def test_create_customer_duplicate_returns_existing(
+        self, db_session: Session
+    ):
         existing = Customer(phone_number="+255123456789", full_name="John")
         db_session.add(existing)
         db_session.commit()
@@ -86,10 +89,14 @@ class TestCustomerService:
 
     def test_get_or_create_customer_new(self, db_session: Session):
         service = CustomerService(db_session)
-        customer = service.get_or_create_customer("+255123456789", "Hello there")
+        customer = service.get_or_create_customer(
+            "+255123456789", "Hello there"
+        )
 
         assert customer.phone_number == "+255123456789"
-        assert customer.language == CustomerLanguage.EN  # Default for English greeting
+        assert (
+            customer.language == CustomerLanguage.EN
+        )  # Default for English greeting
 
     def test_get_or_create_customer_existing(self, db_session: Session):
         existing = Customer(phone_number="+255123456789", full_name="Jane")
@@ -109,9 +116,7 @@ class TestCustomerService:
 
         service = CustomerService(db_session)
         updated = service.update_customer_profile(
-            customer.id, 
-            full_name="Updated Name",
-            language=CustomerLanguage.SW
+            customer.id, full_name="Updated Name", language=CustomerLanguage.SW
         )
 
         assert updated.full_name == "Updated Name"
@@ -125,46 +130,45 @@ class TestCustomerService:
 
     def test_detect_language_swahili(self, db_session: Session):
         service = CustomerService(db_session)
-        
+
         # Test various Swahili greetings
         swahili_messages = [
             "Hujambo",
             "mambo vipi",
             "Habari za leo",
             "SALAMA",
-            "shikamoo mzee"
+            "shikamoo mzee",
         ]
-        
+
         for message in swahili_messages:
             language = service._detect_language_from_message(message)
-            assert language == CustomerLanguage.SW, f"Failed for message: {message}"
+            assert (
+                language == CustomerLanguage.SW
+            ), f"Failed for message: {message}"
 
     def test_detect_language_english(self, db_session: Session):
         service = CustomerService(db_session)
-        
+
         english_messages = [
             "Hello",
             "Hi there",
             "Good morning",
             "GOOD AFTERNOON",
-            "hey how are you"
+            "hey how are you",
         ]
-        
+
         for message in english_messages:
             language = service._detect_language_from_message(message)
-            assert language == CustomerLanguage.EN, f"Failed for message: {message}"
+            assert (
+                language == CustomerLanguage.EN
+            ), f"Failed for message: {message}"
 
     def test_detect_language_default(self, db_session: Session):
         service = CustomerService(db_session)
-        
+
         # Test unknown language defaults to English
-        unknown_messages = [
-            "Bonjour",
-            "Guten Tag",
-            "Konnichiwa",
-            ""
-        ]
-        
+        unknown_messages = ["Bonjour", "Guten Tag", "Konnichiwa", ""]
+
         for message in unknown_messages:
             language = service._detect_language_from_message(message)
             assert language == CustomerLanguage.EN

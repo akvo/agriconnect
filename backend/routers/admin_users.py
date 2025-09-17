@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
 from typing import Optional
 
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+
 from database import get_db
+from models.user import User
 from schemas.user import (
     AdminUserCreate,
     AdminUserCreateResponse,
@@ -13,7 +15,6 @@ from schemas.user import (
 )
 from services.user_service import UserService
 from utils.auth_dependencies import admin_required
-from models.user import User
 
 router = APIRouter(prefix="/admin/users", tags=["admin-users"])
 
@@ -51,15 +52,20 @@ async def create_user_by_admin(
     invitation_url = None
     if user.invitation_token:
         import os
+
         web_domain = os.getenv("WEBDOMAIN", "localhost")
         protocol = "https" if web_domain != "localhost" else "http"
-        invitation_url = f"{protocol}://{web_domain}/accept-invitation/{user.invitation_token}"
+        invitation_url = "{}://{}/accept-invitation/{}".format(
+            protocol, web_domain, user.invitation_token
+        )
 
     return AdminUserCreateResponse(
-        message="User invited successfully" if email_sent else "User created but email failed to send",
+        message="User invited successfully"
+        if email_sent
+        else "User created but email failed to send",
         user=UserResponse.model_validate(user),
         invitation_sent=email_sent,
-        invitation_url=invitation_url
+        invitation_url=invitation_url,
     )
 
 
@@ -107,8 +113,10 @@ async def resend_invitation(
     email_sent = await UserService.resend_invitation(
         db, user_id, invited_by_name=current_user.full_name
     )
-    
+
     return {
-        "message": "Invitation resent successfully" if email_sent else "Invitation resent but email failed to send",
-        "email_sent": email_sent
+        "message": "Invitation resent successfully"
+        if email_sent
+        else "Invitation resent but email failed to send",
+        "email_sent": email_sent,
     }

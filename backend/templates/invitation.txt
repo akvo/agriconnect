@@ -1,0 +1,21 @@
+Welcome to AgriConnect!
+
+Hello {{ full_name }}!
+
+You have been invited to join AgriConnect as a {{ user_type_display }} by {{ invited_by_name }}.
+
+Your Account Details:
+Email: {{ email }}
+Role: {{ user_type_display }}
+
+To complete your account setup, please visit the following link to set your password:
+{{ invitation_url }}
+
+IMPORTANT: This invitation link will expire in 7 days.
+
+About AgriConnect:
+AgriConnect is a comprehensive agricultural extension platform designed to connect farmers with agricultural services and support.
+
+If you have any questions, please contact your administrator.
+
+© 2025 AgriConnect Platform

@@ -1,7 +1,7 @@
 import os
-from twilio.rest import Client
-from typing import Dict, Any
+from typing import Any, Dict
 
+from twilio.rest import Client
 
 # Store content sid that we get from Twilio console
 # How to get content sid: https://www.twilio.com/docs/whatsapp/api/message-templates
@@ -19,11 +19,11 @@ class WhatsAppService:
         whatsapp_number = os.getenv(
             "TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886"
         )
-        
+
         # Ensure whatsapp: prefix is present
         if not whatsapp_number.startswith("whatsapp:"):
             whatsapp_number = f"whatsapp:{whatsapp_number}"
-        
+
         self.whatsapp_number = whatsapp_number
 
         if not self.account_sid or not self.auth_token:

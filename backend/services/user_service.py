@@ -1,34 +1,42 @@
-import secrets
-import string
 import uuid
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_
+
 from fastapi import HTTPException, status
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from models.user import User
-from schemas.user import UserCreate, AdminUserCreate, UserUpdate, SelfUpdateRequest
-from utils.auth import get_password_hash, verify_password
-from utils.constants import (
-    EMAIL_ALREADY_REGISTERED,
-    PHONE_ALREADY_REGISTERED,
-    PHONE_ALREADY_IN_USE,
-    INVALID_EMAIL_OR_PASSWORD,
-    USER_NOT_FOUND,
-    USER_ACCOUNT_INACTIVE,
-    USER_REGISTRATION_FAILED,
-    USER_CREATION_FAILED,
-    UPDATE_FAILED,
-    DELETE_FAILED,
-    CANNOT_DELETE_OWN_ACCOUNT,
+from schemas.user import (
+    AdminUserCreate,
+    SelfUpdateRequest,
+    UserCreate,
+    UserUpdate,
 )
 from services.email_service import email_service
+from utils.auth import get_password_hash, verify_password
+from utils.constants import (
+    CANNOT_DELETE_OWN_ACCOUNT,
+    DELETE_FAILED,
+    EMAIL_ALREADY_REGISTERED,
+    INVALID_EMAIL_OR_PASSWORD,
+    PHONE_ALREADY_IN_USE,
+    PHONE_ALREADY_REGISTERED,
+    UPDATE_FAILED,
+    USER_ACCOUNT_INACTIVE,
+    USER_CREATION_FAILED,
+    USER_NOT_FOUND,
+    USER_REGISTRATION_FAILED,
+)
 
 
 class UserService:
     @staticmethod
     def _check_user_exists(db: Session, email: str, phone_number: str) -> None:
-        """Check if user already exists by email or phone number and raise appropriate exception"""
+        """
+        Check if user already exists by email
+        or phone number and raise appropriate exception
+        """
         existing_user = (
             db.query(User)
             .filter(
@@ -52,7 +60,9 @@ class UserService:
     @staticmethod
     def create_user(db: Session, user_data: UserCreate) -> User:
         # Check if user already exists
-        UserService._check_user_exists(db, user_data.email, user_data.phone_number)
+        UserService._check_user_exists(
+            db, user_data.email, user_data.phone_number
+        )
 
         # Create new user
         hashed_password = get_password_hash(user_data.password)
@@ -107,11 +117,15 @@ class UserService:
 
     @staticmethod
     async def admin_create_user(
-        db: Session, user_data: AdminUserCreate, invited_by_name: str = "Administrator"
+        db: Session,
+        user_data: AdminUserCreate,
+        invited_by_name: str = "Administrator",
     ) -> tuple[User, bool]:
         """Create user by admin with email invitation"""
         # Check if user already exists
-        UserService._check_user_exists(db, user_data.email, user_data.phone_number)
+        UserService._check_user_exists(
+            db, user_data.email, user_data.phone_number
+        )
 
         # Generate invitation token and expiration
         invitation_token = UserService.generate_invitation_token()
@@ -134,18 +148,18 @@ class UserService:
             db.add(db_user)
             db.commit()
             db.refresh(db_user)
-            
+
             # Send invitation email
             email_sent = await email_service.send_invitation_email(
                 email=user_data.email,
                 full_name=user_data.full_name,
                 invitation_token=invitation_token,
                 user_type=user_data.user_type.value,
-                invited_by_name=invited_by_name
+                invited_by_name=invited_by_name,
             )
-            
+
             return db_user, email_sent
-            
+
         except IntegrityError:
             db.rollback()
             raise HTTPException(
@@ -176,70 +190,82 @@ class UserService:
         return users, total
 
     @staticmethod
-    def verify_invitation_token(db: Session, invitation_token: str) -> tuple[bool, bool, User]:
+    def verify_invitation_token(
+        db: Session, invitation_token: str
+    ) -> tuple[bool, bool, User]:
         """
         Verify invitation token validity and expiration
-        
+
         Returns:
             tuple: (is_valid, is_expired, user_or_none)
         """
-        user = db.query(User).filter(User.invitation_token == invitation_token).first()
-        
+        user = (
+            db.query(User)
+            .filter(User.invitation_token == invitation_token)
+            .first()
+        )
+
         if not user:
             return False, False, None
-        
+
         if user.is_active:
             return False, False, user  # Already activated
-        
+
         # Handle timezone-aware comparison
         current_time = datetime.utcnow()
         if user.invitation_expires_at.tzinfo is not None:
-            # If invitation_expires_at is timezone-aware, make current_time timezone-aware
+            # If invitation_expires_at is timezone-aware, make current_time
+            # timezone-aware
             from datetime import timezone
+
             current_time = current_time.replace(tzinfo=timezone.utc)
-        
+
         is_expired = current_time > user.invitation_expires_at
         return True, is_expired, user
 
     @staticmethod
-    def accept_invitation(db: Session, invitation_token: str, password: str) -> User:
+    def accept_invitation(
+        db: Session, invitation_token: str, password: str
+    ) -> User:
         """Accept invitation and activate user account"""
-        is_valid, is_expired, user = UserService.verify_invitation_token(db, invitation_token)
-        
+        is_valid, is_expired, user = UserService.verify_invitation_token(
+            db, invitation_token
+        )
+
         if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid invitation token"
+                detail="Invalid invitation token",
             )
-        
+
         if is_expired:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invitation token has expired"
+                detail="Invitation token has expired",
             )
-        
+
         if user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Account is already activated"
+                detail="Account is already activated",
             )
-        
+
         try:
             # Set password and activate account
             user.hashed_password = get_password_hash(password)
             user.is_active = True
             user.password_set_at = datetime.utcnow()
             user.invitation_token = None  # Clear token after use
-            
+
             db.commit()
             db.refresh(user)
             return user
-            
+
         except IntegrityError:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to activate account"
+                detail="Failed to activate account",
             )
 
     @staticmethod
@@ -248,44 +274,43 @@ class UserService:
     ) -> bool:
         """Resend invitation email to user"""
         user = db.query(User).filter(User.id == user_id).first()
-        
+
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=USER_NOT_FOUND
+                status_code=status.HTTP_404_NOT_FOUND, detail=USER_NOT_FOUND
             )
-        
+
         if user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User account is already active"
+                detail="User account is already active",
             )
-        
+
         try:
             # Generate new invitation token and expiration
             user.invitation_token = UserService.generate_invitation_token()
             user.invitation_sent_at = datetime.utcnow()
             user.invitation_expires_at = datetime.utcnow() + timedelta(days=7)
-            
+
             db.commit()
             db.refresh(user)
-            
+
             # Send invitation email
             email_sent = await email_service.send_invitation_email(
                 email=user.email,
                 full_name=user.full_name,
                 invitation_token=user.invitation_token,
                 user_type=user.user_type.value,
-                invited_by_name=invited_by_name
+                invited_by_name=invited_by_name,
             )
-            
+
             return email_sent
-            
+
         except Exception:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to resend invitation"
+                detail="Failed to resend invitation",
             )
 
     @staticmethod
@@ -328,7 +353,7 @@ class UserService:
         if user_data.user_type is not None and user.id == current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Cannot change your own role"
+                detail="Cannot change your own role",
             )
 
         # Update fields
@@ -382,21 +407,25 @@ class UserService:
             if not (update_data.new_password and update_data.current_password):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Both current_password and new_password are required for password change"
+                    detail="current_password and new_password are required",
                 )
-            
+
             # Verify current password
-            if not verify_password(update_data.current_password, current_user.hashed_password):
+            if not verify_password(
+                update_data.current_password, current_user.hashed_password
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Current password is incorrect"
+                    detail="Current password is incorrect",
                 )
-            
+
             # Check if new password is different
-            if verify_password(update_data.new_password, current_user.hashed_password):
+            if verify_password(
+                update_data.new_password, current_user.hashed_password
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="New password must be different from current password"
+                    detail="New password must be different",
                 )
 
         # Check phone number conflicts if updating
@@ -424,7 +453,9 @@ class UserService:
         if update_data.phone_number is not None:
             current_user.phone_number = update_data.phone_number
         if update_data.new_password is not None:
-            current_user.hashed_password = get_password_hash(update_data.new_password)
+            current_user.hashed_password = get_password_hash(
+                update_data.new_password
+            )
 
         try:
             db.commit()

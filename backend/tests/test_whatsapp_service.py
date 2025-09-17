@@ -1,6 +1,8 @@
-import pytest
 import os
 from unittest.mock import Mock, patch
+
+import pytest
+
 from services.whatsapp_service import WhatsAppService
 
 
@@ -181,9 +183,7 @@ class TestWhatsAppService:
                 with patch.object(service, "send_message") as mock_send:
                     mock_send.return_value = {"sid": "SM789", "status": "sent"}
 
-                    result = service.send_welcome_message(
-                        "+255123456789", "fr"
-                    )
+                    service.send_welcome_message("+255123456789", "fr")
 
                     # Should default to English
                     expected_message = "Welcome to AgriConnect! We're here to help you with agricultural information and support. How can we assist you today?"
@@ -205,7 +205,7 @@ class TestWhatsAppService:
                 with patch.object(service, "send_message") as mock_send:
                     mock_send.return_value = {"sid": "SM999", "status": "sent"}
 
-                    result = service.send_welcome_message("+255123456789")
+                    service.send_welcome_message("+255123456789")
 
                     # Should default to English
                     expected_message = "Welcome to AgriConnect! We're here to help you with agricultural information and support. How can we assist you today?"

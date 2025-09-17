@@ -1,10 +1,15 @@
+import os
 from datetime import datetime, timedelta
 from typing import Optional
-import os
+
+from fastapi import HTTPException, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status
-from utils.constants import COULD_NOT_VALIDATE_CREDENTIALS, WWW_AUTHENTICATE_HEADER
+
+from utils.constants import (
+    COULD_NOT_VALIDATE_CREDENTIALS,
+    WWW_AUTHENTICATE_HEADER,
+)
 
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
@@ -40,14 +45,17 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_refresh_token(data: dict,
+                         expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
-    encoded_jwt = jwt.encode(to_encode, REFRESH_SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode,
+                             REFRESH_SECRET_KEY,
+                             algorithm=ALGORITHM)
     return encoded_jwt
 
 
