@@ -66,7 +66,7 @@ class TestMessageModel:
         message = Message(
             message_sid="SM_AI_001",
             customer_id=customer.id,
-            body="Based on your location, here are some crop recommendations...",
+            body="Based on your location, here are some recommendations...",
             from_source=MessageFrom.LLM,
         )
         db_session.add(message)

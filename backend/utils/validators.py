@@ -13,5 +13,6 @@ def validate_phone_number(phone_number: str) -> str:
     """
     if not phone_number.startswith("+") or len(phone_number) < 10:
         raise ValueError(
-            "Phone number must start with + and be at least 10 characters")
+            "Phone number must start with + and be at least 10 characters"
+        )
     return phone_number

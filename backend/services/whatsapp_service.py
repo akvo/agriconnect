@@ -1,15 +1,35 @@
+import json
 import os
 from typing import Any, Dict
-
 from twilio.rest import Client
 
 # Store content sid that we get from Twilio console
-# How to get content sid: https://www.twilio.com/docs/whatsapp/api/message-templates
+# How to get content sid:
+# https://www.twilio.com/docs/whatsapp/api/message-templates
 # Example template
 # greetings, broadcast, reconnection
-# GREETINGS = "HI {{1}}, welcome to AgriConnect! How can we assist you today?"
-# BROADCAST = "Hello {{1}}, check out our latest agricultural tips and updates!"
-# RECONNECTION = "There are unread messages from AgriConnect: {{1}}"
+# GREETINGS
+# "HI {{1}}, welcome to AgriConnect! How can we assist you today?"
+# BROADCAST
+# "Hello {{1}}, check out our latest agricultural tips and updates!"
+# RECONNECTION
+# "There are unread messages from AgriConnect: {{1}}"
+
+
+def load_message_templates():
+    """Load WhatsApp messages from template."""
+    try:
+        with open(
+            "templates/whatsapp_messages.json", "r", encoding="utf-8"
+        ) as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading WhatsApp messages: {e}")
+        return {}
+
+
+# Load WhatsApp messages from template
+WHATSAPP_MESSAGES = load_message_templates()
 
 
 class WhatsAppService:
@@ -78,10 +98,13 @@ class WhatsAppService:
         self, to_number: str, language: str = "en"
     ) -> Dict[str, Any]:
         """Send welcome message to new customer."""
-        welcome_messages = {
-            "en": "Welcome to AgriConnect! We're here to help you with agricultural information and support. How can we assist you today?",
-            "sw": "Karibu AgriConnect! Tuko hapa kukusaidia na maelezo na msaada wa kilimo. Tunawezaje kukusaidia leo?",
-        }
+        welcome_messages = WHATSAPP_MESSAGES.get("welcome_messages", {})
 
-        message = welcome_messages.get(language, welcome_messages["en"])
+        message = welcome_messages.get(
+            language, welcome_messages.get("en", "")
+        )
+        if not message:
+            print("No welcome message found for language: {}".format(language))
+            return {}
+
         return self.send_message(to_number, message)

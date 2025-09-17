@@ -227,7 +227,7 @@ class TestUserProfile:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert (
-            "Both current_password and new_password are required for password change"
+            "current_password and new_password are required"
             in response.json()["detail"]
         )
 

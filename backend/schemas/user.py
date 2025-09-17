@@ -116,16 +116,18 @@ class SelfUpdateRequest(BaseModel):
 
     @classmethod
     def validate_password_fields(cls, values):
-        current_password = values.get('current_password')
-        new_password = values.get('new_password')
+        current_password = values.get("current_password")
+        new_password = values.get("new_password")
 
         # If changing password, both fields are required
         if new_password and not current_password:
             raise ValueError(
-                "current_password is required when changing password")
+                "current_password is required when changing password"
+            )
         if current_password and not new_password:
             raise ValueError(
-                "new_password is required when providing current_password")
+                "new_password is required when providing current_password"
+            )
 
         return values
 

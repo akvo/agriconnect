@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from services.whatsapp_service import WhatsAppService
+from services.whatsapp_service import WhatsAppService, load_message_templates
 
 
 class TestWhatsAppService:
@@ -139,7 +139,8 @@ class TestWhatsAppService:
                         "+255123456789", "en"
                     )
 
-                    expected_message = "Welcome to AgriConnect! We're here to help you with agricultural information and support. How can we assist you today?"
+                    templates = load_message_templates()
+                    expected_message = templates["welcome_messages"]["en"]
                     mock_send.assert_called_once_with(
                         "+255123456789", expected_message
                     )
@@ -163,7 +164,8 @@ class TestWhatsAppService:
                         "+255123456789", "sw"
                     )
 
-                    expected_message = "Karibu AgriConnect! Tuko hapa kukusaidia na maelezo na msaada wa kilimo. Tunawezaje kukusaidia leo?"
+                    templates = load_message_templates()
+                    expected_message = templates["welcome_messages"]["sw"]
                     mock_send.assert_called_once_with(
                         "+255123456789", expected_message
                     )
@@ -186,7 +188,8 @@ class TestWhatsAppService:
                     service.send_welcome_message("+255123456789", "fr")
 
                     # Should default to English
-                    expected_message = "Welcome to AgriConnect! We're here to help you with agricultural information and support. How can we assist you today?"
+                    templates = load_message_templates()
+                    expected_message = templates["welcome_messages"]["en"]
                     mock_send.assert_called_once_with(
                         "+255123456789", expected_message
                     )
@@ -208,7 +211,8 @@ class TestWhatsAppService:
                     service.send_welcome_message("+255123456789")
 
                     # Should default to English
-                    expected_message = "Welcome to AgriConnect! We're here to help you with agricultural information and support. How can we assist you today?"
+                    templates = load_message_templates()
+                    expected_message = templates["welcome_messages"]["en"]
                     mock_send.assert_called_once_with(
                         "+255123456789", expected_message
                     )
@@ -300,10 +304,12 @@ class TestWhatsAppService:
                 mock_client.return_value = mock_client_instance
 
                 service = WhatsAppService()
+                failed_message = "Failed to send WhatsApp template message"
+                invalid_content = "Invalid content SID"
 
                 with pytest.raises(
                     Exception,
-                    match="Failed to send WhatsApp template message: Invalid content SID",
+                    match="{}: {}".format(failed_message, invalid_content),
                 ):
                     service.send_template_message(
                         "+255123456789", "invalid_sid", {"1": "John"}

@@ -6,12 +6,12 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # Use test database when running tests
 if os.getenv("TESTING"):
     DATABASE_URL = os.getenv(
-        "DATABASE_URL",
-        "postgresql://akvo:password@db:5432/agriconnect").replace(
-            "agriconnect", "agriconnect_test")
+        "DATABASE_URL", "postgresql://akvo:password@db:5432/agriconnect"
+    ).replace("agriconnect", "agriconnect_test")
 else:
-    DATABASE_URL = os.getenv("DATABASE_URL",
-                             "postgresql://akvo:password@db:5432/agriconnect")
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL", "postgresql://akvo:password@db:5432/agriconnect"
+    )
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
