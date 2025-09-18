@@ -2,6 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from models.customer import Customer, CustomerLanguage
+from models.message import Message, MessageFrom
 from services.service_token_service import ServiceTokenService
 
 
@@ -12,6 +14,34 @@ def service_token_and_plain(db_session: Session):
         db_session, "akvo-rag", "callback:write"
     )
     return service_token, plain_token
+
+
+@pytest.fixture
+def test_customer(db_session: Session):
+    """Create a test customer"""
+    customer = Customer(
+        phone_number="+1234567890", language=CustomerLanguage.EN
+    )
+    db_session.add(customer)
+    db_session.commit()
+    db_session.refresh(customer)
+    return customer
+
+
+@pytest.fixture
+def test_message(db_session: Session, test_customer):
+    """Create a test message from customer"""
+    message = Message(
+        message_sid="test_msg_123",
+        customer_id=test_customer.id,
+        user_id=None,
+        body="Hello, I need help with water treatment",
+        from_source=MessageFrom.CUSTOMER,
+    )
+    db_session.add(message)
+    db_session.commit()
+    db_session.refresh(message)
+    return message
 
 
 def test_ai_callback_success(
@@ -30,15 +60,11 @@ def test_ai_callback_success(
             ],
         },
         "callback_params": {
-            "reply_to": "wa:+679123456",
-            "conversation_id": "conv_123",
+            "message_id": 123,
             "kb_id": 1,
         },
         "trace_id": "trace_001",
-        "event_type": "result",
         "job": "chat",
-        "tenant_id": "tenant-x",
-        "app_id": "app_123",
     }
 
     headers = {"Authorization": f"Bearer {plain_token}"}
@@ -47,6 +73,97 @@ def test_ai_callback_success(
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "job_123"}
+
+
+def test_ai_callback_success_with_message_storage(
+    client: TestClient,
+    service_token_and_plain,
+    test_message,
+    db_session: Session,
+):
+    """Test successful AI callback that stores response in database"""
+    _, plain_token = service_token_and_plain
+
+    payload = {
+        "job_id": "job_456",
+        "stage": "done",
+        "result": {
+            "answer": "Use 2-4 mg/L free chlorine for water treatment",
+            "citations": [
+                {"title": "WHO Water Quality", "url": "https://who.int/water"}
+            ],
+        },
+        "callback_params": {
+            "message_id": test_message.id,  # Use real message ID
+            "kb_id": 1,
+        },
+        "trace_id": "trace_002",
+        "job": "chat",
+    }
+
+    headers = {"Authorization": f"Bearer {plain_token}"}
+
+    response = client.post("/api/callback/ai", json=payload, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "received", "job_id": "job_456"}
+
+    # Verify AI response was stored in database
+    ai_messages = (
+        db_session.query(Message)
+        .filter(Message.from_source == MessageFrom.LLM)
+        .filter(Message.customer_id == test_message.customer_id)
+        .all()
+    )
+
+    assert len(ai_messages) == 1
+    ai_message = ai_messages[0]
+    assert ai_message.body == "Use 2-4 mg/L free chlorine for water treatment"
+    assert ai_message.message_sid == "ai_job_456"
+    assert ai_message.customer_id == test_message.customer_id
+    assert ai_message.from_source == MessageFrom.LLM
+
+
+def test_ai_callback_success_invalid_message_id(
+    client: TestClient, service_token_and_plain, db_session: Session
+):
+    """Test AI callback with invalid message_id - should not store response"""
+    _, plain_token = service_token_and_plain
+
+    payload = {
+        "job_id": "job_invalid",
+        "stage": "done",
+        "result": {
+            "answer": "Use 2-4 mg/L free chlorine for water treatment",
+            "citations": [
+                {"title": "WHO Water Quality", "url": "https://who.int/water"}
+            ],
+        },
+        "callback_params": {
+            "message_id": 99999,  # Non-existent message ID
+            "kb_id": 1,
+        },
+        "trace_id": "trace_invalid",
+        "job": "chat",
+    }
+
+    headers = {"Authorization": f"Bearer {plain_token}"}
+
+    response = client.post("/api/callback/ai", json=payload, headers=headers)
+
+    # Should still return success (callback received)
+    assert response.status_code == 200
+    assert response.json() == {"status": "received", "job_id": "job_invalid"}
+
+    # Verify no AI message was created
+    ai_messages = (
+        db_session.query(Message)
+        .filter(Message.from_source == MessageFrom.LLM)
+        .filter(Message.message_sid == "ai_job_invalid")
+        .all()
+    )
+
+    assert len(ai_messages) == 0
 
 
 def test_ai_callback_failed_job(
@@ -59,14 +176,10 @@ def test_ai_callback_failed_job(
         "job_id": "job_456",
         "stage": "failed",
         "callback_params": {
-            "reply_to": "wa:+679123456",
-            "conversation_id": "conv_123",
+            "message_id": 456,
         },
         "trace_id": "trace_002",
-        "event_type": "error",
         "job": "chat",
-        "tenant_id": "tenant-x",
-        "app_id": "app_123",
     }
 
     headers = {"Authorization": f"Bearer {plain_token}"}
@@ -88,10 +201,7 @@ def test_kb_callback_success(
         "stage": "done",
         "callback_params": {"kb_id": 2},
         "trace_id": "trace_003",
-        "event_type": "result",
         "job": "upload",
-        "tenant_id": "tenant-y",
-        "app_id": "app_456",
     }
 
     headers = {"Authorization": f"Bearer {plain_token}"}
@@ -112,10 +222,7 @@ def test_kb_callback_timeout(
         "job_id": "kb_job_timeout",
         "stage": "timeout",
         "trace_id": "trace_004",
-        "event_type": "error",
         "job": "upload",
-        "tenant_id": "tenant-z",
-        "app_id": "app_789",
     }
 
     headers = {"Authorization": f"Bearer {plain_token}"}
@@ -151,7 +258,6 @@ def test_callback_missing_token(client: TestClient):
     payload = {
         "job_id": "job_123",
         "stage": "done",
-        "event_type": "result",
         "job": "chat",
     }
 
@@ -170,27 +276,6 @@ def test_callback_invalid_stage_enum(
     payload = {
         "job_id": "job_123",
         "stage": "invalid_stage",  # Invalid enum value
-        "event_type": "result",
-        "job": "chat",
-    }
-
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
-
-    assert response.status_code == 422  # Validation error
-
-
-def test_callback_invalid_event_type_enum(
-    client: TestClient, service_token_and_plain
-):
-    """Test callback with invalid event_type enum"""
-    _, plain_token = service_token_and_plain
-
-    payload = {
-        "job_id": "job_123",
-        "stage": "done",
-        "event_type": "invalid_event",  # Invalid enum value
         "job": "chat",
     }
 
@@ -210,7 +295,6 @@ def test_callback_invalid_job_enum(
     payload = {
         "job_id": "job_123",
         "stage": "done",
-        "event_type": "result",
         "job": "invalid_job",  # Invalid enum value
     }
 
@@ -229,7 +313,7 @@ def test_callback_missing_required_fields(
 
     payload = {
         "job_id": "job_123",
-        # Missing stage, event_type, job
+        # Missing stage, job
     }
 
     headers = {"Authorization": f"Bearer {plain_token}"}
@@ -256,15 +340,11 @@ def test_callback_with_all_optional_fields(
             ],
         },
         "callback_params": {
-            "reply_to": "wa:+1234567890",
-            "conversation_id": "conv_full",
+            "message_id": 789,
             "kb_id": 5,
         },
         "trace_id": "trace_complete",
-        "event_type": "result",
         "job": "chat",
-        "tenant_id": "tenant-complete",
-        "app_id": "app_complete",
     }
 
     headers = {"Authorization": f"Bearer {plain_token}"}
@@ -282,7 +362,6 @@ def test_callback_queued_stage(client: TestClient, service_token_and_plain):
     payload = {
         "job_id": "job_queued",
         "stage": "queued",
-        "event_type": "result",
         "job": "chat",
         "trace_id": "trace_queued",
     }

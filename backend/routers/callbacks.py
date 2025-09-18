@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.service_token import ServiceToken
 from schemas.callback import WebhookCallback
+from services.message_service import MessageService
 from utils.auth_dependencies import verify_service_token
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
@@ -21,19 +22,34 @@ async def ai_callback(
         print(f"AI Callback received from {service_token.service_name}:")
         print(f"Job ID: {payload.job_id}")
         print(f"Stage: {payload.stage}")
-        print(f"Event Type: {payload.event_type}")
         print(f"Job Type: {payload.job}")
 
-        # Process the callback based on stage and event_type
+        # Process the callback based on stage
         if payload.stage.value == "done" and payload.result:
             # Handle successful AI response
             print(f"AI response: {payload.result.answer}")
             print(f"Citations: {len(payload.result.citations)}")
 
+            # Store AI response in database if message_id is provided
+            if payload.callback_params and payload.callback_params.message_id:
+                message_service = MessageService(db)
+                ai_message = message_service.create_ai_response(
+                    original_message_id=payload.callback_params.message_id,
+                    ai_response=payload.result.answer,
+                    message_sid=f"ai_{payload.job_id}",
+                )
+                if ai_message:
+                    print(f"AI response stored as message ID: {ai_message.id}")
+                else:
+                    print(
+                        "Failed to store AI response for message: {}".format(
+                            payload.callback_params.message_id
+                        )
+                    )
+
             # Here you would typically:
-            # 1. Send the response to WhatsApp if reply_to is provided
+            # 1. Send the response to WhatsApp if message_id is provided
             # 2. Update conversation state
-            # 3. Store the result in your database
 
         elif payload.stage.value in ["failed", "timeout"]:
             # Handle error cases
@@ -45,7 +61,7 @@ async def ai_callback(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing callback: {str(e)}"
+            detail=f"Error processing callback: {str(e)}",
         )
 
 
@@ -61,10 +77,9 @@ async def kb_callback(
         print(f"KB Callback received from {service_token.service_name}:")
         print(f"Job ID: {payload.job_id}")
         print(f"Stage: {payload.stage}")
-        print(f"Event Type: {payload.event_type}")
         print(f"Job Type: {payload.job}")
 
-        # Process the callback based on stage and event_type
+        # Process the callback based on stage
         if payload.stage.value == "done":
             # Handle successful KB upload/processing
             print(f"KB processing completed for job: {payload.job_id}")
@@ -84,5 +99,5 @@ async def kb_callback(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing callback: {str(e)}"
+            detail=f"Error processing callback: {str(e)}",
         )

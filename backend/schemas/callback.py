@@ -11,11 +11,6 @@ class CallbackStage(str, Enum):
     TIMEOUT = "timeout"
 
 
-class EventType(str, Enum):
-    RESULT = "result"
-    ERROR = "error"
-
-
 class JobType(str, Enum):
     CHAT = "chat"
     UPLOAD = "upload"
@@ -32,8 +27,7 @@ class CallbackResult(BaseModel):
 
 
 class CallbackParams(BaseModel):
-    reply_to: Optional[str] = None
-    conversation_id: Optional[str] = None
+    message_id: Optional[int] = None
     kb_id: Optional[int] = None
 
 
@@ -43,7 +37,4 @@ class WebhookCallback(BaseModel):
     result: Optional[CallbackResult] = None
     callback_params: Optional[CallbackParams] = None
     trace_id: Optional[str] = None
-    event_type: EventType
     job: JobType
-    tenant_id: Optional[str] = None
-    app_id: Optional[str] = None

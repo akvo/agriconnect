@@ -343,7 +343,6 @@ def test_service_token_workflow_integration(
     callback_payload = {
         "job_id": "integration_test_job",
         "stage": "done",
-        "event_type": "result",
         "job": "chat",
     }
 
