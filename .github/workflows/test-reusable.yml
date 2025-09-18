@@ -1,0 +1,27 @@
+name: Reusable Build & Test
+
+on:
+  workflow_call:
+    outputs:
+      test_result:
+        description: "The result of the test job (success or failure)"
+        value: ${{ jobs.test.outputs.test_result }}
+
+jobs:
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    outputs:
+      test_result: ${{ steps.test_script.outcome }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build and Test
+        env:
+          CI_COMMIT: ${{ env.COMMIT_SHORT_SHA }}
+          CI_BRANCH: ${{ github.ref_name }}
+          CI_PULL_REQUEST: ${{ env.PULL_REQUEST_EVENT }}
+          COMPOSE_INTERACTIVE_NO_CLI: 1
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: |
+          ./ci/build.sh

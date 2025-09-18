@@ -5,7 +5,15 @@ on:
     branches:
       - main
 
+concurrency:
+  group: deploy-to-test
+  cancel-in-progress: false
+
 jobs:
+  run-tests:
+    name: Run Tests
+    uses: ./.github/workflows/test-reusable.yml # Calls the reusable test workflow
+    secrets: inherit
   build-push:
     name: Build and Push to Registry
     runs-on: ubuntu-latest
