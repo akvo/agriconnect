@@ -16,6 +16,7 @@ class ServiceTokenService:
         access_token: Optional[str] = None,
         chat_url: Optional[str] = None,
         upload_url: Optional[str] = None,
+        active: Optional[int] = None,
     ) -> tuple[ServiceToken, str]:
         """Create a new service token and return the token and plain text."""
         # Generate a secure random token (256-bit)
@@ -24,6 +25,17 @@ class ServiceTokenService:
         # Hash the token for storage
         token_hash = hashlib.sha256(plain_token.encode()).hexdigest()
 
+        # Check if this is the first service token - auto-activate if so
+        existing_tokens_count = db.query(ServiceToken).count()
+        if active is None:
+            active = (
+                1 if existing_tokens_count == 0 else 0
+            )  # Auto-activate first service
+
+        # If setting this service as active, deactivate others
+        if active == 1:
+            ServiceTokenService._deactivate_all_tokens(db)
+
         service_token = ServiceToken(
             service_name=service_name,
             token_hash=token_hash,
@@ -31,6 +43,7 @@ class ServiceTokenService:
             access_token=access_token,
             chat_url=chat_url,
             upload_url=upload_url,
+            active=active,
         )
 
         db.add(service_token)
@@ -68,6 +81,7 @@ class ServiceTokenService:
         access_token: Optional[str] = None,
         chat_url: Optional[str] = None,
         upload_url: Optional[str] = None,
+        active: Optional[int] = None,
     ) -> Optional[ServiceToken]:
         """Update service token configuration with external service details."""
         token = (
@@ -77,16 +91,33 @@ class ServiceTokenService:
         if not token:
             return None
 
+        # If setting this service as active, deactivate others first
+        if active == 1:
+            ServiceTokenService._deactivate_all_tokens(db)
+
         if access_token is not None:
             token.access_token = access_token
         if chat_url is not None:
             token.chat_url = chat_url
         if upload_url is not None:
             token.upload_url = upload_url
+        if active is not None:
+            token.active = active
 
         db.commit()
         db.refresh(token)
         return token
+
+    @staticmethod
+    def get_active_token(db: Session) -> Optional[ServiceToken]:
+        """Get the currently active service token."""
+        return db.query(ServiceToken).filter(ServiceToken.active == 1).first()
+
+    @staticmethod
+    def _deactivate_all_tokens(db: Session) -> None:
+        """Helper method to deactivate all service tokens."""
+        db.query(ServiceToken).update({"active": 0})
+        # Note: Don't commit here, let the calling method handle it
 
     @staticmethod
     def delete_token(db: Session, token_id: int) -> bool:

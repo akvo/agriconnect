@@ -19,6 +19,9 @@ class ServiceToken(Base):
     upload_url = Column(
         String, nullable=True
     )  # URL for KB upload job requests
+    active = Column(
+        Integer, nullable=False, default=0, index=True
+    )  # 0=inactive, 1=active, only one can be active
 
     created_at = Column(
         DateTime(timezone=True), default=func.now(), nullable=False

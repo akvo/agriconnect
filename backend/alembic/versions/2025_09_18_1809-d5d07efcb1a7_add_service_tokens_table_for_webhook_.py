@@ -1,8 +1,8 @@
-"""Add service_tokens table for webhook authentication
+"""Add service_tokens table for webhook authentication and job management
 
-Revision ID: f11621b33ac5
+Revision ID: d5d07efcb1a7
 Revises: 4df435c19dc7
-Create Date: 2025-09-17 23:49:46.810756
+Create Date: 2025-09-18 18:09:47.177063
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f11621b33ac5'
+revision: str = 'd5d07efcb1a7'
 down_revision: Union[str, None] = '4df435c19dc7'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,10 +25,15 @@ def upgrade() -> None:
     sa.Column('service_name', sa.String(), nullable=False),
     sa.Column('token_hash', sa.String(), nullable=False),
     sa.Column('scopes', sa.String(), nullable=True),
+    sa.Column('access_token', sa.String(), nullable=True),
+    sa.Column('chat_url', sa.String(), nullable=True),
+    sa.Column('upload_url', sa.String(), nullable=True),
+    sa.Column('active', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_service_tokens_active'), 'service_tokens', ['active'], unique=False)
     op.create_index(op.f('ix_service_tokens_id'), 'service_tokens', ['id'], unique=False)
     op.create_index(op.f('ix_service_tokens_service_name'), 'service_tokens', ['service_name'], unique=False)
     op.create_index(op.f('ix_service_tokens_token_hash'), 'service_tokens', ['token_hash'], unique=True)
@@ -40,5 +45,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_service_tokens_token_hash'), table_name='service_tokens')
     op.drop_index(op.f('ix_service_tokens_service_name'), table_name='service_tokens')
     op.drop_index(op.f('ix_service_tokens_id'), table_name='service_tokens')
+    op.drop_index(op.f('ix_service_tokens_active'), table_name='service_tokens')
     op.drop_table('service_tokens')
     # ### end Alembic commands ###

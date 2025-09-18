@@ -20,12 +20,14 @@ class ServiceTokenCreate(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    active: Optional[int] = None
 
 
 class ServiceTokenUpdate(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    active: Optional[int] = None
 
 
 class ServiceTokenResponse(BaseModel):
@@ -35,6 +37,7 @@ class ServiceTokenResponse(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    active: int
     created_at: datetime
     updated_at: datetime
 
@@ -75,6 +78,7 @@ def create_service_token(
         token_data.access_token,
         token_data.chat_url,
         token_data.upload_url,
+        token_data.active,
     )
 
     message = (
@@ -113,6 +117,7 @@ def update_service_token(
         token_data.access_token,
         token_data.chat_url,
         token_data.upload_url,
+        token_data.active,
     )
 
     if not updated_token:
