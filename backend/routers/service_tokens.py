@@ -17,12 +17,24 @@ router = APIRouter(prefix="/admin/service-tokens", tags=["service-tokens"])
 class ServiceTokenCreate(BaseModel):
     service_name: str
     scopes: str = None
+    access_token: Optional[str] = None
+    chat_url: Optional[str] = None
+    upload_url: Optional[str] = None
+
+
+class ServiceTokenUpdate(BaseModel):
+    access_token: Optional[str] = None
+    chat_url: Optional[str] = None
+    upload_url: Optional[str] = None
 
 
 class ServiceTokenResponse(BaseModel):
     id: int
     service_name: str
     scopes: Optional[str] = None
+    access_token: Optional[str] = None
+    chat_url: Optional[str] = None
+    upload_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -50,21 +62,30 @@ def create_service_token(
     if existing_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(f"Service token already exists for "
-                    f"'{token_data.service_name}'")
+            detail=(
+                f"Service token already exists for "
+                f"'{token_data.service_name}'"
+            ),
         )
 
     service_token, plain_token = ServiceTokenService.create_token(
-        db, token_data.service_name, token_data.scopes
+        db,
+        token_data.service_name,
+        token_data.scopes,
+        token_data.access_token,
+        token_data.chat_url,
+        token_data.upload_url,
     )
 
-    message = ("Service token created successfully. Store the plain token "
-               "securely - it won't be shown again.")
+    message = (
+        "Service token created successfully. Store the plain token "
+        "securely - it won't be shown again."
+    )
 
     return ServiceTokenCreateResponse(
         token=ServiceTokenResponse.model_validate(service_token),
         plain_token=plain_token,
-        message=message
+        message=message,
     )
 
 
@@ -76,6 +97,31 @@ def list_service_tokens(
     """List all service tokens (Admin only)"""
     tokens = db.query(ServiceToken).all()
     return [ServiceTokenResponse.model_validate(token) for token in tokens]
+
+
+@router.put("/{token_id}", response_model=ServiceTokenResponse)
+def update_service_token(
+    token_id: int,
+    token_data: ServiceTokenUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(admin_required),
+):
+    """Update service token configuration (Admin only)"""
+    updated_token = ServiceTokenService.update_token_config(
+        db,
+        token_id,
+        token_data.access_token,
+        token_data.chat_url,
+        token_data.upload_url,
+    )
+
+    if not updated_token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Service token not found",
+        )
+
+    return ServiceTokenResponse.model_validate(updated_token)
 
 
 @router.delete("/{token_id}")
@@ -90,7 +136,7 @@ def delete_service_token(
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Service token not found"
+            detail="Service token not found",
         )
 
     return {"message": "Service token deleted successfully"}
