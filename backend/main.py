@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 
-from routers import admin_users, auth, customers, whatsapp
+from routers import (
+    admin_users, auth, callbacks, customers, service_tokens, whatsapp
+)
 
 app = FastAPI(
     title="AgriConnect API",
@@ -22,7 +24,9 @@ app = FastAPI(
 # Include routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(admin_users.router, prefix="/api")
+app.include_router(callbacks.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
+app.include_router(service_tokens.router, prefix="/api")
 app.include_router(whatsapp.router, prefix="/api")
 
 

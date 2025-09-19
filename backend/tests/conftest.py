@@ -38,10 +38,11 @@ def db_session(test_db):
     finally:
         db.rollback()
         # Clean up all tables after each test
-        from models import Customer, Message, User
+        from models import Customer, Message, ServiceToken, User
 
         db.query(Message).delete()
         db.query(Customer).delete()
+        db.query(ServiceToken).delete()
         db.query(User).delete()
         db.commit()
         db.close()
