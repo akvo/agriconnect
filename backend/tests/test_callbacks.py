@@ -61,7 +61,7 @@ def test_ai_callback_success(
         },
         "callback_params": {
             "message_id": 123,
-            "kb_id": 1,
+            "message_type": 1,
         },
         "trace_id": "trace_001",
         "job": "chat",
@@ -95,7 +95,7 @@ def test_ai_callback_success_with_message_storage(
         },
         "callback_params": {
             "message_id": test_message.id,  # Use real message ID
-            "kb_id": 1,
+            "message_type": 2,  # Test WHISPER type
         },
         "trace_id": "trace_002",
         "job": "chat",
@@ -122,6 +122,9 @@ def test_ai_callback_success_with_message_storage(
     assert ai_message.message_sid == "ai_job_456"
     assert ai_message.customer_id == test_message.customer_id
     assert ai_message.from_source == MessageFrom.LLM
+    # Import MessageType to check the value
+    from schemas.callback import MessageType
+    assert ai_message.message_type == MessageType.WHISPER
 
 
 def test_ai_callback_success_invalid_message_id(
@@ -141,7 +144,7 @@ def test_ai_callback_success_invalid_message_id(
         },
         "callback_params": {
             "message_id": 99999,  # Non-existent message ID
-            "kb_id": 1,
+            "message_type": 1,
         },
         "trace_id": "trace_invalid",
         "job": "chat",
@@ -177,6 +180,7 @@ def test_ai_callback_failed_job(
         "stage": "failed",
         "callback_params": {
             "message_id": 456,
+            "message_type": 1,
         },
         "trace_id": "trace_002",
         "job": "chat",
@@ -199,7 +203,7 @@ def test_kb_callback_success(
     payload = {
         "job_id": "kb_job_789",
         "stage": "done",
-        "callback_params": {"kb_id": 2},
+        "callback_params": {"kb_id": 2, "user_id": 1},
         "trace_id": "trace_003",
         "job": "upload",
     }
@@ -341,7 +345,7 @@ def test_callback_with_all_optional_fields(
         },
         "callback_params": {
             "message_id": 789,
-            "kb_id": 5,
+            "message_type": 1,
         },
         "trace_id": "trace_complete",
         "job": "chat",

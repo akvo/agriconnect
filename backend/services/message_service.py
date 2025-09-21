@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from models.message import Message, MessageFrom
+from schemas.callback import MessageType
 
 
 class MessageService:
@@ -16,6 +17,7 @@ class MessageService:
         original_message_id: int,
         ai_response: str,
         message_sid: str = None,
+        message_type: MessageType = None,
     ) -> Message:
         """Create an AI response message linked to the original message."""
         original_message = self.get_message_by_id(original_message_id)
@@ -32,6 +34,7 @@ class MessageService:
             user_id=None,  # AI response has no user
             body=ai_response,
             from_source=MessageFrom.LLM,
+            message_type=message_type,
         )
 
         self.db.add(ai_message)
