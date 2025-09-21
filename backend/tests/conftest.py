@@ -39,9 +39,11 @@ def db_session(test_db):
         db.rollback()
         # Clean up all tables after each test
         from models import Customer, Message, ServiceToken, User
+        from models.knowledge_base import KnowledgeBase
 
         db.query(Message).delete()
         db.query(Customer).delete()
+        db.query(KnowledgeBase).delete()  # Delete KBs before Users due to FK
         db.query(ServiceToken).delete()
         db.query(User).delete()
         db.commit()

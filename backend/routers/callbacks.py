@@ -151,15 +151,41 @@ async def kb_callback(
             # Handle successful KB upload/processing
             print(f"KB processing completed for job: {payload.job_id}")
 
-            # Here you would typically:
-            # 1. Update KB status in database
-            # 2. Notify users that KB is ready
-            # 3. Enable KB for queries
+            # Update KB status in database if kb_id is provided
+            if payload.callback_params and payload.callback_params.kb_id:
+                from services.knowledge_base_service import KnowledgeBaseService
+                kb_service = KnowledgeBaseService(db)
+                updated_kb = kb_service.update_status(
+                    payload.callback_params.kb_id,
+                    payload.stage
+                )
+                if updated_kb:
+                    print(f"KB status updated to DONE for KB ID: {updated_kb.id}")
+                else:
+                    print(f"Failed to update KB status for KB ID: {payload.callback_params.kb_id}")
+
+            # Here you would typically also:
+            # 1. Notify users that KB is ready
+            # 2. Enable KB for queries
 
         elif payload.stage.value in ["failed", "timeout"]:
             # Handle error cases
             print(f"KB processing failed: {payload.stage}")
-            # Update KB status to failed and notify users
+
+            # Update KB status in database if kb_id is provided
+            if payload.callback_params and payload.callback_params.kb_id:
+                from services.knowledge_base_service import KnowledgeBaseService
+                kb_service = KnowledgeBaseService(db)
+                updated_kb = kb_service.update_status(
+                    payload.callback_params.kb_id,
+                    payload.stage
+                )
+                if updated_kb:
+                    print(f"KB status updated to {payload.stage.value.upper()} for KB ID: {updated_kb.id}")
+                else:
+                    print(f"Failed to update KB status for KB ID: {payload.callback_params.kb_id}")
+
+            # Notify users of failure
 
         return {"status": "received", "job_id": payload.job_id}
 
