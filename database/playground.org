@@ -13,16 +13,18 @@
 #+end_src
 
 #+RESULTS: Schema
-| List of relations |                  |          |       |
-|-------------------+------------------+----------+-------|
-| Schema            | Name             | Type     | Owner |
-| public            | alembic_version  | table    | akvo  |
-| public            | customers        | table    | akvo  |
-| public            | customers_id_seq | sequence | akvo  |
-| public            | messages         | table    | akvo  |
-| public            | messages_id_seq  | sequence | akvo  |
-| public            | users            | table    | akvo  |
-| public            | users_id_seq     | sequence | akvo  |
+| List of relations |                       |          |       |
+|-------------------+-----------------------+----------+-------|
+| Schema            | Name                  | Type     | Owner |
+| public            | alembic_version       | table    | akvo  |
+| public            | customers             | table    | akvo  |
+| public            | customers_id_seq      | sequence | akvo  |
+| public            | messages              | table    | akvo  |
+| public            | messages_id_seq       | sequence | akvo  |
+| public            | service_tokens        | table    | akvo  |
+| public            | service_tokens_id_seq | sequence | akvo  |
+| public            | users                 | table    | akvo  |
+| public            | users_id_seq          | sequence | akvo  |
 
 #+NAME: Column List
 #+begin_src sql
@@ -31,58 +33,71 @@ SELECT
     table_name,
     column_name,
     is_nullable,
-    data_type,
-    character_maximum_length as len
+    data_type
 FROM   information_schema.columns
 WHERE  table_name IN (
     'users',
     'customers',
-    'messages'
+    'messages',
+    'service_tokens'
 )
 ORDER  BY table_name, ordinal_position;
 #+end_src
 
 #+RESULTS: Column List
-| pos | table_name | column_name           | is_nullable | data_type                | len |
-|-----+------------+-----------------------+-------------+--------------------------+-----|
-|   1 | customers  | id                    | NO          | integer                  |     |
-|   2 | customers  | phone_number          | NO          | character varying        |     |
-|   3 | customers  | full_name             | YES         | character varying        |     |
-|   4 | customers  | language              | YES         | USER-DEFINED             |     |
-|   5 | customers  | created_at            | YES         | timestamp with time zone |     |
-|   6 | customers  | updated_at            | YES         | timestamp with time zone |     |
-|   1 | messages   | id                    | NO          | integer                  |     |
-|   2 | messages   | message_sid           | NO          | character varying        |     |
-|   3 | messages   | customer_id           | NO          | integer                  |     |
-|   4 | messages   | user_id               | YES         | integer                  |     |
-|   5 | messages   | body                  | NO          | text                     |     |
-|   6 | messages   | from_source           | NO          | integer                  |     |
-|   7 | messages   | created_at            | YES         | timestamp with time zone |     |
-|   1 | users      | id                    | NO          | integer                  |     |
-|   2 | users      | email                 | NO          | character varying        |     |
-|   3 | users      | phone_number          | NO          | character varying        |     |
-|   4 | users      | hashed_password       | YES         | character varying        |     |
-|   5 | users      | user_type             | NO          | USER-DEFINED             |     |
-|   6 | users      | full_name             | NO          | character varying        |     |
-|   8 | users      | created_at            | YES         | timestamp with time zone |     |
-|   9 | users      | updated_at            | YES         | timestamp with time zone |     |
-|  10 | users      | invitation_token      | YES         | character varying        |     |
-|  11 | users      | invitation_sent_at    | YES         | timestamp with time zone |     |
-|  12 | users      | invitation_expires_at | YES         | timestamp with time zone |     |
-|  13 | users      | password_set_at       | YES         | timestamp with time zone |     |
-|  14 | users      | is_active             | NO          | boolean                  |     |
+| pos | table_name     | column_name           | is_nullable | data_type                |
+|-----+----------------+-----------------------+-------------+--------------------------|
+|   1 | customers      | id                    | NO          | integer                  |
+|   2 | customers      | phone_number          | NO          | character varying        |
+|   3 | customers      | full_name             | YES         | character varying        |
+|   4 | customers      | language              | YES         | USER-DEFINED             |
+|   5 | customers      | created_at            | YES         | timestamp with time zone |
+|   6 | customers      | updated_at            | YES         | timestamp with time zone |
+|   1 | messages       | id                    | NO          | integer                  |
+|   2 | messages       | message_sid           | NO          | character varying        |
+|   3 | messages       | customer_id           | NO          | integer                  |
+|   4 | messages       | user_id               | YES         | integer                  |
+|   5 | messages       | body                  | NO          | text                     |
+|   6 | messages       | from_source           | NO          | integer                  |
+|   7 | messages       | created_at            | YES         | timestamp with time zone |
+|   1 | service_tokens | id                    | NO          | integer                  |
+|   2 | service_tokens | service_name          | NO          | character varying        |
+|   3 | service_tokens | token_hash            | NO          | character varying        |
+|   4 | service_tokens | scopes                | YES         | character varying        |
+|   5 | service_tokens | access_token          | YES         | character varying        |
+|   6 | service_tokens | chat_url              | YES         | character varying        |
+|   7 | service_tokens | upload_url            | YES         | character varying        |
+|   8 | service_tokens | active                | NO          | integer                  |
+|   9 | service_tokens | created_at            | NO          | timestamp with time zone |
+|  10 | service_tokens | updated_at            | NO          | timestamp with time zone |
+|   1 | users          | id                    | NO          | integer                  |
+|   2 | users          | email                 | NO          | character varying        |
+|   3 | users          | phone_number          | NO          | character varying        |
+|   4 | users          | hashed_password       | YES         | character varying        |
+|   5 | users          | user_type             | NO          | USER-DEFINED             |
+|   6 | users          | full_name             | NO          | character varying        |
+|   8 | users          | created_at            | YES         | timestamp with time zone |
+|   9 | users          | updated_at            | YES         | timestamp with time zone |
+|  10 | users          | invitation_token      | YES         | character varying        |
+|  11 | users          | invitation_sent_at    | YES         | timestamp with time zone |
+|  12 | users          | invitation_expires_at | YES         | timestamp with time zone |
+|  13 | users          | password_set_at       | YES         | timestamp with time zone |
+|  14 | users          | is_active             | NO          | boolean                  |
 
 #+NAME: Customer Message
 #+begin_src sql
-SELECT m.body, c.phone_number, c.created_at
+SELECT m.id, m.user_id, m.customer_id, m.message_type, m.from_source, c.phone_number, c.created_at
 FROM messages m
 LEFT JOIN customers c
 ON m.customer_id = c.id;
 #+end_src
 
 #+RESULTS: Customer Message
-| body | phone_number | created_at |
-|------+--------------+------------|
+| id | user_id | customer_id | message_type | from_source |   phone_number | created_at                    |
+|----+---------+-------------+--------------+-------------+----------------+-------------------------------|
+|  1 |         |           1 |              |           1 | +6285190053283 | 2025-09-22 03:01:56.451468+00 |
+|  2 |         |           1 |              |           1 | +6285190053283 | 2025-09-22 03:01:56.451468+00 |
+|  3 |         |           1 | REPLY        |           3 | +6285190053283 | 2025-09-22 03:01:56.451468+00 |
 
 #+NAME: Delete Customer
 #+begin_src sql
