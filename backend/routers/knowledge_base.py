@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -30,6 +32,13 @@ router = APIRouter(prefix="/kb", tags=["knowledge_base"])
     "/",
     response_model=KnowledgeBaseResponse,
     summary="Upload Knowledge Base File",
+    # flake8: noqa: E501
+    description="Upload a file and create a knowledge base entry. The file will be processed by Akvo RAG service.",
+)
+@router.post(
+    "",
+    response_model=KnowledgeBaseResponse,
+    summary="Upload Knowledge Base File (without trailing slash)",
     # flake8: noqa: E501
     description="Upload a file and create a knowledge base entry. The file will be processed by Akvo RAG service.",
 )
@@ -92,36 +101,39 @@ async def create_knowledge_base(
     # flake8: noqa: E501
     description="Get paginated list of knowledge bases. Admin users see all, regular users see only their own.",
 )
+@router.get(
+    "",
+    response_model=KnowledgeBaseListResponse,
+    summary="List Knowledge Bases (without trailing slash)",
+    # flake8: noqa: E501
+    description="Get paginated list of knowledge bases. Admin users see all, regular users see only their own.",
+)
 async def list_knowledge_bases(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(
-        10, ge=1, le=100, description="Number of records to return"
-    ),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(10, ge=1, le=100, description="Number of records per page"),
+    search: Optional[str] = Query(None, description="Search term"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get list of knowledge bases"""
+    """Get paginated list of knowledge bases with optional search"""
     kb_service = KnowledgeBaseService(db)
 
     # If user is admin, show all knowledge bases
     # Otherwise, show only user's own knowledge bases
     if current_user.user_type.value == "admin":
-        knowledge_bases = kb_service.get_all_knowledge_bases(
-            skip=skip, limit=limit
+        knowledge_bases, total = kb_service.get_all_knowledge_bases(
+            page=page, size=size, search=search
         )
-        # Get total count for pagination
-        total = db.query(KnowledgeBase).count()
     else:
-        knowledge_bases = kb_service.get_user_knowledge_bases(current_user.id)
-        # Apply pagination manually for user-specific query
-        total = len(knowledge_bases)
-        knowledge_bases = knowledge_bases[skip : skip + limit]
+        knowledge_bases, total = kb_service.get_user_knowledge_bases(
+            current_user.id, page=page, size=size, search=search
+        )
 
     return KnowledgeBaseListResponse(
         knowledge_bases=knowledge_bases,
         total=total,
-        skip=skip,
-        limit=limit,
+        page=page,
+        size=size,
     )
 
 

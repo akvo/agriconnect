@@ -123,13 +123,15 @@ class TestKnowledgeBaseService:
             title="Second Document",
         )
 
-        kbs = kb_service.get_user_knowledge_bases(test_user.id)
+        kbs, total = kb_service.get_user_knowledge_bases(test_user.id)
+        assert total == 2
         assert len(kbs) == 2
         assert all(kb.user_id == test_user.id for kb in kbs)
 
     def test_get_all_knowledge_bases(self, kb_service, sample_kb):
         """Test getting all knowledge bases"""
-        kbs = kb_service.get_all_knowledge_bases()
+        kbs, total = kb_service.get_all_knowledge_bases()
+        assert total >= 1
         assert len(kbs) >= 1
         assert any(kb.id == sample_kb.id for kb in kbs)
 
@@ -179,6 +181,100 @@ class TestKnowledgeBaseService:
         """Test updating status of non-existent knowledge base"""
         updated_kb = kb_service.update_status(99999, CallbackStage.DONE)
         assert updated_kb is None
+
+    def test_search_functionality(self, kb_service, test_user):
+        """Test search functionality across title, filename, and description"""
+        # Create test KBs with different searchable content
+        kb1 = kb_service.create_knowledge_base(
+            user_id=test_user.id,
+            filename="agriculture_guide.pdf",
+            title="Modern Agriculture Techniques",
+            description="A comprehensive guide to modern farming methods",
+        )
+        kb2 = kb_service.create_knowledge_base(
+            user_id=test_user.id,
+            filename="livestock_manual.pdf",
+            title="Livestock Management",
+            description="Best practices for animal husbandry",
+        )
+        kb3 = kb_service.create_knowledge_base(
+            user_id=test_user.id,
+            filename="crop_rotation.pdf",
+            title="Sustainable Crop Rotation",
+            description="Environmental friendly agriculture practices",
+        )
+
+        # Test search by title
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, search="Modern Agriculture"
+        )
+        assert total == 1
+        assert results[0].id == kb1.id
+
+        # Test search by filename
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, search="livestock"
+        )
+        assert total == 1
+        assert results[0].id == kb2.id
+
+        # Test search by description
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, search="environmental"
+        )
+        assert total == 1
+        assert results[0].id == kb3.id
+
+        # Test case-insensitive search
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, search="AGRICULTURE"
+        )
+        assert total == 2  # Should match kb1 and kb3
+
+        # Test partial match
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, search="crop"
+        )
+        assert total == 1
+        assert results[0].id == kb3.id
+
+        # Test no results
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, search="nonexistent"
+        )
+        assert total == 0
+        assert len(results) == 0
+
+    def test_pagination_functionality(self, kb_service, test_user):
+        """Test pagination with page and size parameters"""
+        # Create multiple KBs for pagination testing
+        for i in range(15):
+            kb_service.create_knowledge_base(
+                user_id=test_user.id,
+                filename=f"doc_{i}.pdf",
+                title=f"Document {i}",
+            )
+
+        # Test first page
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, page=1, size=5
+        )
+        assert total >= 15  # At least 15 from this test + sample_kb
+        assert len(results) == 5
+
+        # Test second page
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, page=2, size=5
+        )
+        assert total >= 15
+        assert len(results) == 5
+
+        # Test larger page size
+        results, total = kb_service.get_user_knowledge_bases(
+            test_user.id, page=1, size=10
+        )
+        assert total >= 15
+        assert len(results) == 10
 
 
 class TestKnowledgeBaseEndpoints:
@@ -376,9 +472,11 @@ class TestKnowledgeBaseIntegration:
         )
 
         # Verify isolation
-        user1_kbs = kb_service.get_user_knowledge_bases(user1.id)
-        user2_kbs = kb_service.get_user_knowledge_bases(user2.id)
+        user1_kbs, user1_total = kb_service.get_user_knowledge_bases(user1.id)
+        user2_kbs, user2_total = kb_service.get_user_knowledge_bases(user2.id)
 
+        assert user1_total == 1
+        assert user2_total == 1
         assert len(user1_kbs) == 1
         assert len(user2_kbs) == 1
         assert user1_kbs[0].id == kb1.id
@@ -405,11 +503,15 @@ class TestKnowledgeBaseIntegration:
         )
 
         # Admin should see all KBs
-        all_kbs = kb_service.get_all_knowledge_bases()
+        all_kbs, all_total = kb_service.get_all_knowledge_bases()
+        assert all_total >= 2
         assert len(all_kbs) >= 2
 
         # Regular user should only see their own
-        user_kbs = kb_service.get_user_knowledge_bases(test_user.id)
+        user_kbs, user_total = kb_service.get_user_knowledge_bases(
+            test_user.id
+        )
+        assert user_total == 1
         assert len(user_kbs) == 1
         assert user_kbs[0].title == "User Document"
 

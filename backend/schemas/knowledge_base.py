@@ -59,5 +59,5 @@ class KnowledgeBaseListResponse(BaseModel):
 
     knowledge_bases: List[KnowledgeBaseResponse]
     total: int
-    skip: int
-    limit: int
+    page: int
+    size: int

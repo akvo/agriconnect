@@ -1,7 +1,7 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
-
 from models.knowledge_base import KnowledgeBase
 from schemas.callback import CallbackStage
 
@@ -40,26 +40,65 @@ class KnowledgeBaseService:
             .first()
         )
 
-    def get_user_knowledge_bases(self, user_id: int) -> List[KnowledgeBase]:
-        """Get all knowledge bases for a user."""
-        return (
-            self.db.query(KnowledgeBase)
-            .filter(KnowledgeBase.user_id == user_id)
-            .order_by(KnowledgeBase.created_at.desc())
+    def get_user_knowledge_bases(
+        self,
+        user_id: int,
+        page: int = 1,
+        size: int = 10,
+        search: Optional[str] = None,
+    ) -> Tuple[List[KnowledgeBase], int]:
+        """Get all knowledge bases for a user with pagination and search."""
+        query = self.db.query(KnowledgeBase).filter(
+            KnowledgeBase.user_id == user_id
+        )
+
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    KnowledgeBase.title.ilike(search_term),
+                    KnowledgeBase.filename.ilike(search_term),
+                    KnowledgeBase.description.ilike(search_term),
+                )
+            )
+
+        total = query.count()
+
+        knowledge_bases = (
+            query.order_by(KnowledgeBase.created_at.desc())
+            .offset((page - 1) * size)
+            .limit(size)
             .all()
         )
 
+        return knowledge_bases, total
+
     def get_all_knowledge_bases(
-        self, skip: int = 0, limit: int = 100
-    ) -> List[KnowledgeBase]:
-        """Get all knowledge bases with pagination."""
-        return (
-            self.db.query(KnowledgeBase)
-            .order_by(KnowledgeBase.created_at.desc())
-            .offset(skip)
-            .limit(limit)
+        self, page: int = 1, size: int = 10, search: Optional[str] = None
+    ) -> Tuple[List[KnowledgeBase], int]:
+        """Get all knowledge bases with pagination and search."""
+        query = self.db.query(KnowledgeBase)
+
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    KnowledgeBase.title.ilike(search_term),
+                    KnowledgeBase.filename.ilike(search_term),
+                    KnowledgeBase.description.ilike(search_term),
+                )
+            )
+
+        total = query.count()
+
+        knowledge_bases = (
+            query.order_by(KnowledgeBase.created_at.desc())
+            .offset((page - 1) * size)
+            .limit(size)
             .all()
         )
+
+        return knowledge_bases, total
 
     def update_knowledge_base(
         self,
