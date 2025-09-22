@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from models.knowledge_base import KnowledgeBase
 from models.user import User, UserType
 from schemas.callback import CallbackStage
+from unittest.mock import Mock
 from services.knowledge_base_service import KnowledgeBaseService
 
 
@@ -516,6 +517,601 @@ class TestKnowledgeBaseIntegration:
         assert user_kbs[0].title == "User Document"
 
 
+class TestKnowledgeBaseRouterCoverage:
+    """Tests to improve router endpoint coverage"""
+
+    def create_mock_file(
+        self,
+        filename="test.pdf",
+        content_type="application/pdf",
+        content=b"test",
+    ):
+
+        mock_file = Mock()
+        mock_file.filename = filename
+        mock_file.content_type = content_type
+        mock_file.size = len(content)
+        mock_file.file = Mock()
+        return mock_file
+
+    @pytest.mark.asyncio
+    async def test_create_kb_invalid_file_type(
+        self, db_session: Session, test_user
+    ):
+        """Test file upload with unsupported file type"""
+        from routers.knowledge_base import create_knowledge_base
+        from fastapi import HTTPException
+
+        mock_file = self.create_mock_file(
+            filename="test.exe", content_type="application/x-executable"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_knowledge_base(
+                file=mock_file,
+                title="Test Document",
+                description="Test description",
+                current_user=test_user,
+                db=db_session,
+            )
+
+        assert exc_info.value.status_code == 500
+        assert "Error creating knowledge base" in str(exc_info.value.detail)
+        assert "Unsupported file type" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_create_kb_exception_handling(
+        self, db_session: Session, test_user, monkeypatch
+    ):
+        """Test exception handling during KB creation"""
+        from routers.knowledge_base import create_knowledge_base
+        from fastapi import HTTPException
+
+        mock_file = self.create_mock_file()
+
+        # Mock KnowledgeBaseService to raise an exception
+        def mock_create_kb(*args, **kwargs):
+            raise Exception("Database error")
+
+        monkeypatch.setattr(
+            # flake8: noqa: E501
+            "services.knowledge_base_service.KnowledgeBaseService.create_knowledge_base",
+            mock_create_kb,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_knowledge_base(
+                file=mock_file,
+                title="Test Document",
+                description="Test description",
+                current_user=test_user,
+                db=db_session,
+            )
+
+        assert exc_info.value.status_code == 500
+        assert "Error creating knowledge base" in str(exc_info.value.detail)
+        assert "Database error" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_list_kb_admin_vs_user_access(
+        self, db_session: Session, test_user, admin_user, kb_service
+    ):
+        """Test admin can see all KBs while users see only their own"""
+        from routers.knowledge_base import list_knowledge_bases
+
+        # Create KB for test user
+        user_kb = kb_service.create_knowledge_base(
+            user_id=test_user.id,
+            filename="user_doc.pdf",
+            title="User Document",
+        )
+
+        # Create KB for admin
+        admin_kb = kb_service.create_knowledge_base(
+            user_id=admin_user.id,
+            filename="admin_doc.pdf",
+            title="Admin Document",
+        )
+
+        # Test regular user sees only their own
+        user_response = await list_knowledge_bases(
+            page=1, size=10, search=None, current_user=test_user, db=db_session
+        )
+
+        user_kb_ids = [kb.id for kb in user_response.knowledge_bases]
+        assert user_kb.id in user_kb_ids
+        assert admin_kb.id not in user_kb_ids
+
+        # Test admin sees all
+        admin_response = await list_knowledge_bases(
+            page=1,
+            size=10,
+            search=None,
+            current_user=admin_user,
+            db=db_session,
+        )
+
+        admin_kb_ids = [kb.id for kb in admin_response.knowledge_bases]
+        assert user_kb.id in admin_kb_ids
+        assert admin_kb.id in admin_kb_ids
+
+    @pytest.mark.asyncio
+    async def test_get_kb_not_found(self, db_session: Session, test_user):
+        """Test getting non-existent knowledge base"""
+        from routers.knowledge_base import get_knowledge_base
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_knowledge_base(
+                kb_id=99999, current_user=test_user, db=db_session
+            )
+
+        assert exc_info.value.status_code == 404
+        assert "Knowledge base not found" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_get_kb_forbidden_access(
+        self, db_session: Session, test_user, admin_user, kb_service
+    ):
+        """Test user cannot access another user's KB"""
+        from routers.knowledge_base import get_knowledge_base
+        from fastapi import HTTPException
+
+        # Create KB for admin
+        admin_kb = kb_service.create_knowledge_base(
+            user_id=admin_user.id,
+            filename="admin_doc.pdf",
+            title="Admin Document",
+        )
+
+        # Test regular user cannot access admin's KB
+        with pytest.raises(HTTPException) as exc_info:
+            await get_knowledge_base(
+                kb_id=admin_kb.id, current_user=test_user, db=db_session
+            )
+
+        assert exc_info.value.status_code == 403
+        assert "Not authorized to access this knowledge base" in str(
+            exc_info.value.detail
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_kb_admin_access_any(
+        self, db_session: Session, test_user, admin_user, kb_service
+    ):
+        """Test admin can access any user's KB"""
+        from routers.knowledge_base import get_knowledge_base
+
+        # Create KB for regular user
+        user_kb = kb_service.create_knowledge_base(
+            user_id=test_user.id,
+            filename="user_doc.pdf",
+            title="User Document",
+        )
+
+        # Test admin can access user's KB
+        result = await get_knowledge_base(
+            kb_id=user_kb.id, current_user=admin_user, db=db_session
+        )
+
+        assert result.id == user_kb.id
+        assert result.title == "User Document"
+
+    @pytest.mark.asyncio
+    async def test_update_kb_not_found(self, db_session: Session, test_user):
+        """Test updating non-existent knowledge base"""
+        from routers.knowledge_base import update_knowledge_base
+        from schemas.knowledge_base import KnowledgeBaseUpdate
+        from fastapi import HTTPException
+
+        update_data = KnowledgeBaseUpdate(
+            title="Updated Title", description="Updated description"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_knowledge_base(
+                kb_id=99999,
+                kb_update=update_data,
+                current_user=test_user,
+                db=db_session,
+            )
+
+        assert exc_info.value.status_code == 404
+        assert "Knowledge base not found" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_update_kb_forbidden_access(
+        self, db_session: Session, test_user, admin_user, kb_service
+    ):
+        """Test user cannot update another user's KB"""
+        from routers.knowledge_base import update_knowledge_base
+        from schemas.knowledge_base import KnowledgeBaseUpdate
+        from fastapi import HTTPException
+
+        # Create KB for admin
+        admin_kb = kb_service.create_knowledge_base(
+            user_id=admin_user.id,
+            filename="admin_doc.pdf",
+            title="Admin Document",
+        )
+
+        update_data = KnowledgeBaseUpdate(title="Hacked Title")
+
+        # Test regular user cannot update admin's KB
+        with pytest.raises(HTTPException) as exc_info:
+            await update_knowledge_base(
+                kb_id=admin_kb.id,
+                kb_update=update_data,
+                current_user=test_user,
+                db=db_session,
+            )
+
+        assert exc_info.value.status_code == 403
+        assert "Not authorized to update this knowledge base" in str(
+            exc_info.value.detail
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_kb_not_found(self, db_session: Session, test_user):
+        """Test deleting non-existent knowledge base"""
+        from routers.knowledge_base import delete_knowledge_base
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_knowledge_base(
+                kb_id=99999, current_user=test_user, db=db_session
+            )
+
+        assert exc_info.value.status_code == 404
+        assert "Knowledge base not found" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_delete_kb_forbidden_access(
+        self, db_session: Session, test_user, admin_user, kb_service
+    ):
+        """Test user cannot delete another user's KB"""
+        from routers.knowledge_base import delete_knowledge_base
+        from fastapi import HTTPException
+
+        # Create KB for admin
+        admin_kb = kb_service.create_knowledge_base(
+            user_id=admin_user.id,
+            filename="admin_doc.pdf",
+            title="Admin Document",
+        )
+
+        # Test regular user cannot delete admin's KB
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_knowledge_base(
+                kb_id=admin_kb.id, current_user=test_user, db=db_session
+            )
+
+        assert exc_info.value.status_code == 403
+        assert "Not authorized to delete this knowledge base" in str(
+            exc_info.value.detail
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_kb_service_failure(
+        self, db_session: Session, test_user, kb_service, monkeypatch
+    ):
+        """Test delete KB when service returns False"""
+        from routers.knowledge_base import delete_knowledge_base
+        from fastapi import HTTPException
+
+        # Create a KB
+        user_kb = kb_service.create_knowledge_base(
+            user_id=test_user.id,
+            filename="test_doc.pdf",
+            title="Test Document",
+        )
+
+        # Mock delete service to return False
+        def mock_delete_kb(*args, **kwargs):
+            return False
+
+        monkeypatch.setattr(
+            # flake8: noqa: E501
+            "services.knowledge_base_service.KnowledgeBaseService.delete_knowledge_base",
+            mock_delete_kb,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_knowledge_base(
+                kb_id=user_kb.id, current_user=test_user, db=db_session
+            )
+
+        assert exc_info.value.status_code == 500
+        assert "Failed to delete knowledge base" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_update_status_not_found(
+        self, db_session: Session, test_user
+    ):
+        """Test updating status of non-existent KB"""
+        from routers.knowledge_base import update_knowledge_base_status
+        from schemas.knowledge_base import KnowledgeBaseStatusUpdate
+        from fastapi import HTTPException
+
+        status_data = KnowledgeBaseStatusUpdate(status=CallbackStage.DONE)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_knowledge_base_status(
+                kb_id=99999,
+                status_update=status_data,
+                current_user=test_user,
+                db=db_session,
+            )
+
+        assert exc_info.value.status_code == 404
+        assert "Knowledge base not found" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_update_status_forbidden_access(
+        self, db_session: Session, test_user, admin_user, kb_service
+    ):
+        """Test user cannot update status of another user's KB"""
+        from routers.knowledge_base import update_knowledge_base_status
+        from schemas.knowledge_base import KnowledgeBaseStatusUpdate
+        from fastapi import HTTPException
+
+        # Create KB for admin
+        admin_kb = kb_service.create_knowledge_base(
+            user_id=admin_user.id,
+            filename="admin_doc.pdf",
+            title="Admin Document",
+        )
+
+        status_data = KnowledgeBaseStatusUpdate(status=CallbackStage.DONE)
+
+        # Test regular user cannot update admin's KB status
+        with pytest.raises(HTTPException) as exc_info:
+            await update_knowledge_base_status(
+                kb_id=admin_kb.id,
+                status_update=status_data,
+                current_user=test_user,
+                db=db_session,
+            )
+
+        assert exc_info.value.status_code == 403
+        assert "Not authorized to update this knowledge base status" in str(
+            exc_info.value.detail
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_kb_file_without_size_attribute(
+        self, db_session: Session, test_user
+    ):
+        """Test file upload with file that doesn't have size attribute"""
+        from routers.knowledge_base import create_knowledge_base
+        from fastapi import UploadFile
+        from io import BytesIO
+
+        mock_file = Mock()
+        mock_file.filename = "test.pdf"
+        mock_file.content_type = "application/pdf"
+        mock_file.file = Mock()
+        # Explicitly don't set size attribute to test the hasattr check
+        del mock_file.size
+
+        result = await create_knowledge_base(
+            file=mock_file,
+            title="Test Document",
+            description="Test description",
+            current_user=test_user,
+            db=db_session,
+        )
+
+        assert result is not None
+        assert result.title == "Test Document"
+        assert (
+            result.extra_data["size"] is None
+        )  # Should be None when size not available
+
+    @pytest.mark.asyncio
+    async def test_successful_operations_coverage(
+        self, db_session: Session, test_user, admin_user, kb_service
+    ):
+        """Test successful operation paths for better coverage"""
+        from routers.knowledge_base import (
+            get_knowledge_base,
+            update_knowledge_base,
+            delete_knowledge_base,
+            update_knowledge_base_status,
+        )
+        from schemas.knowledge_base import (
+            KnowledgeBaseUpdate,
+            KnowledgeBaseStatusUpdate,
+        )
+
+        # Create a KB for test user
+        user_kb = kb_service.create_knowledge_base(
+            user_id=test_user.id,
+            filename="user_doc.pdf",
+            title="User Document",
+            description="User description",
+        )
+
+        # Test successful get by owner
+        get_result = await get_knowledge_base(
+            kb_id=user_kb.id, current_user=test_user, db=db_session
+        )
+        assert get_result.id == user_kb.id
+        assert get_result.title == "User Document"
+
+        # Test successful update by owner
+        update_data = KnowledgeBaseUpdate(
+            title="Updated Title",
+            description="Updated description",
+            extra_data={"updated": True},
+        )
+        update_result = await update_knowledge_base(
+            kb_id=user_kb.id,
+            kb_update=update_data,
+            current_user=test_user,
+            db=db_session,
+        )
+        assert update_result.title == "Updated Title"
+        assert update_result.description == "Updated description"
+
+        # Test successful status update by owner
+        status_data = KnowledgeBaseStatusUpdate(status=CallbackStage.DONE)
+        status_result = await update_knowledge_base_status(
+            kb_id=user_kb.id,
+            status_update=status_data,
+            current_user=test_user,
+            db=db_session,
+        )
+        assert status_result.status == CallbackStage.DONE
+
+        # Test successful admin operations on user's KB
+        admin_get = await get_knowledge_base(
+            kb_id=user_kb.id, current_user=admin_user, db=db_session
+        )
+        assert admin_get.id == user_kb.id
+
+        admin_update = await update_knowledge_base(
+            kb_id=user_kb.id,
+            kb_update=KnowledgeBaseUpdate(title="Admin Updated"),
+            current_user=admin_user,
+            db=db_session,
+        )
+        assert admin_update.title == "Admin Updated"
+
+        admin_status = await update_knowledge_base_status(
+            kb_id=user_kb.id,
+            status_update=KnowledgeBaseStatusUpdate(
+                status=CallbackStage.FAILED
+            ),
+            current_user=admin_user,
+            db=db_session,
+        )
+        assert admin_status.status == CallbackStage.FAILED
+
+        # Test successful delete by owner
+        delete_result = await delete_knowledge_base(
+            kb_id=user_kb.id, current_user=test_user, db=db_session
+        )
+        assert (
+            delete_result["message"] == "Knowledge base deleted successfully"
+        )
+
+
+class TestKnowledgeBaseEndpointEdgeCases:
+    """Test edge cases and boundary conditions for endpoints"""
+
+    @pytest.mark.asyncio
+    async def test_list_kb_with_search_and_pagination(
+        self, db_session: Session, test_user, kb_service
+    ):
+        """Test list endpoint with search and pagination parameters"""
+        from routers.knowledge_base import list_knowledge_bases
+
+        # Create multiple KBs for testing
+        for i in range(5):
+            kb_service.create_knowledge_base(
+                user_id=test_user.id,
+                filename=f"test_doc_{i}.pdf",
+                title=f"Agriculture Document {i}",
+                description=f"Test description {i}",
+            )
+
+        # Test with search parameter
+        search_result = await list_knowledge_bases(
+            page=1,
+            size=3,
+            search="Agriculture",
+            current_user=test_user,
+            db=db_session,
+        )
+        assert search_result.total >= 5
+        assert len(search_result.knowledge_bases) <= 3
+        assert search_result.page == 1
+        assert search_result.size == 3
+
+        # Test pagination without search
+        page_result = await list_knowledge_bases(
+            page=2, size=2, search=None, current_user=test_user, db=db_session
+        )
+        assert page_result.page == 2
+        assert page_result.size == 2
+
+    @pytest.mark.asyncio
+    async def test_create_kb_with_all_supported_file_types(
+        self, db_session: Session, test_user
+    ):
+        """Test creating KBs with all supported file types"""
+        from routers.knowledge_base import create_knowledge_base
+        from fastapi import UploadFile
+        from io import BytesIO
+
+        supported_types = [
+            ("application/pdf", "document.pdf"),
+            ("text/plain", "document.txt"),
+            (
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "document.docx",
+            ),
+        ]
+
+        for content_type, filename in supported_types:
+
+            mock_file = Mock()
+            mock_file.filename = filename
+            mock_file.content_type = content_type
+            mock_file.size = len(b"test content")
+            mock_file.file = Mock()
+
+            result = await create_knowledge_base(
+                file=mock_file,
+                title=f"Test {filename}",
+                description=f"Test {content_type}",
+                current_user=test_user,
+                db=db_session,
+            )
+
+            assert result is not None
+            assert result.title == f"Test {filename}"
+            assert result.extra_data["content_type"] == content_type
+            assert result.extra_data["original_filename"] == filename
+
+    @pytest.mark.asyncio
+    async def test_update_kb_with_partial_data(
+        self, db_session: Session, test_user, kb_service
+    ):
+        """Test updating KB with partial data (None values)"""
+        from routers.knowledge_base import update_knowledge_base
+        from schemas.knowledge_base import KnowledgeBaseUpdate
+
+        # Create a KB
+        user_kb = kb_service.create_knowledge_base(
+            user_id=test_user.id,
+            filename="test.pdf",
+            title="Original Title",
+            description="Original description",
+            extra_data={"original": "data"},
+        )
+
+        # Test update with only title (description and extra_data as None)
+        update_data = KnowledgeBaseUpdate(
+            title="New Title Only", description=None, extra_data=None
+        )
+
+        result = await update_knowledge_base(
+            kb_id=user_kb.id,
+            kb_update=update_data,
+            current_user=test_user,
+            db=db_session,
+        )
+
+        assert result.title == "New Title Only"
+        # Service layer should preserve original values when None is passed in update
+        assert (
+            result.description == "Original description"
+        )  # None values preserve existing data
+        assert result.extra_data == {"original": "data"}
+
+
 # Additional test helpers for mocking authentication
 class TestKnowledgeBaseWithMockedAuth:
     """Tests with mocked authentication for full endpoint testing"""
@@ -584,3 +1180,86 @@ class TestKnowledgeBaseWithMockedAuth:
         # 6. Verify deletion
         deleted_kb = kb_service.get_knowledge_base_by_id(kb.id)
         assert deleted_kb is None
+
+
+class TestKnowledgeBaseRouterIntegration:
+    """Integration tests for router with real service interactions"""
+
+    @pytest.mark.asyncio
+    async def test_full_kb_lifecycle_via_router(
+        self, db_session: Session, test_user
+    ):
+        """Test complete KB lifecycle through router endpoints"""
+        from routers.knowledge_base import (
+            create_knowledge_base,
+            list_knowledge_bases,
+            get_knowledge_base,
+            update_knowledge_base,
+            update_knowledge_base_status,
+            delete_knowledge_base,
+        )
+        from schemas.knowledge_base import (
+            KnowledgeBaseUpdate,
+            KnowledgeBaseStatusUpdate,
+        )
+        from fastapi import UploadFile
+        from io import BytesIO
+
+        mock_file = Mock()
+        mock_file.filename = "integration_test.pdf"
+        mock_file.content_type = "application/pdf"
+        mock_file.size = len(b"integration test content")
+        mock_file.file = Mock()
+
+        created_kb = await create_knowledge_base(
+            file=mock_file,
+            title="Integration Test",
+            description="Testing full lifecycle",
+            current_user=test_user,
+            db=db_session,
+        )
+        assert created_kb.status == CallbackStage.QUEUED
+
+        # 2. List KBs and verify it's there
+        list_result = await list_knowledge_bases(
+            page=1, size=10, search=None, current_user=test_user, db=db_session
+        )
+        kb_ids = [kb.id for kb in list_result.knowledge_bases]
+        assert created_kb.id in kb_ids
+
+        # 3. Get specific KB
+        get_result = await get_knowledge_base(
+            kb_id=created_kb.id, current_user=test_user, db=db_session
+        )
+        assert get_result.title == "Integration Test"
+
+        # 4. Update KB
+        update_data = KnowledgeBaseUpdate(
+            title="Updated Integration Test",
+            description="Updated via integration test",
+        )
+        update_result = await update_knowledge_base(
+            kb_id=created_kb.id,
+            kb_update=update_data,
+            current_user=test_user,
+            db=db_session,
+        )
+        assert update_result.title == "Updated Integration Test"
+
+        # 5. Update status
+        status_data = KnowledgeBaseStatusUpdate(status=CallbackStage.DONE)
+        status_result = await update_knowledge_base_status(
+            kb_id=created_kb.id,
+            status_update=status_data,
+            current_user=test_user,
+            db=db_session,
+        )
+        assert status_result.status == CallbackStage.DONE
+
+        # 6. Delete KB
+        delete_result = await delete_knowledge_base(
+            kb_id=created_kb.id, current_user=test_user, db=db_session
+        )
+        assert (
+            delete_result["message"] == "Knowledge base deleted successfully"
+        )
