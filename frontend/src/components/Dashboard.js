@@ -11,6 +11,7 @@ import {
   BuildingStorefrontIcon,
   ChevronRightIcon,
   SparklesIcon,
+  DocumentIcon,
 } from "@heroicons/react/24/outline";
 
 export default function Dashboard() {
@@ -100,6 +101,32 @@ export default function Dashboard() {
               </div>
               <div className="mt-4 flex items-center text-green-600 text-sm font-semibold group-hover:text-green-700">
                 <span>Manage Customers</span>
+                <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
+              </div>
+            </a>
+
+            <a
+              href="/knowledge-base"
+              className="group bg-gradient-to-br from-blue-50 to-blue-100 p-6 text-left hover:from-blue-100 hover:to-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
+              style={{ borderRadius: "5px" }}
+            >
+              <div className="flex items-center mb-4">
+                <div
+                  className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 mr-3"
+                  style={{ borderRadius: "5px" }}
+                >
+                  <DocumentIcon className="w-5 h-5 text-white" />
+                </div>
+                <div className="text-blue-700 font-bold text-lg">
+                  Knowledge Base
+                </div>
+              </div>
+              <div className="text-secondary-600 text-sm leading-relaxed">
+                Upload and manage documents for AI-powered assistance and
+                knowledge sharing
+              </div>
+              <div className="mt-4 flex items-center text-blue-600 text-sm font-semibold group-hover:text-blue-700">
+                <span>Manage Documents</span>
                 <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
               </div>
             </a>

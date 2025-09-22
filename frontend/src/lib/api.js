@@ -25,7 +25,9 @@ const API = () => {
   const buildUrl = (url) => {
     // URLs should start with /api for the backend
     const cleanUrl = url.startsWith("/") ? url : `/${url}`;
-    return `/api${cleanUrl}`;
+    const apiUrl = `/api${cleanUrl}`;
+    // Ensure trailing slash is preserved if present in original URL
+    return apiUrl;
   };
 
   // Add response interceptor to handle authentication errors and token refresh
@@ -34,6 +36,7 @@ const API = () => {
     async (error) => {
       const originalRequest = error.config;
 
+      // Only handle auth errors for actual API calls, not navigation
       if (error.response?.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
 
@@ -45,9 +48,11 @@ const API = () => {
           if (typeof window !== "undefined" && window.clearUserSession) {
             window.clearUserSession();
           }
+          // Only redirect if we're not already on login page
           if (
             typeof window !== "undefined" &&
-            !window.location.pathname.includes("/login")
+            !window.location.pathname.includes("/login") &&
+            window.location.pathname !== "/"
           ) {
             window.location.href = "/";
           }
@@ -72,9 +77,17 @@ const API = () => {
           if (typeof window !== "undefined" && window.clearUserSession) {
             window.clearUserSession();
           }
+          // Only redirect if we're not already on login page and this was a user-initiated request
           if (
             typeof window !== "undefined" &&
-            !window.location.pathname.includes("/login")
+            !window.location.pathname.includes("/login") &&
+            window.location.pathname !== "/" &&
+            // Only redirect for auth-related endpoints or profile requests
+            (originalRequest.url?.includes("/auth/") ||
+              originalRequest.url?.includes("/profile") ||
+              originalRequest.url?.includes("/admin/") ||
+              originalRequest.url?.includes("/customers/") ||
+              originalRequest.url?.includes("/kb/"))
           ) {
             window.location.href = "/";
           }
@@ -82,16 +95,26 @@ const API = () => {
         }
       }
 
-      // For other 401/403 errors or if refresh is not available, clear session
+      // For other 401/403 errors, only clear session and redirect if it's an auth-related request
       if (error.response?.status === 401 || error.response?.status === 403) {
-        if (typeof window !== "undefined" && window.clearUserSession) {
-          window.clearUserSession();
-        }
+        // Only handle auth errors for actual authenticated endpoints
         if (
-          typeof window !== "undefined" &&
-          !window.location.pathname.includes("/login")
+          originalRequest.url?.includes("/auth/") ||
+          originalRequest.url?.includes("/profile") ||
+          originalRequest.url?.includes("/admin/") ||
+          originalRequest.url?.includes("/customers/") ||
+          originalRequest.url?.includes("/kb/")
         ) {
-          window.location.href = "/";
+          if (typeof window !== "undefined" && window.clearUserSession) {
+            window.clearUserSession();
+          }
+          if (
+            typeof window !== "undefined" &&
+            !window.location.pathname.includes("/login") &&
+            window.location.pathname !== "/"
+          ) {
+            window.location.href = "/";
+          }
         }
       }
 
@@ -100,31 +123,62 @@ const API = () => {
   );
 
   return {
-    get: (url, requestConfig = {}) =>
-      axiosInstance.get(buildUrl(url), {
-        ...getConfig(),
+    get: (url, requestConfig = {}) => {
+      const baseConfig = getConfig();
+      return axiosInstance.get(buildUrl(url), {
+        ...baseConfig,
         ...requestConfig,
-      }),
-    post: (url, data, requestConfig = {}) =>
-      axiosInstance.post(buildUrl(url), data, {
-        ...getConfig(),
+        headers: {
+          ...baseConfig.headers,
+          ...requestConfig.headers,
+        },
+      });
+    },
+    post: (url, data, requestConfig = {}) => {
+      const baseConfig = getConfig();
+      const finalConfig = {
+        ...baseConfig,
         ...requestConfig,
-      }),
-    put: (url, data, requestConfig = {}) =>
-      axiosInstance.put(buildUrl(url), data, {
-        ...getConfig(),
+        headers: {
+          ...baseConfig.headers,
+          ...requestConfig.headers,
+        },
+      };
+      return axiosInstance.post(buildUrl(url), data, finalConfig);
+    },
+    put: (url, data, requestConfig = {}) => {
+      const baseConfig = getConfig();
+      return axiosInstance.put(buildUrl(url), data, {
+        ...baseConfig,
         ...requestConfig,
-      }),
-    patch: (url, data, requestConfig = {}) =>
-      axiosInstance.patch(buildUrl(url), data, {
-        ...getConfig(),
+        headers: {
+          ...baseConfig.headers,
+          ...requestConfig.headers,
+        },
+      });
+    },
+    patch: (url, data, requestConfig = {}) => {
+      const baseConfig = getConfig();
+      return axiosInstance.patch(buildUrl(url), data, {
+        ...baseConfig,
         ...requestConfig,
-      }),
-    delete: (url, requestConfig = {}) =>
-      axiosInstance.delete(buildUrl(url), {
-        ...getConfig(),
+        headers: {
+          ...baseConfig.headers,
+          ...requestConfig.headers,
+        },
+      });
+    },
+    delete: (url, requestConfig = {}) => {
+      const baseConfig = getConfig();
+      return axiosInstance.delete(buildUrl(url), {
+        ...baseConfig,
         ...requestConfig,
-      }),
+        headers: {
+          ...baseConfig.headers,
+          ...requestConfig.headers,
+        },
+      });
+    },
     setToken: (token) => {
       api.token = token;
     },
