@@ -3,7 +3,7 @@
 	"main": "expo-router/entry",
 	"version": "1.0.0",
 	"scripts": {
-		"start": "expo start --port 19000 --host localhost",
+		"start": "expo start --port 19000 --host lan",
 		"reset-project": "node ./scripts/reset-project.js",
 		"android": "expo start --android",
 		"ios": "expo start --ios",
