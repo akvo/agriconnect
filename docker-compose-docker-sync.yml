@@ -4,6 +4,11 @@ services:
   frontend:
     volumes:
       - agriconnect-docker-sync:/app/node_modules:nocopy
+  mobileapp:
+    volumes:
+      - agriconnect-app-docker-sync:/app/node_modules:nocopy
 volumes:
   agriconnect-docker-sync:
+    external: true
+  agriconnect-app-docker-sync:
     external: true

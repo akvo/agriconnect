@@ -1,4 +1,4 @@
-FROM akvo/akvo-node-18-alpine:20250306.055839.23cadbd
+FROM akvo/akvo-node-20-alpine:20250923.063900.7ce4b53
 
 WORKDIR /app
 
