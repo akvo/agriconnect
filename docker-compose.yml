@@ -37,10 +37,19 @@ services:
   frontend:
     depends_on:
       - backend
-    image: akvo/akvo-node-18-alpine:20250306.055839.23cadbd
+    image: akvo/akvo-node-20-alpine:20250923.063900.7ce4b53
     command: ["./start.sh"]
     working_dir: /app
     volumes:
       - ./frontend:/app:delegated
+  mobileapp:
+    image: akvo/akvo-node-24-alpine:20250923.073213.57d80cd
+    command: ["./start.sh"]
+    volumes:
+      - ./app:/app:delegated
+      - ./.git:/app/.git:ro
+    working_dir: /app
+    environment:
+      - BACKEND_IP_ADDRESS=${IP_ADDRESS}
 volumes:
   pg-data:
