@@ -1,9 +1,6 @@
 #!/bin/sh
 
-echo "SERVER_URL=${BACKEND_IP_ADDRESS}" >.env
+echo "AGRICONNECT_SERVER_URL=${BACKEND_IP_ADDRESS}" >.env
 
 yarn install
-
-tail -f /dev/null
-
 yarn start
