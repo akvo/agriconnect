@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from routers import (
     admin_users,
+    administrative,
     auth,
     callbacks,
     customers,
@@ -30,6 +31,7 @@ app = FastAPI(
 # Include routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(admin_users.router, prefix="/api")
+app.include_router(administrative.router, prefix="/api")
 app.include_router(callbacks.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(knowledge_base.router, prefix="/api")

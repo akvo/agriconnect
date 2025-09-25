@@ -13,6 +13,7 @@ import {
   Cog6ToothIcon,
   BookOpenIcon,
   ArrowPathIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
 
 export default function UserList({
@@ -86,13 +87,7 @@ export default function UserList({
             <th className="px-8 py-5 text-left text-xs font-bold text-secondary-700 uppercase tracking-wider">
               <div className="flex items-center">
                 <ClipboardDocumentListIcon className="w-4 h-4 mr-2 text-secondary-500" />
-                Type
-              </div>
-            </th>
-            <th className="px-8 py-5 text-left text-xs font-bold text-secondary-700 uppercase tracking-wider">
-              <div className="flex items-center">
-                <CheckCircleIcon className="w-4 h-4 mr-2 text-secondary-500" />
-                Status
+                Type / Status
               </div>
             </th>
             <th className="px-8 py-5 text-right text-xs font-bold text-secondary-700 uppercase tracking-wider">
@@ -119,53 +114,70 @@ export default function UserList({
                     <div className="text-sm text-secondary-500 font-medium flex items-center">
                       {user.email}
                     </div>
+                    {user.administrative_location?.full_path && (
+                      <div className="text-xs text-gray-400 mt-1 flex items-center">
+                        <MapPinIcon className="w-3 h-3 mr-1" />
+                        {user.administrative_location.full_path}
+                      </div>
+                    )}
                   </div>
                 </div>
               </td>
               <td className="px-8 py-6 whitespace-nowrap">
-                <span
-                  className={`inline-flex items-center px-4 py-2 rounded-[5px] text-sm font-bold  ${getUserTypeBadgeColor(user.user_type)}`}
-                >
-                  {user.user_type === "admin" ? (
-                    <Cog6ToothIcon className="w-4 h-4 mr-2 flex-shrink-0" />
-                  ) : (
-                    <BookOpenIcon className="w-4 h-4 mr-2 flex-shrink-0" />
-                  )}
-                  <span className="leading-none">
-                    {getUserTypeLabel(user.user_type)}
-                  </span>
-                </span>
-              </td>
-              <td className="px-8 py-6 whitespace-nowrap">
-                <span
-                  className={`inline-flex items-center px-4 py-2 rounded-[5px] text-sm font-bold  ${
-                    user.is_active
-                      ? "bg-primary-100 text-primary-800 border border-primary-200"
-                      : user.password_set_at
-                        ? "bg-red-100 text-red-800 border border-red-200"
-                        : "bg-yellow-100 text-yellow-800 border border-yellow-200"
-                  }`}
-                >
-                  {user.is_active ? (
-                    <CheckCircleIcon className="w-4 h-4 mr-2" />
-                  ) : user.password_set_at ? (
-                    <XCircleIcon className="w-4 h-4 mr-2" />
-                  ) : (
-                    <ClockIcon className="w-4 h-4 mr-2" />
-                  )}
-                  {user.is_active
-                    ? "Active"
-                    : user.password_set_at
-                      ? "Inactive"
-                      : "Pending"}
-                </span>
+                <div className="space-y-1">
+                  {/* User Type */}
+                  <div>
+                    <span
+                      className={`inline-flex items-center px-3 py-1 text-sm font-medium ${
+                        user.user_type === "admin"
+                          ? "text-purple-700"
+                          : "text-blue-700"
+                      }`}
+                    >
+                      {user.user_type === "admin" ? (
+                        <Cog6ToothIcon className="w-4 h-4 mr-2 flex-shrink-0" />
+                      ) : (
+                        <BookOpenIcon className="w-4 h-4 mr-2 flex-shrink-0" />
+                      )}
+                      <span className="leading-none">
+                        {getUserTypeLabel(user.user_type)}
+                      </span>
+                    </span>
+                  </div>
+
+                  {/* User Status */}
+                  <div>
+                    <span
+                      className={`inline-flex items-center px-3 py-1 text-sm font-medium ${
+                        user.is_active
+                          ? "text-green-700"
+                          : user.password_set_at
+                            ? "text-red-700"
+                            : "text-yellow-700"
+                      }`}
+                    >
+                      {user.is_active ? (
+                        <CheckCircleIcon className="w-4 h-4 mr-2" />
+                      ) : user.password_set_at ? (
+                        <XCircleIcon className="w-4 h-4 mr-2" />
+                      ) : (
+                        <ClockIcon className="w-4 h-4 mr-2" />
+                      )}
+                      {user.is_active
+                        ? "Active"
+                        : user.password_set_at
+                          ? "Inactive"
+                          : "Pending"}
+                    </span>
+                  </div>
+                </div>
               </td>
               <td className="px-8 py-6 whitespace-nowrap text-right">
                 <div className="flex items-center justify-end space-x-3">
                   {!user.is_active && !user.password_set_at && (
                     <button
                       onClick={() => onResendInvitation?.(user)}
-                      className="bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
+                      className="bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200 flex items-center cursor-pointer"
                       title="Resend invitation email"
                     >
                       <ArrowPathIcon className="w-4 h-4 mr-1" />
@@ -174,7 +186,7 @@ export default function UserList({
                   )}
                   <button
                     onClick={() => onEditUser(user)}
-                    className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200    flex items-center cursor-pointer"
+                    className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200    flex items-center cursor-pointer"
                   >
                     <PencilIcon className="w-4 h-4 mr-1" />
                     Edit
@@ -182,7 +194,7 @@ export default function UserList({
                   {currentUser.id !== user.id && (
                     <button
                       onClick={() => onDeleteUser(user.id)}
-                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200    flex items-center cursor-pointer"
+                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200    flex items-center cursor-pointer"
                     >
                       <TrashIcon className="w-4 h-4 mr-1" />
                       Delete

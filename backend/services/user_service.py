@@ -6,13 +6,19 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models.user import User
+from models import (
+    User,
+    UserAdministrative,
+    Administrative,
+    AdministrativeLevel,
+)
 from schemas.user import (
     AdminUserCreate,
     SelfUpdateRequest,
     UserCreate,
     UserUpdate,
 )
+from services.administrative_service import AdministrativeService
 from services.email_service import email_service
 from utils.auth import get_password_hash, verify_password
 from utils.constants import (
@@ -31,6 +37,69 @@ from utils.constants import (
 
 
 class UserService:
+    @staticmethod
+    def _build_administrative_path(
+        db: Session, administrative_id: int
+    ) -> str:
+        """Build the full administrative path."""
+        # Example: 'Region - District - Ward'
+        if not administrative_id:
+            return None
+
+        # Get the administrative area and its full hierarchy
+        admin = (
+            db.query(Administrative)
+            .filter(Administrative.id == administrative_id)
+            .first()
+        )
+        if not admin:
+            return None
+
+        # Split the path to get all administrative codes
+        path_parts = admin.path.split('.') if admin.path else []
+
+        # Query all administrative areas in the path
+        areas = (
+            db.query(Administrative)
+            .join(AdministrativeLevel)
+            .filter(Administrative.code.in_(path_parts))
+            .order_by(AdministrativeLevel.id)
+            .all()
+        )
+
+        # Build the path string, excluding country level (level_id 1)
+        path_names = []
+        for area in areas:
+            if area.level_id != 1:  # Skip country level
+                path_names.append(area.name)
+
+        return ' - '.join(path_names) if path_names else None
+
+    @staticmethod
+    def _get_user_administrative_info(db: Session, user_id: int) -> dict:
+        """Get administrative location information for a user"""
+        # Get the user's administrative assignment
+        user_admin = (
+            db.query(UserAdministrative)
+            .filter(UserAdministrative.user_id == user_id)
+            .first()
+        )
+
+        if not user_admin:
+            return {
+                'id': None,
+                'full_path': None
+            }
+
+        full_path = UserService._build_administrative_path(
+            db, user_admin.administrative_id
+        )
+
+        return {
+            'id': user_admin.administrative_id,
+            'full_path': full_path,
+        }
+
     @staticmethod
     def _check_user_exists(db: Session, email: str, phone_number: str) -> None:
         """
@@ -149,6 +218,23 @@ class UserService:
             db.commit()
             db.refresh(db_user)
 
+            # Assign administrative areas if provided
+            if user_data.administrative_ids:
+                from schemas.administrative import AdministrativeAssign
+
+                try:
+                    assignment_data = AdministrativeAssign(
+                        administrative_ids=user_data.administrative_ids
+                    )
+                    AdministrativeService.assign_user_to_administrative(
+                        db, db_user.id, assignment_data
+                    )
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=str(e)
+                    )
+
             # Send invitation email
             email_sent = await email_service.send_invitation_email(
                 email=user_data.email,
@@ -170,7 +256,7 @@ class UserService:
     @staticmethod
     def get_users_list(
         db: Session, page: int = 1, size: int = 10, search: str = None
-    ) -> tuple[list[User], int]:
+    ) -> tuple[list[dict], int]:
         """Get paginated list of users with optional search"""
         query = db.query(User)
 
@@ -187,7 +273,25 @@ class UserService:
         total = query.count()
         users = query.offset((page - 1) * size).limit(size).all()
 
-        return users, total
+        # Convert users to dict format with administrative location info
+        user_data = []
+        for user in users:
+            user_dict = {
+                'id': user.id,
+                'email': user.email,
+                'phone_number': user.phone_number,
+                'full_name': user.full_name,
+                'user_type': user.user_type,
+                'is_active': user.is_active,
+                'invitation_status': None,
+                'password_set_at': user.password_set_at,
+                'administrative_location': (
+                    UserService._get_user_administrative_info(db, user.id)
+                ),
+            }
+            user_data.append(user_dict)
+
+        return user_data, total
 
     @staticmethod
     def verify_invitation_token(
@@ -314,19 +418,39 @@ class UserService:
             )
 
     @staticmethod
-    def get_user_by_id(db: Session, user_id: int) -> User:
-        """Get user by ID"""
+    def get_user_by_id(db: Session, user_id: int) -> dict:
+        """Get user by ID with administrative location info"""
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=USER_NOT_FOUND
             )
-        return user
+
+        # Convert to dict with administrative location info
+        user_dict = {
+            'id': user.id,
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'full_name': user.full_name,
+            'user_type': user.user_type,
+            'is_active': user.is_active,
+            'invitation_token': user.invitation_token,
+            'invitation_sent_at': user.invitation_sent_at,
+            'invitation_expires_at': user.invitation_expires_at,
+            'password_set_at': user.password_set_at,
+            'created_at': user.created_at,
+            'updated_at': user.updated_at,
+            'administrative_location': (
+                UserService._get_user_administrative_info(db, user.id)
+            ),
+        }
+
+        return user_dict
 
     @staticmethod
     def update_user(
         db: Session, user_id: int, user_data: UserUpdate, current_user: User
-    ) -> User:
+    ) -> dict:
         """Update user details"""
         user = UserService.get_user_by_id(db, user_id)
 
@@ -350,24 +474,53 @@ class UserService:
                 )
 
         # Prevent users from changing their own role
-        if user_data.user_type is not None and user.id == current_user.id:
+        if user_data.user_type is not None and user_id == current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot change your own role",
             )
 
+        # Handle administrative location changes
+        if (hasattr(user_data, 'administrative_id') and
+                user_data.administrative_id is not None):
+            # Clear existing administrative assignments
+            db.query(UserAdministrative).filter(
+                UserAdministrative.user_id == user_id
+            ).delete()
+
+            # Assign new administrative location if provided
+            if user_data.administrative_id:
+                try:
+                    from schemas.administrative import AdministrativeAssign
+
+                    assignment_data = AdministrativeAssign(
+                        administrative_ids=[user_data.administrative_id]
+                    )
+                    AdministrativeService.assign_user_to_administrative(
+                        db, user_id, assignment_data
+                    )
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=str(e)
+                    )
+
+        # Get the actual user model for updating
+        actual_user = db.query(User).filter(User.id == user_id).first()
+
         # Update fields
         if user_data.full_name is not None:
-            user.full_name = user_data.full_name
+            actual_user.full_name = user_data.full_name
         if user_data.phone_number is not None:
-            user.phone_number = user_data.phone_number
+            actual_user.phone_number = user_data.phone_number
         if user_data.user_type is not None:
-            user.user_type = user_data.user_type
+            actual_user.user_type = user_data.user_type
 
         try:
             db.commit()
-            db.refresh(user)
-            return user
+            db.refresh(actual_user)
+            # Return updated user with administrative location info
+            return UserService.get_user_by_id(db, user_id)
         except IntegrityError:
             db.rollback()
             raise HTTPException(
@@ -384,7 +537,12 @@ class UserService:
                 detail=CANNOT_DELETE_OWN_ACCOUNT,
             )
 
-        user = UserService.get_user_by_id(db, user_id)
+        # Get the actual user model for deletion
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=USER_NOT_FOUND
+            )
 
         try:
             db.delete(user)

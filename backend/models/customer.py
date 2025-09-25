@@ -25,3 +25,6 @@ class Customer(Base):
     messages = relationship(
         "Message", back_populates="customer", cascade="all, delete-orphan"
     )
+    customer_administrative = relationship(
+        "CustomerAdministrative", back_populates="customer"
+    )
