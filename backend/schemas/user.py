@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -69,11 +69,22 @@ class AdminUserCreate(BaseModel):
     phone_number: str
     full_name: str
     user_type: UserType
+    administrative_ids: List[int] = []
 
     @field_validator("phone_number")
     @classmethod
     def validate_phone_number_field(cls, v):
         return validate_phone_number(v)
+
+    @field_validator("administrative_ids")
+    @classmethod
+    def validate_administrative_ids(cls, v, values):
+        user_type = values.data.get("user_type")
+        if user_type == UserType.EXTENSION_OFFICER and not v:
+            raise ValueError(
+                "Extension officers must be assigned to an administrative area"
+            )
+        return v
 
 
 class UserUpdate(BaseModel):

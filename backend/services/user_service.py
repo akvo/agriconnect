@@ -6,13 +6,14 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models.user import User
+from models import User
 from schemas.user import (
     AdminUserCreate,
     SelfUpdateRequest,
     UserCreate,
     UserUpdate,
 )
+from services.administrative_service import AdministrativeService
 from services.email_service import email_service
 from utils.auth import get_password_hash, verify_password
 from utils.constants import (
@@ -148,6 +149,17 @@ class UserService:
             db.add(db_user)
             db.commit()
             db.refresh(db_user)
+
+            # Assign administrative areas if provided
+            if user_data.administrative_ids:
+                from schemas.administrative import AdministrativeAssign
+
+                assignment_data = AdministrativeAssign(
+                    administrative_ids=user_data.administrative_ids
+                )
+                AdministrativeService.assign_user_to_administrative(
+                    db, db_user.id, assignment_data
+                )
 
             # Send invitation email
             email_sent = await email_service.send_invitation_email(
