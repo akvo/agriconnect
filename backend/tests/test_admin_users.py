@@ -652,7 +652,7 @@ class TestAdminUserManagement:
             json=user_data,
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_create_user_with_duplicate_administrative_ids(
         self, client, db_session

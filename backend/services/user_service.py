@@ -154,12 +154,18 @@ class UserService:
             if user_data.administrative_ids:
                 from schemas.administrative import AdministrativeAssign
 
-                assignment_data = AdministrativeAssign(
-                    administrative_ids=user_data.administrative_ids
-                )
-                AdministrativeService.assign_user_to_administrative(
-                    db, db_user.id, assignment_data
-                )
+                try:
+                    assignment_data = AdministrativeAssign(
+                        administrative_ids=user_data.administrative_ids
+                    )
+                    AdministrativeService.assign_user_to_administrative(
+                        db, db_user.id, assignment_data
+                    )
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=str(e)
+                    )
 
             # Send invitation email
             email_sent = await email_service.send_invitation_email(
