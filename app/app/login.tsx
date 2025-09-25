@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { api, LoginCredentials } from "../services/api";
 
@@ -27,11 +35,14 @@ export default function LoginScreen() {
         params: {
           fullName: response.user.full_name,
           email: response.user.email,
-          token: response.access_token
-        }
+          token: response.access_token,
+        },
       });
     } catch (error) {
-      Alert.alert("Login Failed", error instanceof Error ? error.message : "Invalid credentials");
+      Alert.alert(
+        "Login Failed",
+        error instanceof Error ? error.message : "Invalid credentials",
+      );
     } finally {
       setIsLoading(false);
     }

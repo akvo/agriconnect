@@ -1,6 +1,6 @@
 {
 	"name": "agriconnect",
-	"main": "expo-router/entry",
+	"main": "./App.js",
 	"version": "1.0.0",
 	"scripts": {
 		"start": "expo start --port 19000",

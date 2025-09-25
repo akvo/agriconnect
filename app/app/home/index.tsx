@@ -3,7 +3,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function HomeScreen() {
-  const { fullName, email } = useLocalSearchParams<{ fullName: string; email: string }>();
+  const { fullName, email } = useLocalSearchParams<{
+    fullName: string;
+    email: string;
+  }>();
   const router = useRouter();
 
   const handleLogout = () => {
@@ -14,7 +17,7 @@ export default function HomeScreen() {
   const getInitials = (name: string) => {
     return name
       .split(" ")
-      .map(word => word.charAt(0).toUpperCase())
+      .map((word) => word.charAt(0).toUpperCase())
       .slice(0, 2)
       .join("");
   };
@@ -42,7 +45,9 @@ export default function HomeScreen() {
 
       {/* Dashboard content placeholder */}
       <View style={styles.dashboardPlaceholder}>
-        <Text style={styles.placeholderText}>Dashboard content will appear here</Text>
+        <Text style={styles.placeholderText}>
+          Dashboard content will appear here
+        </Text>
       </View>
     </View>
   );
