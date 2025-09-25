@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import api from "../../lib/api";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 
 export default function EditUserModal({
   user,
@@ -14,6 +16,7 @@ export default function EditUserModal({
     full_name: user.full_name || "",
     phone_number: user.phone_number || "",
     user_type: user.user_type || "eo",
+    administrative_id: user.administrative_location?.id || null,
     current_password: "",
     new_password: "",
     confirm_password: "",
@@ -23,12 +26,171 @@ export default function EditUserModal({
   const [showDetails, setShowDetails] = useState(false);
   const [showPasswordFields, setShowPasswordFields] = useState(false);
 
+  // Administrative location states
+  const [administrativeLevels, setAdministrativeLevels] = useState([]);
+  const [availableLocations, setAvailableLocations] = useState({});
+  const [selectedLocation, setSelectedLocation] = useState({});
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+
+    // Clear administrative location if user type is changed to admin
+    if (name === 'user_type' && value === 'admin') {
+      setFormData(prev => ({
+        ...prev,
+        administrative_id: null
+      }));
+      setSelectedLocation({});
+      setAvailableLocations({});
+    }
+  };
+
+  // Load administrative levels and starting location data
+  useEffect(() => {
+    if (!isSelfUpdate && !isDataLoaded && formData.user_type === 'eo') {
+      loadAdministrativeLevels();
+    }
+  }, [isSelfUpdate, isDataLoaded, formData.user_type]);
+
+  const loadAdministrativeLevels = async () => {
+    try {
+      setLoadingLocations(true);
+      const response = await api.get('/administrative/levels');
+      setAdministrativeLevels(response.data);
+      setIsDataLoaded(true);
+
+      // Load starting locations (skip country level)
+      const startIndex = 1; // Start from level after country (index 0)
+      if (startIndex < response.data.length) {
+        const startLevel = response.data[startIndex];
+        loadStartingLocations(startLevel, startIndex);
+      }
+
+      // If user has existing administrative location, load the hierarchy
+      if (user.administrative_location?.id) {
+        loadUserAdministrativeHierarchy(user.administrative_location.id);
+      }
+    } catch (err) {
+      console.error('Error loading administrative levels:', err);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const loadUserAdministrativeHierarchy = async (administrativeId) => {
+    try {
+      // Get the administrative area details to understand the hierarchy
+      const response = await api.get(`/administrative/${administrativeId}`);
+      const adminArea = response.data;
+
+      if (adminArea.path) {
+        const pathParts = adminArea.path.split('.');
+        // Load each level in the hierarchy
+        for (let i = 1; i < pathParts.length; i++) { // Skip country (index 0)
+          if (i < administrativeLevels.length) {
+            // Find parent ID for this level
+            const parentPath = pathParts.slice(0, i).join('.');
+            const parentResponse = await api.get(`/administrative/?path=${parentPath}`);
+            if (parentResponse.data.administrative?.length > 0) {
+              const parentId = parentResponse.data.administrative[0].id;
+              loadChildLocations(parentId, i);
+
+              // Set the selected location
+              if (pathParts[i] === adminArea.code) {
+                setSelectedLocation(prev => ({
+                  ...prev,
+                  [i]: administrativeId
+                }));
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error loading user administrative hierarchy:', err);
+    }
+  };
+
+  const loadStartingLocations = async (levelName, levelIndex) => {
+    try {
+      const response = await api.get(`/administrative/?level=${levelName}`);
+      setAvailableLocations(prev => ({
+        ...prev,
+        [levelIndex]: response.data.administrative
+      }));
+    } catch (err) {
+      console.error('Error loading starting locations:', err);
+    }
+  };
+
+  const loadChildLocations = async (parentId, levelIndex) => {
+    try {
+      const response = await api.get(`/administrative/?parent_id=${parentId}`);
+      setAvailableLocations(prev => ({
+        ...prev,
+        [levelIndex]: response.data.administrative
+      }));
+    } catch (err) {
+      console.error('Error loading child locations:', err);
+    }
+  };
+
+  const handleLocationChange = (levelIndex, locationId) => {
+    const newSelectedLocation = { ...selectedLocation };
+    const newAvailableLocations = { ...availableLocations };
+
+    if (locationId) {
+      newSelectedLocation[levelIndex] = parseInt(locationId);
+      setFormData(prev => ({
+        ...prev,
+        administrative_id: parseInt(locationId)
+      }));
+
+      // Clear all deeper levels
+      for (let i = levelIndex + 1; i < administrativeLevels.length; i++) {
+        delete newSelectedLocation[i];
+        delete newAvailableLocations[i];
+      }
+
+      // Load child locations for the next level
+      const nextLevelIndex = levelIndex + 1;
+      if (nextLevelIndex < administrativeLevels.length) {
+        loadChildLocations(locationId, nextLevelIndex);
+      }
+    } else {
+      // Clear this level and all deeper levels
+      for (let i = levelIndex; i < administrativeLevels.length; i++) {
+        delete newSelectedLocation[i];
+        delete newAvailableLocations[i];
+      }
+
+      // Set administrative_id to the parent level or null
+      const parentLevelIndex = levelIndex - 1;
+      if (parentLevelIndex >= 0 && newSelectedLocation[parentLevelIndex]) {
+        setFormData(prev => ({
+          ...prev,
+          administrative_id: newSelectedLocation[parentLevelIndex]
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          administrative_id: null
+        }));
+      }
+    }
+
+    setSelectedLocation(newSelectedLocation);
+    setAvailableLocations(newAvailableLocations);
+  };
+
+  const getLevelName = (levelIndex) => {
+    return administrativeLevels[levelIndex] || `Level ${levelIndex + 1}`;
   };
 
   const handleSubmit = async (e) => {
@@ -86,7 +248,7 @@ export default function EditUserModal({
 
         await api.put("/auth/profile", updateData);
       } else {
-        // Handle admin update (existing logic)
+        // Handle admin update with administrative location
         const changedData = {};
         const fieldsToCheck = ["full_name", "phone_number", "user_type"];
         fieldsToCheck.forEach((key) => {
@@ -94,6 +256,14 @@ export default function EditUserModal({
             changedData[key] = formData[key];
           }
         });
+
+        // Handle administrative location changes for extension officers
+        if (formData.user_type === "eo") {
+          const currentAdminId = user.administrative_location?.id;
+          if (formData.administrative_id !== currentAdminId) {
+            changedData.administrative_id = formData.administrative_id;
+          }
+        }
 
         if (Object.keys(changedData).length === 0) {
           onClose();
@@ -365,6 +535,95 @@ export default function EditUserModal({
                   </select>
                 )}
               </div>
+
+              {!isSelfUpdate && formData.user_type === "eo" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Administrative Location
+                    </label>
+
+                    {loadingLocations ? (
+                      <div className="text-sm text-gray-500">Loading locations...</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {/* Show first level dropdown (index 1, after country) */}
+                        {administrativeLevels.length > 1 && availableLocations[1] && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600">
+                              {getLevelName(1)}
+                            </label>
+                            <select
+                              value={selectedLocation[1] || user.administrative_location?.id || ""}
+                              onChange={(e) => handleLocationChange(1, e.target.value)}
+                              className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                              style={{ borderRadius: "5px" }}
+                            >
+                              <option value="">Select {getLevelName(1)}</option>
+                              {availableLocations[1].map((location) => (
+                                <option key={location.id} value={location.id}>
+                                  {location.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Show second level dropdown only if first level is selected */}
+                        {selectedLocation[1] && availableLocations[2] && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600">
+                              {getLevelName(2)}
+                            </label>
+                            <select
+                              value={selectedLocation[2] || ""}
+                              onChange={(e) => handleLocationChange(2, e.target.value)}
+                              className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                              style={{ borderRadius: "5px" }}
+                            >
+                              <option value="">Select {getLevelName(2)}</option>
+                              {availableLocations[2].map((location) => (
+                                <option key={location.id} value={location.id}>
+                                  {location.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Show third level dropdown only if second level is selected */}
+                        {selectedLocation[2] && availableLocations[3] && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600">
+                              {getLevelName(3)}
+                            </label>
+                            <select
+                              value={selectedLocation[3] || ""}
+                              onChange={(e) => handleLocationChange(3, e.target.value)}
+                              className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                              style={{ borderRadius: "5px" }}
+                            >
+                              <option value="">Select {getLevelName(3)}</option>
+                              {availableLocations[3].map((location) => (
+                                <option key={location.id} value={location.id}>
+                                  {location.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Show message if no locations are available */}
+                        {administrativeLevels.length > 1 && !availableLocations[1] && (
+                          <div className="text-sm text-gray-500">
+                            No administrative locations available
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {isSelfUpdate && (
                 <div

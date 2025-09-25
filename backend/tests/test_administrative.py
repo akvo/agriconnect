@@ -33,8 +33,10 @@ class TestAdministrativeAPI:
         assert "region" in data
         assert "district" in data
         assert "ward" in data
-        # Should be sorted alphabetically
-        assert data == sorted(data)
+
+        # Should be in hierarchical order
+        # (by ID: country, region, district, ward)
+        assert data == ["country", "region", "district", "ward"]
 
     def test_get_administrative_levels_empty(
         self, client: TestClient, db_session: Session

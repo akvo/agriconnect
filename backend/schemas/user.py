@@ -7,6 +7,11 @@ from models.user import UserType
 from utils.validators import validate_phone_number
 
 
+class AdministrativeLocationInfo(BaseModel):
+    id: Optional[int] = None
+    full_path: Optional[str] = None
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     phone_number: str
@@ -38,6 +43,7 @@ class UserResponse(BaseModel):
     is_active: bool
     invitation_status: Optional[str] = None
     password_set_at: Optional[datetime] = None
+    administrative_location: Optional[AdministrativeLocationInfo] = None
 
 
 class UserDetailResponse(BaseModel):
@@ -91,6 +97,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
     user_type: Optional[UserType] = None
+    administrative_id: Optional[int] = None
 
     @field_validator("phone_number")
     @classmethod
