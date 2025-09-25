@@ -1,0 +1,16 @@
+code,name,level,parent_code
+KEN,Kenya,country,
+NBI,Nairobi Region,region,KEN
+RFT,Rift Valley Region,region,KEN
+NRB-C,Central District,district,NBI
+NRB-E,Eastern District,district,NBI
+RFT-N,North District,district,RFT
+RFT-S,South District,district,RFT
+NRB-C-1,Westlands Ward,ward,NRB-C
+NRB-C-2,Kibera Ward,ward,NRB-C
+NRB-E-1,Kasarani Ward,ward,NRB-E
+NRB-E-2,Embakasi Ward,ward,NRB-E
+RFT-N-1,Eldoret Ward,ward,RFT-N
+RFT-N-2,Kitale Ward,ward,RFT-N
+RFT-S-1,Nakuru Ward,ward,RFT-S
+RFT-S-2,Naivasha Ward,ward,RFT-S

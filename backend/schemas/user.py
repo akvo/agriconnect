@@ -1,10 +1,15 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
 
 from models.user import UserType
 from utils.validators import validate_phone_number
+
+
+class AdministrativeLocationInfo(BaseModel):
+    id: Optional[int] = None
+    full_path: Optional[str] = None
 
 
 class UserCreate(BaseModel):
@@ -38,6 +43,7 @@ class UserResponse(BaseModel):
     is_active: bool
     invitation_status: Optional[str] = None
     password_set_at: Optional[datetime] = None
+    administrative_location: Optional[AdministrativeLocationInfo] = None
 
 
 class UserDetailResponse(BaseModel):
@@ -69,17 +75,29 @@ class AdminUserCreate(BaseModel):
     phone_number: str
     full_name: str
     user_type: UserType
+    administrative_ids: List[int] = []
 
     @field_validator("phone_number")
     @classmethod
     def validate_phone_number_field(cls, v):
         return validate_phone_number(v)
 
+    @field_validator("administrative_ids")
+    @classmethod
+    def validate_administrative_ids(cls, v, values):
+        user_type = values.data.get("user_type")
+        if user_type == UserType.EXTENSION_OFFICER and not v:
+            raise ValueError(
+                "Extension officers must be assigned to an administrative area"
+            )
+        return v
+
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
     user_type: Optional[UserType] = None
+    administrative_id: Optional[int] = None
 
     @field_validator("phone_number")
     @classmethod

@@ -1,6 +1,12 @@
 from fastapi import status
 
-from models.user import UserType
+from models import (
+    Administrative,
+    AdministrativeLevel,
+    User,
+    UserAdministrative,
+    UserType,
+)
 
 
 class TestAdminUserManagement:
@@ -416,3 +422,294 @@ class TestAdminUserManagement:
 
         updated_user = response.json()
         assert updated_user["user_type"] == "admin"
+
+    def test_create_extension_officer_with_administrative_success(
+        self, client, db_session
+    ):
+        """
+        Test successful creation of extension officer
+        with administrative assignments
+        """
+        # Setup administrative data
+        country_level = AdministrativeLevel(name="country")
+        region_level = AdministrativeLevel(name="region")
+        db_session.add_all([country_level, region_level])
+        db_session.commit()
+
+        kenya = Administrative(
+            code="KEN",
+            name="Kenya",
+            level_id=country_level.id,
+            parent_id=None,
+            path="KEN",
+        )
+        nairobi = Administrative(
+            code="NBI",
+            name="Nairobi Region",
+            level_id=region_level.id,
+            parent_id=kenya.id,
+            path="KEN.NBI",
+        )
+        db_session.add_all([kenya, nairobi])
+        db_session.commit()
+
+        # Create admin user
+        from passlib.context import CryptContext
+
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+        admin_user = User(
+            email="admin@test.com",
+            phone_number="+1234567890",
+            hashed_password=pwd_context.hash("testpass123"),
+            full_name="Test Admin",
+            user_type=UserType.ADMIN,
+            is_active=True,
+        )
+        db_session.add(admin_user)
+        db_session.commit()
+
+        # Login to get token
+        login_response = client.post(
+            "/api/auth/login/",
+            json={"email": "admin@test.com", "password": "testpass123"},
+        )
+        token = login_response.json()["access_token"]
+
+        # Create extension officer with administrative assignments
+        user_data = {
+            "email": "eo@test.com",
+            "phone_number": "+254700000000",
+            "full_name": "Extension Officer",
+            "user_type": "eo",
+            "administrative_ids": [kenya.id, nairobi.id],
+        }
+        response = client.post(
+            "/api/admin/users/",
+            json=user_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["user"]["email"] == user_data["email"]
+        assert data["user"]["user_type"] == "eo"
+
+        # Verify administrative assignments were created
+        user_id = data["user"]["id"]
+        assignments = (
+            db_session.query(UserAdministrative)
+            .filter(UserAdministrative.user_id == user_id)
+            .all()
+        )
+        assert len(assignments) == 2
+        assigned_ids = [a.administrative_id for a in assignments]
+        assert kenya.id in assigned_ids
+        assert nairobi.id in assigned_ids
+
+    def test_create_extension_officer_without_administrative_failure(
+        self, client, db_session
+    ):
+        """
+        Test that extension officer creation
+        fails without administrative assignments
+        """
+        # Create admin user
+        from passlib.context import CryptContext
+
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+        admin_user = User(
+            email="admin2@test.com",
+            phone_number="+1234567891",
+            hashed_password=pwd_context.hash("testpass123"),
+            full_name="Test Admin 2",
+            user_type=UserType.ADMIN,
+            is_active=True,
+        )
+        db_session.add(admin_user)
+        db_session.commit()
+
+        # Login to get token
+        login_response = client.post(
+            "/api/auth/login/",
+            json={"email": "admin2@test.com", "password": "testpass123"},
+        )
+        token = login_response.json()["access_token"]
+
+        # Try to create extension officer without administrative assignments
+        user_data = {
+            "email": "eo2@test.com",
+            "phone_number": "+254700000001",
+            "full_name": "Extension Officer 2",
+            "user_type": "eo",
+            "administrative_ids": [],
+        }
+        response = client.post(
+            "/api/admin/users/",
+            json=user_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert (
+            "Extension officers must be assigned to an administrative area"
+            in response.text
+        )
+
+    def test_create_admin_without_administrative_success(
+        self, client, db_session
+    ):
+        """
+        Test that admin creation succeeds
+        without administrative assignments
+        """
+        # Create admin user
+        from passlib.context import CryptContext
+
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+        admin_user = User(
+            email="admin3@test.com",
+            phone_number="+1234567892",
+            hashed_password=pwd_context.hash("testpass123"),
+            full_name="Test Admin 3",
+            user_type=UserType.ADMIN,
+            is_active=True,
+        )
+        db_session.add(admin_user)
+        db_session.commit()
+
+        # Login to get token
+        login_response = client.post(
+            "/api/auth/login/",
+            json={"email": "admin3@test.com", "password": "testpass123"},
+        )
+        token = login_response.json()["access_token"]
+
+        # Create admin user without administrative assignments
+        user_data = {
+            "email": "admin4@test.com",
+            "phone_number": "+1234567893",
+            "full_name": "Test Admin 4",
+            "user_type": "admin",
+            "administrative_ids": [],
+        }
+        response = client.post(
+            "/api/admin/users/",
+            json=user_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["user"]["email"] == user_data["email"]
+        assert data["user"]["user_type"] == "admin"
+
+        # Verify no administrative assignments were created
+        user_id = data["user"]["id"]
+        assignments = (
+            db_session.query(UserAdministrative)
+            .filter(UserAdministrative.user_id == user_id)
+            .all()
+        )
+        assert len(assignments) == 0
+
+    def test_create_user_with_invalid_administrative_ids(
+        self, client, db_session
+    ):
+        """Test that user creation fails with invalid administrative IDs"""
+        # Create admin user
+        from passlib.context import CryptContext
+
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+        admin_user = User(
+            email="admin5@test.com",
+            phone_number="+1234567894",
+            hashed_password=pwd_context.hash("testpass123"),
+            full_name="Test Admin 5",
+            user_type=UserType.ADMIN,
+            is_active=True,
+        )
+        db_session.add(admin_user)
+        db_session.commit()
+
+        # Login to get token
+        login_response = client.post(
+            "/api/auth/login/",
+            json={"email": "admin5@test.com", "password": "testpass123"},
+        )
+        token = login_response.json()["access_token"]
+
+        # Try to create user with invalid administrative IDs
+        user_data = {
+            "email": "eo3@test.com",
+            "phone_number": "+254700000002",
+            "full_name": "Extension Officer 3",
+            "user_type": "eo",
+            "administrative_ids": [999, 1000],  # Invalid IDs
+        }
+        response = client.post(
+            "/api/admin/users/",
+            json=user_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_create_user_with_duplicate_administrative_ids(
+        self, client, db_session
+    ):
+        """Test that user creation fails with duplicate administrative IDs"""
+        # Setup administrative data
+        country_level = AdministrativeLevel(name="country")
+        db_session.add(country_level)
+        db_session.commit()
+
+        kenya = Administrative(
+            code="KEN",
+            name="Kenya",
+            level_id=country_level.id,
+            parent_id=None,
+            path="KEN",
+        )
+        db_session.add(kenya)
+        db_session.commit()
+
+        # Create admin user
+        from passlib.context import CryptContext
+
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+        admin_user = User(
+            email="admin6@test.com",
+            phone_number="+1234567895",
+            hashed_password=pwd_context.hash("testpass123"),
+            full_name="Test Admin 6",
+            user_type=UserType.ADMIN,
+            is_active=True,
+        )
+        db_session.add(admin_user)
+        db_session.commit()
+
+        # Login to get token
+        login_response = client.post(
+            "/api/auth/login/",
+            json={"email": "admin6@test.com", "password": "testpass123"},
+        )
+        token = login_response.json()["access_token"]
+
+        # Try to create user with duplicate administrative IDs
+        user_data = {
+            "email": "eo4@test.com",
+            "phone_number": "+254700000003",
+            "full_name": "Extension Officer 4",
+            "user_type": "eo",
+            "administrative_ids": [kenya.id, kenya.id],  # Duplicate ID
+        }
+        response = client.post(
+            "/api/admin/users/",
+            json=user_data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert (
+            "Duplicate administrative areas are not allowed" in response.text
+        )

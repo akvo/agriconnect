@@ -38,12 +38,26 @@ def db_session(test_db):
     finally:
         db.rollback()
         # Clean up all tables after each test
-        from models import Customer, Message, ServiceToken, User
-        from models.knowledge_base import KnowledgeBase
+        from models import (
+            Administrative,
+            AdministrativeLevel,
+            Customer,
+            CustomerAdministrative,
+            KnowledgeBase,
+            Message,
+            ServiceToken,
+            User,
+            UserAdministrative,
+        )
 
+        # Delete in correct order to respect foreign key constraints
+        db.query(UserAdministrative).delete()
+        db.query(CustomerAdministrative).delete()
         db.query(Message).delete()
         db.query(Customer).delete()
-        db.query(KnowledgeBase).delete()  # Delete KBs before Users due to FK
+        db.query(KnowledgeBase).delete()
+        db.query(Administrative).delete()
+        db.query(AdministrativeLevel).delete()
         db.query(ServiceToken).delete()
         db.query(User).delete()
         db.commit()

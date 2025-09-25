@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import api from "../../lib/api";
 import {
   CheckIcon,
@@ -14,11 +14,19 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
     email: "",
     phone_number: "",
     user_type: "eo",
+    administrative_id: null,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [createdUser, setCreatedUser] = useState(null);
   const [invitationStatus, setInvitationStatus] = useState(null);
+
+  // Administrative location states
+  const [administrativeLevels, setAdministrativeLevels] = useState([]);
+  const [availableLocations, setAvailableLocations] = useState({});
+  const [selectedLocation, setSelectedLocation] = useState({});
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -26,6 +34,119 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
       ...prev,
       [name]: value,
     }));
+
+    // Clear administrative location if user type is changed to admin
+    if (name === "user_type" && value === "admin") {
+      setFormData((prev) => ({
+        ...prev,
+        administrative_id: null,
+      }));
+      setSelectedLocation({});
+      setAvailableLocations({});
+    }
+  };
+
+  const loadStartingLocations = useCallback(async (levelName, levelIndex) => {
+    try {
+      const response = await api.get(`/administrative/?level=${levelName}`);
+      setAvailableLocations((prev) => ({
+        ...prev,
+        [levelIndex]: response.data.administrative,
+      }));
+    } catch (err) {
+      console.error("Error loading starting locations:", err);
+    }
+  }, []);
+
+  const loadChildLocations = useCallback(async (parentId, levelIndex) => {
+    try {
+      const response = await api.get(`/administrative/?parent_id=${parentId}`);
+      setAvailableLocations((prev) => ({
+        ...prev,
+        [levelIndex]: response.data.administrative,
+      }));
+    } catch (err) {
+      console.error("Error loading child locations:", err);
+    }
+  }, []);
+
+  const loadAdministrativeLevels = useCallback(async () => {
+    try {
+      setLoadingLocations(true);
+      const response = await api.get("/administrative/levels");
+      setAdministrativeLevels(response.data);
+      setIsDataLoaded(true);
+
+      // Load starting locations (skip country level)
+      const startIndex = 1; // Start from level after country (index 0)
+      if (startIndex < response.data.length) {
+        const startLevel = response.data[startIndex];
+        loadStartingLocations(startLevel, startIndex);
+      }
+    } catch (err) {
+      console.error("Error loading administrative levels:", err);
+    } finally {
+      setLoadingLocations(false);
+    }
+  }, [loadStartingLocations]);
+
+  // Load administrative levels and starting location data
+  useEffect(() => {
+    if (!isDataLoaded) {
+      loadAdministrativeLevels();
+    }
+  }, [isDataLoaded, loadAdministrativeLevels]);
+
+  const handleLocationChange = (levelIndex, locationId) => {
+    const newSelectedLocation = { ...selectedLocation };
+    const newAvailableLocations = { ...availableLocations };
+
+    if (locationId) {
+      newSelectedLocation[levelIndex] = parseInt(locationId);
+      setFormData((prev) => ({
+        ...prev,
+        administrative_id: parseInt(locationId),
+      }));
+
+      // Clear all deeper levels
+      for (let i = levelIndex + 1; i < administrativeLevels.length; i++) {
+        delete newSelectedLocation[i];
+        delete newAvailableLocations[i];
+      }
+
+      // Load child locations for the next level
+      const nextLevelIndex = levelIndex + 1;
+      if (nextLevelIndex < administrativeLevels.length) {
+        loadChildLocations(locationId, nextLevelIndex);
+      }
+    } else {
+      // Clear this level and all deeper levels
+      for (let i = levelIndex; i < administrativeLevels.length; i++) {
+        delete newSelectedLocation[i];
+        delete newAvailableLocations[i];
+      }
+
+      // Set administrative_id to the parent level or null
+      const parentLevelIndex = levelIndex - 1;
+      if (parentLevelIndex >= 0 && newSelectedLocation[parentLevelIndex]) {
+        setFormData((prev) => ({
+          ...prev,
+          administrative_id: newSelectedLocation[parentLevelIndex],
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          administrative_id: null,
+        }));
+      }
+    }
+
+    setSelectedLocation(newSelectedLocation);
+    setAvailableLocations(newAvailableLocations);
+  };
+
+  const getLevelName = (levelIndex) => {
+    return administrativeLevels[levelIndex] || `Level ${levelIndex + 1}`;
   };
 
   const handleSubmit = async (e) => {
@@ -33,8 +154,21 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
     setLoading(true);
     setError(null);
 
+    // Validate administrative location for extension officers
+    if (formData.user_type === "eo" && !formData.administrative_id) {
+      setError("Administrative location is required for extension officers");
+      setLoading(false);
+      return;
+    }
+
+    // Ensure admin users don't have administrative_id set
+    const submitData = { ...formData };
+    if (submitData.user_type === "admin") {
+      submitData.administrative_id = null;
+    }
+
     try {
-      const response = await api.post("/admin/users/", formData);
+      const response = await api.post("/admin/users/", submitData);
       setCreatedUser(response.data.user);
       setInvitationStatus({
         sent: response.data.invitation_sent,
@@ -267,6 +401,105 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                 <option value="admin">Administrator</option>
               </select>
             </div>
+
+            {formData.user_type === "eo" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Administrative Location *
+                  </label>
+
+                  {loadingLocations ? (
+                    <div className="text-sm text-gray-500">
+                      Loading locations...
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Show first level dropdown (index 1, after country) */}
+                      {administrativeLevels.length > 1 &&
+                        availableLocations[1] && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600">
+                              {getLevelName(1)}
+                            </label>
+                            <select
+                              value={selectedLocation[1] || ""}
+                              onChange={(e) =>
+                                handleLocationChange(1, e.target.value)
+                              }
+                              className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                              style={{ borderRadius: "5px" }}
+                            >
+                              <option value="">Select {getLevelName(1)}</option>
+                              {availableLocations[1].map((location) => (
+                                <option key={location.id} value={location.id}>
+                                  {location.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                      {/* Show second level dropdown only if first level is selected */}
+                      {selectedLocation[1] && availableLocations[2] && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600">
+                            {getLevelName(2)}
+                          </label>
+                          <select
+                            value={selectedLocation[2] || ""}
+                            onChange={(e) =>
+                              handleLocationChange(2, e.target.value)
+                            }
+                            className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                            style={{ borderRadius: "5px" }}
+                          >
+                            <option value="">Select {getLevelName(2)}</option>
+                            {availableLocations[2].map((location) => (
+                              <option key={location.id} value={location.id}>
+                                {location.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Show third level dropdown only if second level is selected */}
+                      {selectedLocation[2] && availableLocations[3] && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600">
+                            {getLevelName(3)}
+                          </label>
+                          <select
+                            value={selectedLocation[3] || ""}
+                            onChange={(e) =>
+                              handleLocationChange(3, e.target.value)
+                            }
+                            className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
+                            style={{ borderRadius: "5px" }}
+                          >
+                            <option value="">Select {getLevelName(3)}</option>
+                            {availableLocations[3].map((location) => (
+                              <option key={location.id} value={location.id}>
+                                {location.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Show message if no locations are available */}
+                      {administrativeLevels.length > 1 &&
+                        !availableLocations[1] && (
+                          <div className="text-sm text-gray-500">
+                            No administrative locations available
+                          </div>
+                        )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 flex space-x-3">
