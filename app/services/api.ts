@@ -18,6 +18,7 @@ interface UserResponse {
   is_active: boolean;
   invitation_status?: string;
   password_set_at?: string;
+  administrative_location?: string;
 }
 
 interface TokenResponse {
