@@ -45,6 +45,9 @@
         }
       ]
     ],
+    "androidNavigationBar": {
+      "visible": "immersive"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
