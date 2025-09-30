@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { api, LoginCredentials } from "../services/api";
+import { dao, saveProfile } from "@/database/dao";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -28,6 +29,18 @@ export default function LoginScreen() {
     try {
       const credentials: LoginCredentials = { email, password };
       const response = await api.login(credentials);
+      saveProfile.eoUser({
+        id: response.user.id,
+        email: response.user.email,
+        phone_number: response.user.phone_number,
+        full_name: response.user.full_name,
+        user_type: response.user.user_type,
+        is_active: response.user.is_active,
+        invitation_status: response.user.invitation_status,
+        password_set_at: response.user.password_set_at,
+        administrative_location: response.user.administrative_location,
+        authToken: response.access_token,
+      });
 
       // Navigate to home page with user data
       router.replace({
@@ -41,7 +54,7 @@ export default function LoginScreen() {
     } catch (error) {
       Alert.alert(
         "Login Failed",
-        error instanceof Error ? error.message : "Invalid credentials",
+        error instanceof Error ? error.message : "Invalid credentials"
       );
     } finally {
       setIsLoading(false);
