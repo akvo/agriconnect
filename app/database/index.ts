@@ -1,6 +1,26 @@
 import { openDatabaseSync, SQLiteDatabase } from "expo-sqlite";
 import { DATABASE_VERSION, DATABASE_NAME } from "./config";
-import { getMigrationsByVersion } from "./migrations";
+import { getMigrationsByVersion, Migration } from "./migrations";
+
+// Helper function to execute migrations with transaction support
+const executeMigration = (db: SQLiteDatabase, migration: Migration): void => {
+  console.log(`📋 Running migration: ${migration.name}`);
+  try {
+    db.execSync('BEGIN TRANSACTION;');
+    db.execSync(migration.migration);
+    db.execSync('COMMIT;');
+    console.log(`✅ Migration ${migration.name} completed successfully`);
+  } catch (error) {
+    console.error(`❌ Migration ${migration.name} failed:`, error);
+    try {
+      db.execSync('ROLLBACK;');
+      console.log(`🔄 Migration ${migration.name} rolled back`);
+    } catch (rollbackError) {
+      console.error(`🚨 Failed to rollback migration ${migration.name}:`, rollbackError);
+    }
+    throw new Error(`Migration ${migration.name} failed: ${error}`);
+  }
+};
 
 export const migrateDbIfNeeded = (): SQLiteDatabase => {
   const db = openDatabaseSync(DATABASE_NAME);
@@ -26,8 +46,7 @@ export const migrateDbIfNeeded = (): SQLiteDatabase => {
     const version1Migrations = getMigrationsByVersion(1);
 
     for (const migration of version1Migrations) {
-      console.log(`📋 Running migration: ${migration.name}`);
-      db.execSync(migration.migration);
+      executeMigration(db, migration);
     }
 
     currentDbVersion = 1;
@@ -40,8 +59,7 @@ export const migrateDbIfNeeded = (): SQLiteDatabase => {
   //   const version2Migrations = getMigrationsByVersion(2);
   //
   //   for (const migration of version2Migrations) {
-  //     console.log(`📋 Running migration: ${migration.name}`);
-  //     db.execSync(migration.migration);
+  //     executeMigration(db, migration);
   //   }
   //
   //   currentDbVersion = 2;
