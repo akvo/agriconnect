@@ -3,11 +3,16 @@
   "compilerOptions": {
     "jsx": "react-native",
     "strict": true,
+    "target": "es5",
     "paths": {
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "lib": [
+      "dom",
+      "es2015"
+    ]
   },
   "include": [
     "**/*.ts",

@@ -1,31 +1,15 @@
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { dao } from "@/database/dao";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function HomeScreen() {
-  const { fullName, email } = useLocalSearchParams<{
-    fullName: string;
-    email: string;
-  }>();
-  const user = useMemo(() => {
-    const findUser = dao.eoUser.getProfile();
-    if (findUser) {
-      return {
-        ...findUser,
-        fullName: findUser.full_name,
-      };
-    }
-    return {
-      fullName: fullName as string,
-      email: email as string,
-    };
-  }, [fullName, email]);
   const router = useRouter();
+  const { logout, user } = useAuth();
 
   const handleLogout = () => {
-    dao.eoUser.removeUserData();
+    logout();
     router.replace("/login");
   };
 
@@ -42,21 +26,23 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Header with profile icon */}
       <View style={styles.header}>
-        <View style={styles.profileIcon}>
-          <Text style={styles.profileText}>
-            {user?.fullName ? getInitials(user.fullName) : "U"}
-          </Text>
+        <View style={styles.profileContainer}>
+          <View style={styles.profileIcon}>
+            <Text style={styles.profileText}>
+              {user?.fullName ? getInitials(user.fullName) : "U"}
+            </Text>
+          </View>
+          <View style={styles.profileDetails}>
+            <Text style={styles.welcomeText}>
+              Welcome Back
+            </Text>
+            <Text style={styles.nameText}>{user?.fullName || "User"}</Text>
+            <Text style={styles.emailText}>{user?.email}</Text>
+          </View>
         </View>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={24} color="#666" />
+          <Ionicons name="log-out-outline" size={24} color="#fff" />
         </TouchableOpacity>
-      </View>
-
-      {/* Welcome message */}
-      <View style={styles.content}>
-        <Text style={styles.welcomeText}>Welcome Back,</Text>
-        <Text style={styles.nameText}>{user?.fullName || "User"}</Text>
-        <Text style={styles.emailText}>{user?.email}</Text>
       </View>
 
       {/* Dashboard content placeholder */}
@@ -80,7 +66,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 60,
-    backgroundColor: "white",
+    backgroundColor: "#014533",
+    color: "white",
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
@@ -88,36 +75,45 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#2d6e3e",
+    backgroundColor: "#027E5D",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "white",
   },
   profileText: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
   },
+  profileContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
   logoutButton: {
     padding: 8,
   },
-  content: {
-    padding: 20,
-    paddingTop: 40,
+  profileDetails: {
+    lineHeight: 20,
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "flex-start",
   },
   welcomeText: {
     fontSize: 18,
-    color: "#666",
+    color: "#fff",
     marginBottom: 8,
   },
   nameText: {
-    fontSize: 32,
+    fontSize: 16,
     fontWeight: "bold",
-    color: "#333",
+    color: "#fff",
     marginBottom: 8,
   },
   emailText: {
     fontSize: 16,
-    color: "#888",
+    color: "#e0e0e0",
   },
   dashboardPlaceholder: {
     flex: 1,
