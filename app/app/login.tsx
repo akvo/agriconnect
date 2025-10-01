@@ -10,12 +10,14 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { api, LoginCredentials } from "../services/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -30,6 +32,11 @@ export default function LoginScreen() {
       const response = await api.login(credentials);
 
       // Navigate to home page with user data
+      login({
+        fullName: response.user.full_name,
+        email: response.user.email,
+        authToken: response.access_token,
+      });
       router.replace({
         pathname: "/home",
         params: {
