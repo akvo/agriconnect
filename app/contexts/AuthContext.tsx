@@ -8,6 +8,8 @@ import React, {
 } from "react";
 import { useRouter, useSegments, useLocalSearchParams } from "expo-router";
 import { api } from "@/services/api";
+import { dao } from "@/database/dao";
+import { resetDatabase } from "@/database/utils";
 
 interface User {
   fullName: string;
@@ -38,29 +40,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isValid, setIsValid] = useState<boolean>(false);
-  const { email, token } = useLocalSearchParams();
+  const { token: routeToken } = useLocalSearchParams();
   const router = useRouter();
   const segments = useSegments();
 
   const checkAuth = useCallback(async () => {
-    if ((user?.authToken || token) && isValid) {
+    const userDB = await dao.eoUser.getProfile();
+    if (!user && userDB) {
+      setUser(userDB);
+    }
+    if ((user?.authToken || routeToken) && isValid) {
       return;
     }
     try {
-      const token = user?.authToken;
-      const apiData = await api.getProfile(token || "");
+      const apiToken = user?.authToken || userDB?.authToken || routeToken;
+      if (!apiToken && segments[0] !== "login") {
+        router.replace("/login");
+        return;
+      }
+      const apiData = await api.getProfile(apiToken);
       setIsValid(true);
       setUser({ ...apiData, fullName: apiData?.full_name });
       if (segments[0] === "login") {
-        // route to the tabs index screen which is defined in app/(tabs)/index.tsx
         router.replace("/home");
       }
     } catch (error) {
-      if (segments[0] !== "login" && email && token) {
+      if (segments[0] !== "login" && routeToken) {
         router.replace("/login");
       }
     }
-  }, [user, segments, router, email, token, isValid]);
+  }, [user, segments, router, routeToken, isValid]);
 
   useEffect(() => {
     checkAuth();
@@ -71,6 +80,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const logout = () => {
+    resetDatabase({
+      dropTables: false,
+      resetVersion: false,
+      clearData: true,
+    });
     setUser(null);
     setIsValid(false);
   };
