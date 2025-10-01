@@ -13,22 +13,22 @@ export class SyncLogDAO extends BaseDAOImpl<SyncLog> {
   }
 
   create(data: CreateSyncLogData): SyncLog {
+    const stmt = this.db.prepareSync(
+      `INSERT INTO sync_logs (
+        sync_type, status, started_at, completed_at, details, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
     try {
       const now = new Date().toISOString();
-      const result = this.db.runSync(
-        `INSERT INTO sync_logs (
-          sync_type, status, started_at, completed_at, details, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          data.sync_type,
-          data.status || SYNC_STATUS.PENDING,
-          data.started_at,
-          data.completed_at || null,
-          data.details || null,
-          now,
-          now,
-        ]
-      );
+      const result = stmt.executeSync([
+        data.sync_type,
+        data.status || SYNC_STATUS.PENDING,
+        data.started_at,
+        data.completed_at || null,
+        data.details || null,
+        now,
+        now,
+      ]);
 
       const syncLog = this.findById(result.lastInsertRowId);
       if (!syncLog) {
@@ -38,6 +38,8 @@ export class SyncLogDAO extends BaseDAOImpl<SyncLog> {
     } catch (error) {
       console.error("Error creating sync log:", error);
       throw error;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
@@ -75,12 +77,15 @@ export class SyncLogDAO extends BaseDAOImpl<SyncLog> {
       values.push(new Date().toISOString());
       values.push(id);
 
-      const result = this.db.runSync(
-        `UPDATE sync_logs SET ${updates.join(", ")} WHERE id = ?`,
-        values
+      const stmt = this.db.prepareSync(
+        `UPDATE sync_logs SET ${updates.join(", ")} WHERE id = ?`
       );
-
-      return result.changes > 0;
+      try {
+        const result = stmt.executeSync(values);
+        return result.changes > 0;
+      } finally {
+        stmt.finalizeSync();
+      }
     } catch (error) {
       console.error("Error updating sync log:", error);
       return false;
@@ -120,40 +125,49 @@ export class SyncLogDAO extends BaseDAOImpl<SyncLog> {
 
   // Get sync logs by status
   findByStatus(status: number, limit: number = 10): SyncLog[] {
+    const stmt = this.db.prepareSync(
+      "SELECT * FROM sync_logs WHERE status = ? ORDER BY created_at DESC LIMIT ?"
+    );
     try {
-      return this.db.getAllSync<SyncLog>(
-        "SELECT * FROM sync_logs WHERE status = ? ORDER BY created_at DESC LIMIT ?",
-        [status, limit]
-      );
+      const result = stmt.executeSync<SyncLog>([status, limit]);
+      return result.getAllSync();
     } catch (error) {
       console.error("Error finding sync logs by status:", error);
       return [];
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   // Get sync logs by type
   findBySyncType(syncType: string, limit: number = 10): SyncLog[] {
+    const stmt = this.db.prepareSync(
+      "SELECT * FROM sync_logs WHERE sync_type = ? ORDER BY created_at DESC LIMIT ?"
+    );
     try {
-      return this.db.getAllSync<SyncLog>(
-        "SELECT * FROM sync_logs WHERE sync_type = ? ORDER BY created_at DESC LIMIT ?",
-        [syncType, limit]
-      );
+      const result = stmt.executeSync<SyncLog>([syncType, limit]);
+      return result.getAllSync();
     } catch (error) {
       console.error("Error finding sync logs by type:", error);
       return [];
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   // Get recent sync logs
   getRecentLogs(limit: number = 20): SyncLog[] {
+    const stmt = this.db.prepareSync(
+      "SELECT * FROM sync_logs ORDER BY created_at DESC LIMIT ?"
+    );
     try {
-      return this.db.getAllSync<SyncLog>(
-        "SELECT * FROM sync_logs ORDER BY created_at DESC LIMIT ?",
-        [limit]
-      );
+      const result = stmt.executeSync<SyncLog>([limit]);
+      return result.getAllSync();
     } catch (error) {
       console.error("Error getting recent sync logs:", error);
       return [];
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
@@ -174,37 +188,41 @@ export class SyncLogDAO extends BaseDAOImpl<SyncLog> {
 
   // Get last successful sync by type
   getLastSuccessfulSync(syncType: string): SyncLog | null {
+    const stmt = this.db.prepareSync(
+      `SELECT * FROM sync_logs 
+       WHERE sync_type = ? AND status = ? 
+       ORDER BY completed_at DESC 
+       LIMIT 1`
+    );
     try {
-      const result = this.db.getFirstSync<SyncLog>(
-        `SELECT * FROM sync_logs 
-         WHERE sync_type = ? AND status = ? 
-         ORDER BY completed_at DESC 
-         LIMIT 1`,
-        [syncType, SYNC_STATUS.COMPLETED]
-      );
-      return result || null;
+      const result = stmt.executeSync<SyncLog>([syncType, SYNC_STATUS.COMPLETED]);
+      return result.getFirstSync() || null;
     } catch (error) {
       console.error("Error getting last successful sync:", error);
       return null;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   // Clean up old sync logs (keep last N records)
   cleanupOldLogs(keepCount: number = 100): number {
+    const stmt = this.db.prepareSync(
+      `DELETE FROM sync_logs 
+       WHERE id NOT IN (
+         SELECT id FROM sync_logs 
+         ORDER BY created_at DESC 
+         LIMIT ?
+       )`
+    );
     try {
-      const result = this.db.runSync(
-        `DELETE FROM sync_logs 
-         WHERE id NOT IN (
-           SELECT id FROM sync_logs 
-           ORDER BY created_at DESC 
-           LIMIT ?
-         )`,
-        [keepCount]
-      );
+      const result = stmt.executeSync([keepCount]);
       return result.changes;
     } catch (error) {
       console.error("Error cleaning up old sync logs:", error);
       return 0;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 }

@@ -24,24 +24,30 @@ export abstract class BaseDAOImpl<T extends { id: number }> implements BaseDAO<T
   ) {}
 
   findById(id: number): T | null {
+    const stmt = this.db.prepareSync(
+      `SELECT * FROM ${this.tableName} WHERE id = ?`
+    );
     try {
-      const result = this.db.getFirstSync<T>(
-        `SELECT * FROM ${this.tableName} WHERE id = ?`,
-        [id]
-      );
-      return result || null;
+      const result = stmt.executeSync<T>([id]);
+      return result.getFirstSync() || null;
     } catch (error) {
       console.error(`Error finding ${this.tableName} by id:`, error);
       return null;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   findAll(): T[] {
+    const stmt = this.db.prepareSync(`SELECT * FROM ${this.tableName} ORDER BY id DESC`);
     try {
-      return this.db.getAllSync<T>(`SELECT * FROM ${this.tableName} ORDER BY id DESC`);
+      const result = stmt.executeSync<T>();
+      return result.getAllSync();
     } catch (error) {
       console.error(`Error finding all ${this.tableName}:`, error);
       return [];
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
@@ -49,42 +55,49 @@ export abstract class BaseDAOImpl<T extends { id: number }> implements BaseDAO<T
   abstract update(id: number, data: Partial<T>): boolean;
 
   delete(id: number): boolean {
+    const stmt = this.db.prepareSync(
+      `DELETE FROM ${this.tableName} WHERE id = ?`
+    );
     try {
-      const result = this.db.runSync(
-        `DELETE FROM ${this.tableName} WHERE id = ?`,
-        [id]
-      );
+      const result = stmt.executeSync([id]);
       return result.changes > 0;
     } catch (error) {
       console.error(`Error deleting ${this.tableName}:`, error);
       return false;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   // Utility method for counting records
   count(): number {
+    const stmt = this.db.prepareSync(
+      `SELECT COUNT(*) as count FROM ${this.tableName}`
+    );
     try {
-      const result = this.db.getFirstSync<{ count: number }>(
-        `SELECT COUNT(*) as count FROM ${this.tableName}`
-      );
-      return result?.count || 0;
+      const result = stmt.executeSync<{ count: number }>();
+      return result.getFirstSync()?.count || 0;
     } catch (error) {
       console.error(`Error counting ${this.tableName}:`, error);
       return 0;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   // Utility method for checking if record exists
   exists(id: number): boolean {
+    const stmt = this.db.prepareSync(
+      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE id = ?`
+    );
     try {
-      const result = this.db.getFirstSync<{ count: number }>(
-        `SELECT COUNT(*) as count FROM ${this.tableName} WHERE id = ?`,
-        [id]
-      );
-      return (result?.count || 0) > 0;
+      const result = stmt.executeSync<{ count: number }>([id]);
+      return (result.getFirstSync()?.count || 0) > 0;
     } catch (error) {
       console.error(`Error checking if ${this.tableName} exists:`, error);
       return false;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 }

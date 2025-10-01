@@ -8,29 +8,29 @@ export class EoUserDAO extends BaseDAOImpl<EoUser> {
   }
 
   create(data: CreateEoUserData): EoUser {
+    const stmt = this.db.prepareSync(
+      `INSERT INTO eo_users (
+        id, email, phone_number, full_name, user_type, is_active,
+        invitation_status, password_set_at, administrative_location,
+        authToken, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
     try {
       const now = new Date().toISOString();
-      const result = this.db.runSync(
-        `INSERT INTO eo_users (
-          id, email, phone_number, full_name, user_type, is_active,
-          invitation_status, password_set_at, administrative_location,
-          authToken, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          data.id || null,
-          data.email,
-          data.phone_number,
-          data.full_name,
-          data.user_type || "eo",
-          data.is_active !== undefined ? data.is_active : true,
-          data.invitation_status || null,
-          data.password_set_at || null,
-          data.administrative_location || null,
-          data.authToken || null,
-          now,
-          now,
-        ]
-      );
+      const result = stmt.executeSync([
+        data.id || null,
+        data.email,
+        data.phone_number,
+        data.full_name,
+        data.user_type || "eo",
+        data.is_active !== undefined ? data.is_active : true,
+        data.invitation_status || null,
+        data.password_set_at || null,
+        data.administrative_location || null,
+        data.authToken || null,
+        now,
+        now,
+      ]);
 
       const user = this.findById(result.lastInsertRowId);
       if (!user) {
@@ -40,6 +40,8 @@ export class EoUserDAO extends BaseDAOImpl<EoUser> {
     } catch (error) {
       console.error("Error creating EO user:", error);
       throw error;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
@@ -63,12 +65,15 @@ export class EoUserDAO extends BaseDAOImpl<EoUser> {
       values.push(new Date().toISOString());
       values.push(id);
 
-      const result = this.db.runSync(
-        `UPDATE eo_users SET ${updates.join(", ")} WHERE id = ?`,
-        values
+      const stmt = this.db.prepareSync(
+        `UPDATE eo_users SET ${updates.join(", ")} WHERE id = ?`
       );
-
-      return result.changes > 0;
+      try {
+        const result = stmt.executeSync(values);
+        return result.changes > 0;
+      } finally {
+        stmt.finalizeSync();
+      }
     } catch (error) {
       console.error("Error updating EO user:", error);
       return false;
@@ -76,24 +81,28 @@ export class EoUserDAO extends BaseDAOImpl<EoUser> {
   }
 
   getProfile(): EoUser | null {
+    const stmt = this.db.prepareSync('SELECT * FROM eo_users LIMIT 1');
     try {
-      const result = this.db.getFirstSync<EoUser>(
-        `SELECT * FROM eo_users LIMIT 1`
-      );
-      return result || null;
+      const result = stmt.executeSync<EoUser>();
+      return result.getFirstSync() || null;
     } catch (error) {
       console.error("Error fetching EO user profile:", error);
       return null;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   removeUserData(): boolean {
+    const stmt = this.db.prepareSync(`DELETE FROM eo_users`);
     try {
-      const result = this.db.runSync(`DELETE FROM eo_users`);
+      const result = stmt.executeSync();
       return result.changes > 0;
     } catch (error) {
       console.error("Error removing EO user data:", error);
       return false;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 }

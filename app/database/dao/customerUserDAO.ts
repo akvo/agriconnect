@@ -12,21 +12,21 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   }
 
   create(data: CreateCustomerUserData): CustomerUser {
+    const stmt = this.db.prepareSync(
+      `INSERT INTO customer_users (
+        id, phone_number, full_name, language, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?)`
+    );
     try {
       const now = new Date().toISOString();
-      const result = this.db.runSync(
-        `INSERT INTO customer_users (
-          id, phone_number, full_name, language, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          data.id || null,
-          data.phone_number,
-          data.full_name,
-          data.language || "en",
-          now,
-          now,
-        ]
-      );
+      const result = stmt.executeSync([
+        data.id || null,
+        data.phone_number,
+        data.full_name,
+        data.language || "en",
+        now,
+        now,
+      ]);
 
       const user = this.findById(result.lastInsertRowId);
       if (!user) {
@@ -36,6 +36,8 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
     } catch (error) {
       console.error("Error creating customer user:", error);
       throw error;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
@@ -65,12 +67,15 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
       values.push(new Date().toISOString());
       values.push(id);
 
-      const result = this.db.runSync(
-        `UPDATE customer_users SET ${updates.join(", ")} WHERE id = ?`,
-        values
+      const stmt = this.db.prepareSync(
+        `UPDATE customer_users SET ${updates.join(", ")} WHERE id = ?`
       );
-
-      return result.changes > 0;
+      try {
+        const result = stmt.executeSync(values);
+        return result.changes > 0;
+      } finally {
+        stmt.finalizeSync();
+      }
     } catch (error) {
       console.error("Error updating customer user:", error);
       return false;
@@ -79,54 +84,65 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
 
   // Find user by phone number
   findByPhoneNumber(phoneNumber: string): CustomerUser | null {
+    const stmt = this.db.prepareSync(
+      "SELECT * FROM customer_users WHERE phone_number = ?"
+    );
     try {
-      const result = this.db.getFirstSync<CustomerUser>(
-        "SELECT * FROM customer_users WHERE phone_number = ?",
-        [phoneNumber]
-      );
-      return result || null;
+      const result = stmt.executeSync<CustomerUser>([phoneNumber]);
+      return result.getFirstSync() || null;
     } catch (error) {
       console.error("Error finding customer by phone number:", error);
       return null;
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   // Search customers by name (partial match)
   searchByName(name: string): CustomerUser[] {
+    const stmt = this.db.prepareSync(
+      "SELECT * FROM customer_users WHERE full_name LIKE ? ORDER BY full_name"
+    );
     try {
-      return this.db.getAllSync<CustomerUser>(
-        "SELECT * FROM customer_users WHERE full_name LIKE ? ORDER BY full_name",
-        [`%${name}%`]
-      );
+      const result = stmt.executeSync<CustomerUser>([`%${name}%`]);
+      return result.getAllSync();
     } catch (error) {
       console.error("Error searching customers by name:", error);
       return [];
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   // Get customers by language
   findByLanguage(language: string): CustomerUser[] {
+    const stmt = this.db.prepareSync(
+      "SELECT * FROM customer_users WHERE language = ? ORDER BY full_name"
+    );
     try {
-      return this.db.getAllSync<CustomerUser>(
-        "SELECT * FROM customer_users WHERE language = ? ORDER BY full_name",
-        [language]
-      );
+      const result = stmt.executeSync<CustomerUser>([language]);
+      return result.getAllSync();
     } catch (error) {
       console.error("Error finding customers by language:", error);
       return [];
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
   // Get recent customers (ordered by creation date)
   findRecent(limit: number = 10): CustomerUser[] {
+    const stmt = this.db.prepareSync(
+      "SELECT * FROM customer_users ORDER BY created_at DESC LIMIT ?"
+    );
     try {
-      return this.db.getAllSync<CustomerUser>(
-        "SELECT * FROM customer_users ORDER BY created_at DESC LIMIT ?",
-        [limit]
-      );
+      const result = stmt.executeSync<CustomerUser>([limit]);
+      return result.getAllSync();
     } catch (error) {
       console.error("Error finding recent customers:", error);
       return [];
+    } finally {
+      stmt.finalizeSync();
     }
   }
 
