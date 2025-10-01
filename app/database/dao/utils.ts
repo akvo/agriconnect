@@ -1,9 +1,15 @@
-import { dao } from "./index";
-import {
+import type {
   CreateEoUserData,
   CreateCustomerUserData,
   CreateMessageData,
 } from "./types";
+import type { DAOType } from "./dao-types";
+
+// Avoid circular require: do not import `dao` at module top-level.
+// Instead, get it lazily at call time. We type the returned value as
+// `DAOType` to have stronger typing while keeping runtime lazy-loading.
+declare const require: any;
+const getDao = (): DAOType => (require("./index") as any).dao as DAOType;
 
 /**
  * High-level utility functions for common database operations
@@ -15,14 +21,15 @@ export const saveProfile = {
   // Save or update EO user profile
   eoUser: async (data: CreateEoUserData & { id?: number }) => {
     try {
+      const d = getDao();
       if (data.id) {
-        const success = dao.eoUser.update(data.id, data);
+        const success = d.eoUser.update(data.id, data);
         if (success) {
-          return dao.eoUser.findById(data.id);
+          return d.eoUser.findById(data.id);
         }
-        return dao.eoUser.create(data); // If update failed, try creating
+        return d.eoUser.create(data); // If update failed, try creating
       } else {
-        return dao.eoUser.create(data);
+        return d.eoUser.create(data);
       }
     } catch (error) {
       console.error("Error saving EO user profile:", error);
@@ -33,14 +40,15 @@ export const saveProfile = {
   // Save or update customer profile
   customerUser: async (data: CreateCustomerUserData & { id?: number }) => {
     try {
+      const d = getDao();
       if (data.id) {
-        const success = dao.customerUser.update(data.id, data);
+        const success = d.customerUser.update(data.id, data);
         if (success) {
-          return dao.customerUser.findById(data.id);
+          return d.customerUser.findById(data.id);
         }
-        return dao.customerUser.create(data); // If update failed, try creating
+        return d.customerUser.create(data); // If update failed, try creating
       } else {
-        return dao.customerUser.create(data);
+        return d.customerUser.create(data);
       }
     } catch (error) {
       console.error("Error saving customer user profile:", error);
@@ -52,7 +60,8 @@ export const saveProfile = {
 // Inbox and messaging
 export const getInbox = (eoId: number, limit: number = 20) => {
   try {
-    return dao.message.getInbox(eoId, limit);
+  const d = getDao();
+  return d.message.getInbox(eoId, limit);
   } catch (error) {
     console.error("Error getting inbox:", error);
     return [];
@@ -65,7 +74,8 @@ export const getMessages = (
   limit: number = 50
 ) => {
   try {
-    return dao.message.getConversation(customerId, eoId, limit);
+  const d = getDao();
+  return d.message.getConversation(customerId, eoId, limit);
   } catch (error) {
     console.error("Error getting messages:", error);
     return [];
@@ -74,7 +84,8 @@ export const getMessages = (
 
 export const sendMessage = (data: CreateMessageData) => {
   try {
-    return dao.message.create(data);
+  const d = getDao();
+  return d.message.create(data);
   } catch (error) {
     console.error("Error sending message:", error);
     return null;
@@ -84,7 +95,8 @@ export const sendMessage = (data: CreateMessageData) => {
 // Search functionality
 export const searchCustomers = (query: string) => {
   try {
-    return dao.customerUser.searchByName(query);
+  const d = getDao();
+  return d.customerUser.searchByName(query);
   } catch (error) {
     console.error("Error searching customers:", error);
     return [];
@@ -93,7 +105,8 @@ export const searchCustomers = (query: string) => {
 
 export const searchMessages = (query: string, limit: number = 20) => {
   try {
-    return dao.message.searchMessages(query, limit);
+  const d = getDao();
+  return d.message.searchMessages(query, limit);
   } catch (error) {
     console.error("Error searching messages:", error);
     return [];
@@ -104,7 +117,8 @@ export const searchMessages = (query: string, limit: number = 20) => {
 export const syncOperations = {
   start: (syncType: string, details?: string) => {
     try {
-      return dao.syncLog.startSync(syncType, details);
+  const d = getDao();
+  return d.syncLog.startSync(syncType, details);
     } catch (error) {
       console.error("Error starting sync:", error);
       return null;
@@ -113,7 +127,8 @@ export const syncOperations = {
 
   complete: (syncId: number, details?: string) => {
     try {
-      return dao.syncLog.completeSync(syncId, details);
+  const d = getDao();
+  return d.syncLog.completeSync(syncId, details);
     } catch (error) {
       console.error("Error completing sync:", error);
       return false;
@@ -122,7 +137,8 @@ export const syncOperations = {
 
   fail: (syncId: number, errorDetails: string) => {
     try {
-      return dao.syncLog.failSync(syncId, errorDetails);
+  const d = getDao();
+  return d.syncLog.failSync(syncId, errorDetails);
     } catch (error) {
       console.error("Error failing sync:", error);
       return false;
@@ -131,7 +147,8 @@ export const syncOperations = {
 
   getRecent: (limit: number = 10) => {
     try {
-      return dao.syncLog.getRecentLogs(limit);
+  const d = getDao();
+  return d.syncLog.getRecentLogs(limit);
     } catch (error) {
       console.error("Error getting recent sync logs:", error);
       return [];
@@ -140,7 +157,8 @@ export const syncOperations = {
 
   getPending: () => {
     try {
-      return dao.syncLog.getPendingSyncs();
+  const d = getDao();
+  return d.syncLog.getPendingSyncs();
     } catch (error) {
       console.error("Error getting pending syncs:", error);
       return [];
@@ -151,13 +169,14 @@ export const syncOperations = {
 // Statistics and analytics
 export const getStats = () => {
   try {
+    const d = getDao();
     return {
-      totalEoUsers: dao.eoUser.count(),
-      totalCustomers: dao.customerUser.count(),
-      totalMessages: dao.message.count(),
-      totalSyncs: dao.syncLog.count(),
-      recentMessages: dao.message.getRecentMessages(5),
-      recentSyncs: dao.syncLog.getRecentLogs(5),
+      totalEoUsers: d.eoUser.count(),
+      totalCustomers: d.customerUser.count(),
+      totalMessages: d.message.count(),
+      totalSyncs: d.syncLog.count(),
+      recentMessages: d.message.getRecentMessages(5),
+      recentSyncs: d.syncLog.getRecentLogs(5),
     };
   } catch (error) {
     console.error("Error getting stats:", error);
