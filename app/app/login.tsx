@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { api, LoginCredentials } from "../services/api";
-import { dao, saveProfile } from "@/database/dao";
+import { saveProfile } from "@/database/dao";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginScreen() {
