@@ -3,6 +3,7 @@
 set -euo pipefail
 
 echo "Running tests"
+export TEST=true
 COVERAGE_PROCESS_START=./.coveragerc \
   coverage run --parallel-mode --concurrency=thread,gevent --rcfile=./.coveragerc \
   /usr/local/bin/pytest -vvv -rP

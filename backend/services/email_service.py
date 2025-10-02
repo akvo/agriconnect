@@ -33,6 +33,12 @@ class EmailService:
         template_dir = Path(__file__).parent.parent / "templates"
         self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
 
+        # If running in test mode, disable actual sending to avoid
+        # failures when SMTP credentials are not available. We detect
+        # only the `TEST` environment variable. Accept '1' or 'true'.
+        test_val = os.getenv("TEST", "").lower()
+        self.disable_sending = test_val in ("1", "true")
+
     async def send_invitation_email(
         self,
         email: EmailStr,
@@ -94,6 +100,12 @@ class EmailService:
                 subtype=MessageType.html,
             )
 
+            if self.disable_sending:
+                logger.info(
+                    f"Email disabled in test/CI; skipping invite to {email}"
+                )
+                return True
+
             await self.fastmail.send_message(message)
             logger.info(f"Invitation email sent successfully to {email}")
             return True
@@ -142,6 +154,12 @@ class EmailService:
                 alternative_body=text_content,
                 subtype=MessageType.html,
             )
+
+            if self.disable_sending:
+                logger.info(
+                    f"Email disabled in test/CI; skipping pwd reset to {email}"
+                )
+                return True
 
             await self.fastmail.send_message(message)
             logger.info(f"Password reset email sent successfully to {email}")
