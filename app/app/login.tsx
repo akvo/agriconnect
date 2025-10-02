@@ -13,7 +13,6 @@ import {
 import { useRouter } from "expo-router";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api, LoginCredentials } from "../services/api";
-import { saveProfile } from "@/database/dao";
 import { useAuth } from "@/contexts/AuthContext";
 import themeColors from "@/styles/colors";
 
@@ -36,37 +35,29 @@ export default function LoginScreen() {
     try {
       const credentials: LoginCredentials = { email, password };
       const response = await api.login(credentials);
-      saveProfile.eoUser({
+
+      // Map API response to User interface
+      const userData = {
         id: response.user.id,
         email: response.user.email,
-        phone_number: response.user.phone_number,
-        full_name: response.user.full_name,
-        user_type: response.user.user_type,
-        is_active: response.user.is_active,
-        invitation_status: response.user.invitation_status,
-        password_set_at: response.user.password_set_at,
-        administrative_location: response.user.administrative_location,
-        authToken: response.access_token,
-      });
-
-      // Navigate to home page with user data
-      login({
         fullName: response.user.full_name,
-        email: response.user.email,
-        authToken: response.access_token,
-      });
-      router.replace({
-        pathname: "/home",
-        params: {
-          fullName: response.user.full_name,
-          email: response.user.email,
-          token: response.access_token,
-        },
-      });
+        phoneNumber: response.user.phone_number,
+        userType: response.user.user_type,
+        isActive: response.user.is_active,
+        invitationStatus: response.user.invitation_status,
+        administrativeLocation: response.user.administrative_location,
+      };
+
+      // Call login with access token and user data
+      // This will save both user and profile to database
+      await login(response.access_token, userData);
+
+      // Navigate to home page
+      router.replace("/home");
     } catch (error) {
       Alert.alert(
         "Login Failed",
-        error instanceof Error ? error.message : "Invalid credentials"
+        error instanceof Error ? error.message : "Invalid credentials",
       );
     } finally {
       setIsLoading(false);
