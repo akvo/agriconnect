@@ -1,5 +1,5 @@
 import { StyleSheet, TextStyle } from "react-native";
-import themeColors from "./colors";
+import colors from "./colors";
 
 export const typographyTokens = {
   familyPrimary: "Inter",
@@ -78,7 +78,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.title1.fontSize,
     lineHeight: typographyTokens.title1.lineHeight,
     letterSpacing: typographyTokens.title1.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   title2: {
     fontFamily: baseFontFamily,
@@ -86,7 +86,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.title2.fontSize,
     lineHeight: typographyTokens.title2.lineHeight,
     letterSpacing: typographyTokens.title2.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   title3: {
     fontFamily: baseFontFamily,
@@ -94,7 +94,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.title3.fontSize,
     lineHeight: typographyTokens.title3.lineHeight,
     letterSpacing: typographyTokens.title3.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
 
   heading1: {
@@ -103,7 +103,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.heading1.fontSize,
     lineHeight: typographyTokens.heading1.lineHeight,
     letterSpacing: typographyTokens.heading1.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   heading2: {
     fontFamily: baseFontFamily,
@@ -111,7 +111,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.heading2.fontSize,
     lineHeight: typographyTokens.heading2.lineHeight,
     letterSpacing: typographyTokens.heading2.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   heading3: {
     fontFamily: baseFontFamily,
@@ -119,7 +119,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.heading3.fontSize,
     lineHeight: typographyTokens.heading3.lineHeight,
     letterSpacing: typographyTokens.heading3.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   heading4: {
     fontFamily: baseFontFamily,
@@ -127,7 +127,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.heading4.fontSize,
     lineHeight: typographyTokens.heading4.lineHeight,
     letterSpacing: typographyTokens.heading4.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   heading5: {
     fontFamily: baseFontFamily,
@@ -135,7 +135,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.heading5.fontSize,
     lineHeight: typographyTokens.heading5.lineHeight,
     letterSpacing: typographyTokens.heading5.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   heading6: {
     fontFamily: baseFontFamily,
@@ -143,7 +143,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.heading6.fontSize,
     lineHeight: typographyTokens.heading6.lineHeight,
     letterSpacing: typographyTokens.heading6.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
 
   label1: {
@@ -152,7 +152,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.label1.fontSize,
     lineHeight: typographyTokens.label1.lineHeight,
     letterSpacing: typographyTokens.label1.letterSpacing,
-  color: themeColors.textSecondary,
+  color: colors.textSecondary,
   },
   label2: {
     fontFamily: baseFontFamily,
@@ -160,7 +160,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.label2.fontSize,
     lineHeight: typographyTokens.label2.lineHeight,
     letterSpacing: typographyTokens.label2.letterSpacing,
-  color: themeColors.textSecondary,
+  color: colors.textSecondary,
   },
   label3: {
     fontFamily: baseFontFamily,
@@ -168,7 +168,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.label3.fontSize,
     lineHeight: typographyTokens.label3.lineHeight,
     letterSpacing: typographyTokens.label3.letterSpacing,
-  color: themeColors.textSecondary,
+  color: colors.textSecondary,
   },
 
   body1: {
@@ -177,7 +177,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.body1.fontSize,
     lineHeight: typographyTokens.body1.lineHeight,
     letterSpacing: typographyTokens.body1.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   body2: {
     fontFamily: baseFontFamily,
@@ -185,7 +185,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.body2.fontSize,
     lineHeight: typographyTokens.body2.lineHeight,
     letterSpacing: typographyTokens.body2.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   body3: {
     fontFamily: baseFontFamily,
@@ -193,7 +193,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.body3.fontSize,
     lineHeight: typographyTokens.body3.lineHeight,
     letterSpacing: typographyTokens.body3.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   body4: {
     fontFamily: baseFontFamily,
@@ -201,7 +201,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.body4.fontSize,
     lineHeight: typographyTokens.body4.lineHeight,
     letterSpacing: typographyTokens.body4.letterSpacing,
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
 
   caption1: {
@@ -210,7 +210,7 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.caption1.fontSize,
     lineHeight: typographyTokens.caption1.lineHeight,
     letterSpacing: typographyTokens.caption1.letterSpacing,
-  color: themeColors.textTertiary,
+  color: colors.textTertiary,
   },
   caption2: {
     fontFamily: baseFontFamily,
@@ -218,16 +218,16 @@ const typography = StyleSheet.create<TextStyles>({
     fontSize: typographyTokens.caption2.fontSize,
     lineHeight: typographyTokens.caption2.lineHeight,
     letterSpacing: typographyTokens.caption2.letterSpacing,
-  color: themeColors.textTertiary,
+  color: colors.textTertiary,
   },
   bold: {
     fontWeight: String(weights.bold) as any,
   },
   textPrimary: {
-  color: themeColors.textPrimary,
+  color: colors.textPrimary,
   },
   textGreen500: {
-    color: themeColors["green-500"],
+    color: colors["green-500"],
   },
 });
 
