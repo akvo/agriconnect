@@ -14,15 +14,14 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   create(data: CreateCustomerUserData): CustomerUser {
     const stmt = this.db.prepareSync(
       `INSERT INTO customer_users (
-        id, phone_number, full_name, language, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?)`
+        phoneNumber, fullName, language, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?)`,
     );
     try {
       const now = new Date().toISOString();
       const result = stmt.executeSync([
-        data.id || null,
-        data.phone_number,
-        data.full_name,
+        data.phoneNumber,
+        data.fullName,
         data.language || "en",
         now,
         now,
@@ -46,13 +45,13 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
       const updates: string[] = [];
       const values: any[] = [];
 
-      if (data.phone_number !== undefined) {
-        updates.push("phone_number = ?");
-        values.push(data.phone_number);
+      if (data.phoneNumber !== undefined) {
+        updates.push("phoneNumber = ?");
+        values.push(data.phoneNumber);
       }
-      if (data.full_name !== undefined) {
-        updates.push("full_name = ?");
-        values.push(data.full_name);
+      if (data.fullName !== undefined) {
+        updates.push("fullName = ?");
+        values.push(data.fullName);
       }
       if (data.language !== undefined) {
         updates.push("language = ?");
@@ -63,12 +62,12 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
         return false;
       }
 
-      updates.push("updated_at = ?");
+      updates.push("updatedAt = ?");
       values.push(new Date().toISOString());
       values.push(id);
 
       const stmt = this.db.prepareSync(
-        `UPDATE customer_users SET ${updates.join(", ")} WHERE id = ?`
+        `UPDATE customer_users SET ${updates.join(", ")} WHERE id = ?`,
       );
       try {
         const result = stmt.executeSync(values);
@@ -85,7 +84,7 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   // Find user by phone number
   findByPhoneNumber(phoneNumber: string): CustomerUser | null {
     const stmt = this.db.prepareSync(
-      "SELECT * FROM customer_users WHERE phone_number = ?"
+      "SELECT * FROM customer_users WHERE phoneNumber = ?",
     );
     try {
       const result = stmt.executeSync<CustomerUser>([phoneNumber]);
@@ -101,7 +100,7 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   // Search customers by name (partial match)
   searchByName(name: string): CustomerUser[] {
     const stmt = this.db.prepareSync(
-      "SELECT * FROM customer_users WHERE full_name LIKE ? ORDER BY full_name"
+      "SELECT * FROM customer_users WHERE fullName LIKE ? ORDER BY fullName",
     );
     try {
       const result = stmt.executeSync<CustomerUser>([`%${name}%`]);
@@ -117,7 +116,7 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   // Get customers by language
   findByLanguage(language: string): CustomerUser[] {
     const stmt = this.db.prepareSync(
-      "SELECT * FROM customer_users WHERE language = ? ORDER BY full_name"
+      "SELECT * FROM customer_users WHERE language = ? ORDER BY fullName",
     );
     try {
       const result = stmt.executeSync<CustomerUser>([language]);
@@ -133,7 +132,7 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   // Get recent customers (ordered by creation date)
   findRecent(limit: number = 10): CustomerUser[] {
     const stmt = this.db.prepareSync(
-      "SELECT * FROM customer_users ORDER BY created_at DESC LIMIT ?"
+      "SELECT * FROM customer_users ORDER BY createdAt DESC LIMIT ?",
     );
     try {
       const result = stmt.executeSync<CustomerUser>([limit]);

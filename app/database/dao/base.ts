@@ -1,10 +1,10 @@
-import { SQLiteDatabase } from 'expo-sqlite';
+import { SQLiteDatabase } from "expo-sqlite";
 
 // Base DAO interface for common operations
 export interface BaseDAO<T> {
   findById(id: number): T | null;
   findAll(): T[];
-  create(data: Partial<T>): T;
+  create(data: Omit<T, "id">): T;
   update(id: number, data: Partial<T>): boolean;
   delete(id: number): boolean;
 }
@@ -17,15 +17,17 @@ export interface DatabaseResult {
 }
 
 // Base DAO class with common functionality
-export abstract class BaseDAOImpl<T extends { id: number }> implements BaseDAO<T> {
+export abstract class BaseDAOImpl<T extends { id: number }>
+  implements BaseDAO<T>
+{
   constructor(
     protected db: SQLiteDatabase,
-    protected tableName: string
+    protected tableName: string,
   ) {}
 
   findById(id: number): T | null {
     const stmt = this.db.prepareSync(
-      `SELECT * FROM ${this.tableName} WHERE id = ?`
+      `SELECT * FROM ${this.tableName} WHERE id = ?`,
     );
     try {
       const result = stmt.executeSync<T>([id]);
@@ -39,7 +41,9 @@ export abstract class BaseDAOImpl<T extends { id: number }> implements BaseDAO<T
   }
 
   findAll(): T[] {
-    const stmt = this.db.prepareSync(`SELECT * FROM ${this.tableName} ORDER BY id DESC`);
+    const stmt = this.db.prepareSync(
+      `SELECT * FROM ${this.tableName} ORDER BY id DESC`,
+    );
     try {
       const result = stmt.executeSync<T>();
       return result.getAllSync();
@@ -51,12 +55,12 @@ export abstract class BaseDAOImpl<T extends { id: number }> implements BaseDAO<T
     }
   }
 
-  abstract create(data: Omit<T, 'id'>): T;
+  abstract create(data: Omit<T, "id">): T;
   abstract update(id: number, data: Partial<T>): boolean;
 
   delete(id: number): boolean {
     const stmt = this.db.prepareSync(
-      `DELETE FROM ${this.tableName} WHERE id = ?`
+      `DELETE FROM ${this.tableName} WHERE id = ?`,
     );
     try {
       const result = stmt.executeSync([id]);
@@ -72,7 +76,7 @@ export abstract class BaseDAOImpl<T extends { id: number }> implements BaseDAO<T
   // Utility method for counting records
   count(): number {
     const stmt = this.db.prepareSync(
-      `SELECT COUNT(*) as count FROM ${this.tableName}`
+      `SELECT COUNT(*) as count FROM ${this.tableName}`,
     );
     try {
       const result = stmt.executeSync<{ count: number }>();
@@ -88,7 +92,7 @@ export abstract class BaseDAOImpl<T extends { id: number }> implements BaseDAO<T
   // Utility method for checking if record exists
   exists(id: number): boolean {
     const stmt = this.db.prepareSync(
-      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE id = ?`
+      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE id = ?`,
     );
     try {
       const result = stmt.executeSync<{ count: number }>([id]);

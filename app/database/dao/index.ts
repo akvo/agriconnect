@@ -1,16 +1,16 @@
 import { SQLiteDatabase } from "expo-sqlite";
 import { getDatabase } from "../index";
-import { EoUserDAO } from "./eoUserDAO";
+import { UserDAO } from "./userDAO";
 import { CustomerUserDAO } from "./customerUserDAO";
 import { MessageDAO } from "./messageDAO";
-import { SyncLogDAO } from "./syncLogDAO";
+import { ProfileDAO } from "./profileDAO";
 
 /**
  * DAO Manager - Central access point for all database operations
  *
  * Usage:
  * const dao = DAOManager.getInstance();
- * const users = dao.eoUser.findAll();
+ * const users = dao.user.findAll();
  * const messages = dao.message.getInbox(eoId);
  */
 export class DAOManager {
@@ -18,10 +18,10 @@ export class DAOManager {
   private db: SQLiteDatabase;
 
   // DAO instances
-  public readonly eoUser: EoUserDAO;
+  public readonly user: UserDAO;
   public readonly customerUser: CustomerUserDAO;
   public readonly message: MessageDAO;
-  public readonly syncLog: SyncLogDAO;
+  public readonly profile: ProfileDAO;
 
   private constructor() {
     this.db = getDatabase();
@@ -40,10 +40,10 @@ export class DAOManager {
     }
 
     // Initialize all DAOs
-    this.eoUser = new EoUserDAO(this.db);
+    this.user = new UserDAO(this.db);
     this.customerUser = new CustomerUserDAO(this.db);
     this.message = new MessageDAO(this.db);
-    this.syncLog = new SyncLogDAO(this.db);
+    this.profile = new ProfileDAO(this.db);
   }
 
   /**
@@ -79,3 +79,6 @@ export * from "./types";
 
 // Export utility functions
 export * from "./utils";
+
+// Profile is base config or user preferences including token
+// User is mainly for messages and other user-specific data

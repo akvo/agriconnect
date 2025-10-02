@@ -16,9 +16,9 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   create(data: CreateMessageData): Message {
     const stmt = this.db.prepareSync(
       `INSERT INTO messages (
-        from_source, message_sid, customer_id, eo_id, body, 
-        message_type, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        from_source, message_sid, customer_id, user_id, body, 
+        message_type, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     try {
       const now = new Date().toISOString();
@@ -26,7 +26,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         data.from_source,
         data.message_sid,
         data.customer_id,
-        data.eo_id,
+        data.user_id,
         data.body,
         data.message_type || "text",
         now,
@@ -63,9 +63,9 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         updates.push("customer_id = ?");
         values.push(data.customer_id);
       }
-      if (data.eo_id !== undefined) {
-        updates.push("eo_id = ?");
-        values.push(data.eo_id);
+      if (data.user_id !== undefined) {
+        updates.push("user_id = ?");
+        values.push(data.user_id);
       }
       if (data.body !== undefined) {
         updates.push("body = ?");
@@ -80,12 +80,12 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         return false;
       }
 
-      updates.push("updated_at = ?");
+      updates.push("updatedAt = ?");
       values.push(new Date().toISOString());
       values.push(id);
 
       const stmt = this.db.prepareSync(
-        `UPDATE messages SET ${updates.join(", ")} WHERE id = ?`
+        `UPDATE messages SET ${updates.join(", ")} WHERE id = ?`,
       );
       try {
         const result = stmt.executeSync(values);
@@ -103,24 +103,28 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   getConversation(
     customerId: number,
     eoId: number,
-    limit: number = 50
+    limit: number = 50,
   ): MessageWithUsers[] {
     const stmt = this.db.prepareSync(
       `SELECT 
         m.*,
-        f.full_name as customer_name,
-        f.phone_number as customer_phone,
-        e.full_name as eo_name,
+        f.fullName as customer_name,
+        f.phoneNumber as customer_phone,
+        e.fullName as eo_name,
         e.email as eo_email
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
-      JOIN eo_users e ON m.eo_id = e.id
-      WHERE m.customer_id = ? AND m.eo_id = ?
-      ORDER BY m.created_at DESC
-      LIMIT ?`
+      JOIN users u ON m.user_id = u.id
+      WHERE m.customer_id = ? AND m.user_id = ?
+      ORDER BY m.createdAt DESC
+      LIMIT ?`,
     );
     try {
-      const result = stmt.executeSync<MessageWithUsers>([customerId, eoId, limit]);
+      const result = stmt.executeSync<MessageWithUsers>([
+        customerId,
+        eoId,
+        limit,
+      ]);
       return result.getAllSync();
     } catch (error) {
       console.error("Error getting conversation:", error);
@@ -135,27 +139,27 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     const stmt = this.db.prepareSync(
       `SELECT 
         m1.customer_id,
-        m1.eo_id,
-        f.full_name as customer_name,
-        f.phone_number as customer_phone,
-        e.full_name as eo_name,
+        m1.user_id,
+        f.fullName as customer_name,
+        f.phoneNumber as customer_phone,
+        e.fullName as eo_name,
         e.email as eo_email,
         m1.body as last_message,
         m1.message_type as last_message_type,
-        m1.created_at as last_message_time,
+        m1.createdAt as last_message_time,
         0 as unread_count
       FROM messages m1
       JOIN customer_users f ON m1.customer_id = f.id
-      JOIN eo_users e ON m1.eo_id = e.id
-      WHERE m1.eo_id = ? 
-      AND m1.created_at = (
-        SELECT MAX(m2.created_at) 
+      JOIN users u ON m1.user_id = u.id
+      WHERE m1.user_id = ? 
+      AND m1.createdAt = (
+        SELECT MAX(m2.createdAt) 
         FROM messages m2 
         WHERE m2.customer_id = m1.customer_id 
-        AND m2.eo_id = m1.eo_id
+        AND m2.user_id = m1.user_id
       )
-      ORDER BY m1.created_at DESC
-      LIMIT ?`
+      ORDER BY m1.createdAt DESC
+      LIMIT ?`,
     );
     try {
       const result = stmt.executeSync<ConversationSummary>([eoId, limit]);
@@ -171,21 +175,21 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   // Get messages by customer
   getMessagesByCustomer(
     customerId: number,
-    limit: number = 50
+    limit: number = 50,
   ): MessageWithUsers[] {
     const stmt = this.db.prepareSync(
       `SELECT 
         m.*,
-        f.full_name as customer_name,
-        f.phone_number as customer_phone,
-        e.full_name as eo_name,
+        f.fullName as customer_name,
+        f.phoneNumber as customer_phone,
+        e.fullName as eo_name,
         e.email as eo_email
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
-      JOIN eo_users e ON m.eo_id = e.id
+      JOIN users u ON m.user_id = u.id
       WHERE m.customer_id = ?
-      ORDER BY m.created_at DESC
-      LIMIT ?`
+      ORDER BY m.createdAt DESC
+      LIMIT ?`,
     );
     try {
       const result = stmt.executeSync<MessageWithUsers>([customerId, limit]);
@@ -203,16 +207,16 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     const stmt = this.db.prepareSync(
       `SELECT 
         m.*,
-        f.full_name as customer_name,
-        f.phone_number as customer_phone,
-        e.full_name as eo_name,
+        f.fullName as customer_name,
+        f.phoneNumber as customer_phone,
+        e.fullName as eo_name,
         e.email as eo_email
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
-      JOIN eo_users e ON m.eo_id = e.id
-      WHERE m.eo_id = ?
-      ORDER BY m.created_at DESC
-      LIMIT ?`
+      JOIN users u ON m.user_id = u.id
+      WHERE m.user_id = ?
+      ORDER BY m.createdAt DESC
+      LIMIT ?`,
     );
     try {
       const result = stmt.executeSync<MessageWithUsers>([eoId, limit]);
@@ -228,7 +232,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   // Find message by WhatsApp message SID
   findByMessageSid(messageSid: string): Message | null {
     const stmt = this.db.prepareSync(
-      "SELECT * FROM messages WHERE message_sid = ?"
+      "SELECT * FROM messages WHERE message_sid = ?",
     );
     try {
       const result = stmt.executeSync<Message>([messageSid]);
@@ -246,15 +250,15 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     const stmt = this.db.prepareSync(
       `SELECT 
         m.*,
-        f.full_name as customer_name,
-        f.phone_number as customer_phone,
-        e.full_name as eo_name,
+        f.fullName as customer_name,
+        f.phoneNumber as customer_phone,
+        e.fullName as eo_name,
         e.email as eo_email
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
-      JOIN eo_users e ON m.eo_id = e.id
-      ORDER BY m.created_at DESC
-      LIMIT ?`
+      JOIN users u ON m.user_id = u.id
+      ORDER BY m.createdAt DESC
+      LIMIT ?`,
     );
     try {
       const result = stmt.executeSync<MessageWithUsers>([limit]);
@@ -272,16 +276,16 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     const stmt = this.db.prepareSync(
       `SELECT 
         m.*,
-        f.full_name as customer_name,
-        f.phone_number as customer_phone,
-        e.full_name as eo_name,
+        f.fullName as customer_name,
+        f.phoneNumber as customer_phone,
+        e.fullName as eo_name,
         e.email as eo_email
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
-      JOIN eo_users e ON m.eo_id = e.id
+      JOIN users u ON m.user_id = u.id
       WHERE m.body LIKE ?
-      ORDER BY m.created_at DESC
-      LIMIT ?`
+      ORDER BY m.createdAt DESC
+      LIMIT ?`,
     );
     try {
       const result = stmt.executeSync<MessageWithUsers>([`%${query}%`, limit]);
