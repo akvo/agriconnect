@@ -47,7 +47,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const checkAuth = useCallback(async () => {
     const userDB = await dao.eoUser.getProfile();
     if (!user && userDB) {
-      setUser(userDB);
+      setUser({
+        ...userDB,
+        fullName: userDB.full_name,
+      });
     }
     if ((user?.authToken || routeToken) && isValid) {
       return;
