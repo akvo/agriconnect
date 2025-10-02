@@ -7,15 +7,20 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
+import Feathericons from "@expo/vector-icons/Feather";
 import { api, LoginCredentials } from "../services/api";
 import { saveProfile } from "@/database/dao";
 import { useAuth } from "@/contexts/AuthContext";
+import themeColors from "@/styles/colors";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
@@ -69,7 +74,10 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       <Text style={styles.title}>Agriconnect</Text>
       <Text style={styles.subtitle}>Sign in to your account</Text>
 
@@ -82,13 +90,28 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        <View style={styles.passwordRow}>
+          <TextInput
+            style={[styles.input, styles.passwordInput]}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword((prev: boolean) => !prev)}
+            accessibilityLabel={
+              showPassword ? "Hide password" : "Show password"
+            }
+          >
+            <Feathericons
+              name={showPassword ? "eye-off" : "eye"}
+              size={20}
+              color={themeColors.dark4}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -102,7 +125,7 @@ export default function LoginScreen() {
           <Text style={styles.buttonText}>Sign In</Text>
         )}
       </TouchableOpacity>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -138,6 +161,22 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: "white",
     fontSize: 16,
+  },
+  passwordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  passwordInput: {
+    flex: 1,
+    marginBottom: 0,
+    paddingRight: 40,
+  },
+  eyeButton: {
+    position: "absolute",
+    right: 12,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
   },
   button: {
     height: 50,
