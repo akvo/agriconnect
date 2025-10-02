@@ -1,9 +1,15 @@
 import uuid
 
 import pytest
+
 from fastapi import status
 
 from models.user import UserType
+# Create user directly for testing (bypass invitation system)
+from passlib.context import CryptContext
+from models.user import User
+from models.administrative import Administrative, UserAdministrative
+from seeder.administrative import seed_administrative_data
 
 
 class TestUserLogin:
@@ -11,11 +17,6 @@ class TestUserLogin:
         """Test successful user login"""
 
         unique_id = str(uuid.uuid4())[:8]
-        # Create user directly for testing (bypass invitation system)
-        from passlib.context import CryptContext
-
-        from models.user import User
-
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
         user = User(
@@ -40,6 +41,69 @@ class TestUserLogin:
         assert data["user"]["email"] == user.email
         assert data["user"]["full_name"] == user.full_name
 
+    def test_login_with_administrative_location(self, client, db_session):
+        """Test successful user login with administrative location"""
+
+        # Seed an administrative via commands
+        rows = [
+            {
+                "code": "LOC1",
+                "name": "Location 1",
+                "level": "Country",
+                "parent_code": ""
+            },
+            {
+                "code": "LOC2",
+                "name": "Location 2",
+                "level": "Region",
+                "parent_code": "LOC1"
+            },
+            {
+                "code": "LOC3",
+                "name": "Location 3",
+                "level": "District",
+                "parent_code": "LOC2"
+            },
+        ]
+        seed_administrative_data(db_session, rows)
+
+        unique_id = str(uuid.uuid4())[:8]
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+        adm = db_session.query(Administrative).filter_by(code="LOC3").first()
+        assert adm is not None
+        user = User(
+            email=f"admin-{unique_id}@example.com",
+            phone_number=f"+123456789{unique_id[:3]}",
+            hashed_password=pwd_context.hash("testpassword123"),
+            full_name="Admin User",
+            user_type=UserType.EXTENSION_OFFICER,
+            is_active=True,
+        )
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+
+        # Create UserAdministrative relationship
+        user_admin = UserAdministrative(
+            user_id=user.id,
+            administrative_id=adm.id
+        )
+        db_session.add(user_admin)
+        db_session.commit()
+
+        # Test login
+        login_data = {"email": user.email, "password": "testpassword123"}
+        response = client.post("/api/auth/login/", json=login_data)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["user"]["administrative_location"] is not None
+        assert data["user"]["administrative_location"]["id"] == adm.id
+        expected_path = "Location 2 - Location 3"
+        actual_path = data["user"]["administrative_location"]["full_path"]
+        assert actual_path == expected_path
+
     def test_login_invalid_email(self, client):
         """Test login with non-existent email"""
         login_data = {
@@ -55,10 +119,6 @@ class TestUserLogin:
         """Test login with wrong password"""
 
         unique_id = str(uuid.uuid4())[:8]
-        # Create user directly for testing (bypass invitation system)
-        from passlib.context import CryptContext
-
-        from models.user import User
 
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -87,10 +147,6 @@ def authenticated_user_token(client, db_session):
     """Create a user and return authentication token"""
 
     unique_id = str(uuid.uuid4())[:8]
-    # Create user directly for testing (bypass invitation system)
-    from passlib.context import CryptContext
-
-    from models.user import User
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

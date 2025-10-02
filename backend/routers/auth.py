@@ -64,8 +64,22 @@ def login_user(
         path="/",
     )
 
+    # Get user administrative info
+    admin_info = UserService._get_user_administrative_info(db, user.id)
+    # Build user response with administrative location
+    user_dict = {
+        "id": user.id,
+        "email": user.email,
+        "phone_number": user.phone_number,
+        "full_name": user.full_name,
+        "user_type": user.user_type,
+        "is_active": user.is_active,
+        "password_set_at": user.password_set_at,
+        "administrative_location": admin_info,
+    }
+
     return TokenResponse(
-        access_token=access_token, user=UserResponse.model_validate(user)
+        access_token=access_token, user=UserResponse(**user_dict)
     )
 
 
@@ -117,9 +131,25 @@ def logout_user(response: Response):
 
 
 @router.get("/profile", response_model=UserResponse)
-def get_profile(current_user: User = Depends(get_current_user)):
+def get_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Get current user's profile"""
-    return UserResponse.model_validate(current_user)
+    # Get user administrative info
+    admin_info = UserService._get_user_administrative_info(db, current_user.id)
+    # Build user response with administrative location
+    user_dict = {
+        "id": current_user.id,
+        "email": current_user.email,
+        "phone_number": current_user.phone_number,
+        "full_name": current_user.full_name,
+        "user_type": current_user.user_type,
+        "is_active": current_user.is_active,
+        "password_set_at": current_user.password_set_at,
+        "administrative_location": admin_info,
+    }
+    return UserResponse(**user_dict)
 
 
 @router.put("/profile", response_model=UserResponse)
@@ -130,7 +160,20 @@ def update_profile(
 ):
     """Update current user's profile and optionally change password"""
     updated_user = UserService.update_self(db, current_user, update_data)
-    return UserResponse.model_validate(updated_user)
+    # Get user administrative info
+    admin_info = UserService._get_user_administrative_info(db, updated_user.id)
+    # Build user response with administrative location
+    user_dict = {
+        "id": updated_user.id,
+        "email": updated_user.email,
+        "phone_number": updated_user.phone_number,
+        "full_name": updated_user.full_name,
+        "user_type": updated_user.user_type,
+        "is_active": updated_user.is_active,
+        "password_set_at": updated_user.password_set_at,
+        "administrative_location": admin_info,
+    }
+    return UserResponse(**user_dict)
 
 
 @router.get(
@@ -212,6 +255,20 @@ def accept_invitation(
         path="/",
     )
 
+    # Get user administrative info
+    admin_info = UserService._get_user_administrative_info(db, user.id)
+    # Build user response with administrative location
+    user_dict = {
+        "id": user.id,
+        "email": user.email,
+        "phone_number": user.phone_number,
+        "full_name": user.full_name,
+        "user_type": user.user_type,
+        "is_active": user.is_active,
+        "password_set_at": user.password_set_at,
+        "administrative_location": admin_info,
+    }
+
     return TokenResponse(
-        access_token=access_token, user=UserResponse.model_validate(user)
+        access_token=access_token, user=UserResponse(**user_dict)
     )
