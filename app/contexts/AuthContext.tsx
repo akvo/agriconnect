@@ -70,7 +70,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const checkAuth = useCallback(async () => {
     // Get profile with user details from database (single JOIN query)
     const profileDB = await dao.profile.getCurrentProfile();
-    console.log("Profile from DB:", profileDB, user, routeToken, isValid);
 
     if (!user && profileDB) {
       // Map profile data to user state
