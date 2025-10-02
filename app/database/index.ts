@@ -6,17 +6,20 @@ import { getMigrationsByVersion, Migration } from "./migrations";
 const executeMigration = (db: SQLiteDatabase, migration: Migration): void => {
   console.log(`📋 Running migration: ${migration.name}`);
   try {
-    db.execSync('BEGIN TRANSACTION;');
+    db.execSync("BEGIN TRANSACTION;");
     db.execSync(migration.migration);
-    db.execSync('COMMIT;');
+    db.execSync("COMMIT;");
     console.log(`✅ Migration ${migration.name} completed successfully`);
   } catch (error) {
     console.error(`❌ Migration ${migration.name} failed:`, error);
     try {
-      db.execSync('ROLLBACK;');
+      db.execSync("ROLLBACK;");
       console.log(`🔄 Migration ${migration.name} rolled back`);
     } catch (rollbackError) {
-      console.error(`🚨 Failed to rollback migration ${migration.name}:`, rollbackError);
+      console.error(
+        `🚨 Failed to rollback migration ${migration.name}:`,
+        rollbackError,
+      );
     }
     throw new Error(`Migration ${migration.name} failed: ${error}`);
   }
@@ -79,7 +82,7 @@ export const getDatabase = (): SQLiteDatabase => {
 export const getDatabaseVersion = (): number => {
   const db = openDatabaseSync(DATABASE_NAME);
   const { user_version } = db.getFirstSync<{ user_version: number }>(
-    "PRAGMA user_version"
+    "PRAGMA user_version",
   );
   return user_version;
 };
