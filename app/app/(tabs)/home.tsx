@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
+import MDCommunityicons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import typography from "@/styles/typography";
@@ -11,9 +12,13 @@ export default function HomeScreen() {
   const router = useRouter();
   const { logout, user } = useAuth();
 
-  const handleLogout = () => {
-    logout();
-    router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.replace("/login");
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
   };
 
   // Get initials for profile icon
@@ -31,6 +36,11 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.profileContainer}>
           <View style={styles.profileIcon}>
+            {user?.userType === "admin" && (
+              <View style={styles.adminBadge}>
+                <MDCommunityicons name="crown" size={20} color={"white"} />
+              </View>
+            )}
             <Text style={styles.profileText}>
               {user?.fullName ? getInitials(user.fullName) : "U"}
             </Text>
@@ -38,6 +48,23 @@ export default function HomeScreen() {
           <View style={styles.profileDetails}>
             <Text style={styles.welcomeText}>Welcome Back</Text>
             <Text style={styles.nameText}>{user?.fullName || "User"}</Text>
+            {user?.administrativeLocation?.full_path && (
+              <Text style={styles.locationText}>
+                {user?.administrativeLocation?.full_path}
+              </Text>
+            )}
+            {user?.userType && (
+              <Text
+                style={[
+                  styles.userTypeLabel,
+                  user.userType === "eo"
+                    ? styles.eoTypeLabel
+                    : styles.adminTypeLabel,
+                ]}
+              >
+                {user.userType === "eo" ? "Extension Officer" : "Admin"}
+              </Text>
+            )}
           </View>
         </View>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -362,12 +389,14 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   profileDetails: {
-    lineHeight: 20,
+    lineHeight: 28,
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "flex-start",
-    gap: 0,
+    gap: 2,
     paddingVertical: 0,
+    overflowX: "hidden",
+    maxWidth: 260,
   },
   welcomeText: {
     fontSize: 18,
@@ -380,9 +409,38 @@ const styles = StyleSheet.create({
     color: themeColors.white,
     marginBottom: 0,
   },
-  emailText: {
-    fontSize: 16,
-    color: themeColors.borderLight,
+  locationText: {
+    ...typography.body4,
+    color: themeColors.white,
+    textWrap: "wrap",
+  },
+  userTypeLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginTop: 6,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  adminTypeLabel: {
+    backgroundColor: themeColors.adminType,
+    color: themeColors.white,
+  },
+  eoTypeLabel: {
+    backgroundColor: themeColors.extensionOfficerType,
+    color: themeColors.dark10,
+  },
+  adminBadge: {
+    position: "absolute",
+    top: -12,
+    left: "50%",
+    width: 28,
+    height: 28,
+    marginLeft: -14, // center horizontally (half of width)
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
   },
   cardTopContainer: {
     width: "100%",
