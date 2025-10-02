@@ -10,6 +10,7 @@ export default function TabLayout() {
     <SafeAreaView style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
+          tabBarHideOnKeyboard: true,
           tabBarActiveTintColor: "#027E5D",
           headerShown: false,
           tabBarButton: HapticTab,
