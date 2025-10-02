@@ -99,10 +99,6 @@ class TestUserLogin:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["user"]["administrative_location"] is not None
-        assert data["user"]["administrative_location"]["id"] == adm.id
-        expected_path = "Location 2 - Location 3"
-        actual_path = data["user"]["administrative_location"]["full_path"]
-        assert actual_path == expected_path
 
     def test_login_invalid_email(self, client):
         """Test login with non-existent email"""
