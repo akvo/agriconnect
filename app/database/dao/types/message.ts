@@ -4,18 +4,18 @@ export interface Message {
   from_source: string;
   message_sid: string;
   customer_id: number;
-  eo_id: number;
+  user_id: number;
   body: string;
   message_type: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateMessageData {
   from_source: string;
   message_sid: string;
   customer_id: number;
-  eo_id: number;
+  user_id: number;
   body: string;
   message_type?: string;
 }
@@ -24,7 +24,7 @@ export interface UpdateMessageData {
   from_source?: string;
   message_sid?: string;
   customer_id?: number;
-  eo_id?: number;
+  user_id?: number;
   body?: string;
   message_type?: string;
 }
@@ -40,7 +40,7 @@ export interface MessageWithUsers extends Message {
 // Conversation summary for inbox
 export interface ConversationSummary {
   customer_id: number;
-  eo_id: number;
+  user_id: number;
   customer_name: string;
   customer_phone: string;
   eo_name: string;
