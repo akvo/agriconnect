@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "output": "static",
@@ -43,13 +44,22 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": false,
+          "useSQLCipher": true
+        }
       ]
     ],
+    "androidNavigationBar": {
+      "visible": "immersive"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "scheme": "agriconnect",
     "platforms": ["ios", "android", "web"]
   }
 }

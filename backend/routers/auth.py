@@ -64,8 +64,14 @@ def login_user(
         path="/",
     )
 
+    # Get user administrative info
+    admin_info = UserService._get_user_administrative_info(db, user.id)
+    # Build user response with administrative location
+    user_response = UserResponse.model_validate(user)
+    user_response.administrative_location = admin_info
+
     return TokenResponse(
-        access_token=access_token, user=UserResponse.model_validate(user)
+        access_token=access_token, user=user_response
     )
 
 
@@ -117,9 +123,17 @@ def logout_user(response: Response):
 
 
 @router.get("/profile", response_model=UserResponse)
-def get_profile(current_user: User = Depends(get_current_user)):
+def get_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Get current user's profile"""
-    return UserResponse.model_validate(current_user)
+    # Get user administrative info
+    admin_info = UserService._get_user_administrative_info(db, current_user.id)
+    # Build user response with administrative location
+    user_response = UserResponse.model_validate(current_user)
+    user_response.administrative_location = admin_info
+    return user_response
 
 
 @router.put("/profile", response_model=UserResponse)
@@ -130,7 +144,12 @@ def update_profile(
 ):
     """Update current user's profile and optionally change password"""
     updated_user = UserService.update_self(db, current_user, update_data)
-    return UserResponse.model_validate(updated_user)
+    # Get user administrative info
+    admin_info = UserService._get_user_administrative_info(db, updated_user.id)
+    # Build user response with administrative location
+    user_response = UserResponse.model_validate(updated_user)
+    user_response.administrative_location = admin_info
+    return user_response
 
 
 @router.get(
@@ -212,6 +231,12 @@ def accept_invitation(
         path="/",
     )
 
+    # Get user administrative info
+    admin_info = UserService._get_user_administrative_info(db, user.id)
+    # Build user response with administrative location
+    user_response = UserResponse.model_validate(user)
+    user_response.administrative_location = admin_info
+
     return TokenResponse(
-        access_token=access_token, user=UserResponse.model_validate(user)
+        access_token=access_token, user=user_response
     )
