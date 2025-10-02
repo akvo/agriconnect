@@ -29,6 +29,10 @@ export default function TabLayout() {
             height: 80,
             marginHorizontal: 16,
             marginBottom: 16,
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
           },
           tabBarItemStyle: {
             paddingTop: 12,
