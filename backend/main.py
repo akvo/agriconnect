@@ -9,6 +9,7 @@ from routers import (
     knowledge_base,
     service_tokens,
     whatsapp,
+    tickets,
 )
 
 app = FastAPI(
@@ -37,6 +38,7 @@ app.include_router(customers.router, prefix="/api")
 app.include_router(knowledge_base.router, prefix="/api")
 app.include_router(service_tokens.router, prefix="/api")
 app.include_router(whatsapp.router, prefix="/api")
+app.include_router(tickets.router, prefix="/api")
 
 
 @app.get("/api/health-check", tags=["health-check"])
