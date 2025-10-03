@@ -40,6 +40,7 @@ class Administrative(Base):
     customer_administrative = relationship(
         "CustomerAdministrative", back_populates="administrative"
     )
+    tickets = relationship("Ticket", back_populates="ticket_administrative")
 
 
 class UserAdministrative(Base):
