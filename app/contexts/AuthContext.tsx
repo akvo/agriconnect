@@ -25,6 +25,7 @@ interface User {
   isActive: boolean;
   invitationStatus?: string;
   administrativeLocation?: AdministrativeLocation | null;
+  accessToken?: string;
 }
 
 interface AuthContextType {
@@ -87,6 +88,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         isActive: profileDB.isActive,
         invitationStatus: profileDB.invitationStatus,
         administrativeLocation: adm,
+        accessToken: profileDB.accessToken,
       });
     }
 
@@ -121,6 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         isActive: apiData.is_active,
         invitationStatus: apiData.invitation_status,
         administrativeLocation: apiData.administrative_location,
+        accessToken: accessToken,
       };
 
       setUser(userData);
@@ -129,10 +132,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         router.replace("/home");
       }
     } catch (error) {
-      console.error("Auth validation error:", error);
-      if (segments[0] !== "login" && routeToken) {
-        router.replace("/login");
+      console.log("test");
+      setUser(null);
+      setIsValid(false);
+      const isHealthy = checkDatabaseHealth();
+      if (isHealthy) {
+        forceClearDatabase();
       }
+      router.replace("/login");
     }
   }, [user, segments, router, routeToken, isValid]);
 
