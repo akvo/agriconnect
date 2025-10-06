@@ -7,17 +7,15 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSQLiteContext } from "expo-sqlite";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
 import InboxTabs from "@/components/inbox/tabs-button";
 import Search from "@/components/inbox/search";
-import TicketItem, {
-  Ticket as TicketType,
-} from "@/components/inbox/ticket-item";
+import TicketItem from "@/components/inbox/ticket-item";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/services/api";
-
-type Ticket = TicketType;
+import { Ticket } from "@/database/dao/types/ticket";
+import TicketSyncService from "@/services/ticketSync";
 
 const Tabs = {
   PENDING: "open",
@@ -28,7 +26,7 @@ const Inbox: React.FC = () => {
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [activeTab, setActiveTab] = useState<(typeof Tabs)[keyof typeof Tabs]>(
-    Tabs.PENDING
+    Tabs.PENDING,
   );
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -40,27 +38,28 @@ const Inbox: React.FC = () => {
   const endReachedTimeout = React.useRef<number | null>(null);
   const isFetchingRef = React.useRef(false); // prevent duplicate fetches
   const isInitialMount = React.useRef(true); // track initial mount
+  const db = useSQLiteContext();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tickets.filter((t: Ticket) => {
-      const isResolved = !!t.resolved_at;
+      const isResolved = !!t.resolvedAt;
       if (activeTab === Tabs.PENDING && isResolved) return false;
       if (activeTab === Tabs.RESPONDED && !isResolved) return false;
 
       if (!q) return true;
-      const inName = t.customer.name.toLowerCase().includes(q);
-      const inContent = (t.message?.body || "").toLowerCase().includes(q);
-      const inTicketId = t.ticket_number.toLowerCase().includes(q);
+      const inName = t.customer?.name.toString().includes(q);
+      const inContent = (t.message?.body.toString() || "").includes(q);
+      const inTicketId = t.ticketNumber.toLowerCase().includes(q);
       return inName || inContent || inTicketId;
     });
   }, [tickets, activeTab, query]);
   const { user } = useAuth();
 
   const onPressTicket = (ticket: Ticket) => {
-    // Navigate to the chat screen, passing ticket_number as query param
+    // Navigate to the chat screen, passing ticketNumber as query param
     router.push(
-      `/chat?ticketNumber=${encodeURIComponent(ticket.ticket_number)}`
+      `/chat?ticketNumber=${encodeURIComponent(ticket.ticketNumber)}`,
     );
   };
 
@@ -69,7 +68,7 @@ const Inbox: React.FC = () => {
       tab: (typeof Tabs)[keyof typeof Tabs],
       p: number,
       append: boolean = false,
-      isRefreshing: boolean = false
+      isRefreshing: boolean = false,
     ) => {
       // Prevent concurrent fetches
       if (isFetchingRef.current) return;
@@ -83,28 +82,27 @@ const Inbox: React.FC = () => {
         if (isRefreshing) setRefreshing(true);
         else setLoading(true);
 
-        const apiData = await api.getTickets(
+        // Use TicketSyncService to fetch tickets (local-first approach)
+        const syncResult = await TicketSyncService.getTickets(
+          db,
           user.accessToken,
           tab,
           p,
-          pageSize
+          pageSize,
+          user.id,
         );
-        // API response shape: { tickets, total, page, size }
-        const fetched: Ticket[] = apiData?.tickets || [];
-        const total: number | undefined = apiData?.total;
-        const size: number | undefined = apiData?.size || pageSize;
-        const currentPage: number | undefined = apiData?.page || p;
 
-        // if API provides total/size, compute hasMore using pages
-        if (typeof total === "number" && typeof size === "number") {
-          const totalPages = Math.ceil(total / size);
-          setHasMore((currentPage ?? p) < totalPages);
-        } else {
-          setHasMore(fetched.length > 0);
-        }
+        const fetched: Ticket[] = syncResult.tickets || [];
+        const total: number = syncResult.total;
+        const size: number = syncResult.size;
+        const currentPage: number = syncResult.page;
+
+        // Compute hasMore using total and size
+        const totalPages = Math.ceil(total / size);
+        setHasMore(currentPage < totalPages);
 
         setTickets((prev: Ticket[]) =>
-          append ? [...prev, ...fetched] : fetched
+          append ? [...prev, ...fetched] : fetched,
         );
       } catch (error) {
         console.error("Failed to fetch tickets:", error);
@@ -115,7 +113,7 @@ const Inbox: React.FC = () => {
         isFetchingRef.current = false;
       }
     },
-    [user?.accessToken, pageSize]
+    [user?.accessToken, pageSize, db, user?.id],
   );
 
   // Reset list when tab changes
@@ -142,9 +140,11 @@ const Inbox: React.FC = () => {
     if (page === 1) return;
     // Skip if refreshing
     if (refreshing) return;
+    // Skip if there's an error
+    if (error) return;
 
     fetchTickets(activeTab, page, true);
-  }, [page, activeTab, fetchTickets, refreshing]);
+  }, [page, activeTab, fetchTickets, refreshing, error]);
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
