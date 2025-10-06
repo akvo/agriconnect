@@ -5,28 +5,7 @@ import themeColors from "@/styles/colors";
 import { formatTime, formatResolved } from "@/utils/time";
 import { initialsFromName } from "@/utils/string";
 import Avatar from "@/components/avatar";
-
-type Customer = { id: number; name: string };
-type User = { id: number; name: string } | null;
-type Message = { id: number; body: string };
-
-export type Ticket = {
-  id: number;
-  ticket_number: string;
-  customer: Customer;
-  message: Message;
-  status: string;
-  created_at: string;
-  resolved_at: string | null;
-  resolver: User;
-  last_message_at: string;
-  // Computed properties for backward compatibility
-  ticketNumber?: string;
-  unreadMessages?: number;
-  lastMessage?: { content: string; timestamp: string };
-  resolvedAt?: string | null;
-  respondedBy?: User;
-};
+import { Ticket } from "@/database/dao/types/ticket";
 
 const TicketItem: React.FC<{
   ticket: Ticket;
@@ -39,10 +18,9 @@ const TicketItem: React.FC<{
   onPress: (t: Ticket) => void;
 }) => {
   // Compute display values from API response
-  const ticketNumber = ticket.ticket_number;
-  const isUnread = ticket.unreadMessages ?? 0;
+  const isUnread = ticket.unreadCount ?? 0;
   const messageContent = ticket.message?.body || "";
-  const messageTimestamp = ticket.last_message_at;
+  const messageTimestamp = ticket.lastMessageAt;
   const respondedBy = ticket.resolver;
 
   return (
@@ -119,7 +97,7 @@ const TicketItem: React.FC<{
       </View>
       <View style={styles.ticketFooter}>
         <Text style={[typography.caption1, { color: themeColors.dark3 }]}>
-          {ticketNumber}
+          {ticket.ticketNumber}
         </Text>
         <View style={[styles.flexRow]}>
           <Text style={[typography.body4, { color: themeColors.textPrimary }]}>
