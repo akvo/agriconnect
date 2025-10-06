@@ -71,6 +71,37 @@ class ApiClient {
 
     return response.json();
   }
+
+  async getTickets(
+    token: string,
+    status: "open" | "resolved",
+    page: number = 1,
+    size?: number
+  ): Promise<any> {
+    const sizeQuery = size ? `&size=${size}` : "";
+    const response = await fetch(
+      `${this.baseUrl}/tickets/?status=${status}&page=${page}${sizeQuery}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    // console.log(`Fetching tickets: status=${status}, page=${page}${sizeQuery}`, await response.json());
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch tickets");
+    }
+
+    const res = await response.json();
+    return {
+      ...res,
+      tickets: res.tickets.map((ticket: any) => ({
+        ...ticket,
+        ticketNumber: ticket.ticket_number, // map ticket_number to ticketNumber
+      })),
+    };
+  }
 }
 
 export const api = new ApiClient();
