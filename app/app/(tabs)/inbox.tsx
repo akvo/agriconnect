@@ -16,6 +16,7 @@ import TicketItem from "@/components/inbox/ticket-item";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ticket } from "@/database/dao/types/ticket";
 import TicketSyncService from "@/services/ticketSync";
+import { useTicket } from "@/contexts/TicketContext";
 
 const Tabs = {
   PENDING: "open",
@@ -39,6 +40,7 @@ const Inbox: React.FC = () => {
   const isFetchingRef = React.useRef(false); // prevent duplicate fetches
   const isInitialMount = React.useRef(true); // track initial mount
   const db = useSQLiteContext();
+  const { updateTicket } = useTicket();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -57,6 +59,19 @@ const Inbox: React.FC = () => {
   const { user } = useAuth();
 
   const onPressTicket = (ticket: Ticket) => {
+    // update unreadCount
+    if (ticket.unreadCount && ticket.unreadCount > 0) {
+      const _unreadCount = ticket.unreadCount - 1;
+      const updated = {
+        ...ticket,
+        unreadCount: _unreadCount,
+      };
+      updateTicket(ticket.id, { unreadCount: _unreadCount });
+      // update local state immediately for responsiveness
+      setTickets((prev: Ticket[]) =>
+        prev.map((t: Ticket) => (t.id === ticket.id ? updated : t)),
+      );
+    }
     // Navigate to the chat screen, passing ticketNumber as query param
     router.push(
       `/chat?ticketNumber=${encodeURIComponent(ticket.ticketNumber)}`,
