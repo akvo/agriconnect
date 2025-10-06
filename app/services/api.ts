@@ -135,6 +135,37 @@ class ApiClient {
       })),
     };
   }
+
+  async closeTicket(token: string, ticketID: number): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/tickets/${ticketID}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        resolved_at: new Date().toISOString().replace("Z", "+00:00"),
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+          } catch (e) {
+            console.error("unauthorizedHandler error:", e);
+          }
+        }
+      }
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to close ticket" }));
+      throw new Error(error.detail || "Failed to close ticket");
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();
