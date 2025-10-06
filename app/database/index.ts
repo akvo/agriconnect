@@ -56,18 +56,18 @@ export const migrateDbIfNeeded = (): SQLiteDatabase => {
     console.log("✅ Database initialized successfully");
   }
 
-  // Future migrations can be added here
-  // if (currentDbVersion === 1) {
-  //   console.log('🔄 Upgrading database to version 2...');
-  //   const version2Migrations = getMigrationsByVersion(2);
-  //
-  //   for (const migration of version2Migrations) {
-  //     executeMigration(db, migration);
-  //   }
-  //
-  //   currentDbVersion = 2;
-  //   console.log('✅ Database upgraded to version 2');
-  // }
+  if (currentDbVersion === 1) {
+    console.log("🔄 Upgrading database to version 2...");
+    const version2Migrations = getMigrationsByVersion(2);
+
+    for (const migration of version2Migrations) {
+      console.log(`Executing migration: ${migration.name}`);
+      executeMigration(db, migration);
+    }
+
+    currentDbVersion = 2;
+    console.log("✅ Database upgraded to version 2");
+  }
 
   db.execSync(`PRAGMA user_version = ${DATABASE_VERSION}`);
   return db;
