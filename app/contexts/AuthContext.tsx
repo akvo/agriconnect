@@ -7,6 +7,7 @@ import React, {
   ReactNode,
 } from "react";
 import { useRouter, useSegments, useLocalSearchParams } from "expo-router";
+import { useSQLiteContext } from "expo-sqlite";
 import { api } from "@/services/api";
 import { dao } from "@/database/dao";
 import { forceClearDatabase, checkDatabaseHealth } from "@/database/utils";
@@ -67,10 +68,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const { token: routeToken } = useLocalSearchParams();
   const router = useRouter();
   const segments = useSegments();
+  const db = useSQLiteContext();
 
   const checkAuth = useCallback(async () => {
     // Get profile with user details from database (single JOIN query)
-    const profileDB = await dao.profile.getCurrentProfile();
+    const profileDB = await dao.profile.getCurrentProfile(db);
 
     if (!user && profileDB) {
       // Map profile data to user state
@@ -132,14 +134,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         router.replace("/home");
       }
     } catch (error) {
-      console.log("test");
-      setUser(null);
-      setIsValid(false);
-      const isHealthy = checkDatabaseHealth();
-      if (isHealthy) {
-        forceClearDatabase();
+      if (segments[0] !== "login" && routeToken) {
+        setUser(null);
+        setIsValid(false);
+        const isHealthy = checkDatabaseHealth();
+        if (isHealthy) {
+          forceClearDatabase();
+        }
+        router.replace("/login");
       }
-      router.replace("/login");
     }
   }, [user, segments, router, routeToken, isValid]);
 
@@ -147,10 +150,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     checkAuth();
   }, [checkAuth]);
 
+  // Register unauthorized handler to auto-logout on 401 responses
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      // perform logout; don't await here to avoid blocking
+      logout().catch((err) =>
+        console.error("Error during auto-logout (unauthorized):", err),
+      );
+    };
+
+    // register
+    api.setUnauthorizedHandler(handleUnauthorized);
+
+    return () => {
+      // unregister handler on unmount
+      api.setUnauthorizedHandler(undefined);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const login = async (accessToken: string, userData: User) => {
     try {
       // Create new user
-      dao.user.create({
+      dao.user.create(db, {
         id: userData.id,
         email: userData.email,
         fullName: userData.fullName,
@@ -162,12 +184,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       });
 
       // Create new profile
-      dao.profile.create({
+      dao.profile.create(db, {
         userId: userData.id,
         accessToken: accessToken,
       });
 
-      setUser(userData);
+      setUser({
+        ...userData,
+        accessToken: accessToken,
+      });
       setIsValid(true);
     } catch (error) {
       console.error("Error during login:", error);
