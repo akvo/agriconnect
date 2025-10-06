@@ -261,6 +261,7 @@ class TicketSyncService {
   ): Promise<void> {
     try {
       dao.ticket.upsert(db, {
+        id: ticketData.id, // Include API id
         ticketNumber: ticketData.ticketNumber || ticketData.ticket_number,
         customerId: ticketData.customerId,
         messageId: ticketData.messageId,

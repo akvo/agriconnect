@@ -13,28 +13,53 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
   }
 
   // Insert a ticket and return the full Ticket shape
+  // Override with specific CreateTicketData type instead of Omit<Ticket, "id">
+  // Ticket has nested objects (customer, message) while CreateTicketData has IDs (customerId, messageId)
+  // @ts-expect-error - Intentional override with different but compatible parameter type
   create(db: SQLiteDatabase, data: CreateTicketData): Ticket {
-    const stmt = db.prepareSync(
-      `INSERT INTO tickets (
-        customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
+    // Prepare SQL with or without ID based on whether it's provided
+    const hasId = data.id !== undefined;
+    const stmt = hasId
+      ? db.prepareSync(
+          `INSERT INTO tickets (
+            id, customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, updatedAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+      : db.prepareSync(
+          `INSERT INTO tickets (
+            customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, updatedAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        );
 
     try {
       const now = new Date().toISOString();
-      const result = stmt.executeSync([
-        data.customerId,
-        data.messageId,
-        data.status,
-        data.ticketNumber,
-        data.unreadCount || 0,
-        data.lastMessageAt || now,
-        now,
-        now,
-      ]);
+      const params = hasId
+        ? [
+            data.id,
+            data.customerId,
+            data.messageId,
+            data.status,
+            data.ticketNumber,
+            data.unreadCount || 0,
+            data.lastMessageAt || now,
+            now,
+            now,
+          ]
+        : [
+            data.customerId,
+            data.messageId,
+            data.status,
+            data.ticketNumber,
+            data.unreadCount || 0,
+            data.lastMessageAt || now,
+            now,
+            now,
+          ];
 
-      const id = result.lastInsertRowId;
-      const ticket = this.findById(db, id as number);
+      const result = stmt.executeSync(params);
+
+      const ticketId = hasId ? data.id! : result.lastInsertRowId;
+      const ticket = this.findById(db, ticketId as number);
       if (!ticket) {
         throw new Error("Failed to retrieve created ticket");
       }
@@ -278,6 +303,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       } else {
         // Create new ticket - need to ensure customer and message exist
         const createData: CreateTicketData = {
+          id: ticketData.id, // Include API id
           customerId: ticketData.customerId,
           messageId: ticketData.messageId,
           status: ticketData.status,

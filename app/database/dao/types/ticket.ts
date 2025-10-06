@@ -18,6 +18,7 @@ export type Ticket = {
 };
 
 export interface CreateTicketData {
+  id?: number;
   customerId: number;
   messageId: number;
   status: string;
