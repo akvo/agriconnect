@@ -37,7 +37,7 @@ export const formatDateLabel = (rawDate: string) => {
     // format dd/mm/yyyy
     const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
     return `${pad2(dt.getDate())}/${pad2(
-      dt.getMonth() + 1
+      dt.getMonth() + 1,
     )}/${dt.getFullYear()}`;
   }
   return rawDate;
