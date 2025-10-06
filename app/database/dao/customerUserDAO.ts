@@ -7,12 +7,12 @@ import {
 } from "./types/customerUser";
 
 export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
-  constructor(db: SQLiteDatabase) {
-    super(db, "customer_users"); // Keep table name as is for now
+  constructor() {
+    super("customer_users"); // Keep table name as is for now
   }
 
-  create(data: CreateCustomerUserData): CustomerUser {
-    const stmt = this.db.prepareSync(
+  create(db: SQLiteDatabase, data: CreateCustomerUserData): CustomerUser {
+    const stmt = db.prepareSync(
       `INSERT INTO customer_users (
         phoneNumber, fullName, language, createdAt, updatedAt
       ) VALUES (?, ?, ?, ?, ?)`,
@@ -27,7 +27,7 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
         now,
       ]);
 
-      const user = this.findById(result.lastInsertRowId);
+      const user = this.findById(db, result.lastInsertRowId);
       if (!user) {
         throw new Error("Failed to retrieve created customer user");
       }
@@ -40,7 +40,11 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
     }
   }
 
-  update(id: number, data: UpdateCustomerUserData): boolean {
+  update(
+    db: SQLiteDatabase,
+    id: number,
+    data: UpdateCustomerUserData,
+  ): boolean {
     try {
       const updates: string[] = [];
       const values: any[] = [];
@@ -66,7 +70,7 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
       values.push(new Date().toISOString());
       values.push(id);
 
-      const stmt = this.db.prepareSync(
+      const stmt = db.prepareSync(
         `UPDATE customer_users SET ${updates.join(", ")} WHERE id = ?`,
       );
       try {
@@ -82,8 +86,11 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   }
 
   // Find user by phone number
-  findByPhoneNumber(phoneNumber: string): CustomerUser | null {
-    const stmt = this.db.prepareSync(
+  findByPhoneNumber(
+    db: SQLiteDatabase,
+    phoneNumber: string,
+  ): CustomerUser | null {
+    const stmt = db.prepareSync(
       "SELECT * FROM customer_users WHERE phoneNumber = ?",
     );
     try {
@@ -98,8 +105,8 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   }
 
   // Search customers by name (partial match)
-  searchByName(name: string): CustomerUser[] {
-    const stmt = this.db.prepareSync(
+  searchByName(db: SQLiteDatabase, name: string): CustomerUser[] {
+    const stmt = db.prepareSync(
       "SELECT * FROM customer_users WHERE fullName LIKE ? ORDER BY fullName",
     );
     try {
@@ -114,8 +121,8 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   }
 
   // Get customers by language
-  findByLanguage(language: string): CustomerUser[] {
-    const stmt = this.db.prepareSync(
+  findByLanguage(db: SQLiteDatabase, language: string): CustomerUser[] {
+    const stmt = db.prepareSync(
       "SELECT * FROM customer_users WHERE language = ? ORDER BY fullName",
     );
     try {
@@ -130,8 +137,8 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   }
 
   // Get recent customers (ordered by creation date)
-  findRecent(limit: number = 10): CustomerUser[] {
-    const stmt = this.db.prepareSync(
+  findRecent(db: SQLiteDatabase, limit: number = 10): CustomerUser[] {
+    const stmt = db.prepareSync(
       "SELECT * FROM customer_users ORDER BY createdAt DESC LIMIT ?",
     );
     try {
@@ -146,7 +153,7 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   }
 
   // Update customer's language preference
-  updateLanguage(id: number, language: string): boolean {
-    return this.update(id, { language });
+  updateLanguage(db: SQLiteDatabase, id: number, language: string): boolean {
+    return this.update(db, id, { language });
   }
 }

@@ -8,12 +8,12 @@ import {
 } from "./types/profile";
 
 export class ProfileDAO extends BaseDAOImpl<Profile> {
-  constructor(db: SQLiteDatabase) {
-    super(db, "profile");
+  constructor() {
+    super("profile");
   }
 
-  create(data: CreateProfileData): Profile {
-    const stmt = this.db.prepareSync(
+  create(db: SQLiteDatabase, data: CreateProfileData): Profile {
+    const stmt = db.prepareSync(
       `INSERT INTO profile (
         userId, accessToken, syncWifiOnly, syncInterval, language, lastSyncAt, createdAt, updatedAt
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -31,7 +31,7 @@ export class ProfileDAO extends BaseDAOImpl<Profile> {
         now,
       ]);
 
-      const profile = this.findById(result.lastInsertRowId);
+      const profile = this.findById(db, result.lastInsertRowId);
       if (!profile) {
         throw new Error("Failed to retrieve created profile");
       }
@@ -44,7 +44,7 @@ export class ProfileDAO extends BaseDAOImpl<Profile> {
     }
   }
 
-  update(id: number, data: UpdateProfileData): boolean {
+  update(db: SQLiteDatabase, id: number, data: UpdateProfileData): boolean {
     try {
       const updates: string[] = [];
       const values: any[] = [];
@@ -78,7 +78,7 @@ export class ProfileDAO extends BaseDAOImpl<Profile> {
       values.push(new Date().toISOString());
       values.push(id);
 
-      const stmt = this.db.prepareSync(
+      const stmt = db.prepareSync(
         `UPDATE profile SET ${updates.join(", ")} WHERE id = ?`,
       );
       try {
@@ -94,8 +94,8 @@ export class ProfileDAO extends BaseDAOImpl<Profile> {
   }
 
   // Get profile by userId
-  getByUserId(userId: number): Profile | null {
-    const stmt = this.db.prepareSync("SELECT * FROM profile WHERE userId = ?");
+  getByUserId(db: SQLiteDatabase, userId: number): Profile | null {
+    const stmt = db.prepareSync("SELECT * FROM profile WHERE userId = ?");
     try {
       const result = stmt.executeSync<Profile>([userId]);
       return result.getFirstSync() || null;
@@ -108,8 +108,8 @@ export class ProfileDAO extends BaseDAOImpl<Profile> {
   }
 
   // Get the current user's profile with user details (assumes only one profile exists)
-  getCurrentProfile(): ProfileWithUser | null {
-    const stmt = this.db.prepareSync(`
+  getCurrentProfile(db: SQLiteDatabase): ProfileWithUser | null {
+    const stmt = db.prepareSync(`
       SELECT 
         p.id, 
         p.userId, 
@@ -143,24 +143,28 @@ export class ProfileDAO extends BaseDAOImpl<Profile> {
   }
 
   // Update profile by userId
-  updateByUserId(userId: number, data: UpdateProfileData): boolean {
-    const profile = this.getByUserId(userId);
+  updateByUserId(
+    db: SQLiteDatabase,
+    userId: number,
+    data: UpdateProfileData,
+  ): boolean {
+    const profile = this.getByUserId(db, userId);
     if (!profile) {
       return false;
     }
-    return this.update(profile.id, data);
+    return this.update(db, profile.id, data);
   }
 
   // Update last sync time
-  updateLastSyncTime(userId: number): boolean {
-    return this.updateByUserId(userId, {
+  updateLastSyncTime(db: SQLiteDatabase, userId: number): boolean {
+    return this.updateByUserId(db, userId, {
       lastSyncAt: new Date().toISOString(),
     });
   }
 
   // Remove profile data
-  removeProfileData(): boolean {
-    const stmt = this.db.prepareSync(`DELETE FROM profile`);
+  removeProfileData(db: SQLiteDatabase): boolean {
+    const stmt = db.prepareSync(`DELETE FROM profile`);
     try {
       const result = stmt.executeSync();
       return result.changes > 0;

@@ -13,8 +13,8 @@ interface UserRaw extends Omit<User, "administrativeLocation"> {
 }
 
 export class UserDAO extends BaseDAOImpl<User> {
-  constructor(db: SQLiteDatabase) {
-    super(db, "users");
+  constructor() {
+    super("users");
   }
 
   // Helper method to parse administrativeLocation from JSON string
@@ -34,10 +34,8 @@ export class UserDAO extends BaseDAOImpl<User> {
   }
 
   // Override findById to parse JSON
-  findById(id: number): User | null {
-    const stmt = this.db.prepareSync(
-      `SELECT * FROM ${this.tableName} WHERE id = ?`,
-    );
+  findById(db: SQLiteDatabase, id: number): User | null {
+    const stmt = db.prepareSync(`SELECT * FROM ${this.tableName} WHERE id = ?`);
     try {
       const result = stmt.executeSync<UserRaw>([id]);
       const raw = result.getFirstSync();
@@ -51,8 +49,8 @@ export class UserDAO extends BaseDAOImpl<User> {
   }
 
   // Override findAll to parse JSON
-  findAll(): User[] {
-    const stmt = this.db.prepareSync(
+  findAll(db: SQLiteDatabase): User[] {
+    const stmt = db.prepareSync(
       `SELECT * FROM ${this.tableName} ORDER BY id DESC`,
     );
     try {
@@ -67,18 +65,18 @@ export class UserDAO extends BaseDAOImpl<User> {
     }
   }
 
-  create(data: CreateUserData): User {
+  create(db: SQLiteDatabase, data: CreateUserData): User {
     // Prepare SQL with or without ID based on whether it's provided
     const hasId = data.id !== undefined;
     const stmt = hasId
-      ? this.db.prepareSync(
+      ? db.prepareSync(
           `INSERT INTO users (
             id, email, fullName, phoneNumber, userType, isActive,
             invitationStatus, administrativeLocation,
             createdAt, updatedAt
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-      : this.db.prepareSync(
+      : db.prepareSync(
           `INSERT INTO users (
             email, fullName, phoneNumber, userType, isActive,
             invitationStatus, administrativeLocation,
@@ -121,7 +119,7 @@ export class UserDAO extends BaseDAOImpl<User> {
       const result = stmt.executeSync(params);
 
       const userId = hasId ? data.id! : result.lastInsertRowId;
-      const user = this.findById(userId);
+      const user = this.findById(db, userId);
       if (!user) {
         throw new Error("Failed to retrieve created user");
       }
@@ -134,7 +132,7 @@ export class UserDAO extends BaseDAOImpl<User> {
     }
   }
 
-  update(id: number, data: UpdateUserData): boolean {
+  update(db: SQLiteDatabase, id: number, data: UpdateUserData): boolean {
     try {
       const updates: string[] = [];
       const values: any[] = [];
@@ -182,7 +180,7 @@ export class UserDAO extends BaseDAOImpl<User> {
       values.push(new Date().toISOString());
       values.push(id);
 
-      const stmt = this.db.prepareSync(
+      const stmt = db.prepareSync(
         `UPDATE users SET ${updates.join(", ")} WHERE id = ?`,
       );
       try {
@@ -197,8 +195,8 @@ export class UserDAO extends BaseDAOImpl<User> {
     }
   }
 
-  removeUserData(): boolean {
-    const stmt = this.db.prepareSync(`DELETE FROM users`);
+  removeUserData(db: SQLiteDatabase): boolean {
+    const stmt = db.prepareSync(`DELETE FROM users`);
     try {
       const result = stmt.executeSync();
       return result.changes > 0;

@@ -1,49 +1,34 @@
-import { SQLiteDatabase } from "expo-sqlite";
-import { getDatabase } from "../index";
 import { UserDAO } from "./userDAO";
 import { CustomerUserDAO } from "./customerUserDAO";
 import { MessageDAO } from "./messageDAO";
 import { ProfileDAO } from "./profileDAO";
+import { TicketDAO } from "./ticketDAO";
 
 /**
  * DAO Manager - Central access point for all database operations
  *
  * Usage:
- * const dao = DAOManager.getInstance();
- * const users = dao.user.findAll();
- * const messages = dao.message.getInbox(eoId);
+ * const db = useSQLiteContext(); // Get from React context
+ * const profile = dao.profile.getCurrentProfile(db);
+ * const messages = dao.message.getInbox(db, eoId);
  */
 export class DAOManager {
   private static instance: DAOManager;
-  private db: SQLiteDatabase;
 
   // DAO instances
   public readonly user: UserDAO;
   public readonly customerUser: CustomerUserDAO;
   public readonly message: MessageDAO;
   public readonly profile: ProfileDAO;
+  public readonly ticket: TicketDAO;
 
   private constructor() {
-    this.db = getDatabase();
-
-    // Verify database is properly initialized
-    if (!this.db) {
-      throw new Error("Failed to initialize database");
-    }
-
-    // Test database connection
-    try {
-      this.db.getFirstSync("SELECT 1 as test");
-    } catch (error) {
-      console.error("Database connection test failed:", error);
-      throw new Error("Database is not accessible");
-    }
-
-    // Initialize all DAOs
-    this.user = new UserDAO(this.db);
-    this.customerUser = new CustomerUserDAO(this.db);
-    this.message = new MessageDAO(this.db);
-    this.profile = new ProfileDAO(this.db);
+    // Initialize all DAOs without database dependency
+    this.user = new UserDAO();
+    this.customerUser = new CustomerUserDAO();
+    this.message = new MessageDAO();
+    this.profile = new ProfileDAO();
+    this.ticket = new TicketDAO();
   }
 
   /**
@@ -54,13 +39,6 @@ export class DAOManager {
       DAOManager.instance = new DAOManager();
     }
     return DAOManager.instance;
-  }
-
-  /**
-   * Get raw database instance (for advanced operations)
-   */
-  public getDatabase(): SQLiteDatabase {
-    return this.db;
   }
 
   /**

@@ -2,11 +2,11 @@ import { SQLiteDatabase } from "expo-sqlite";
 
 // Base DAO interface for common operations
 export interface BaseDAO<T> {
-  findById(id: number): T | null;
-  findAll(): T[];
-  create(data: Omit<T, "id">): T;
-  update(id: number, data: Partial<T>): boolean;
-  delete(id: number): boolean;
+  findById(db: SQLiteDatabase, id: number): T | null;
+  findAll(db: SQLiteDatabase): T[];
+  create(db: SQLiteDatabase, data: Omit<T, "id">): T;
+  update(db: SQLiteDatabase, id: number, data: Partial<T>): boolean;
+  delete(db: SQLiteDatabase, id: number): boolean;
 }
 
 // Common database result types
@@ -20,15 +20,10 @@ export interface DatabaseResult {
 export abstract class BaseDAOImpl<T extends { id: number }>
   implements BaseDAO<T>
 {
-  constructor(
-    protected db: SQLiteDatabase,
-    protected tableName: string,
-  ) {}
+  constructor(protected tableName: string) {}
 
-  findById(id: number): T | null {
-    const stmt = this.db.prepareSync(
-      `SELECT * FROM ${this.tableName} WHERE id = ?`,
-    );
+  findById(db: SQLiteDatabase, id: number): T | null {
+    const stmt = db.prepareSync(`SELECT * FROM ${this.tableName} WHERE id = ?`);
     try {
       const result = stmt.executeSync<T>([id]);
       return result.getFirstSync() || null;
@@ -40,8 +35,8 @@ export abstract class BaseDAOImpl<T extends { id: number }>
     }
   }
 
-  findAll(): T[] {
-    const stmt = this.db.prepareSync(
+  findAll(db: SQLiteDatabase): T[] {
+    const stmt = db.prepareSync(
       `SELECT * FROM ${this.tableName} ORDER BY id DESC`,
     );
     try {
@@ -55,13 +50,11 @@ export abstract class BaseDAOImpl<T extends { id: number }>
     }
   }
 
-  abstract create(data: Omit<T, "id">): T;
-  abstract update(id: number, data: Partial<T>): boolean;
+  abstract create(db: SQLiteDatabase, data: Omit<T, "id">): T;
+  abstract update(db: SQLiteDatabase, id: number, data: Partial<T>): boolean;
 
-  delete(id: number): boolean {
-    const stmt = this.db.prepareSync(
-      `DELETE FROM ${this.tableName} WHERE id = ?`,
-    );
+  delete(db: SQLiteDatabase, id: number): boolean {
+    const stmt = db.prepareSync(`DELETE FROM ${this.tableName} WHERE id = ?`);
     try {
       const result = stmt.executeSync([id]);
       return result.changes > 0;
@@ -74,8 +67,8 @@ export abstract class BaseDAOImpl<T extends { id: number }>
   }
 
   // Utility method for counting records
-  count(): number {
-    const stmt = this.db.prepareSync(
+  count(db: SQLiteDatabase): number {
+    const stmt = db.prepareSync(
       `SELECT COUNT(*) as count FROM ${this.tableName}`,
     );
     try {
@@ -90,8 +83,8 @@ export abstract class BaseDAOImpl<T extends { id: number }>
   }
 
   // Utility method for checking if record exists
-  exists(id: number): boolean {
-    const stmt = this.db.prepareSync(
+  exists(db: SQLiteDatabase, id: number): boolean {
+    const stmt = db.prepareSync(
       `SELECT COUNT(*) as count FROM ${this.tableName} WHERE id = ?`,
     );
     try {
