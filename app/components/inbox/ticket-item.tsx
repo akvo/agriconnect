@@ -1,0 +1,223 @@
+import React from "react";
+import { View, Text, Pressable, StyleSheet } from "react-native";
+import typography from "@/styles/typography";
+import themeColors from "@/styles/colors";
+import { formatTime, formatResolved } from "@/utils/time";
+import { initialsFromName } from "@/utils/string";
+import Avatar from "@/components/avatar";
+
+type Customer = { id: number; name: string };
+type User = { id: number; name: string } | null;
+type Message = { id: number; body: string };
+
+export type Ticket = {
+  id: number;
+  ticket_number: string;
+  customer: Customer;
+  message: Message;
+  status: string;
+  created_at: string;
+  resolved_at: string | null;
+  resolver: User;
+  last_message_at: string;
+  // Computed properties for backward compatibility
+  ticketNumber?: string;
+  unreadMessages?: number;
+  lastMessage?: { content: string; timestamp: string };
+  resolvedAt?: string | null;
+  respondedBy?: User;
+};
+
+const TicketItem: React.FC<{
+  ticket: Ticket;
+  onPress: (t: Ticket) => void;
+}> = ({
+  ticket,
+  onPress,
+}: {
+  ticket: Ticket;
+  onPress: (t: Ticket) => void;
+}) => {
+  // Compute display values from API response
+  const ticketNumber = ticket.ticket_number;
+  const isUnread = ticket.unreadMessages ?? 0;
+  const messageContent = ticket.message?.body || "";
+  const messageTimestamp = ticket.last_message_at;
+  const respondedBy = ticket.resolver;
+
+  return (
+    <Pressable
+      onPress={() => onPress(ticket)}
+      style={({ pressed }: { pressed: boolean }) => [
+        styles.ticketContainer,
+        isUnread > 0 && styles.ticketUnread,
+        pressed && { opacity: 0.8 },
+      ]}
+    >
+      <View style={styles.ticketBody}>
+        <View style={styles.avatarContainer}>
+          <Avatar initials={initialsFromName(ticket.customer.name)} size={48} />
+        </View>
+        <View style={styles.ticketMeta}>
+          <View
+            style={{
+              minHeight: 48,
+              flexDirection: "column",
+              justifyContent: "space-between",
+              // allow this column to shrink so its Text children can truncate
+              minWidth: 0,
+              flexShrink: 1,
+            }}
+          >
+            <Text
+              style={[
+                typography.label1,
+                typography.bold,
+                { color: themeColors.textPrimary },
+              ]}
+            >
+              {ticket.customer.name}
+            </Text>
+            <Text
+              style={[
+                typography.body3,
+                {
+                  color: themeColors.textSecondary,
+                  // allow this text to shrink and be clipped/truncated inside the row
+                  flexShrink: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                },
+              ]}
+              numberOfLines={2}
+            >
+              {messageContent}
+            </Text>
+          </View>
+          <View
+            style={{
+              minHeight: 48,
+              flexDirection: "column",
+              justifyContent: "space-between",
+              marginLeft: "auto",
+            }}
+          >
+            {isUnread > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text
+                  style={[typography.caption1, { color: themeColors.white }]}
+                >
+                  {isUnread}
+                </Text>
+              </View>
+            )}
+            <Text style={[typography.caption1, { color: themeColors.dark4 }]}>
+              {formatTime(messageTimestamp)}
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View style={styles.ticketFooter}>
+        <Text style={[typography.caption1, { color: themeColors.dark3 }]}>
+          {ticketNumber}
+        </Text>
+        <View style={[styles.flexRow]}>
+          <Text style={[typography.body4, { color: themeColors.textPrimary }]}>
+            Responded by:
+          </Text>
+          {respondedBy ? (
+            <View style={[styles.flexRow, { justifyContent: "space-between" }]}>
+              <Text style={[typography.body4, { color: themeColors.dark5 }]}>
+                {respondedBy.name}
+              </Text>
+              <Text style={[typography.caption2, { color: themeColors.dark4 }]}>
+                {formatResolved(ticket.resolved_at)}
+              </Text>
+            </View>
+          ) : (
+            <Text
+              style={[
+                typography.body4,
+                { color: themeColors.error, fontWeight: 500 },
+              ]}
+            >
+              No response yet
+            </Text>
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+};
+
+const styles = StyleSheet.create({
+  ticketContainer: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    backgroundColor: themeColors.background,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: themeColors.cardBorder,
+  },
+  ticketUnread: {
+    backgroundColor: themeColors.white,
+    borderColor: themeColors.mutedBorder,
+  },
+  avatarContainer: { paddingRight: 12 },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: themeColors["green-500"],
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  ticketBody: {
+    width: "100%",
+    flex: 1,
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  ticketMeta: {
+    width: "100%",
+    flex: 1,
+    flexDirection: "row",
+    minWidth: 0,
+    flexShrink: 1,
+    alignItems: "center",
+    gap: 12,
+  },
+  ticketFooter: {
+    width: "100%",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 4,
+    borderWidth: 1,
+    borderColor: themeColors.mutedBorder,
+    borderRadius: 8,
+    padding: 12,
+  },
+  unreadBadge: {
+    width: 24,
+    height: 24,
+    backgroundColor: themeColors.error,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  flexRow: {
+    width: "100%",
+    flex: 1,
+    flexShrink: 1,
+    gap: 4,
+    flexDirection: "row",
+  },
+});
+
+export default TicketItem;
