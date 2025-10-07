@@ -25,6 +25,8 @@ export interface CreateTicketData {
   ticketNumber: string;
   unreadCount?: number;
   lastMessageAt?: string;
+  resolvedAt?: string | null;
+  resolvedBy?: number | null;
 }
 
 export interface UpdateTicketData {
@@ -33,5 +35,4 @@ export interface UpdateTicketData {
   resolvedBy?: number | null;
   unreadCount?: number;
   lastMessageAt?: string;
-  respondedById?: number | null;
 }

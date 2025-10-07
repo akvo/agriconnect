@@ -22,13 +22,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     const stmt = hasId
       ? db.prepareSync(
           `INSERT INTO tickets (
-            id, customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, updatedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            id, customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, resolvedAt, resolvedBy
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
       : db.prepareSync(
           `INSERT INTO tickets (
-            customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, updatedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, resolvedAt, resolvedBy
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         );
 
     try {
@@ -43,7 +43,8 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
             data.unreadCount || 0,
             data.lastMessageAt || now,
             now,
-            now,
+            data.resolvedAt || null,
+            data.resolvedBy || null,
           ]
         : [
             data.customerId,
@@ -53,7 +54,8 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
             data.unreadCount || 0,
             data.lastMessageAt || now,
             now,
-            now,
+            data.resolvedAt || null,
+            data.resolvedBy || null,
           ];
 
       const result = stmt.executeSync(params);
@@ -296,6 +298,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           resolvedAt: ticketData.resolvedAt,
           unreadCount: ticketData.unreadCount,
           lastMessageAt: ticketData.lastMessageAt,
+          resolvedBy: ticketData.resolvedBy,
         };
 
         this.update(db, existing.id, updateData);
@@ -310,6 +313,8 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           ticketNumber: ticketData.ticketNumber,
           unreadCount: ticketData.unreadCount,
           lastMessageAt: ticketData.lastMessageAt,
+          resolvedAt: ticketData.resolvedAt,
+          resolvedBy: ticketData.resolvedBy,
         };
 
         return this.create(db, createData);
