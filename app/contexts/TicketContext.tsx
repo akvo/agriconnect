@@ -1,6 +1,6 @@
-import { dao } from "@/database/dao";
+import { DAOManager } from "@/database/dao";
 import { CreateTicketData, Ticket } from "@/database/dao/types/ticket";
-import { useSQLiteContext } from "expo-sqlite";
+import { useDatabase } from "@/database/context";
 import React, {
   createContext,
   useCallback,
@@ -8,6 +8,7 @@ import React, {
   useEffect,
   useState,
   useRef,
+  useMemo,
   ReactNode,
 } from "react";
 
@@ -27,8 +28,11 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
   children: ReactNode;
 }) => {
   const [tickets, setTickets] = useState([]);
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const isMounted = useRef(true);
+
+  // Create DAO manager with database from context
+  const dao = useMemo(() => new DAOManager(db), [db]);
 
   useEffect(() => {
     return () => {
@@ -45,7 +49,7 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
     } catch (error) {
       console.error("Error loading tickets:", error);
     }
-  }, [db]);
+  }, [db, dao]);
 
   useEffect(() => {
     loadTickets();
@@ -62,7 +66,7 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Error creating ticket:", error);
       }
     },
-    [db],
+    [db, dao],
   );
 
   const updateTicket = useCallback(
@@ -78,7 +82,7 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Error updating ticket:", error);
       }
     },
-    [db],
+    [db, dao],
   );
 
   return (
