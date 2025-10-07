@@ -3,8 +3,6 @@ import { api } from "./api";
 import { DAOManager } from "@/database/dao";
 import { Ticket } from "@/database/dao/types/ticket";
 
-const dao = DAOManager.getInstance();
-
 interface SyncResult {
   tickets: Ticket[];
   total: number;
@@ -33,6 +31,9 @@ class TicketSyncService {
     userId?: number,
   ): Promise<SyncResult> {
     try {
+      // Create DAO manager instance
+      const dao = new DAOManager(db);
+
       // Always try local first for initial page
       const localResult = dao.ticket.findByStatus(db, status, page, pageSize);
 
@@ -71,6 +72,7 @@ class TicketSyncService {
     } catch (error) {
       console.error("Error getting tickets:", error);
       // On error, try to return local data as fallback
+      const dao = new DAOManager(db);
       const localResult = dao.ticket.findByStatus(db, status, page, pageSize);
       return {
         ...localResult,
@@ -91,6 +93,9 @@ class TicketSyncService {
     userId?: number,
   ): Promise<SyncResult> {
     try {
+      // Create DAO manager instance
+      const dao = new DAOManager(db);
+
       // Fetch from API
       const apiData = await api.getTickets(accessToken, status, page, pageSize);
       const apiTickets = apiData?.tickets || [];
@@ -126,6 +131,9 @@ class TicketSyncService {
     userId?: number,
   ): Promise<void> {
     try {
+      // Create DAO manager instance
+      const dao = new DAOManager(db);
+
       for (const apiTicket of apiTickets) {
         // 1. Sync customer
         let customerId: number | null = null;
@@ -196,6 +204,9 @@ class TicketSyncService {
     customerData: any,
   ): Promise<number> {
     try {
+      // Create DAO manager instance
+      const dao = new DAOManager(db);
+
       // Check if customer exists by ID first (API customer ID)
       let existing = null;
 
@@ -243,6 +254,9 @@ class TicketSyncService {
     messageData: any,
   ): Promise<number> {
     try {
+      // Create DAO manager instance
+      const dao = new DAOManager(db);
+
       // Try to find existing message by message_sid if available
       let existing = null;
 
@@ -286,6 +300,9 @@ class TicketSyncService {
     ticketData: any,
   ): Promise<void> {
     try {
+      // Create DAO manager instance
+      const dao = new DAOManager(db);
+
       // Ensure resolvedAt is explicitly null for open tickets
       const resolvedAt =
         ticketData.resolvedAt || ticketData.resolved_at || null;

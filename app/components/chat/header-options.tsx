@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { View, Alert } from "react-native";
-import { useSQLiteContext } from "expo-sqlite";
+import { useDatabase } from "@/database/context";
 import { useRouter } from "expo-router";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { dao } from "@/database/dao";
+import { DAOManager } from "@/database/dao";
 import { DropdownMenu, MenuItem } from "../dropdown-menu";
 import { useTicket } from "@/contexts/TicketContext";
 
@@ -17,18 +17,21 @@ const HeaderOptions = ({ ticketID }: Props) => {
   const [ticket, setTicket] = useState(null);
   const { user } = useAuth();
   const { updateTicket } = useTicket();
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const router = useRouter();
+
+  // Create DAO manager with database from context
+  const dao = useMemo(() => new DAOManager(db), [db]);
 
   const fetchTicket = useCallback(async () => {
     if (ticketID) {
       const fetchedTicket = dao.ticket.findByTicketNumber(
         db,
-        ticketID as string
+        ticketID as string,
       );
       setTicket(fetchedTicket);
     }
-  }, [db, ticketID]);
+  }, [db, ticketID, dao]);
 
   useEffect(() => {
     fetchTicket();
@@ -41,7 +44,7 @@ const HeaderOptions = ({ ticketID }: Props) => {
       }
       const { ticket: resData } = await api.closeTicket(
         user?.accessToken,
-        ticket.id
+        ticket.id,
       );
       updateTicket(ticket.id, {
         resolvedAt: resData.resolved_at,
