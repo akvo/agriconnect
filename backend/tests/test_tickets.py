@@ -219,7 +219,8 @@ class TestTickets:
         c1 = Customer(phone_number="+255200000001", full_name="Customer One")
         c2 = Customer(phone_number="+255200000002", full_name="Customer Two")
         c3 = Customer(phone_number="+255200000003", full_name="Customer Three")
-        db_session.add_all([c1, c2, c3])
+        c4 = Customer(phone_number="+255200000004", full_name="Customer Four")
+        db_session.add_all([c1, c2, c3, c4])
         db_session.commit()
 
         m1 = Message(
@@ -240,7 +241,20 @@ class TestTickets:
             body="Message C",
             from_source=MessageFrom.CUSTOMER,
         )
-        db_session.add_all([m1, m2, m3])
+        # Additional messages for testing customer grouping
+        m4 = Message(
+            message_sid="LT4",
+            customer_id=c1.id,
+            body="Message A2",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        m5 = Message(
+            message_sid="LT5",
+            customer_id=c4.id,
+            body="Message D",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add_all([m1, m2, m3, m4, m5])
         db_session.commit()
 
         # Create EO users for different wards
@@ -261,19 +275,18 @@ class TestTickets:
         )
 
         # Create open tickets in different wards
+        # t1 and t4 are from same customer (c1), t4 should appear as latest
         t1 = Ticket(
             ticket_number="T001",
             administrative_id=administrative_data["ward_ngudu"].id,
             customer_id=c1.id,
             message_id=m1.id,
-            last_message_at=datetime(2025, 1, 3),
         )
         t2 = Ticket(
             ticket_number="T002",
             administrative_id=administrative_data["ward_ngudu"].id,
             customer_id=c2.id,
             message_id=m2.id,
-            last_message_at=datetime(2025, 1, 2),
         )
         t3 = Ticket(
             ticket_number="T003",
@@ -282,12 +295,28 @@ class TestTickets:
             message_id=m3.id,
             resolved_at=datetime(2025, 1, 1),
             resolved_by=admin_user.id,
-            last_message_at=datetime(2025, 1, 1),
         )
-        db_session.add_all([t1, t2, t3])
+        # t4 is a newer ticket from same customer as t1
+        t4 = Ticket(
+            ticket_number="T004",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=c1.id,
+            message_id=m4.id,
+        )
+        # t5 is in Bukandwe ward - resolved
+        t5 = Ticket(
+            ticket_number="T005",
+            administrative_id=administrative_data["ward_bukandwe"].id,
+            customer_id=c4.id,
+            message_id=m5.id,
+            resolved_at=datetime(2025, 1, 2),
+            resolved_by=admin_user.id,
+        )
+        db_session.add_all([t1, t2, t3, t4, t5])
         db_session.commit()
 
         # 1, 13. Test EO1 can only access tickets in their ward (Ngudu)
+        # Should see 2 unique customers (c1 showing latest t4, and c2)
         eo1_response = client.get(
             "/api/tickets?status=open&page=1&page_size=10", headers=eo1_headers
         )
@@ -297,7 +326,25 @@ class TestTickets:
         eo1_data = eo1_response.json()
         assert (
             eo1_data["total"] == 2
-        ), "EO1 should see only 2 tickets from Ngudu ward"
+        ), "EO1 should see 2 unique customers from Ngudu ward"
+        # Verify customer grouping - should only see t4 (latest) for c1, not t1
+        customer_ids = [
+            ticket["customer"]["id"] for ticket in eo1_data["tickets"]
+        ]
+        assert len(customer_ids) == len(set(customer_ids)), (
+            "Each customer should appear only once"
+        )
+        # Check if c1's latest ticket is shown (t4, not t1)
+        c1_ticket = next(
+            (t for t in eo1_data["tickets"]
+             if t["customer"]["id"] == c1.id),
+            None
+        )
+        assert c1_ticket is not None, "Should have ticket for customer c1"
+        assert c1_ticket["ticket_number"] == "T004", (
+            "Should show latest ticket (T004) for customer c1"
+        )
+
         for ticket in eo1_data["tickets"]:
             # Verify ticket belongs to Ngudu ward
             db_ticket = (
@@ -320,9 +367,10 @@ class TestTickets:
         eo2_data = eo2_response.json()
         assert (
             eo2_data["total"] == 0
-        ), "EO2 should see 0 open tickets (only resolved ticket in Bukandwe)"
+        ), "EO2 should see 0 open tickets (only resolved tickets in Bukandwe)"
 
         # Test EO2 can see resolved tickets in their ward
+        # Should see 2 unique customers (c3 and c4)
         eo2_resolved_response = client.get(
             "/api/tickets?status=resolved&page=1&page_size=10",
             headers=eo2_headers,
@@ -330,8 +378,8 @@ class TestTickets:
         assert eo2_resolved_response.status_code == 200
         eo2_resolved_data = eo2_resolved_response.json()
         assert (
-            eo2_resolved_data["total"] == 1
-        ), "EO2 should see 1 resolved ticket in Bukandwe"
+            eo2_resolved_data["total"] == 2
+        ), "EO2 should see 2 resolved unique customers in Bukandwe"
 
         # 1. Test admin can access tickets from all wards
         response = client.get(
@@ -363,9 +411,21 @@ class TestTickets:
         assert payload["page"] == 1, "page should be 1"
         assert payload["size"] == 10, "size should be 10"
 
-        # 2. Test status=open filtering
-        assert payload["total"] == 2, "Should have 2 open tickets"
+        # 2. Test status=open filtering with customer grouping
+        # Should have 2 unique customers with open tickets
+        # (c1 with t4, c2 with t2)
+        assert payload["total"] == 2, (
+            "Should have 2 unique customers with open tickets"
+        )
         assert len(payload["tickets"]) == 2, "Should return 2 open tickets"
+
+        # Verify no duplicate customers
+        customer_ids = [
+            ticket["customer"]["id"] for ticket in payload["tickets"]
+        ]
+        assert len(customer_ids) == len(set(customer_ids)), (
+            "Each customer should appear only once"
+        )
 
         # 8, 11. Validate each ticket object and sorting
         tickets = payload["tickets"]
@@ -388,39 +448,41 @@ class TestTickets:
             assert (
                 ticket["resolver"] is None
             ), "Open ticket should not have resolver"
-            assert (
-                "last_message_at" in ticket
-            ), "Ticket should have 'last_message_at'"
-
-            # 11. Verify descending order by last_message_at
-            if i > 0:
-                prev_ts = tickets[i - 1]["last_message_at"]
-                curr_ts = ticket["last_message_at"]
-                assert (
-                    prev_ts >= curr_ts
-                ), "Tickets should be sorted by last_message_at descending"
 
         # 2. Test status=resolved filtering
+        # Should show 2 unique customers with resolved tickets (c3, c4)
         resolved_response = client.get(
             "/api/tickets?status=resolved&page=1&page_size=10",
             headers=admin_headers,
         )
         assert resolved_response.status_code == 200
         resolved_payload = resolved_response.json()
-        assert resolved_payload["total"] == 1, "Should have 1 resolved ticket"
-        resolved_ticket = resolved_payload["tickets"][0]
-        assert (
-            resolved_ticket["status"] == "resolved"
-        ), "Status should be 'resolved'"
-        assert (
-            resolved_ticket["resolved_at"] is not None
-        ), "Resolved ticket should have resolved_at"
-        assert (
-            resolved_ticket["resolver"] is not None
-        ), "Resolved ticket should have resolver"
-        assert (
-            resolved_ticket["resolver"]["id"] == admin_user.id
-        ), "Resolver should match admin user"
+        assert resolved_payload["total"] == 2, (
+            "Should have 2 unique customers with resolved tickets"
+        )
+
+        # Verify no duplicate customers in resolved list
+        resolved_customer_ids = [
+            ticket["customer"]["id"]
+            for ticket in resolved_payload["tickets"]
+        ]
+        assert len(resolved_customer_ids) == len(
+            set(resolved_customer_ids)
+        ), "Each customer should appear only once in resolved list"
+
+        for resolved_ticket in resolved_payload["tickets"]:
+            assert (
+                resolved_ticket["status"] == "resolved"
+            ), "Status should be 'resolved'"
+            assert (
+                resolved_ticket["resolved_at"] is not None
+            ), "Resolved ticket should have resolved_at"
+            assert (
+                resolved_ticket["resolver"] is not None
+            ), "Resolved ticket should have resolver"
+            assert (
+                resolved_ticket["resolver"]["id"] == admin_user.id
+            ), "Resolver should match admin user"
 
         # 4, 10. Test different page sizes
         small_page_response = client.get(
@@ -510,7 +572,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_ngudu"].id,
             customer_id=customer.id,
             message_id=message.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_ngudu)
         db_session.commit()
@@ -530,7 +591,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_bukandwe"].id,
             customer_id=customer.id,
             message_id=message_buk.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_bukandwe)
         db_session.commit()
@@ -614,7 +674,6 @@ class TestTickets:
             t["resolved_at"] is None
         ), "Open ticket should not have resolved_at"
         assert t["resolver"] is None, "Open ticket should not have resolver"
-        assert "last_message_at" in t, "Ticket should have 'last_message_at'"
 
         # Test with resolved ticket (7)
         message_resolved = Message(
@@ -633,7 +692,6 @@ class TestTickets:
             message_id=message_resolved.id,
             resolved_at=datetime.utcnow(),
             resolved_by=admin_user.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(resolved_ticket)
         db_session.commit()
@@ -720,7 +778,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_ngudu"].id,
             customer_id=customer.id,
             message_id=msg_base.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_ngudu)
         db_session.commit()
@@ -767,7 +824,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_bukandwe"].id,
             customer_id=customer.id,
             message_id=msg_buk.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_bukandwe)
         db_session.commit()
@@ -943,7 +999,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_ngudu"].id,
             customer_id=customer.id,
             message_id=message.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_ngudu)
         db_session.commit()
@@ -964,7 +1019,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_bukandwe"].id,
             customer_id=customer.id,
             message_id=message_buk.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_bukandwe)
         db_session.commit()
@@ -1013,7 +1067,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_ngudu"].id,
             customer_id=customer.id,
             message_id=message_admin.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_admin)
         db_session.commit()
@@ -1109,7 +1162,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_ngudu"].id,
             customer_id=customer.id,
             message_id=message_invalid.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_invalid)
         db_session.commit()
@@ -1152,7 +1204,6 @@ class TestTickets:
             administrative_id=administrative_data["ward_ngudu"].id,
             customer_id=customer.id,
             message_id=message_empty.id,
-            last_message_at=datetime.utcnow(),
         )
         db_session.add(ticket_empty)
         db_session.commit()
@@ -1170,3 +1221,198 @@ class TestTickets:
         assert (
             "required" in empty_response.json()["detail"].lower()
         ), "Error should indicate resolved_at is required"
+
+    def test_list_tickets_multiple_resolved_same_customer(
+        self, client, auth_headers_factory, db_session, administrative_data
+    ):
+        """Test that when a customer has multiple resolved tickets,
+        only the latest resolved ticket is shown in the list."""
+        admin_headers, admin_user = auth_headers_factory(user_type="admin")
+
+        # Create a customer with multiple resolved tickets
+        customer = Customer(
+            phone_number="+255300000001", full_name="Customer Multi"
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Create multiple messages for this customer
+        m1 = Message(
+            message_sid="MRT1",
+            customer_id=customer.id,
+            body="First resolved issue",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        m2 = Message(
+            message_sid="MRT2",
+            customer_id=customer.id,
+            body="Second resolved issue",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        m3 = Message(
+            message_sid="MRT3",
+            customer_id=customer.id,
+            body="Third resolved issue",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add_all([m1, m2, m3])
+        db_session.commit()
+
+        # Create multiple resolved tickets for the same customer
+        # t1 - oldest resolved ticket
+        t1 = Ticket(
+            ticket_number="TR001",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer.id,
+            message_id=m1.id,
+            resolved_at=datetime(2025, 1, 1, 10, 0, 0),
+            resolved_by=admin_user.id,
+        )
+        # t2 - middle resolved ticket
+        t2 = Ticket(
+            ticket_number="TR002",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer.id,
+            message_id=m2.id,
+            resolved_at=datetime(2025, 1, 2, 10, 0, 0),
+            resolved_by=admin_user.id,
+        )
+        # t3 - latest resolved ticket (should be the one shown)
+        t3 = Ticket(
+            ticket_number="TR003",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer.id,
+            message_id=m3.id,
+            resolved_at=datetime(2025, 1, 3, 10, 0, 0),
+            resolved_by=admin_user.id,
+        )
+        db_session.add_all([t1, t2, t3])
+        db_session.commit()
+
+        # Query for resolved tickets
+        response = client.get(
+            "/api/tickets?status=resolved&page=1&page_size=10",
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should see only 1 unique customer
+        assert data["total"] == 1, (
+            "Should have only 1 unique customer with resolved tickets"
+        )
+        assert len(data["tickets"]) == 1, (
+            "Should return only 1 ticket (latest for customer)"
+        )
+
+        # Verify it's the latest resolved ticket (t3)
+        ticket = data["tickets"][0]
+        assert ticket["customer"]["id"] == customer.id, (
+            "Ticket should belong to the correct customer"
+        )
+        assert ticket["ticket_number"] == "TR003", (
+            "Should show the latest resolved ticket (TR003)"
+        )
+        assert ticket["status"] == "resolved", "Status should be resolved"
+        assert ticket["resolved_at"] is not None, (
+            "Resolved ticket should have resolved_at"
+        )
+
+        # Verify no duplicate customers
+        customer_ids = [t["customer"]["id"] for t in data["tickets"]]
+        assert len(customer_ids) == len(set(customer_ids)), (
+            "Each customer should appear only once"
+        )
+
+        # Now create another customer with both open and resolved tickets
+        # to ensure filtering still works correctly
+        customer2 = Customer(
+            phone_number="+255300000002", full_name="Customer Mixed"
+        )
+        db_session.add(customer2)
+        db_session.commit()
+
+        m4 = Message(
+            message_sid="MRT4",
+            customer_id=customer2.id,
+            body="Open issue",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        m5 = Message(
+            message_sid="MRT5",
+            customer_id=customer2.id,
+            body="Resolved issue",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add_all([m4, m5])
+        db_session.commit()
+
+        # Create one open and one resolved ticket for customer2
+        t4 = Ticket(
+            ticket_number="TR004",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer2.id,
+            message_id=m5.id,
+            resolved_at=datetime(2025, 1, 4, 10, 0, 0),
+            resolved_by=admin_user.id,
+        )
+        t5 = Ticket(
+            ticket_number="TR005",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer2.id,
+            message_id=m4.id,
+            # Not resolved - this is open
+        )
+        db_session.add_all([t4, t5])
+        db_session.commit()
+
+        # Query resolved tickets again
+        resolved_response = client.get(
+            "/api/tickets?status=resolved&page=1&page_size=10",
+            headers=admin_headers,
+        )
+        assert resolved_response.status_code == 200
+        resolved_data = resolved_response.json()
+
+        # Should see 2 unique customers with resolved tickets
+        assert resolved_data["total"] == 2, (
+            "Should have 2 unique customers with resolved tickets"
+        )
+
+        # Verify customer2's resolved ticket is shown (t4)
+        customer2_ticket = next(
+            (t for t in resolved_data["tickets"]
+             if t["customer"]["id"] == customer2.id),
+            None
+        )
+        assert customer2_ticket is not None, (
+            "Should have resolved ticket for customer2"
+        )
+        assert customer2_ticket["ticket_number"] == "TR004", (
+            "Should show customer2's resolved ticket (TR004)"
+        )
+        assert customer2_ticket["status"] == "resolved"
+
+        # Query open tickets - should only see customer2
+        open_response = client.get(
+            "/api/tickets?status=open&page=1&page_size=10",
+            headers=admin_headers,
+        )
+        assert open_response.status_code == 200
+        open_data = open_response.json()
+
+        # Should see 1 unique customer with open tickets (customer2)
+        assert open_data["total"] == 1, (
+            "Should have 1 unique customer with open tickets"
+        )
+        open_ticket = open_data["tickets"][0]
+        assert open_ticket["customer"]["id"] == customer2.id, (
+            "Open ticket should belong to customer2"
+        )
+        assert open_ticket["ticket_number"] == "TR005", (
+            "Should show customer2's open ticket (TR005)"
+        )
+        assert open_ticket["status"] == "open"
+        assert open_ticket["resolved_at"] is None, (
+            "Open ticket should not have resolved_at"
+        )
