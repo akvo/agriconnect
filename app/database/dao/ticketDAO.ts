@@ -22,13 +22,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     const stmt = hasId
       ? db.prepareSync(
           `INSERT INTO tickets (
-            id, customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, resolvedAt, resolvedBy
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            id, customerId, messageId, status, ticketNumber, unreadCount, createdAt, resolvedAt, resolvedBy
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
       : db.prepareSync(
           `INSERT INTO tickets (
-            customerId, messageId, status, ticketNumber, unreadCount, lastMessageAt, createdAt, resolvedAt, resolvedBy
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            customerId, messageId, status, ticketNumber, unreadCount, createdAt, resolvedAt, resolvedBy
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         );
 
     try {
@@ -41,7 +41,6 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
             data.status,
             data.ticketNumber,
             data.unreadCount || 0,
-            data.lastMessageAt || now,
             now,
             data.resolvedAt || null,
             data.resolvedBy || null,
@@ -52,7 +51,6 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
             data.status,
             data.ticketNumber,
             data.unreadCount || 0,
-            data.lastMessageAt || now,
             now,
             data.resolvedAt || null,
             data.resolvedBy || null,
@@ -95,19 +93,16 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         updates.push("unreadCount = ?");
         values.push(data.unreadCount);
       }
-      if (data.lastMessageAt !== undefined) {
-        updates.push("lastMessageAt = ?");
-        values.push(data.lastMessageAt);
+      if (updates.length === 0) {
+        return false;
       }
-
-      if (updates.length === 0) return false;
 
       updates.push("updatedAt = ?");
       values.push(new Date().toISOString());
       values.push(id);
 
       const stmt = db.prepareSync(
-        `UPDATE tickets SET ${updates.join(", ")} WHERE id = ?`,
+        `UPDATE tickets SET ${updates.join(", ")} WHERE id = ?`
       );
       try {
         const result = stmt.executeSync(values);
@@ -140,7 +135,6 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         : null,
       ticketNumber: row.ticketNumber,
       unreadCount: row.unreadCount,
-      lastMessageAt: row.lastMessageAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt || null,
     } as Ticket;
@@ -157,7 +151,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
-      WHERE t.id = ?`,
+      WHERE t.id = ?`
     );
     try {
       const result = stmt.executeSync<any>([id]);
@@ -183,7 +177,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
-      ORDER BY t.createdAt DESC`,
+      ORDER BY t.createdAt DESC`
     );
     try {
       const result = stmt.executeSync<any>();
@@ -197,22 +191,28 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     }
   }
 
-  // Find tickets by status with pagination
+  // Find tickets by status with pagination and customer grouping
+  // Returns only the latest ticket per customer
   findByStatus(
     db: SQLiteDatabase,
     status: "open" | "resolved",
     page: number = 1,
-    pageSize: number = 10,
+    pageSize: number = 10
   ): { tickets: Ticket[]; total: number; page: number; size: number } {
     const offset = (page - 1) * pageSize;
 
     // Build WHERE clause based on status
     const whereClause =
+      status === "open" ? "resolvedAt IS NULL" : "resolvedAt IS NOT NULL";
+    const whereClauseWithAlias =
       status === "open" ? "t.resolvedAt IS NULL" : "t.resolvedAt IS NOT NULL";
 
-    // Get total count
+    // Get total count of unique customers with tickets matching the status
+    // This uses a subquery to group by customer and get their latest ticket
     const countStmt = db.prepareSync(
-      `SELECT COUNT(*) as total FROM tickets t WHERE ${whereClause}`,
+      `SELECT COUNT(DISTINCT t.customerId) as total 
+       FROM tickets t 
+       WHERE ${whereClauseWithAlias}`
     );
 
     let total = 0;
@@ -226,19 +226,26 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       countStmt.finalizeSync();
     }
 
-    // Get paginated tickets
+    // Get paginated tickets - grouped by customer, showing only latest ticket per customer
+    // Strategy: Use a subquery to get the max ticket ID for each customer,
+    // then join to get the full ticket details
     const stmt = db.prepareSync(
       `SELECT t.*, 
         cu.fullName as customer_name,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name
       FROM tickets t
+      INNER JOIN (
+        SELECT customerId, MAX(id) as latest_ticket_id
+        FROM tickets
+        WHERE ${whereClause}
+        GROUP BY customerId
+      ) latest ON t.id = latest.latest_ticket_id
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
-      WHERE ${whereClause}
-      ORDER BY t.lastMessageAt DESC, t.createdAt DESC
-      LIMIT ? OFFSET ?`,
+      ORDER BY t.updatedAt DESC, t.createdAt DESC
+      LIMIT ? OFFSET ?`
     );
 
     try {
@@ -271,7 +278,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
-      WHERE t.ticketNumber = ?`,
+      WHERE t.ticketNumber = ?`
     );
 
     try {
@@ -299,7 +306,6 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           status: ticketData.status,
           resolvedAt: ticketData.resolvedAt,
           unreadCount: ticketData.unreadCount,
-          lastMessageAt: ticketData.lastMessageAt,
           resolvedBy: ticketData.resolvedBy,
         };
 
@@ -314,7 +320,6 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           status: ticketData.status,
           ticketNumber: ticketData.ticketNumber,
           unreadCount: ticketData.unreadCount,
-          lastMessageAt: ticketData.lastMessageAt,
           resolvedAt: ticketData.resolvedAt,
           resolvedBy: ticketData.resolvedBy,
         };

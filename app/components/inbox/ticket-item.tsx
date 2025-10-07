@@ -20,7 +20,7 @@ const TicketItem: React.FC<{
   // Compute display values from API response
   const isUnread = ticket.unreadCount ?? 0;
   const messageContent = ticket.message?.body || "";
-  const messageTimestamp = ticket.lastMessageAt;
+  const messageTimestamp = ticket.message?.timestamp || ticket.createdAt;
   const respondedBy = ticket.resolver;
 
   return (

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, Alert } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
 import { useRouter } from "expo-router";
@@ -14,20 +14,34 @@ type Props = {
 };
 
 const HeaderOptions = ({ ticketID }: Props) => {
+  const [ticket, setTicket] = useState(null);
   const { user } = useAuth();
   const { updateTicket } = useTicket();
   const db = useSQLiteContext();
   const router = useRouter();
 
+  const fetchTicket = useCallback(async () => {
+    if (ticketID) {
+      const fetchedTicket = dao.ticket.findByTicketNumber(
+        db,
+        ticketID as string
+      );
+      setTicket(fetchedTicket);
+    }
+  }, [db, ticketID]);
+
+  useEffect(() => {
+    fetchTicket();
+  }, [fetchTicket]);
+
   const handleCloseTicket = async () => {
     try {
-      const ticket = dao.ticket.findByTicketNumber(db, ticketID as string);
-      if (!ticket) {
+      if (!ticket?.id) {
         throw new Error("Ticket not found");
       }
       const { ticket: resData } = await api.closeTicket(
         user?.accessToken,
-        ticket.id,
+        ticket.id
       );
       updateTicket(ticket.id, {
         resolvedAt: resData.resolved_at,
@@ -50,11 +64,15 @@ const HeaderOptions = ({ ticketID }: Props) => {
 
   return (
     <View style={{ paddingHorizontal: 8, paddingVertical: 6 }}>
-      <DropdownMenu
-        trigger={<Feathericons name="more-vertical" size={22} color="black" />}
-      >
-        <MenuItem onPress={onCloseTicket}>Close Ticket</MenuItem>
-      </DropdownMenu>
+      {!ticket?.resolvedAt && (
+        <DropdownMenu
+          trigger={
+            <Feathericons name="more-vertical" size={22} color="black" />
+          }
+        >
+          <MenuItem onPress={onCloseTicket}>Close Ticket</MenuItem>
+        </DropdownMenu>
+      )}
     </View>
   );
 };

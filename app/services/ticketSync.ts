@@ -286,7 +286,6 @@ class TicketSyncService {
         resolvedAt: ticketData.resolvedAt || ticketData.resolved_at,
         resolvedBy: ticketData?.resolver?.id || null,
         unreadCount: ticketData.unreadCount || ticketData.unread_count || 0,
-        lastMessageAt: ticketData.lastMessageAt || ticketData.last_message_at,
       });
     } catch (error) {
       console.error("Error syncing ticket:", error);
