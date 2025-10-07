@@ -12,22 +12,37 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
   }
 
   create(db: SQLiteDatabase, data: CreateCustomerUserData): CustomerUser {
-    const stmt = db.prepareSync(
-      `INSERT INTO customer_users (
-        phoneNumber, fullName, language, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?)`,
-    );
+    // Prepare SQL with or without ID based on whether it's provided
+    const hasId = data.id !== undefined;
+    const stmt = hasId
+      ? db.prepareSync(
+          `INSERT INTO customer_users (
+            id, phoneNumber, fullName, language, createdAt, updatedAt
+          ) VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+      : db.prepareSync(
+          `INSERT INTO customer_users (
+            phoneNumber, fullName, language, createdAt, updatedAt
+          ) VALUES (?, ?, ?, ?, ?)`,
+        );
+
     try {
       const now = new Date().toISOString();
-      const result = stmt.executeSync([
-        data.phoneNumber,
-        data.fullName,
-        data.language || "en",
-        now,
-        now,
-      ]);
+      const params = hasId
+        ? [
+            data.id,
+            data.phoneNumber,
+            data.fullName,
+            data.language || "en",
+            now,
+            now,
+          ]
+        : [data.phoneNumber, data.fullName, data.language || "en", now, now];
 
-      const user = this.findById(db, result.lastInsertRowId);
+      const result = stmt.executeSync(params);
+
+      const userId = hasId ? data.id! : result.lastInsertRowId;
+      const user = this.findById(db, userId);
       if (!user) {
         throw new Error("Failed to retrieve created customer user");
       }

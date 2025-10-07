@@ -9,6 +9,7 @@ export interface CustomerUser {
 }
 
 export interface CreateCustomerUserData {
+  id?: number; // Optional: Can specify API's customer ID
   phoneNumber: string;
   fullName: string;
   language?: string;
