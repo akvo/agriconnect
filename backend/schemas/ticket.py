@@ -12,6 +12,7 @@ class TicketStatus(str, Enum):
 class TicketCustomer(BaseModel):
     id: Optional[int]
     name: Optional[str]
+    phone_number: Optional[str]
 
 
 class TicketMessage(BaseModel):

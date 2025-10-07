@@ -81,7 +81,11 @@ def _serialize_ticket(
         "id": ticket.id,
         "ticket_number": ticket.ticket_number,
         "customer": (
-            {"id": customer.id, "name": customer.full_name}
+            {
+                "id": customer.id,
+                "name": customer.full_name,
+                "phone_number": customer.phone_number,
+            }
             if customer
             else None
         ),
@@ -166,15 +170,28 @@ async def list_tickets(
     EO users can only see tickets in their assigned administrative areas.
     Ensure tickets are grouped by customer and
     sorted by last message date descending.
-    If customer have multiple tickets,
-    show the most recently updated ticket only.
+    If customer have multiple tickets:
+    - For open status: show the earliest unresolved ticket
+    - For resolved status: show the latest resolved ticket
     """
-    # Subquery to get the latest ticket ID for each customer
+    # Subquery to get the appropriate ticket ID for each customer
     # based on the status filter and administrative area
-    subquery = db.query(
-        Ticket.customer_id,
-        func.max(Ticket.id).label('latest_ticket_id')
-    )
+    # For OPEN: get MIN(id) to show earliest unresolved ticket
+    # For RESOLVED: get MAX(id) to show latest resolved ticket
+    # For RESOLVED: also exclude customers who have any open tickets
+    if status == TicketStatus.OPEN:
+        # For open tickets, prioritize the earliest (first) unresolved ticket
+        subquery = db.query(
+            Ticket.customer_id,
+            func.min(Ticket.id).label('selected_ticket_id')
+        )
+    else:
+        # For resolved tickets, show the latest (most recent) resolved ticket
+        # But exclude customers who have any open tickets
+        subquery = db.query(
+            Ticket.customer_id,
+            func.max(Ticket.id).label('selected_ticket_id')
+        )
     # Filter by administrative area for EO users
     if current_user.user_type == UserType.EXTENSION_OFFICER:
         admin_ids = _get_user_administrative_ids(current_user, db)
@@ -192,12 +209,27 @@ async def list_tickets(
         subquery = subquery.filter(Ticket.resolved_at.is_(None))
     elif status == TicketStatus.RESOLVED:
         subquery = subquery.filter(Ticket.resolved_at.isnot(None))
-    # Group by customer to get latest ticket per customer
+        # Exclude customers who have any open tickets
+        # Get customer IDs that have open tickets
+        customers_with_open_tickets = (
+            db.query(Ticket.customer_id)
+            .filter(Ticket.resolved_at.is_(None))
+        )
+        if current_user.user_type == UserType.EXTENSION_OFFICER:
+            customers_with_open_tickets = customers_with_open_tickets.filter(
+                Ticket.administrative_id.in_(admin_ids)
+            )
+        customers_with_open_tickets = customers_with_open_tickets.distinct()
+        # Exclude those customers from resolved list
+        subquery = subquery.filter(
+            ~Ticket.customer_id.in_(customers_with_open_tickets)
+        )
+    # Group by customer to get the selected ticket per customer
     subquery = subquery.group_by(Ticket.customer_id).subquery()
     # Main query to fetch tickets
     query = db.query(Ticket).join(
         subquery,
-        Ticket.id == subquery.c.latest_ticket_id
+        Ticket.id == subquery.c.selected_ticket_id
     )
     # Get total count of unique customers with tickets
     total = query.count()
