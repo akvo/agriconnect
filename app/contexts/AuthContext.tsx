@@ -4,12 +4,14 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   ReactNode,
 } from "react";
 import { useRouter, useSegments, useLocalSearchParams } from "expo-router";
 import { api } from "@/services/api";
-import { dao } from "@/database/dao";
+import { DAOManager } from "@/database/dao";
 import { forceClearDatabase, checkDatabaseHealth } from "@/database/utils";
+import { useDatabase } from "@/database/context";
 
 interface AdministrativeLocation {
   id: number;
@@ -66,6 +68,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const { token: routeToken } = useLocalSearchParams();
   const router = useRouter();
   const segments = useSegments();
+  const db = useDatabase();
+
+  // Create DAO manager with database from context
+  const dao = useMemo(() => new DAOManager(db), [db]);
 
   const checkAuth = useCallback(async () => {
     // Get profile with user details from database (single JOIN query)
@@ -177,14 +183,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       setIsValid(false);
 
       // Check database health first
-      const isHealthy = checkDatabaseHealth();
+      const isHealthy = checkDatabaseHealth(db);
       console.log(
         "Database health check:",
         isHealthy ? "✅ Healthy" : "⚠️ Issues detected",
       );
 
       // Try force clear (which includes multiple fallback strategies)
-      const result = forceClearDatabase();
+      const result = forceClearDatabase(db);
 
       if (!result.success) {
         console.error("Failed to clear database during logout:", result.error);

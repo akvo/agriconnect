@@ -1,4 +1,4 @@
-import { openDatabaseSync, SQLiteDatabase } from "expo-sqlite";
+import { SQLiteDatabase } from "expo-sqlite";
 import { DATABASE_VERSION, DATABASE_NAME } from "./config";
 import { getMigrationsByVersion, Migration } from "./migrations";
 
@@ -25,15 +25,13 @@ const executeMigration = (db: SQLiteDatabase, migration: Migration): void => {
   }
 };
 
-export const migrateDbIfNeeded = (): SQLiteDatabase => {
-  const db = openDatabaseSync(DATABASE_NAME);
-
+export const migrateDbIfNeeded = (db: SQLiteDatabase): void => {
   let { user_version: currentDbVersion } = db.getFirstSync<{
     user_version: number;
   }>("PRAGMA user_version");
 
   if (currentDbVersion >= DATABASE_VERSION) {
-    return db;
+    return;
   }
 
   if (currentDbVersion === 0) {
@@ -70,19 +68,15 @@ export const migrateDbIfNeeded = (): SQLiteDatabase => {
   // }
 
   db.execSync(`PRAGMA user_version = ${DATABASE_VERSION}`);
-  return db;
-};
-
-// Export database instance getter
-export const getDatabase = (): SQLiteDatabase => {
-  return migrateDbIfNeeded();
 };
 
 // Utility function to check database version
-export const getDatabaseVersion = (): number => {
-  const db = openDatabaseSync(DATABASE_NAME);
+export const getDatabaseVersion = (db: SQLiteDatabase): number => {
   const { user_version } = db.getFirstSync<{ user_version: number }>(
     "PRAGMA user_version",
   );
   return user_version;
 };
+
+// Export database context hook
+export { useDatabase } from "./context";
