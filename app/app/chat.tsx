@@ -47,7 +47,9 @@ const ChatScreen = () => {
   // compute which sections to display based on pagination state
   const displayedSections = React.useMemo(() => {
     const groups = chatUtils.groupMessagesByDate(messages); // [{date, items}]
-    if (groups.length === 0) return [];
+    if (groups.length === 0) {
+      return [];
+    }
 
     if (visibleDayCount > 0) {
       // if visibleDayCount covers all groups, return everything
@@ -87,7 +89,9 @@ const ChatScreen = () => {
         setTimeout(
           () => {
             const sections = displayedSections;
-            if (!sections || sections.length === 0) return;
+            if (!sections || sections.length === 0) {
+              return;
+            }
 
             const sectionIndex = sections.length - 1;
             const lastSection = sections[sectionIndex];
@@ -119,7 +123,9 @@ const ChatScreen = () => {
   // sync initial visibleDayCount from context for this ticket
   useEffect(() => {
     const v = getVisibleDayCount(ticketNumber as string | undefined);
-    if (v && v > 0) setVisibleDayCount(v);
+    if (v && v > 0) {
+      setVisibleDayCount(v);
+    }
   }, [getVisibleDayCount, ticketNumber]);
   useEffect(() => {
     // scroll to bottom on mount and when displayedSections change
@@ -283,7 +289,9 @@ const ChatScreen = () => {
           />
           <TouchableOpacity
             onPress={() => {
-              if (text.trim().length === 0) return;
+              if (text.trim().length === 0) {
+                return;
+              }
 
               const now = new Date();
               const newMsg: Message = {

@@ -8,6 +8,7 @@ module.exports = defineConfig([
     ignores: ["dist/*"],
     rules: {
       "react/react-in-jsx-scope": "off",
+      "curly": ["error", "all"],
     },
   },
 ]);

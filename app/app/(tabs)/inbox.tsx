@@ -50,10 +50,16 @@ const Inbox: React.FC = () => {
     return tickets
       .filter((t: Ticket) => {
         const isResolved = !!t.resolvedAt;
-        if (activeTab === Tabs.PENDING && isResolved) return false;
-        if (activeTab === Tabs.RESPONDED && !isResolved) return false;
+        if (activeTab === Tabs.PENDING && isResolved) {
+          return false;
+        }
+        if (activeTab === Tabs.RESPONDED && !isResolved) {
+          return false;
+        }
 
-        if (!q) return true;
+        if (!q) {
+          return true;
+        }
         const inName = t.customer?.name.toString().includes(q);
         const inContent = (t.message?.body.toString() || "").includes(q);
         const inTicketId = t.ticketNumber.toLowerCase().includes(q);
@@ -79,7 +85,7 @@ const Inbox: React.FC = () => {
   const onPressTicket = (ticket: Ticket) => {
     // update unreadCount
     if (ticket.unreadCount && ticket.unreadCount > 0) {
-      const _unreadCount = ticket.unreadCount - 1;
+      const _unreadCount = 0;
       const updated = {
         ...ticket,
         unreadCount: _unreadCount,
@@ -104,16 +110,23 @@ const Inbox: React.FC = () => {
       isRefreshing: boolean = false,
     ) => {
       // Prevent concurrent fetches
-      if (isFetchingRef.current) return;
+      if (isFetchingRef.current) {
+        return;
+      }
 
-      if (!user?.accessToken) return;
+      if (!user?.accessToken) {
+        return;
+      }
 
       isFetchingRef.current = true;
 
       try {
         setError(null);
-        if (isRefreshing) setRefreshing(true);
-        else setLoading(true);
+        if (isRefreshing) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
 
         // Use TicketSyncService to fetch tickets (local-first approach)
         const syncResult = await TicketSyncService.getTickets(
@@ -170,11 +183,17 @@ const Inbox: React.FC = () => {
   // Fetch when page changes (but not on initial mount or tab change)
   useEffect(() => {
     // Skip if page is 1 (already handled by tab change effect)
-    if (page === 1) return;
+    if (page === 1) {
+      return;
+    }
     // Skip if refreshing
-    if (refreshing) return;
+    if (refreshing) {
+      return;
+    }
     // Skip if there's an error
-    if (error) return;
+    if (error) {
+      return;
+    }
 
     fetchTickets(activeTab, page, true);
   }, [page, activeTab, fetchTickets, refreshing, error]);
@@ -236,7 +255,9 @@ const Inbox: React.FC = () => {
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           // debounce rapid calls
-          if (loading || !hasMore) return;
+          if (loading || !hasMore) {
+            return;
+          }
           if (endReachedTimeout.current) {
             window.clearTimeout(endReachedTimeout.current);
           }
