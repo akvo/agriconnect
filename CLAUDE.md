@@ -54,9 +54,11 @@ docker volume create agriconnect-docker-sync
 
 ### Mobile App Development (Expo)
 ```bash
-./dc.sh exec mobileapp bash                 # Open mobile app shell
-./dc.sh exec mobileapp yarn start           # Start Expo development server
-./dc.sh exec mobileapp yarn lint            # Run ESLint
+./dc.sh exec mobileapp bash                           # Open mobile app shell
+./dc.sh exec mobileapp yarn start                     # Start Expo development server
+./dc.sh exec mobileapp yarn lint                      # Run ESLint
+./dc.sh stop mobileapp && ./dc.sh up -d mobileapp    # Restart with fresh cache
+./dc.sh exec mobileapp rm -rf .expo node_modules/.cache  # Clear Metro cache
 ```
 
 ## Required Environment Variables
@@ -105,13 +107,61 @@ Create `.env` file based on `.env.example`:
 - **Expo SDK 54**
 - **React Navigation** for routing
 - **Expo UI** components and utilities
+- **SQLite** local database with expo-sqlite
+- **DAO pattern** for database operations
+
+#### Mobile App Database Architecture
+
+The mobile app uses SQLite for local data storage with a carefully designed architecture to prevent race conditions:
+
+**Key Components:**
+- **SQLiteProvider**: Manages single database instance (in `app/_layout.tsx`)
+- **Database Context**: Hook to access database from SQLiteProvider
+- **DAO Manager**: Data Access Object pattern for type-safe operations
+- **Migrations**: Automatic schema migrations on app startup
+
+**Important: Database Connection Rules**
+1. **NEVER call `openDatabaseSync()` directly** - always use `useDatabase()` hook
+2. **Single database instance** - SQLiteProvider creates the only database connection
+3. **Pass database to functions** - all utility functions accept `db: SQLiteDatabase` parameter
+4. **Use DAO Manager** - create with `new DAOManager(db)` inside components
+
+**Example Usage:**
+```typescript
+import { useDatabase } from '@/database';
+import { DAOManager } from '@/database/dao';
+
+function MyComponent() {
+  const db = useDatabase(); // Get database from context
+  const dao = useMemo(() => new DAOManager(db), [db]); // Create DAO manager
+
+  // Use DAO for database operations
+  const profile = dao.profile.getCurrentProfile();
+  const users = dao.user.findAll();
+}
+```
+
+**Database Files:**
+- `/app/database/index.ts` - Migration runner
+- `/app/database/context.ts` - Database context hook
+- `/app/database/dao/` - DAO implementations
+- `/app/database/migrations/` - Schema migrations
+- `/app/database/utils/` - Utility functions (reset, health check)
 
 ## Database Management
 
+### Backend Database (PostgreSQL)
 - **PostgreSQL 17** with automatic initialization
 - **Alembic** migrations run on backend startup
 - **pgAdmin** available at http://localhost:5050
 - Database models in `/backend/models/` directory
+
+### Mobile App Database (SQLite)
+- **expo-sqlite** for local storage
+- **Single connection** via SQLiteProvider
+- **Automatic migrations** on app startup
+- **DAO pattern** for type-safe operations
+- Database file: `agriconnect.db` in app's document directory
 
 ## API Architecture
 
@@ -129,6 +179,19 @@ Create `.env` file based on `.env.example`:
 3. Hot reload enabled for all development services
 4. Use the appropriate shell for each service when debugging
 5. Run tests and linters before committing changes
+
+### Mobile App Development Notes
+
+**SQLite Best Practices:**
+- Use `useDatabase()` hook to get database instance
+- Create DAO manager with `useMemo(() => new DAOManager(db), [db])`
+- Never open multiple database connections
+- All database utility functions require `db` parameter
+
+**Common Issues:**
+- **NullPointerException in SQLite**: Caused by multiple concurrent connections. Solution: Always use database from context, never call `openDatabaseSync()` directly
+- **Metro cache issues**: Clear cache with `./dc.sh exec mobileapp rm -rf .expo node_modules/.cache`
+- **Hot reload not working**: Restart service with `./dc.sh stop mobileapp && ./dc.sh up -d mobileapp`
 
 ## Testing
 

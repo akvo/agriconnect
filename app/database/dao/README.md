@@ -25,34 +25,39 @@ database/
 ### Basic Usage
 
 ```typescript
-import { dao, getInbox, saveProfile } from '@/database/dao';
+import { useDatabase } from '@/database';
+import { DAOManager } from '@/database/dao';
 
-// Get all EO users
-const users = dao.eoUser.findAll();
+// Inside a React component or within SQLiteProvider context
+const MyComponent = () => {
+  const db = useDatabase(); // Get database from context
+  const dao = useMemo(() => new DAOManager(db), [db]); // Create DAO manager
 
-// Get inbox for an EO
-const inbox = getInbox(eoId, 20);
+  // Get all users
+  const users = dao.user.findAll();
 
-// Save a user profile
-const user = await saveProfile.eoUser({
-  email: 'user@example.com',
-  phone_number: '+1234567890',
-  full_name: 'John Doe'
-});
+  // Get current profile
+  const profile = dao.profile.getCurrentProfile();
+};
 ```
 
 ### DAO Manager
 
-The `DAOManager` provides centralized access to all database operations:
+The `DAOManager` provides centralized access to all database operations and must be initialized with a database instance from the SQLiteProvider context:
 
 ```typescript
-import { dao } from '@/database/dao';
+import { useDatabase } from '@/database';
+import { DAOManager } from '@/database/dao';
+
+// Inside a React component
+const db = useDatabase(); // Must be inside SQLiteProvider
+const dao = useMemo(() => new DAOManager(db), [db]);
 
 // Access different DAOs
-dao.eoUser.findById(1);
+dao.user.findById(1);
 dao.customerUser.searchByName('John');
-dao.message.getConversation(customerId, eoId);
-dao.syncLog.startSync('manual');
+dao.message.getConversation(customerId, userId);
+dao.profile.getCurrentProfile();
 ```
 
 ## Available Operations
@@ -238,12 +243,16 @@ console.log('Database stats:', {
 ## React Component Usage
 
 ```typescript
-import React, { useEffect, useState } from 'react';
-import { dao, getInbox } from '@/database/dao';
-import { ConversationSummary } from '@/database/dao/types';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useDatabase } from '@/database';
+import { DAOManager } from '@/database/dao';
+import { Message } from '@/database/dao/types';
 
 const InboxScreen: React.FC = () => {
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const db = useDatabase(); // Get database from SQLiteProvider context
+  const dao = useMemo(() => new DAOManager(db), [db]); // Create DAO manager
+
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -252,9 +261,9 @@ const InboxScreen: React.FC = () => {
 
   const loadInbox = () => {
     try {
-      const eoId = 1; // Get from auth context
-      const inbox = getInbox(eoId, 20);
-      setConversations(inbox);
+      const userId = 1; // Get from auth context
+      const inbox = dao.message.getMessagesByUser(userId, 20);
+      setMessages(inbox);
     } catch (error) {
       console.error('Error loading inbox:', error);
     } finally {
@@ -294,17 +303,17 @@ const createUser = (data: CreateEoUserData): EoUser => {
 
 ## Best Practices
 
-1. **Use High-Level Utils**: Prefer `getInbox()`, `saveProfile.eoUser()` over direct DAO calls for common operations
+1. **Use Database Context**: Always get the database instance using `useDatabase()` hook within SQLiteProvider
 
-2. **Error Handling**: Always wrap database operations in try-catch blocks
+2. **Memoize DAO Manager**: Use `useMemo` to create DAO manager instance to avoid recreating it on every render
 
-3. **Type Safety**: Use provided TypeScript interfaces for type safety
+3. **Error Handling**: Always wrap database operations in try-catch blocks
 
-4. **Performance**: Use appropriate limits on queries to avoid loading too much data
+4. **Type Safety**: Use provided TypeScript interfaces for type safety
 
-5. **Singleton Pattern**: The DAOManager uses singleton pattern - always use `dao` export
+5. **Performance**: Use appropriate limits on queries to avoid loading too much data
 
-6. **Testing**: Use `DAOManager.resetInstance()` in tests to ensure clean state
+6. **Single Database Instance**: Never call `openDatabaseSync()` directly - always use the context to prevent race conditions
 
 ## Migration Compatibility
 

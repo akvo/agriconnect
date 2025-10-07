@@ -4,13 +4,15 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   ReactNode,
 } from "react";
 import { useRouter, useSegments, useLocalSearchParams } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { api } from "@/services/api";
-import { dao } from "@/database/dao";
+import { DAOManager } from "@/database/dao";
 import { forceClearDatabase, checkDatabaseHealth } from "@/database/utils";
+import { useDatabase } from "@/database/context";
 
 interface AdministrativeLocation {
   id: number;
@@ -44,9 +46,9 @@ const validJSONString = (str: string): boolean => {
       .replace(/\\["\\\/bfnrtu]/g, "@")
       .replace(
         /"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g,
-        "]",
+        "]"
       )
-      .replace(/(?:^|:|,)(?:\s*\[)+/g, ""),
+      .replace(/(?:^|:|,)(?:\s*\[)+/g, "")
   );
 };
 
@@ -68,7 +70,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const { token: routeToken } = useLocalSearchParams();
   const router = useRouter();
   const segments = useSegments();
-  const db = useSQLiteContext();
+  const db = useDatabase();
+
+  // Create DAO manager with database from context
+  const dao = useMemo(() => new DAOManager(db), [db]);
 
   const checkAuth = useCallback(async () => {
     // Get profile with user details from database (single JOIN query)
@@ -155,7 +160,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     const handleUnauthorized = () => {
       // perform logout; don't await here to avoid blocking
       logout().catch((err) =>
-        console.error("Error during auto-logout (unauthorized):", err),
+        console.error("Error during auto-logout (unauthorized):", err)
       );
     };
 
@@ -209,23 +214,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       setIsValid(false);
 
       // Check database health first
-      const isHealthy = checkDatabaseHealth();
+      const isHealthy = checkDatabaseHealth(db);
       console.log(
         "Database health check:",
-        isHealthy ? "✅ Healthy" : "⚠️ Issues detected",
+        isHealthy ? "✅ Healthy" : "⚠️ Issues detected"
       );
 
       // Try force clear (which includes multiple fallback strategies)
-      const result = forceClearDatabase();
+      const result = forceClearDatabase(db);
 
       if (!result.success) {
         console.error("Failed to clear database during logout:", result.error);
         // Don't throw here - logout should still succeed even if DB clear fails
         console.warn(
-          "Logout completed but database clear failed - data may persist",
+          "Logout completed but database clear failed - data may persist"
         );
         console.log(
-          "💡 User data will be cleared on next app restart when migrations run",
+          "💡 User data will be cleared on next app restart when migrations run"
         );
       } else {
         console.log("✅ Database cleared successfully during logout");
@@ -234,7 +239,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       console.error("Error during logout database clear:", error);
       // Don't throw - logout should still succeed even if DB clear fails
       console.warn(
-        "Logout completed but encountered error during database clear",
+        "Logout completed but encountered error during database clear"
       );
       console.log("💡 User data will be cleared on next app restart");
     }

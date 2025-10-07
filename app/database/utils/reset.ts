@@ -4,11 +4,10 @@
  * This utility provides database reset functionality that can be used
  * directly within your Expo/React Native app for better mobile experience.
  *
- * Usage: Import and call resetDatabase() from your app
+ * Usage: Import and call resetDatabase(db) from your app
  */
 
-import { openDatabaseSync } from "expo-sqlite";
-import { DATABASE_NAME } from "../config";
+import { SQLiteDatabase } from "expo-sqlite";
 import type {
   ResetOptions,
   ResetResult,
@@ -17,46 +16,22 @@ import type {
 } from "./types";
 
 /**
- * Reset database using DATABASE_NAME from config
+ * Reset database using provided database instance
+ * @param db - SQLite database instance from context
  * @param options - Reset configuration options
  */
-export const resetDatabase = (options: ResetOptions = {}): ResetResult => {
+export const resetDatabase = (
+  db: SQLiteDatabase,
+  options: ResetOptions = {},
+): ResetResult => {
   const { dropTables = true, resetVersion = true, clearData = true } = options;
 
   try {
-    console.log("🔄 Starting in-app database reset...");
+    console.log("🔄 Starting in-app database reset... [NEW CODE v2]");
 
-    // Open database using DATABASE_NAME from config with retry logic
-    let db;
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        db = openDatabaseSync(DATABASE_NAME);
-        // Test the connection with a simple query
-        db.execSync("SELECT 1;");
-        break;
-      } catch (connectionError) {
-        retryCount++;
-        console.warn(
-          `Database connection attempt ${retryCount} failed:`,
-          connectionError,
-        );
-
-        if (retryCount >= maxRetries) {
-          throw new Error(
-            `Failed to establish database connection after ${maxRetries} attempts: ${connectionError}`,
-          );
-        }
-
-        // Wait a bit before retrying
-        const delay = retryCount * 100;
-        const start = Date.now();
-        while (Date.now() - start < delay) {
-          // Simple blocking delay
-        }
-      }
+    // Verify database is accessible
+    if (!db) {
+      throw new Error("Database instance is required");
     }
 
     if (clearData) {
@@ -187,13 +162,23 @@ export const resetDatabase = (options: ResetOptions = {}): ResetResult => {
 /**
  * Force clear database - more aggressive approach for logout scenarios
  * This function tries multiple strategies to clear data if normal reset fails
+ * @param db - SQLite database instance from context
  */
-export const forceClearDatabase = (): ResetResult => {
+export const forceClearDatabase = (db: SQLiteDatabase): ResetResult => {
   console.log("🔧 Attempting force database clear...");
+
+  // Verify database is accessible
+  if (!db) {
+    return {
+      success: false,
+      message: "Database instance is required",
+      error: "No database instance provided",
+    };
+  }
 
   // Strategy 1: Try normal reset first
   try {
-    const normalReset = resetDatabase({
+    const normalReset = resetDatabase(db, {
       dropTables: false,
       resetVersion: false,
       clearData: true,
@@ -206,12 +191,9 @@ export const forceClearDatabase = (): ResetResult => {
     console.warn("Normal reset failed, trying alternative approaches:", error);
   }
 
-  // Strategy 2: Try to recreate database connection
+  // Strategy 2: Try direct clearing approach
   try {
     console.log("🔧 Trying database recreation approach...");
-
-    // Create a fresh database connection
-    const db = openDatabaseSync(DATABASE_NAME);
 
     // Get table names with a more basic approach
     const tables = db.getAllSync(
@@ -246,7 +228,6 @@ export const forceClearDatabase = (): ResetResult => {
   // Strategy 3: Try direct table clearing with minimal operations
   try {
     console.log("🔧 Trying minimal database operations...");
-    const db = openDatabaseSync(DATABASE_NAME);
 
     // Try to clear common tables that might exist
     const commonTables = ["users", "profiles", "sessions", "auth_tokens"];
@@ -288,41 +269,14 @@ export const forceClearDatabase = (): ResetResult => {
 
 /**
  * Get database info for debugging
+ * @param db - SQLite database instance from context
  */
-export const getDatabaseInfo = (): DatabaseInfo | null => {
+export const getDatabaseInfo = (db: SQLiteDatabase): DatabaseInfo | null => {
   try {
-    // Open database using DATABASE_NAME from config with retry logic
-    let db;
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        db = openDatabaseSync(DATABASE_NAME);
-        // Test the connection with a simple query
-        db.execSync("SELECT 1;");
-        break;
-      } catch (connectionError) {
-        retryCount++;
-        console.warn(
-          `Database connection attempt ${retryCount} failed:`,
-          connectionError,
-        );
-
-        if (retryCount >= maxRetries) {
-          console.error(
-            "Failed to establish database connection for info retrieval",
-          );
-          return null;
-        }
-
-        // Wait a bit before retrying
-        const delay = retryCount * 100;
-        const start = Date.now();
-        while (Date.now() - start < delay) {
-          // Simple blocking delay
-        }
-      }
+    // Verify database is accessible
+    if (!db) {
+      console.error("Database instance is required");
+      return null;
     }
 
     // Get current version using prepared statement
@@ -371,7 +325,7 @@ export const getDatabaseInfo = (): DatabaseInfo | null => {
     }
 
     return {
-      databaseName: DATABASE_NAME,
+      databaseName: "agriconnect.db",
       version,
       tables: tables.map((t: TableInfo) => t.name),
       tableCounts,
@@ -385,10 +339,14 @@ export const getDatabaseInfo = (): DatabaseInfo | null => {
 
 /**
  * Check if database is accessible and responsive
+ * @param db - SQLite database instance from context
  */
-export const checkDatabaseHealth = (): boolean => {
+export const checkDatabaseHealth = (db: SQLiteDatabase): boolean => {
   try {
-    const db = openDatabaseSync(DATABASE_NAME);
+    if (!db) {
+      console.warn("Database instance is required");
+      return false;
+    }
     db.execSync("SELECT 1;");
     return true;
   } catch (error) {

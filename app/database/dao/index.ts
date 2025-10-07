@@ -1,3 +1,4 @@
+import { SQLiteDatabase } from "expo-sqlite";
 import { UserDAO } from "./userDAO";
 import { CustomerUserDAO } from "./customerUserDAO";
 import { MessageDAO } from "./messageDAO";
@@ -8,12 +9,13 @@ import { TicketDAO } from "./ticketDAO";
  * DAO Manager - Central access point for all database operations
  *
  * Usage:
- * const db = useSQLiteContext(); // Get from React context
- * const profile = dao.profile.getCurrentProfile(db);
- * const messages = dao.message.getInbox(db, eoId);
+ * const db = useDatabase();
+ * const daoManager = new DAOManager(db);
+ * const users = daoManager.user.findAll();
+ * const messages = daoManager.message.getInbox(eoId);
  */
 export class DAOManager {
-  private static instance: DAOManager;
+  private db: SQLiteDatabase;
 
   // DAO instances
   public readonly user: UserDAO;
@@ -22,35 +24,29 @@ export class DAOManager {
   public readonly profile: ProfileDAO;
   public readonly ticket: TicketDAO;
 
-  private constructor() {
-    // Initialize all DAOs without database dependency
-    this.user = new UserDAO();
-    this.customerUser = new CustomerUserDAO();
-    this.message = new MessageDAO();
-    this.profile = new ProfileDAO();
-    this.ticket = new TicketDAO();
-  }
-
-  /**
-   * Get singleton instance of DAO Manager
-   */
-  public static getInstance(): DAOManager {
-    if (!DAOManager.instance) {
-      DAOManager.instance = new DAOManager();
+  constructor(db: SQLiteDatabase) {
+    // Verify database is properly initialized
+    if (!db) {
+      throw new Error("Database instance is required");
     }
-    return DAOManager.instance;
+
+    this.db = db;
+
+    // Initialize all DAOs
+    this.user = new UserDAO(this.db);
+    this.customerUser = new CustomerUserDAO(this.db);
+    this.message = new MessageDAO(this.db);
+    this.profile = new ProfileDAO(this.db);
+    this.ticket = new TicketDAO(this.db);
   }
 
   /**
-   * Reset singleton instance (useful for testing)
+   * Get raw database instance (for advanced operations)
    */
-  public static resetInstance(): void {
-    DAOManager.instance = null as any;
+  public getDatabase(): SQLiteDatabase {
+    return this.db;
   }
 }
-
-// Convenience export for easy access
-export const dao = DAOManager.getInstance();
 
 // Export all types
 export * from "./types";
