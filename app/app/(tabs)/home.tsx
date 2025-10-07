@@ -31,11 +31,6 @@ export default function HomeScreen() {
   }, []);
 
   const handleLogout = async () => {
-    if (!isDatabaseHealthy) {
-      console.warn("Database not healthy, logout disabled");
-      return;
-    }
-
     try {
       await logout();
       router.replace("/login");
