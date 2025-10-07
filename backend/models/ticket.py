@@ -27,7 +27,6 @@ class Ticket(Base):
         Integer, ForeignKey("messages.id"), nullable=False
     )
     resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    last_message_at = Column(DateTime(timezone=True), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(

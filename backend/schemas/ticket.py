@@ -28,7 +28,6 @@ class TicketModel(BaseModel):
     created_at: Optional[datetime]
     resolved_at: Optional[datetime]
     resolver: Optional[Any]
-    last_message_at: Optional[datetime]
 
 
 class TicketCreate(BaseModel):

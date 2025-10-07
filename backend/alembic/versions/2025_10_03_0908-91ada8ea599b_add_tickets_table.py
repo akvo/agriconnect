@@ -28,7 +28,6 @@ def upgrade() -> None:
         sa.Column('customer_id', sa.Integer(), nullable=False),
         sa.Column('message_id', sa.Integer(), nullable=False),
         sa.Column('resolved_by', sa.Integer(), nullable=True),
-        sa.Column('last_message_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('resolved_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),

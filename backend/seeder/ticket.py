@@ -140,7 +140,6 @@ def seed_tickets(
         administrative_id=administrative.id,
         customer_id=customer.id,
         message_id=initial_message.id,
-        last_message_at=initial_message.created_at,
     )
 
     db.add(ticket)
