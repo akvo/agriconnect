@@ -12,7 +12,7 @@ CREATE TABLE tickets (
     updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
     resolvedAt TEXT NULL,
     resolvedBy INTEGER NULL,
-    FOREIGN KEY (customerId) REFERENCES customers(id) ON DELETE CASCADE,
+    FOREIGN KEY (customerId) REFERENCES customer_users(id) ON DELETE CASCADE,
     FOREIGN KEY (messageId) REFERENCES messages(id) ON DELETE CASCADE,
     FOREIGN KEY (resolvedBy) REFERENCES users(id) ON DELETE SET NULL
 );
