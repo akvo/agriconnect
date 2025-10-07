@@ -44,17 +44,27 @@ const Inbox: React.FC = () => {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tickets.filter((t: Ticket) => {
-      const isResolved = !!t.resolvedAt;
-      if (activeTab === Tabs.PENDING && isResolved) return false;
-      if (activeTab === Tabs.RESPONDED && !isResolved) return false;
+    return tickets
+      .filter((t: Ticket) => {
+        const isResolved = !!t.resolvedAt;
+        if (activeTab === Tabs.PENDING && isResolved) return false;
+        if (activeTab === Tabs.RESPONDED && !isResolved) return false;
 
-      if (!q) return true;
-      const inName = t.customer?.name.toString().includes(q);
-      const inContent = (t.message?.body.toString() || "").includes(q);
-      const inTicketId = t.ticketNumber.toLowerCase().includes(q);
-      return inName || inContent || inTicketId;
-    });
+        if (!q) return true;
+        const inName = t.customer?.name.toString().includes(q);
+        const inContent = (t.message?.body.toString() || "").includes(q);
+        const inTicketId = t.ticketNumber.toLowerCase().includes(q);
+        return inName || inContent || inTicketId;
+      })
+      .sort((a: Ticket, b: Ticket) => {
+        // Sort by unreadCount desc, then createdAt desc
+        if ((b.unreadCount || 0) !== (a.unreadCount || 0)) {
+          return (b.unreadCount || 0) - (a.unreadCount || 0);
+        }
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      });
   }, [tickets, activeTab, query]);
   const { user } = useAuth();
 
