@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { checkDatabaseHealth } from "@/database/utils";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
@@ -13,22 +12,6 @@ import Avatar from "@/components/avatar";
 export default function HomeScreen() {
   const router = useRouter();
   const { logout, user } = useAuth();
-  const [isDatabaseHealthy, setIsDatabaseHealthy] = useState(true);
-
-  useEffect(() => {
-    // Check database health on mount
-    const checkHealth = () => {
-      const isHealthy = checkDatabaseHealth();
-      setIsDatabaseHealthy(isHealthy);
-    };
-
-    checkHealth();
-
-    // Check database health periodically (every 5 seconds)
-    const healthCheckInterval = setInterval(checkHealth, 5000);
-
-    return () => clearInterval(healthCheckInterval);
-  }, []);
 
   const handleLogout = async () => {
     try {
@@ -74,19 +57,11 @@ export default function HomeScreen() {
           </View>
         </View>
         <TouchableOpacity
-          style={[
-            styles.logoutButton,
-            !isDatabaseHealthy && styles.logoutButtonDisabled,
-          ]}
+          style={[styles.logoutButton]}
           onPress={handleLogout}
-          disabled={!isDatabaseHealthy}
           test-id="logout-button"
         >
-          <Feathericons
-            name="log-out"
-            size={24}
-            color={isDatabaseHealthy ? "#fff" : "#999"}
-          />
+          <Feathericons name="log-out" size={24} color={"white"} />
         </TouchableOpacity>
       </View>
 
@@ -405,9 +380,6 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     padding: 8,
-  },
-  logoutButtonDisabled: {
-    opacity: 0.5,
   },
   profileDetails: {
     lineHeight: 28,

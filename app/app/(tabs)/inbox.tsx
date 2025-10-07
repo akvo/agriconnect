@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useSQLiteContext } from "expo-sqlite";
+import { useDatabase } from "@/database/context";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
 import InboxTabs from "@/components/inbox/tabs-button";
@@ -42,7 +42,7 @@ const Inbox: React.FC = () => {
   const endReachedTimeout = React.useRef<number | null>(null);
   const isFetchingRef = React.useRef(false); // prevent duplicate fetches
   const isInitialMount = React.useRef(true); // track initial mount
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const { updateTicket } = useTicket();
 
   const filtered = useMemo(() => {
