@@ -6,7 +6,7 @@ with initial ticket data for testing or development purposes.
 import sys
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime
+from datetime import datetime, timezone
 import random
 
 from database import SessionLocal, engine
@@ -132,11 +132,8 @@ def seed_tickets(
     """Create a ticket for the customer under the administrative area
     using the initial message.
     """
-    now = datetime.utcnow()
-    ticket_number = (
-        f"TKT-{administrative.code}-{customer.id}-"
-        f"{int(now.timestamp())}-{random.randint(100, 999)}"
-    )
+    now = datetime.now(timezone.utc)
+    ticket_number = now.strftime("%Y%m%d%H%M%S")
 
     ticket = Ticket(
         ticket_number=ticket_number,
