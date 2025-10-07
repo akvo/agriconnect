@@ -188,16 +188,23 @@ class TicketSyncService {
 
   /**
    * Sync a single customer to local database
+   * Uses API customer ID directly as the primary key (like userDAO pattern)
+   * Falls back to phone number check for existing records
    */
   private static async syncCustomer(
     db: SQLiteDatabase,
     customerData: any,
   ): Promise<number> {
     try {
-      // Check if customer exists by phone number or id
+      // Check if customer exists by ID first (API customer ID)
       let existing = null;
 
-      if (customerData.phone_number) {
+      if (customerData.id) {
+        existing = dao.customerUser.findById(db, customerData.id);
+      }
+
+      // Fall back to phone number check if not found by ID
+      if (!existing && customerData.phone_number) {
         existing = dao.customerUser.findByPhoneNumber(
           db,
           customerData.phone_number,
@@ -205,15 +212,17 @@ class TicketSyncService {
       }
 
       if (existing) {
-        // Update if needed
+        // Update existing customer
         dao.customerUser.update(db, existing.id, {
           fullName: customerData.name || customerData.full_name,
           phoneNumber: customerData.phone_number,
+          language: customerData.language,
         });
         return existing.id;
       } else {
-        // Create new customer
+        // Create new customer with API ID as primary key
         const created = dao.customerUser.create(db, {
+          id: customerData.id, // Use backend customer ID directly
           phoneNumber: customerData.phone_number || `unknown_${Date.now()}`,
           fullName: customerData.name || customerData.full_name || "Unknown",
           language: customerData.language || "en",
@@ -277,13 +286,21 @@ class TicketSyncService {
     ticketData: any,
   ): Promise<void> {
     try {
+      // Ensure resolvedAt is explicitly null for open tickets
+      const resolvedAt =
+        ticketData.resolvedAt || ticketData.resolved_at || null;
+
+      // IMPORTANT: Derive status from resolvedAt to ensure consistency
+      // Don't trust the API's status field - it may be stale
+      const status = resolvedAt ? "resolved" : "open";
+
       dao.ticket.upsert(db, {
         id: ticketData.id, // Include API id
         ticketNumber: ticketData.ticketNumber || ticketData.ticket_number,
         customerId: ticketData.customerId,
         messageId: ticketData.messageId,
-        status: ticketData.status,
-        resolvedAt: ticketData.resolvedAt || ticketData.resolved_at,
+        status: status, // Use derived status, not API status
+        resolvedAt: resolvedAt,
         resolvedBy: ticketData?.resolver?.id || null,
         unreadCount: ticketData.unreadCount || ticketData.unread_count || 0,
       });
