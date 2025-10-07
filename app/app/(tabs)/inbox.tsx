@@ -6,7 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
@@ -24,10 +24,13 @@ const Tabs = {
 } as const;
 
 const Inbox: React.FC = () => {
+  const { initTab } = useLocalSearchParams<{
+    initTab?: (typeof Tabs)[keyof typeof Tabs];
+  }>();
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [activeTab, setActiveTab] = useState<(typeof Tabs)[keyof typeof Tabs]>(
-    Tabs.PENDING,
+    initTab || Tabs.PENDING,
   );
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -61,9 +64,14 @@ const Inbox: React.FC = () => {
         if ((b.unreadCount || 0) !== (a.unreadCount || 0)) {
           return (b.unreadCount || 0) - (a.unreadCount || 0);
         }
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        // Sort by updatedAt desc if available, else createdAt desc
+        const aTime = a.updatedAt
+          ? new Date(a.updatedAt).getTime()
+          : new Date(a.createdAt).getTime();
+        const bTime = b.updatedAt
+          ? new Date(b.updatedAt).getTime()
+          : new Date(b.createdAt).getTime();
+        return bTime - aTime;
       });
   }, [tickets, activeTab, query]);
   const { user } = useAuth();

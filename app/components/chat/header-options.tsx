@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Alert } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
+import { useRouter } from "expo-router";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +17,7 @@ const HeaderOptions = ({ ticketID }: Props) => {
   const { user } = useAuth();
   const { updateTicket } = useTicket();
   const db = useSQLiteContext();
+  const router = useRouter();
 
   const handleCloseTicket = async () => {
     try {
@@ -31,6 +33,8 @@ const HeaderOptions = ({ ticketID }: Props) => {
         resolvedAt: resData.resolved_at,
         resolvedBy: user.id,
       });
+      // Redirect to inbox after closing with active tab as 'responded'
+      router.replace("/inbox?initTab=resolved");
     } catch (error) {
       console.error("Error closing ticket:", error);
     }
