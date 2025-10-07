@@ -15,6 +15,7 @@ export type Ticket = {
   lastMessage?: { content: string; timestamp: string };
   resolvedAt?: string | null;
   respondedBy?: User;
+  updatedAt?: string | null;
 };
 
 export interface CreateTicketData {

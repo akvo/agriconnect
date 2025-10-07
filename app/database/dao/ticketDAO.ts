@@ -141,6 +141,8 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       ticketNumber: row.ticketNumber,
       unreadCount: row.unreadCount,
       lastMessageAt: row.lastMessageAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt || null,
     } as Ticket;
   }
 
