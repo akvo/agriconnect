@@ -2,6 +2,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func, desc
 from datetime import datetime, timezone
 
 from database import get_db
@@ -56,7 +57,9 @@ def _check_ticket_access(ticket: Ticket, user: User, db: Session) -> None:
         )
 
 
-def _serialize_ticket(ticket: Ticket) -> dict:
+def _serialize_ticket(
+    ticket: Ticket, db: Session = None,
+) -> dict:
     resolver = None
     if ticket.resolved_by:
         # lazy load resolver
@@ -93,11 +96,6 @@ def _serialize_ticket(ticket: Ticket) -> dict:
             ticket.resolved_at.isoformat() if ticket.resolved_at else None
         ),
         "resolver": resolver,
-        "last_message_at": (
-            ticket.last_message_at.isoformat()
-            if ticket.last_message_at
-            else None
-        ),
     }
 
 
@@ -146,13 +144,12 @@ async def create_ticket(payload: TicketCreate, db: Session = Depends(get_db)):
         administrative_id=admin_id,
         customer_id=customer.id,
         message_id=message.id,
-        last_message_at=message.created_at,
     )
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
 
-    return {"ticket": _serialize_ticket(ticket)}
+    return {"ticket": _serialize_ticket(ticket, db)}
 
 
 @router.get("/", response_model=TicketListResponse)
@@ -167,9 +164,17 @@ async def list_tickets(
 
     Admin users can see all tickets.
     EO users can only see tickets in their assigned administrative areas.
+    Ensure tickets are grouped by customer and
+    sorted by last message date descending.
+    If customer have multiple tickets,
+    show the most recently updated ticket only.
     """
-    query = db.query(Ticket)
-
+    # Subquery to get the latest ticket ID for each customer
+    # based on the status filter and administrative area
+    subquery = db.query(
+        Ticket.customer_id,
+        func.max(Ticket.id).label('latest_ticket_id')
+    )
     # Filter by administrative area for EO users
     if current_user.user_type == UserType.EXTENSION_OFFICER:
         admin_ids = _get_user_administrative_ids(current_user, db)
@@ -181,24 +186,35 @@ async def list_tickets(
                 "page": page,
                 "size": page_size,
             }
-        query = query.filter(Ticket.administrative_id.in_(admin_ids))
-
+        subquery = subquery.filter(Ticket.administrative_id.in_(admin_ids))
     # Filter by status
     if status == TicketStatus.OPEN:
-        query = query.filter(Ticket.resolved_at.is_(None))
+        subquery = subquery.filter(Ticket.resolved_at.is_(None))
     elif status == TicketStatus.RESOLVED:
-        query = query.filter(Ticket.resolved_at.isnot(None))
-
+        subquery = subquery.filter(Ticket.resolved_at.isnot(None))
+    # Group by customer to get latest ticket per customer
+    subquery = subquery.group_by(Ticket.customer_id).subquery()
+    # Main query to fetch tickets
+    query = db.query(Ticket).join(
+        subquery,
+        Ticket.id == subquery.c.latest_ticket_id
+    )
+    # Get total count of unique customers with tickets
     total = query.count()
+    # Order by updated_at descending (most recently updated first)
+    # Then apply pagination
     tickets = (
-        query.order_by(Ticket.last_message_at.desc().nulls_last())
+        query.order_by(desc(Ticket.updated_at))
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
     )
 
     return {
-        "tickets": [_serialize_ticket(t) for t in tickets],
+        "tickets": [
+            _serialize_ticket(t, db)
+            for t in tickets
+        ],
         "total": total,
         "page": page,
         "size": page_size,
