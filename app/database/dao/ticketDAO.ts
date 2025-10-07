@@ -23,12 +23,12 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       ? db.prepareSync(
           `INSERT INTO tickets (
             id, customerId, messageId, status, ticketNumber, unreadCount, createdAt, resolvedAt, resolvedBy
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
       : db.prepareSync(
           `INSERT INTO tickets (
             customerId, messageId, status, ticketNumber, unreadCount, createdAt, resolvedAt, resolvedBy
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         );
 
     try {
@@ -102,7 +102,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       values.push(id);
 
       const stmt = db.prepareSync(
-        `UPDATE tickets SET ${updates.join(", ")} WHERE id = ?`
+        `UPDATE tickets SET ${updates.join(", ")} WHERE id = ?`,
       );
       try {
         const result = stmt.executeSync(values);
@@ -151,7 +151,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
-      WHERE t.id = ?`
+      WHERE t.id = ?`,
     );
     try {
       const result = stmt.executeSync<any>([id]);
@@ -177,7 +177,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
-      ORDER BY t.createdAt DESC`
+      ORDER BY t.createdAt DESC`,
     );
     try {
       const result = stmt.executeSync<any>();
@@ -192,28 +192,62 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
   }
 
   // Find tickets by status with pagination and customer grouping
-  // Returns only the latest ticket per customer
+  // Returns only one ticket per customer:
+  // - For open status: earliest (first) unresolved ticket
+  // - For resolved status: latest (most recent) resolved ticket
+  //   BUT exclude customers who have any open tickets
   findByStatus(
     db: SQLiteDatabase,
     status: "open" | "resolved",
     page: number = 1,
-    pageSize: number = 10
+    pageSize: number = 10,
   ): { tickets: Ticket[]; total: number; page: number; size: number } {
     const offset = (page - 1) * pageSize;
 
     // Build WHERE clause based on status
+    // Handle both NULL and empty string for open tickets
     const whereClause =
-      status === "open" ? "resolvedAt IS NULL" : "resolvedAt IS NOT NULL";
+      status === "open"
+        ? "(resolvedAt IS NULL OR resolvedAt = '')"
+        : "(resolvedAt IS NOT NULL AND resolvedAt != '')";
     const whereClauseWithAlias =
-      status === "open" ? "t.resolvedAt IS NULL" : "t.resolvedAt IS NOT NULL";
+      status === "open"
+        ? "(t.resolvedAt IS NULL OR t.resolvedAt = '')"
+        : "(t.resolvedAt IS NOT NULL AND t.resolvedAt != '')";
+
+    // Determine aggregation function based on status
+    // OPEN: MIN(id) to get earliest unresolved ticket
+    // RESOLVED: MAX(id) to get latest resolved ticket
+    const aggregateFunc = status === "open" ? "MIN(id)" : "MAX(id)";
+
+    // For resolved status, we need to exclude customers who have any open tickets
+    let customerExclusionClause = "";
+    if (status === "resolved") {
+      customerExclusionClause = `
+        AND customerId NOT IN (
+          SELECT DISTINCT customerId 
+          FROM tickets 
+          WHERE resolvedAt IS NULL OR resolvedAt = ''
+        )
+      `;
+    }
 
     // Get total count of unique customers with tickets matching the status
-    // This uses a subquery to group by customer and get their latest ticket
-    const countStmt = db.prepareSync(
-      `SELECT COUNT(DISTINCT t.customerId) as total 
-       FROM tickets t 
-       WHERE ${whereClauseWithAlias}`
-    );
+    const countQuery =
+      status === "resolved"
+        ? `SELECT COUNT(DISTINCT t.customerId) as total 
+           FROM tickets t 
+           WHERE ${whereClauseWithAlias}
+           AND t.customerId NOT IN (
+             SELECT DISTINCT customerId 
+             FROM tickets 
+             WHERE resolvedAt IS NULL OR resolvedAt = ''
+           )`
+        : `SELECT COUNT(DISTINCT t.customerId) as total 
+           FROM tickets t 
+           WHERE ${whereClauseWithAlias}`;
+
+    const countStmt = db.prepareSync(countQuery);
 
     let total = 0;
     try {
@@ -226,9 +260,10 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       countStmt.finalizeSync();
     }
 
-    // Get paginated tickets - grouped by customer, showing only latest ticket per customer
-    // Strategy: Use a subquery to get the max ticket ID for each customer,
-    // then join to get the full ticket details
+    // Get paginated tickets - grouped by customer
+    // For OPEN: show earliest unresolved ticket per customer
+    // For RESOLVED: show latest resolved ticket per customer
+    //               (excluding customers with any open tickets)
     const stmt = db.prepareSync(
       `SELECT t.*, 
         cu.fullName as customer_name,
@@ -236,16 +271,16 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         r.id as resolver_id, r.fullName as resolver_name
       FROM tickets t
       INNER JOIN (
-        SELECT customerId, MAX(id) as latest_ticket_id
+        SELECT customerId, ${aggregateFunc} as selected_ticket_id
         FROM tickets
-        WHERE ${whereClause}
+        WHERE ${whereClause}${customerExclusionClause}
         GROUP BY customerId
-      ) latest ON t.id = latest.latest_ticket_id
+      ) selected ON t.id = selected.selected_ticket_id
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
       ORDER BY t.updatedAt DESC, t.createdAt DESC
-      LIMIT ? OFFSET ?`
+      LIMIT ? OFFSET ?`,
     );
 
     try {
@@ -265,9 +300,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     } finally {
       stmt.finalizeSync();
     }
-  }
-
-  // Find ticket by ticketNumber
+  } // Find ticket by ticketNumber
   findByTicketNumber(db: SQLiteDatabase, ticketNumber: string): Ticket | null {
     const stmt = db.prepareSync(
       `SELECT t.*, 
@@ -278,7 +311,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
-      WHERE t.ticketNumber = ?`
+      WHERE t.ticketNumber = ?`,
     );
 
     try {
