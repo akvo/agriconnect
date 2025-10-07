@@ -327,22 +327,24 @@ class TestTickets:
         assert (
             eo1_data["total"] == 2
         ), "EO1 should see 2 unique customers from Ngudu ward"
-        # Verify customer grouping - should only see t4 (latest) for c1, not t1
+        # Verify customer grouping
+        # For OPEN status: show earliest unresolved ticket per customer
+        # Should see t1 (earliest) for c1, not t4
         customer_ids = [
             ticket["customer"]["id"] for ticket in eo1_data["tickets"]
         ]
         assert len(customer_ids) == len(set(customer_ids)), (
             "Each customer should appear only once"
         )
-        # Check if c1's latest ticket is shown (t4, not t1)
+        # Check if c1's earliest open ticket is shown (t1, not t4)
         c1_ticket = next(
             (t for t in eo1_data["tickets"]
              if t["customer"]["id"] == c1.id),
             None
         )
         assert c1_ticket is not None, "Should have ticket for customer c1"
-        assert c1_ticket["ticket_number"] == "T004", (
-            "Should show latest ticket (T004) for customer c1"
+        assert c1_ticket["ticket_number"] == "T001", (
+            "Should show earliest open ticket (T001) for customer c1"
         )
 
         for ticket in eo1_data["tickets"]:
@@ -1374,24 +1376,23 @@ class TestTickets:
         assert resolved_response.status_code == 200
         resolved_data = resolved_response.json()
 
-        # Should see 2 unique customers with resolved tickets
-        assert resolved_data["total"] == 2, (
-            "Should have 2 unique customers with resolved tickets"
+        # Should see only 1 unique customer with ALL tickets resolved
+        # customer2 has an open ticket (t5), so they should NOT appear here
+        # Only customer (with all resolved tickets) should appear
+        assert resolved_data["total"] == 1, (
+            "Should have only 1 customer with ALL tickets resolved "
+            "(customer2 has open ticket, so excluded)"
         )
-
-        # Verify customer2's resolved ticket is shown (t4)
+        # Verify customer2 is NOT in the resolved list
         customer2_ticket = next(
             (t for t in resolved_data["tickets"]
              if t["customer"]["id"] == customer2.id),
             None
         )
-        assert customer2_ticket is not None, (
-            "Should have resolved ticket for customer2"
+        assert customer2_ticket is None, (
+            "customer2 should NOT appear in resolved list "
+            "(they have an open ticket)"
         )
-        assert customer2_ticket["ticket_number"] == "TR004", (
-            "Should show customer2's resolved ticket (TR004)"
-        )
-        assert customer2_ticket["status"] == "resolved"
 
         # Query open tickets - should only see customer2
         open_response = client.get(
@@ -1415,4 +1416,201 @@ class TestTickets:
         assert open_ticket["status"] == "open"
         assert open_ticket["resolved_at"] is None, (
             "Open ticket should not have resolved_at"
+        )
+
+    def test_customer_with_mixed_tickets_excluded_from_resolved(
+        self, client, auth_headers_factory, db_session, administrative_data
+    ):
+        """Test that customers with both open and resolved tickets
+        only appear in the OPEN list, not in the RESOLVED list.
+        This ensures no customer appears in both lists simultaneously.
+        """
+        admin_headers, admin_user = auth_headers_factory(user_type="admin")
+
+        # Create customer with both open and resolved tickets
+        customer_mixed = Customer(
+            phone_number="+255400000001", full_name="Customer Mixed Status"
+        )
+        # Create customer with only resolved tickets
+        customer_resolved_only = Customer(
+            phone_number="+255400000002", full_name="Customer All Resolved"
+        )
+        # Create customer with only open tickets
+        customer_open_only = Customer(
+            phone_number="+255400000003", full_name="Customer All Open"
+        )
+        db_session.add_all([
+            customer_mixed,
+            customer_resolved_only,
+            customer_open_only
+        ])
+        db_session.commit()
+
+        # Create messages
+        m1 = Message(
+            message_sid="MIX1",
+            customer_id=customer_mixed.id,
+            body="First issue - will be resolved",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        m2 = Message(
+            message_sid="MIX2",
+            customer_id=customer_mixed.id,
+            body="Second issue - still open",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        m3 = Message(
+            message_sid="MIX3",
+            customer_id=customer_mixed.id,
+            body="Third issue - also resolved",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        m4 = Message(
+            message_sid="RES1",
+            customer_id=customer_resolved_only.id,
+            body="Only resolved ticket",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        m5 = Message(
+            message_sid="OPEN1",
+            customer_id=customer_open_only.id,
+            body="Only open ticket",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add_all([m1, m2, m3, m4, m5])
+        db_session.commit()
+
+        # Create tickets for customer_mixed (has both resolved and open)
+        t1_resolved = Ticket(
+            ticket_number="MIX-R001",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer_mixed.id,
+            message_id=m1.id,
+            resolved_at=datetime(2025, 1, 1, 10, 0, 0),
+            resolved_by=admin_user.id,
+        )
+        t2_open = Ticket(
+            ticket_number="MIX-O001",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer_mixed.id,
+            message_id=m2.id,
+            # No resolved_at - this is open
+        )
+        t3_resolved = Ticket(
+            ticket_number="MIX-R002",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer_mixed.id,
+            message_id=m3.id,
+            resolved_at=datetime(2025, 1, 2, 10, 0, 0),
+            resolved_by=admin_user.id,
+        )
+
+        # Create ticket for customer_resolved_only (only resolved)
+        t4_resolved_only = Ticket(
+            ticket_number="RES-R001",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer_resolved_only.id,
+            message_id=m4.id,
+            resolved_at=datetime(2025, 1, 3, 10, 0, 0),
+            resolved_by=admin_user.id,
+        )
+
+        # Create ticket for customer_open_only (only open)
+        t5_open_only = Ticket(
+            ticket_number="OPEN-O001",
+            administrative_id=administrative_data["ward_ngudu"].id,
+            customer_id=customer_open_only.id,
+            message_id=m5.id,
+            # No resolved_at - this is open
+        )
+
+        db_session.add_all([
+            t1_resolved,
+            t2_open,
+            t3_resolved,
+            t4_resolved_only,
+            t5_open_only
+        ])
+        db_session.commit()
+
+        # TEST 1: Query OPEN tickets
+        open_response = client.get(
+            "/api/tickets?status=open&page=1&page_size=10",
+            headers=admin_headers,
+        )
+        assert open_response.status_code == 200
+        open_data = open_response.json()
+
+        # Should see 2 customers: customer_mixed and customer_open_only
+        assert open_data["total"] == 2, (
+            "Should have 2 customers with open tickets"
+        )
+
+        open_customer_ids = [
+            ticket["customer"]["id"] for ticket in open_data["tickets"]
+        ]
+        assert customer_mixed.id in open_customer_ids, (
+            "customer_mixed should appear in OPEN list"
+        )
+        assert customer_open_only.id in open_customer_ids, (
+            "customer_open_only should appear in OPEN list"
+        )
+        assert customer_resolved_only.id not in open_customer_ids, (
+            "customer_resolved_only should NOT appear in OPEN list"
+        )
+
+        # Verify customer_mixed shows the open ticket (t2), not resolved ones
+        mixed_ticket = next(
+            (t for t in open_data["tickets"]
+             if t["customer"]["id"] == customer_mixed.id),
+            None
+        )
+        assert mixed_ticket is not None
+        assert mixed_ticket["ticket_number"] == "MIX-O001", (
+            "customer_mixed should show their open ticket"
+        )
+        assert mixed_ticket["status"] == "open"
+
+        # TEST 2: Query RESOLVED tickets
+        resolved_response = client.get(
+            "/api/tickets?status=resolved&page=1&page_size=10",
+            headers=admin_headers,
+        )
+        assert resolved_response.status_code == 200
+        resolved_data = resolved_response.json()
+
+        # Should see ONLY 1 customer: customer_resolved_only
+        # customer_mixed should be EXCLUDED because they have an open ticket
+        assert resolved_data["total"] == 1, (
+            "Should have only 1 customer with ALL tickets resolved"
+        )
+
+        resolved_customer_ids = [
+            ticket["customer"]["id"] for ticket in resolved_data["tickets"]
+        ]
+        assert customer_resolved_only.id in resolved_customer_ids, (
+            "customer_resolved_only should appear in RESOLVED list"
+        )
+        assert customer_mixed.id not in resolved_customer_ids, (
+            "customer_mixed should NOT appear in RESOLVED list "
+            "(they have an open ticket)"
+        )
+        assert customer_open_only.id not in resolved_customer_ids, (
+            "customer_open_only should NOT appear in RESOLVED list"
+        )
+
+        # Verify the resolved ticket details
+        resolved_ticket = resolved_data["tickets"][0]
+        assert resolved_ticket["customer"]["id"] == customer_resolved_only.id
+        assert resolved_ticket["ticket_number"] == "RES-R001"
+        assert resolved_ticket["status"] == "resolved"
+        assert resolved_ticket["resolved_at"] is not None
+
+        # TEST 3: Verify no customer appears in both lists
+        open_ids_set = set(open_customer_ids)
+        resolved_ids_set = set(resolved_customer_ids)
+        intersection = open_ids_set.intersection(resolved_ids_set)
+        assert len(intersection) == 0, (
+            "No customer should appear in both OPEN and RESOLVED lists. "
+            f"Found in both: {intersection}"
         )
