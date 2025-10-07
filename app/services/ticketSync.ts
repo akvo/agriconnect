@@ -159,8 +159,25 @@ class TicketSyncService {
           });
         } else {
           console.warn(
-            `Skipping ticket ${apiTicket.ticketNumber || apiTicket.ticket_number}: missing customer or message`,
+            `Skipping ticket ${
+              apiTicket.ticketNumber || apiTicket.ticket_number
+            }: missing customer or message`,
           );
+        }
+
+        // 4. Sync resolver user if available
+        if (apiTicket.resolver?.id) {
+          // Simple upsert by id
+          const existingUser = dao.user.findById(db, apiTicket.resolver.id);
+          if (!existingUser) {
+            dao.user.create(db, {
+              id: apiTicket.resolver.id,
+              fullName: apiTicket.resolver.name,
+              email: apiTicket.resolver.email,
+              phoneNumber: apiTicket.resolver.phone_number,
+              userType: apiTicket.resolver.user_type,
+            });
+          }
         }
       }
     } catch (error) {
@@ -267,6 +284,7 @@ class TicketSyncService {
         messageId: ticketData.messageId,
         status: ticketData.status,
         resolvedAt: ticketData.resolvedAt || ticketData.resolved_at,
+        resolvedBy: ticketData?.resolver?.id || null,
         unreadCount: ticketData.unreadCount || ticketData.unread_count || 0,
         lastMessageAt: ticketData.lastMessageAt || ticketData.last_message_at,
       });
@@ -300,93 +318,6 @@ class TicketSyncService {
     } catch (error) {
       console.error("Error force refreshing tickets:", error);
       throw error;
-    }
-  }
-
-  /**
-   * Get sync statistics for debugging
-   */
-  static getSyncStats(db: SQLiteDatabase): {
-    totalTickets: number;
-    openTickets: number;
-    resolvedTickets: number;
-    totalCustomers: number;
-    totalMessages: number;
-  } {
-    try {
-      const ticketsStmt = db.prepareSync(
-        "SELECT COUNT(*) as count FROM tickets",
-      );
-      const openStmt = db.prepareSync(
-        "SELECT COUNT(*) as count FROM tickets WHERE resolvedAt IS NULL",
-      );
-      const resolvedStmt = db.prepareSync(
-        "SELECT COUNT(*) as count FROM tickets WHERE resolvedAt IS NOT NULL",
-      );
-      const customersStmt = db.prepareSync(
-        "SELECT COUNT(*) as count FROM customer_users",
-      );
-      const messagesStmt = db.prepareSync(
-        "SELECT COUNT(*) as count FROM messages",
-      );
-
-      const totalTickets =
-        ticketsStmt.executeSync<{ count: number }>().getFirstSync()?.count || 0;
-      const openTickets =
-        openStmt.executeSync<{ count: number }>().getFirstSync()?.count || 0;
-      const resolvedTickets =
-        resolvedStmt.executeSync<{ count: number }>().getFirstSync()?.count ||
-        0;
-      const totalCustomers =
-        customersStmt.executeSync<{ count: number }>().getFirstSync()?.count ||
-        0;
-      const totalMessages =
-        messagesStmt.executeSync<{ count: number }>().getFirstSync()?.count ||
-        0;
-
-      ticketsStmt.finalizeSync();
-      openStmt.finalizeSync();
-      resolvedStmt.finalizeSync();
-      customersStmt.finalizeSync();
-      messagesStmt.finalizeSync();
-
-      return {
-        totalTickets,
-        openTickets,
-        resolvedTickets,
-        totalCustomers,
-        totalMessages,
-      };
-    } catch (error) {
-      console.error("Error getting sync stats:", error);
-      return {
-        totalTickets: 0,
-        openTickets: 0,
-        resolvedTickets: 0,
-        totalCustomers: 0,
-        totalMessages: 0,
-      };
-    }
-  }
-
-  /**
-   * Clear all cached tickets (use with caution)
-   */
-  static clearCache(db: SQLiteDatabase): boolean {
-    try {
-      db.execSync("BEGIN TRANSACTION");
-      db.execSync("DELETE FROM tickets");
-      db.execSync("COMMIT");
-      console.log("✅ Cache cleared successfully");
-      return true;
-    } catch (error) {
-      console.error("Error clearing cache:", error);
-      try {
-        db.execSync("ROLLBACK");
-      } catch (rollbackError) {
-        console.error("Error rolling back:", rollbackError);
-      }
-      return false;
     }
   }
 }
