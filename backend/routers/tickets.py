@@ -2,7 +2,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 
 from database import get_db
 from models.ticket import Ticket
@@ -62,9 +62,13 @@ def _serialize_ticket(ticket: Ticket) -> dict:
         # lazy load resolver
         resolver_obj = ticket.resolver
         resolver = (
-            {"id": resolver_obj.id, "name": resolver_obj.full_name}
-            if resolver_obj
-            else None
+            {
+                "id": resolver_obj.id,
+                "name": resolver_obj.full_name,
+                "phone_number": resolver_obj.phone_number,
+                "email": resolver_obj.email,
+                "user_type": resolver_obj.user_type,
+            } if resolver_obj else None
         )
 
     customer = ticket.customer
@@ -135,7 +139,8 @@ async def create_ticket(payload: TicketCreate, db: Session = Depends(get_db)):
     ):
         admin_id = customer.customer_administrative[0].administrative_id
 
-    ticket_number = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    now = datetime.now(timezone.utc)
+    ticket_number = now.strftime("%Y%m%d%H%M%S")
     ticket = Ticket(
         ticket_number=ticket_number,
         administrative_id=admin_id,
