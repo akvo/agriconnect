@@ -2,7 +2,7 @@ export interface Message {
   id: number;
   name: string; // sender's name
   text: string;
-  sender: "user" | "agent";
+  sender: "user" | "customer";
   timestamp: string; // ISO string or formatted date
 }
 
@@ -56,11 +56,11 @@ const generateDummyMessages = (count = 100): Message[] => {
     dt.setMinutes(dt.getMinutes() - minuteOffset);
     msgs.push({
       id: id++,
-      name: isUser ? "You" : "Support Agent",
+      name: isUser ? "You" : "Customer",
       text: isUser
         ? `User message #${id - 1} — sample text to simulate chat content.`
-        : `Agent message #${id - 1} — assisting the user with a response.`,
-      sender: isUser ? "user" : "agent",
+        : `Customer message #${id - 1} — ask question.`,
+      sender: isUser ? "user" : "customer",
       timestamp: dt.toLocaleString(),
     });
   }

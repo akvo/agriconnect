@@ -100,7 +100,7 @@ const ChatScreen = () => {
                 viewPosition: 1,
                 animated,
               });
-            } catch (error) {
+            } catch {
               // Fallback: scroll to end of list
               console.warn("ScrollToLocation failed, using fallback");
               listRef.current?.scrollToEnd({ animated });
@@ -171,7 +171,7 @@ const ChatScreen = () => {
                       viewPosition: 1,
                       animated: true,
                     });
-                  } catch (error) {
+                  } catch {
                     // Final fallback: scroll to end
                     listRef.current?.scrollToEnd({ animated: true });
                   }
