@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models.message import Message, MessageFrom
+from models.ticket import Ticket
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
+from routers.ws import emit_message_created
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
@@ -55,6 +57,45 @@ async def whatsapp_webhook(
         )
         db.add(message)
         db.commit()
+        db.refresh(message)
+
+        # Find the ticket for this customer (if exists)
+        # Only emit WebSocket event if there's an open ticket
+        ticket = (
+            db.query(Ticket)
+            .filter(
+                Ticket.customer_id == customer.id,
+                Ticket.resolved_at.is_(None),
+            )
+            .first()
+        )
+
+        if ticket:
+            # Emit WebSocket event for new message in existing ticket
+            import asyncio
+
+            ward_id = None
+            if (
+                hasattr(customer, "customer_administrative")
+                and len(customer.customer_administrative) > 0
+            ):
+                ward_id = customer.customer_administrative[
+                    0
+                ].administrative_id
+
+            asyncio.create_task(
+                emit_message_created(
+                    ticket_id=ticket.id,
+                    message_id=message.id,
+                    customer_id=customer.id,
+                    body=Body,
+                    kind="customer",
+                    ts=message.created_at.isoformat()
+                    if message.created_at
+                    else None,
+                    ward_id=ward_id,
+                )
+            )
 
         if is_new_customer:
             try:
