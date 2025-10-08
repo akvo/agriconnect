@@ -5,6 +5,7 @@ import { SQLiteProvider, defaultDatabaseDirectory } from "expo-sqlite";
 import { DATABASE_NAME } from "@/database/config";
 import { migrateDbIfNeeded } from "@/database";
 import { TicketProvider } from "@/contexts/TicketContext";
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import HeaderOptions from "@/components/chat/header-options";
 
 export const unstable_settings = {
@@ -19,28 +20,30 @@ export default function RootLayout() {
       onInit={migrateDbIfNeeded}
     >
       <AuthProvider>
-        <TicketProvider>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="chat"
-              options={({
-                navigation,
-                route,
-              }: {
-                navigation: any;
-                route: any;
-              }) => ({
-                headerShown: true,
-                headerTitleAlign: "left",
-                headerRight: () => (
-                  <HeaderOptions ticketID={route?.params?.ticketNumber} />
-                ),
-              })}
-            />
-          </Stack>
-        </TicketProvider>
+        <WebSocketProvider>
+          <TicketProvider>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="login" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="chat"
+                options={({
+                  navigation,
+                  route,
+                }: {
+                  navigation: any;
+                  route: any;
+                }) => ({
+                  headerShown: true,
+                  headerTitleAlign: "left",
+                  headerRight: () => (
+                    <HeaderOptions ticketID={route?.params?.ticketNumber} />
+                  ),
+                })}
+              />
+            </Stack>
+          </TicketProvider>
+        </WebSocketProvider>
       </AuthProvider>
     </SQLiteProvider>
   );
