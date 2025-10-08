@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -19,6 +20,7 @@ from schemas.ticket import (
     TicketStatus,
 )
 from utils.auth_dependencies import get_current_user
+from routers.ws import emit_ticket_resolved
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -370,5 +372,14 @@ async def mark_ticket_resolved(
     ticket.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(ticket)
+
+    # Emit WebSocket event for ticket resolution
+    asyncio.create_task(
+        emit_ticket_resolved(
+            ticket_id=ticket.id,
+            resolved_at=resolved_dt.isoformat(),
+            ward_id=ticket.administrative_id,
+        )
+    )
 
     return {"ticket": _serialize_ticket(ticket)}
