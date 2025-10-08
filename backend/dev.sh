@@ -5,4 +5,4 @@ pip -q install --cache-dir=.pip -r requirements.txt
 pip check
 
 alembic upgrade head
-fastapi dev main.py --host 0.0.0.0
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
