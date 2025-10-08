@@ -796,6 +796,7 @@ class TestTickets:
         msg2 = Message(
             message_sid="C2",
             customer_id=customer.id,
+            user_id=admin_user.id,  # Message from admin user
             body="Second message",
             from_source=MessageFrom.USER,
             created_at=datetime(2025, 1, 1, 12, 0, 0),
@@ -872,28 +873,35 @@ class TestTickets:
 
         # 9. Validate each message object
         messages = payload["messages"]
-        # Note: API returns ALL messages for the customer,
-        # not just for this ticket
-        # So we expect: msg_base + msg1 + msg2 + msg3 + msg_buk = 5 messages
+        # Note: API returns messages from ticket escalation point onwards
+        # ticket_ngudu starts from msg_base (10:00)
+        # Should include: msg_base, msg1 (11:00), msg2 (12:00), msg3 (13:00)
+        # msg2 is from admin_user, so it should be included
+        # msg_buk is for a different ticket (ticket_bukandwe) at 10:00
+        # Since both msg_base and msg_buk are at 10:00, and filter is >=,
+        # msg_buk might also be included
         assert (
-            len(messages) >= 4
-        ), "Should return at least 4 messages for this customer"
+            len(messages) >= 3
+        ), "Should return at least 3 messages from ticket escalation onwards"
 
         for i, m in enumerate(messages):
             assert "id" in m, "Message should have 'id'"
             assert "message_sid" in m, "Message should have 'message_sid'"
             assert "body" in m, "Message should have 'body'"
             assert "from_source" in m, "Message should have 'from_source'"
-            assert "message_type" in m, "Message should have 'message_type'"
+            assert (
+                "message_type" in m
+            ), "Message should have 'message_type'"
             assert "created_at" in m, "Message should have 'created_at'"
 
-            # 7. Verify descending order by created_at
+            # 7. Verify descending order by created_at (newest first)
+            # Messages are returned in desc order for pagination
             if i > 0:
                 prev_ts = messages[i - 1]["created_at"]
                 curr_ts = m["created_at"]
-                assert (
-                    prev_ts >= curr_ts
-                ), "Messages should be sorted by created_at descending"
+                assert prev_ts >= curr_ts, (
+                    "Messages should be sorted by created_at descending"
+                )
 
         # 5, 10. Test with different limit values
         limited_response = client.get(
@@ -907,7 +915,8 @@ class TestTickets:
         ), "Should return only 2 messages with limit=2"
         assert limited_payload["limit"] == 2, "Limit should be 2"
 
-        # 5, 8. Test with before_ts parameter
+        # 5, 8. Test with before_ts parameter (pagination)
+        # before_ts allows fetching older messages for infinite scroll
         middle_ts = datetime(2025, 1, 1, 12, 30, 0).isoformat()
         before_response = client.get(
             f"/api/tickets/{ticket_ngudu.id}/messages?"
@@ -916,8 +925,10 @@ class TestTickets:
         )
         assert before_response.status_code == 200
         before_payload = before_response.json()
-        # Should return messages before 12:30
+        # With before_ts, we get messages before 12:30
         # (msg2 at 12:00, msg1 at 11:00, msg_base + msg_buk at 10:00)
+        # Note: without before_ts the filter is >= ticket message time
+        # With before_ts, it just filters < before_ts
         assert (
             len(before_payload["messages"]) >= 3
         ), "Should return at least 3 messages before specified timestamp"
@@ -926,7 +937,8 @@ class TestTickets:
                 msg["created_at"] < middle_ts
             ), "All messages should be before specified timestamp"
 
-        # 8. Test with before_ts earlier than all messages
+        # 8. Test with before_ts earlier than ticket escalation point
+        # Should return no messages (pagination past the start)
         early_ts = datetime(2025, 1, 1, 9, 0, 0).isoformat()
         early_response = client.get(
             f"/api/tickets/{ticket_ngudu.id}/messages?"

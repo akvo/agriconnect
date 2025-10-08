@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from database import get_db
 from models.ticket import Ticket
 from models.customer import Customer
-from models.message import Message
+from models.message import Message, MessageFrom
 from models.user import User, UserType
 from models.administrative import UserAdministrative, Administrative
 from schemas.ticket import (
@@ -276,6 +276,23 @@ async def get_ticket_header(
     return {"ticket": _serialize_ticket(ticket)}
 
 
+# Helper to convert from_source integer to string
+def get_from_source_string(from_source: int) -> str:
+    """Convert from_source integer to string representation.
+    Uses MessageFrom constants:
+    - CUSTOMER = 1 -> "whatsapp"
+    - USER = 2 -> "system"
+    - LLM = 3 -> "llm"
+    """
+    if from_source == MessageFrom.CUSTOMER:
+        return "whatsapp"
+    elif from_source == MessageFrom.USER:
+        return "system"
+    elif from_source == MessageFrom.LLM:
+        return "llm"
+    return "unknown"
+
+
 @router.get("/{ticket_id}/messages", response_model=TicketMessagesResponse)
 async def get_ticket_conversation(
     ticket_id: int,
@@ -285,6 +302,10 @@ async def get_ticket_conversation(
     db: Session = Depends(get_db),
 ):
     """Get ticket conversation messages.
+
+    Returns messages from the ticket's escalation point onwards.
+    - Without before_ts: messages from ticket.message_id to latest
+    - With before_ts: older messages before that timestamp (pagination)
 
     Admin users can access any ticket.
     EO users can only access tickets in their assigned administrative areas.
@@ -296,17 +317,36 @@ async def get_ticket_conversation(
     # Check access for EO users
     _check_ticket_access(ticket, current_user, db)
 
-    # get messages for the ticket's customer ordered by created_at desc
+    # Get the ticket's base message to determine the starting point
+    ticket_message = ticket.message
+
+    # Get messages for the ticket's customer
+    # Filter messages where:
+    # 1. from_source = CUSTOMER (customer messages) OR
+    # 2. user_id = current_user.id (messages from current user)
+    # This ensures each user only sees their own conversation with the customer
     msgs_query = db.query(Message).filter(
-        Message.customer_id == ticket.customer_id
+        Message.customer_id == ticket.customer_id,
+        (
+            (Message.from_source == MessageFrom.CUSTOMER) |
+            (Message.user_id == current_user.id)
+        )
     )
+
     if before_ts:
+        # Pagination: get older messages before the given timestamp
         try:
             before_dt = datetime.fromisoformat(before_ts)
             msgs_query = msgs_query.filter(Message.created_at < before_dt)
         except Exception:
-            # ignore invalid before_ts, return from head
+            # ignore invalid before_ts, return from ticket start
             pass
+    else:
+        # Default: start from ticket's escalation message onwards
+        if ticket_message and ticket_message.created_at:
+            msgs_query = msgs_query.filter(
+                Message.created_at >= ticket_message.created_at
+            )
 
     msgs = msgs_query.order_by(Message.created_at.desc()).limit(limit).all()
 
@@ -315,7 +355,7 @@ async def get_ticket_conversation(
             "id": m.id,
             "message_sid": m.message_sid,
             "body": m.body,
-            "from_source": m.from_source,
+            "from_source": get_from_source_string(m.from_source),
             "message_type": (
                 getattr(m, "message_type", None).name
                 if getattr(m, "message_type", None)
