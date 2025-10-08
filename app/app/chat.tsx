@@ -17,6 +17,13 @@ import {
   useChatPagination,
   ChatPaginationProvider,
 } from "@/contexts/ChatPaginationContext";
+import {
+  useWebSocket,
+  MessageCreatedEvent,
+  TicketResolvedEvent,
+} from "@/contexts/WebSocketContext";
+import { useDatabase } from "@/database/context";
+import { DAOManager } from "@/database/dao";
 import MessageBubble from "@/components/chat/message-bubble";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
@@ -43,6 +50,11 @@ const ChatScreen = () => {
   const [aiSuggestions, setAiSuggestions] = useState<string>(dummyAISuggestion);
   const [text, setText] = useState<string>("");
   const listRef = useRef<any | null>(null);
+  const db = useDatabase();
+  const daoManager = React.useMemo(() => new DAOManager(db), [db]);
+  const { joinTicket, leaveTicket, onMessageCreated, onTicketResolved } =
+    useWebSocket();
+  const [ticketId, setTicketId] = useState<number | null>(null);
 
   // compute which sections to display based on pagination state
   const displayedSections = React.useMemo(() => {
@@ -133,6 +145,99 @@ const ChatScreen = () => {
   }, [scrollToBottom, displayedSections]);
   // Sample messages for demonstration
   // In a real app, fetch messages from an API or database
+
+  // Handle real-time message_created events
+  useEffect(() => {
+    const unsubscribe = onMessageCreated(async (event: MessageCreatedEvent) => {
+      // Only process if this is for the current ticket
+      if (!ticketId || event.ticket_id !== ticketId) {
+        return;
+      }
+
+      console.log("[Chat] Received new message:", event);
+
+      try {
+        // TODO: Save message to SQLite database
+        // For now, just add to local state
+        const newMessage: Message = {
+          id: event.message_id,
+          name: event.kind === "customer" ? "Customer" : "Agent",
+          text: event.body,
+          timestamp: event.ts, // Already ISO string
+          sender: event.kind === "customer" ? "customer" : "user",
+        };
+
+        setMessages((prev: Message[]) => [...prev, newMessage]);
+
+        // Scroll to bottom to show new message after a short delay
+        setTimeout(() => {
+          try {
+            scrollToBottom(true);
+          } catch (error) {
+            console.warn("[Chat] Error scrolling to bottom:", error);
+          }
+        }, 200);
+      } catch (error) {
+        console.error("[Chat] Error handling new message:", error);
+      }
+    });
+
+    return unsubscribe;
+  }, [onMessageCreated, ticketId, scrollToBottom]);
+
+  // Load ticket ID from ticket number
+  useEffect(() => {
+    const loadTicketId = async () => {
+      if (!ticketNumber) {
+        return;
+      }
+      try {
+        // Fetch ticket from database to get ID
+        const ticket = await daoManager.ticket.findByTicketNumber(
+          db,
+          ticketNumber,
+        );
+        if (ticket) {
+          setTicketId(ticket.id);
+        }
+      } catch (error) {
+        console.error("[Chat] Error loading ticket ID:", error);
+      }
+    };
+    loadTicketId();
+  }, [ticketNumber, db, daoManager]);
+
+  // Join/leave ticket room when screen mounts/unmounts
+  useEffect(() => {
+    if (!ticketId) {
+      return;
+    }
+
+    console.log(`[Chat] Joining ticket room: ${ticketId}`);
+    joinTicket(ticketId);
+
+    return () => {
+      console.log(`[Chat] Leaving ticket room: ${ticketId}`);
+      leaveTicket(ticketId);
+    };
+  }, [ticketId, joinTicket, leaveTicket]);
+
+  // Handle real-time ticket_resolved events
+  useEffect(() => {
+    const unsubscribe = onTicketResolved(async (event: TicketResolvedEvent) => {
+      // Only process if this is for the current ticket
+      if (!ticketId || event.ticket_id !== ticketId) {
+        return;
+      }
+
+      console.log("[Chat] Ticket resolved:", event);
+
+      // TODO: Update UI to show ticket is resolved
+      // Could show a banner or disable input
+    });
+
+    return unsubscribe;
+  }, [onTicketResolved, ticketId]);
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
