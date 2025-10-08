@@ -49,6 +49,7 @@ const HeaderOptions = ({ ticketID }: Props) => {
       updateTicket(ticket.id, {
         resolvedAt: resData.resolved_at,
         resolvedBy: user.id,
+        unreadCount: 0,
       });
       // Redirect to inbox after closing with active tab as 'responded'
       router.replace("/inbox?initTab=resolved");
