@@ -28,3 +28,4 @@ class Customer(Base):
     customer_administrative = relationship(
         "CustomerAdministrative", back_populates="customer"
     )
+    tickets = relationship("Ticket", back_populates="customer")

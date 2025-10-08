@@ -34,9 +34,14 @@ interface TokenResponse {
 
 class ApiClient {
   private baseUrl: string;
+  private unauthorizedHandler?: () => void;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
+  }
+
+  setUnauthorizedHandler(handler?: () => void) {
+    this.unauthorizedHandler = handler;
   }
 
   async login(credentials: LoginCredentials): Promise<TokenResponse> {
@@ -49,6 +54,18 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // trigger registered unauthorized handler and throw
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+          } catch (e) {
+            // swallow handler errors
+            console.error("unauthorizedHandler error:", e);
+          }
+        }
+      }
+
       const error = await response
         .json()
         .catch(() => ({ detail: "Login failed" }));
@@ -67,6 +84,83 @@ class ApiClient {
 
     if (!response.ok) {
       throw new Error("Failed to fetch profile");
+    }
+
+    return response.json();
+  }
+
+  async getTickets(
+    token: string,
+    status: "open" | "resolved",
+    page: number = 1,
+    size?: number,
+  ): Promise<any> {
+    const sizeQuery = size ? `&size=${size}` : "";
+    const response = await fetch(
+      `${this.baseUrl}/tickets/?status=${status}&page=${page}${sizeQuery}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+          } catch (e) {
+            console.error("unauthorizedHandler error:", e);
+          }
+        }
+      }
+      // return HTTP status code and error message
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch tickets" }));
+      throw new Error(
+        `${response.status}: ${error.detail || "Failed to fetch tickets"}`,
+      );
+    }
+
+    const res = await response.json();
+    return {
+      ...res,
+      tickets: res.tickets.map((ticket: any) => ({
+        ...ticket,
+        ticketNumber: ticket.ticket_number,
+        unreadCount: ticket.resolved_at ? 0 : 1,
+      })),
+    };
+  }
+
+  async closeTicket(token: string, ticketID: number): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/tickets/${ticketID}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        resolved_at: new Date().toISOString().replace("Z", "+00:00"),
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+          } catch (e) {
+            console.error("unauthorizedHandler error:", e);
+          }
+        }
+      }
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to close ticket" }));
+      throw new Error(error.detail || "Failed to close ticket");
     }
 
     return response.json();

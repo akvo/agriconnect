@@ -27,6 +27,7 @@ interface User {
   isActive: boolean;
   invitationStatus?: string;
   administrativeLocation?: AdministrativeLocation | null;
+  accessToken?: string;
 }
 
 interface AuthContextType {
@@ -75,7 +76,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   const checkAuth = useCallback(async () => {
     // Get profile with user details from database (single JOIN query)
-    const profileDB = await dao.profile.getCurrentProfile();
+    const profileDB = await dao.profile.getCurrentProfile(db);
 
     if (!user && profileDB) {
       // Map profile data to user state
@@ -93,6 +94,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         isActive: profileDB.isActive,
         invitationStatus: profileDB.invitationStatus,
         administrativeLocation: adm,
+        accessToken: profileDB.accessToken,
       });
     }
 
@@ -127,6 +129,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         isActive: apiData.is_active,
         invitationStatus: apiData.invitation_status,
         administrativeLocation: apiData.administrative_location,
+        accessToken: accessToken,
       };
 
       setUser(userData);
@@ -135,8 +138,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         router.replace("/home");
       }
     } catch (error) {
-      console.error("Auth validation error:", error);
       if (segments[0] !== "login" && routeToken) {
+        setUser(null);
+        setIsValid(false);
         router.replace("/login");
       }
     }
@@ -146,10 +150,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     checkAuth();
   }, [checkAuth]);
 
+  // Register unauthorized handler to auto-logout on 401 responses
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      // perform logout; don't await here to avoid blocking
+      logout().catch((err) =>
+        console.error("Error during auto-logout (unauthorized):", err),
+      );
+    };
+
+    // register
+    api.setUnauthorizedHandler(handleUnauthorized);
+
+    return () => {
+      // unregister handler on unmount
+      api.setUnauthorizedHandler(undefined);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const login = async (accessToken: string, userData: User) => {
     try {
       // Create new user
-      dao.user.create({
+      dao.user.create(db, {
         id: userData.id,
         email: userData.email,
         fullName: userData.fullName,
@@ -161,12 +184,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       });
 
       // Create new profile
-      dao.profile.create({
+      dao.profile.create(db, {
         userId: userData.id,
         accessToken: accessToken,
       });
 
-      setUser(userData);
+      setUser({
+        ...userData,
+        accessToken: accessToken,
+      });
       setIsValid(true);
     } catch (error) {
       console.error("Error during login:", error);

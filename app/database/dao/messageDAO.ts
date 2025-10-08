@@ -9,16 +9,16 @@ import {
 } from "./types/message";
 
 export class MessageDAO extends BaseDAOImpl<Message> {
-  constructor(db: SQLiteDatabase) {
-    super(db, "messages");
+  constructor() {
+    super("messages");
   }
 
-  create(data: CreateMessageData): Message {
-    const stmt = this.db.prepareSync(
+  create(db: SQLiteDatabase, data: CreateMessageData): Message {
+    const stmt = db.prepareSync(
       `INSERT INTO messages (
         from_source, message_sid, customer_id, user_id, body, 
-        message_type, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        message_type, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     );
     try {
       const now = new Date().toISOString();
@@ -30,10 +30,9 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         data.body,
         data.message_type || "text",
         now,
-        now,
       ]);
 
-      const message = this.findById(result.lastInsertRowId);
+      const message = this.findById(db, result.lastInsertRowId);
       if (!message) {
         throw new Error("Failed to retrieve created message");
       }
@@ -46,7 +45,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     }
   }
 
-  update(id: number, data: UpdateMessageData): boolean {
+  update(db: SQLiteDatabase, id: number, data: UpdateMessageData): boolean {
     try {
       const updates: string[] = [];
       const values: any[] = [];
@@ -79,12 +78,10 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       if (updates.length === 0) {
         return false;
       }
-
-      updates.push("updatedAt = ?");
       values.push(new Date().toISOString());
       values.push(id);
 
-      const stmt = this.db.prepareSync(
+      const stmt = db.prepareSync(
         `UPDATE messages SET ${updates.join(", ")} WHERE id = ?`,
       );
       try {
@@ -101,11 +98,12 @@ export class MessageDAO extends BaseDAOImpl<Message> {
 
   // Get conversation between specific customer and EO
   getConversation(
+    db: SQLiteDatabase,
     customerId: number,
     eoId: number,
     limit: number = 50,
   ): MessageWithUsers[] {
-    const stmt = this.db.prepareSync(
+    const stmt = db.prepareSync(
       `SELECT 
         m.*,
         f.fullName as customer_name,
@@ -135,8 +133,12 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   }
 
   // Get inbox - recent conversations for an EO
-  getInbox(eoId: number, limit: number = 20): ConversationSummary[] {
-    const stmt = this.db.prepareSync(
+  getInbox(
+    db: SQLiteDatabase,
+    eoId: number,
+    limit: number = 20,
+  ): ConversationSummary[] {
+    const stmt = db.prepareSync(
       `SELECT 
         m1.customer_id,
         m1.user_id,
@@ -174,10 +176,11 @@ export class MessageDAO extends BaseDAOImpl<Message> {
 
   // Get messages by customer
   getMessagesByCustomer(
+    db: SQLiteDatabase,
     customerId: number,
     limit: number = 50,
   ): MessageWithUsers[] {
-    const stmt = this.db.prepareSync(
+    const stmt = db.prepareSync(
       `SELECT 
         m.*,
         f.fullName as customer_name,
@@ -203,8 +206,12 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   }
 
   // Get messages by EO
-  getMessagesByEO(eoId: number, limit: number = 50): MessageWithUsers[] {
-    const stmt = this.db.prepareSync(
+  getMessagesByEO(
+    db: SQLiteDatabase,
+    eoId: number,
+    limit: number = 50,
+  ): MessageWithUsers[] {
+    const stmt = db.prepareSync(
       `SELECT 
         m.*,
         f.fullName as customer_name,
@@ -230,10 +237,8 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   }
 
   // Find message by WhatsApp message SID
-  findByMessageSid(messageSid: string): Message | null {
-    const stmt = this.db.prepareSync(
-      "SELECT * FROM messages WHERE message_sid = ?",
-    );
+  findByMessageSid(db: SQLiteDatabase, messageSid: string): Message | null {
+    const stmt = db.prepareSync("SELECT * FROM messages WHERE message_sid = ?");
     try {
       const result = stmt.executeSync<Message>([messageSid]);
       return result.getFirstSync() || null;
@@ -246,8 +251,11 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   }
 
   // Get recent messages (for debugging/admin)
-  getRecentMessages(limit: number = 10): MessageWithUsers[] {
-    const stmt = this.db.prepareSync(
+  getRecentMessages(
+    db: SQLiteDatabase,
+    limit: number = 10,
+  ): MessageWithUsers[] {
+    const stmt = db.prepareSync(
       `SELECT 
         m.*,
         f.fullName as customer_name,
@@ -272,8 +280,12 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   }
 
   // Search messages by content
-  searchMessages(query: string, limit: number = 20): MessageWithUsers[] {
-    const stmt = this.db.prepareSync(
+  searchMessages(
+    db: SQLiteDatabase,
+    query: string,
+    limit: number = 20,
+  ): MessageWithUsers[] {
+    const stmt = db.prepareSync(
       `SELECT 
         m.*,
         f.fullName as customer_name,

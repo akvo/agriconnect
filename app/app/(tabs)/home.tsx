@@ -1,12 +1,13 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
-import MDCommunityicons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
+import { initialsFromName } from "@/utils/string";
+import Avatar from "@/components/avatar";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -21,29 +22,17 @@ export default function HomeScreen() {
     }
   };
 
-  // Get initials for profile icon
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((word) => word.charAt(0).toUpperCase())
-      .slice(0, 2)
-      .join("");
-  };
-
   return (
     <ParallaxScrollView>
       {/* Header with profile icon */}
       <View style={styles.header}>
         <View style={styles.profileContainer}>
           <View style={styles.profileIcon}>
-            {user?.userType === "admin" && (
-              <View style={styles.adminBadge}>
-                <MDCommunityicons name="crown" size={20} color={"white"} />
-              </View>
-            )}
-            <Text style={styles.profileText}>
-              {user?.fullName ? getInitials(user.fullName) : "U"}
-            </Text>
+            <Avatar
+              initials={user?.fullName ? initialsFromName(user.fullName) : "U"}
+              size={50}
+              showAdminBadge={user?.userType === "admin"}
+            />
           </View>
           <View style={styles.profileDetails}>
             <Text style={styles.welcomeText}>Welcome Back</Text>
@@ -67,8 +56,12 @@ export default function HomeScreen() {
             )}
           </View>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Feathericons name="log-out" size={24} color="#fff" />
+        <TouchableOpacity
+          style={[styles.logoutButton]}
+          onPress={handleLogout}
+          test-id="logout-button"
+        >
+          <Feathericons name="log-out" size={24} color={"white"} />
         </TouchableOpacity>
       </View>
 

@@ -1,14 +1,8 @@
-// Migration exports for easy importing
-export { usersMigration } from "./001_create_users_table";
-export { customerUsersMigration } from "./002_create_customer_users_table";
-export { messagesMigration } from "./003_create_messages_table";
-export { profileMigration } from "./004_create_profile_table";
-
-// Import the migrations for the array
 import { usersMigration } from "./001_create_users_table";
 import { customerUsersMigration } from "./002_create_customer_users_table";
 import { messagesMigration } from "./003_create_messages_table";
 import { profileMigration } from "./004_create_profile_table";
+import { ticketMigration } from "./005_create_tickets_table";
 
 // Type definition for migration objects
 export interface Migration {
@@ -24,6 +18,7 @@ export const allMigrations: Migration[] = [
   { version: 1, name: "customer_users", migration: customerUsersMigration },
   { version: 1, name: "messages", migration: messagesMigration },
   { version: 1, name: "profile", migration: profileMigration },
+  { version: 2, name: "tickets", migration: ticketMigration },
 
   // Future version 2 migrations can be added here
   // { version: 2, name: 'some_new_table', migration: someNewTableMigration },
