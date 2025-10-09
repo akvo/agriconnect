@@ -1,14 +1,3 @@
-/**
- * Chat Screen - Ticket Conversation View
- *
- * Features:
- * - Loads messages from API: /api/tickets/{ticket_id}/messages
- * - Implements pagination with before_ts parameter for lazy loading
- * - Uses MessageSyncService to sync messages between API and SQLite
- * - Real-time message updates via WebSocket
- * - Message source handling: CUSTOMER (1), USER (2), LLM (3)
- * - Inverted FlatList for chat-like scrolling behavior
- */
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Text,
@@ -46,7 +35,7 @@ import { MessageFrom } from "@/constants/messageSource";
 // Helper function to convert MessageWithUsers to Message
 const convertToUIMessage = (
   msg: MessageWithUsers,
-  currentUserName?: string
+  currentUserName?: string,
 ): Message => {
   // Determine if message is from customer or user/llm
   // from_source: 1=CUSTOMER, 2=USER, 3=LLM
@@ -55,7 +44,7 @@ const convertToUIMessage = (
   console.log(
     `[Chat] Converting message id=${msg.id} text={${msg.body}} from_source=${
       msg.from_source
-    } to UI message as ${isCustomerMessage ? "customer" : "user"}`
+    } to UI message as ${isCustomerMessage ? "customer" : "user"}`,
   );
   return {
     id: msg.id,
@@ -79,7 +68,6 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
-  const [hasMore, setHasMore] = useState<boolean>(true);
   const [oldestTimestamp, setOldestTimestamp] = useState<string | null>(null);
   const [text, setText] = useState<string>("");
   const flatListRef = useRef<any | null>(null);
@@ -153,7 +141,7 @@ const ChatScreen = () => {
     const loadTicketAndMessages = async () => {
       if (!ticketNumber || !user?.accessToken) {
         console.log(
-          `[Chat] Missing ticketNumber or accessToken, skipping load`
+          `[Chat] Missing ticketNumber or accessToken, skipping load`,
         );
         setLoading(false);
         return;
@@ -165,12 +153,12 @@ const ChatScreen = () => {
         // Fetch ticket from database to get ID
         const ticketData = daoManager.ticket.findByTicketNumber(
           db,
-          ticketNumber
+          ticketNumber,
         );
 
         console.log(
           `[Chat] Found ticket data:`,
-          ticketData ? `id=${ticketData.id}` : "null"
+          ticketData ? `id=${ticketData.id}` : "null",
         );
 
         if (ticketData) {
@@ -187,7 +175,7 @@ const ChatScreen = () => {
           // This fetches from API: /api/tickets/{ticket_id}/messages
           // and stores them in SQLite for offline access
           console.log(
-            `[Chat] Calling MessageSyncService.loadInitialMessages for ticket ${ticketData.id}`
+            `[Chat] Calling MessageSyncService.loadInitialMessages for ticket ${ticketData.id}`,
           );
           const result = await MessageSyncService.loadInitialMessages(
             db,
@@ -196,22 +184,21 @@ const ChatScreen = () => {
             ticketData.customer?.id || 0,
             ticketData.createdAt || new Date().toISOString(),
             user?.id,
-            20
+            20,
           );
           console.log(
-            `[Chat] MessageSyncService returned ${result.messages.length} messages`
+            `[Chat] MessageSyncService returned ${result.messages.length} messages`,
           );
 
           // Convert to UI message format
           const uiMessages = result.messages.map((msg) =>
-            convertToUIMessage(msg, user?.fullName)
+            convertToUIMessage(msg, user?.fullName),
           );
           setMessages(uiMessages);
-          setHasMore(result.hasMore);
           setOldestTimestamp(result.oldestTimestamp);
 
           console.log(
-            `[Chat] Loaded ${uiMessages.length} messages for ticket ${ticketNumber}`
+            `[Chat] Loaded ${uiMessages.length} messages for ticket ${ticketNumber}`,
           );
 
           // Scroll to bottom after loading
@@ -232,13 +219,7 @@ const ChatScreen = () => {
   // Load older messages when scrolling up (pagination)
   // Uses before_ts parameter for lazy loading behavior
   const loadOlderMessages = async () => {
-    if (
-      !ticket?.id ||
-      !user?.accessToken ||
-      !oldestTimestamp ||
-      !hasMore ||
-      loadingMore
-    ) {
+    if (!ticket?.id || !user?.accessToken || !oldestTimestamp || loadingMore) {
       return;
     }
 
@@ -254,15 +235,23 @@ const ChatScreen = () => {
         ticket.customer?.id || 0,
         oldestTimestamp,
         user?.id,
-        20
+        20,
       );
 
       // Convert to UI message format
       const uiMessages = result.messages.map((msg) =>
-        convertToUIMessage(msg, user?.fullName)
+        convertToUIMessage(msg, user?.fullName),
       );
-      setMessages(uiMessages);
-      setHasMore(result.hasMore);
+
+      // Prepend older messages to the existing messages list
+      // Filter out duplicates by checking message IDs
+      setMessages((prev: Message[]) => {
+        const existingIds = new Set(prev.map((m: Message) => m.id));
+        const newMessages = uiMessages.filter(
+          (m: Message) => !existingIds.has(m.id),
+        );
+        return [...newMessages, ...prev]; // Prepend older messages
+      });
       setOldestTimestamp(result.oldestTimestamp);
 
       console.log(`[Chat] Loaded ${result.messages.length} older messages`);
@@ -307,7 +296,7 @@ const ChatScreen = () => {
           // Fetch message with user details
           const dbMessage = daoManager.message.findByIdWithUsers(
             db,
-            savedMessage.id
+            savedMessage.id,
           );
 
           if (dbMessage) {
@@ -318,7 +307,7 @@ const ChatScreen = () => {
               const exists = prev.some((m) => m.id === uiMessage.id);
               if (exists) {
                 console.log(
-                  `[Chat] Message ${uiMessage.id} already exists, skipping`
+                  `[Chat] Message ${uiMessage.id} already exists, skipping`,
                 );
                 return prev;
               }
@@ -362,7 +351,7 @@ const ChatScreen = () => {
         } catch (error) {
           console.error("[Chat] Error handling message status update:", error);
         }
-      }
+      },
     );
 
     return unsubscribe;
@@ -473,7 +462,7 @@ const ChatScreen = () => {
             contentContainerStyle={{ padding: 12, paddingBottom: 20 }}
             onEndReached={() => {
               // In inverted mode, onEndReached fires when scrolling up to load older messages
-              if (hasMore && !loadingMore) {
+              if (!loadingMore) {
                 loadOlderMessages();
               }
             }}
@@ -530,13 +519,13 @@ const ChatScreen = () => {
                 // Fetch message with user details
                 const dbMessage = daoManager.message.findByIdWithUsers(
                   db,
-                  savedMessage.id
+                  savedMessage.id,
                 );
 
                 if (dbMessage) {
                   const uiMessage = convertToUIMessage(
                     dbMessage,
-                    user?.fullName
+                    user?.fullName,
                   );
 
                   // Update messages

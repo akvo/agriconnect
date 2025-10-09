@@ -23,7 +23,6 @@ interface MessagesApiResponse {
 interface SyncResult {
   messages: any[];
   total: number;
-  hasMore: boolean;
   oldestTimestamp: string | null;
 }
 
@@ -119,19 +118,16 @@ class MessageSyncService {
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
         );
 
-      // Determine if there are more messages to load
-      const hasMore = apiData.messages.length >= limit;
-
       // Get oldest timestamp from the fetched messages for next pagination
+      // API returns messages in ascending order (oldest first based on logs)
+      // Take the first message's timestamp as the oldest for pagination
       const oldestTimestamp =
         apiData.messages.length > 0
           ? apiData.messages[apiData.messages.length - 1].created_at
           : null;
-
       return {
         messages,
         total: apiData.total,
-        hasMore,
         oldestTimestamp,
       };
     } catch (error) {
