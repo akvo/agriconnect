@@ -49,7 +49,28 @@ export const formatDateLabel = (rawDate: string) => {
       "November",
       "December",
     ];
-    return `${monthNames[dt.getMonth()]} ${dt.getDate()} ${dt.getFullYear()}`;
+    return `${monthNames[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
   }
   return rawDate;
+};
+
+export const formatMessageTimestamp = (iso: string) => {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) {
+    return iso; // Return original if invalid
+  }
+
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const seconds = d.getSeconds();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  const mm = minutes < 10 ? `0${minutes}` : String(minutes);
+  const ss = seconds < 10 ? `0${seconds}` : String(seconds);
+
+  return `${month}/${day}/${year}, ${hours}:${mm}:${ss} ${ampm}`;
 };
