@@ -9,7 +9,7 @@ CREATE TABLE messages (
     customer_id INTEGER NOT NULL, -- Reference to customer_users.id
     user_id INTEGER, -- Reference to users.id (NULL for customer messages)
     body TEXT NOT NULL, -- Message content
-    message_type TEXT NOT NULL DEFAULT 'text', -- text, image, audio, etc.
+    message_type INTEGER, -- Message type: 1=REPLY, 2=WHISPER (matches backend MessageType)
     createdAt TEXT NOT NULL DEFAULT (datetime('now')),
 
     -- Foreign key constraints
