@@ -92,12 +92,15 @@ def _serialize_ticket(
             else None
         ),
         "message": (
-            {"id": message.id, "body": message.body} if message else None
+            {
+                "id": message.id,
+                "body": message.body,
+                "message_sid": message.message_sid,
+                "created_at": message.created_at.isoformat()
+            } if message else None
         ),
         "status": "resolved" if ticket.resolved_at else "open",
-        "created_at": (
-            ticket.created_at.isoformat() if ticket.created_at else None
-        ),
+        "created_at": ticket.created_at.isoformat(),
         "resolved_at": (
             ticket.resolved_at.isoformat() if ticket.resolved_at else None
         ),
