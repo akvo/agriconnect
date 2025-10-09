@@ -1,5 +1,5 @@
 import { SQLiteDatabase } from "expo-sqlite";
-import { DATABASE_VERSION, DATABASE_NAME } from "./config";
+import { DATABASE_VERSION } from "./config";
 import { getMigrationsByVersion, Migration } from "./migrations";
 
 // Helper function to execute migrations with transaction support
@@ -65,6 +65,19 @@ export const migrateDbIfNeeded = (db: SQLiteDatabase): void => {
 
     currentDbVersion = 2;
     console.log("✅ Database upgraded to version 2");
+  }
+
+  if (currentDbVersion === 2) {
+    console.log("🔄 Upgrading database to version 3...");
+    const version3Migrations = getMigrationsByVersion(3);
+
+    for (const migration of version3Migrations) {
+      console.log(`Executing migration: ${migration.name}`);
+      executeMigration(db, migration);
+    }
+
+    currentDbVersion = 3;
+    console.log("✅ Database upgraded to version 3");
   }
 
   db.execSync(`PRAGMA user_version = ${DATABASE_VERSION}`);
