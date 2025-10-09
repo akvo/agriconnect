@@ -5,6 +5,7 @@ import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import { initialsFromName } from "@/utils/string";
 import { Message } from "@/utils/chat";
+import { formatMessageTimestamp } from "@/utils/time";
 
 interface MessageBubbleProps {
   message: Message;
@@ -17,15 +18,14 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
     return (
       <View style={[styles.messageRow, styles.rowRight]}>
         <View style={[styles.bubble]}>
-          <View style={styles.header}>
-            <Text style={[typography.body4, styles.name]}>You</Text>
-            <Text style={[typography.caption, styles.timestamp]}>
-              {message.timestamp}
-            </Text>
-          </View>
           <View style={[styles.bubbleRight]}>
             <Text style={[typography.body3, styles.userText]}>
               {message.text}
+            </Text>
+          </View>
+          <View style={styles.footer}>
+            <Text style={[typography.caption, styles.timestamp]}>
+              {formatMessageTimestamp(message.timestamp)}
             </Text>
           </View>
         </View>
@@ -36,16 +36,13 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
     <View style={[styles.messageRow, styles.rowLeft]}>
       <Avatar initials={initialsFromName(message?.name)} size={40} />
       <View style={[styles.bubble]}>
-        <View style={styles.header}>
-          <Text style={[typography.body3, styles.customerName]}>
-            {message.name}
-          </Text>
-          <Text style={[typography.body4, styles.timestampSecondary]}>
-            {message.timestamp}
-          </Text>
-        </View>
         <View style={[styles.bubbleLeftCustomer]}>
           <Text style={typography.body3}>{message.text}</Text>
+        </View>
+        <View style={styles.footer}>
+          <Text style={[typography.body4, styles.timestampSecondary]}>
+            {formatMessageTimestamp(message.timestamp)}
+          </Text>
         </View>
       </View>
     </View>
@@ -104,7 +101,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 4,
   },
-  header: {
+  footer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

@@ -43,61 +43,6 @@ const groupMessagesByDate = (messages: Message[]) => {
     }));
 };
 
-const generateDummyMessages = (count = 100): Message[] => {
-  const msgs: Message[] = [];
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
-
-  // helper to push a message for a given date and minute offset
-  let id = 1;
-  function pushMsg(dayOffset: number, minuteOffset: number, isUser: boolean) {
-    const dt = new Date(currentYear, currentMonth, today.getDate() - dayOffset);
-    dt.setMinutes(dt.getMinutes() - minuteOffset);
-    msgs.push({
-      id: id++,
-      name: isUser ? "You" : "Customer",
-      text: isUser
-        ? `User message #${id - 1} — sample text to simulate chat content.`
-        : `Customer message #${id - 1} — ask question.`,
-      sender: isUser ? "user" : "customer",
-      timestamp: dt.toLocaleString(),
-    });
-  }
-
-  // Create messages for: today (30 msgs), yesterday (30 msgs), and previous days within current month (remaining)
-  const todayCount = Math.min(30, count);
-  const yesterdayCount = Math.min(30, Math.max(0, count - todayCount));
-  const remaining = Math.max(0, count - todayCount - yesterdayCount);
-
-  // today messages
-  for (let i = 0; i < todayCount; i++) {
-    pushMsg(0, i * 5, i % 2 === 0);
-  }
-
-  // yesterday messages
-  for (let i = 0; i < yesterdayCount; i++) {
-    pushMsg(1, i * 7, i % 2 === 0);
-  }
-
-  // distribute remaining across previous days of the month (starting 2 days ago)
-  let day = 2;
-  let placed = 0;
-  while (placed < remaining) {
-    const perDay = 6; // up to 6 messages per older day
-    for (let i = 0; i < perDay && placed < remaining; i++) {
-      pushMsg(day, i * 10, placed % 2 === 0);
-      placed++;
-    }
-    day++;
-    // stop if we reach beginning of month
-    if (day > 28) break;
-  }
-
-  return msgs;
-};
-
 export default {
   groupMessagesByDate,
-  generateDummyMessages,
 };

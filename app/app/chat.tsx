@@ -1,3 +1,14 @@
+/**
+ * Chat Screen - Ticket Conversation View
+ *
+ * Features:
+ * - Loads messages from API: /api/tickets/{ticket_id}/messages
+ * - Implements pagination with before_ts parameter for lazy loading
+ * - Uses MessageSyncService to sync messages between API and SQLite
+ * - Real-time message updates via WebSocket
+ * - Message source handling: CUSTOMER (1), USER (2), LLM (3)
+ * - Inverted FlatList for chat-like scrolling behavior
+ */
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Text,
@@ -7,377 +18,472 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  SectionList,
-  ScrollView,
+  FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Feathericons from "@expo/vector-icons/Feather";
 import {
-  useChatPagination,
-  ChatPaginationProvider,
-} from "@/contexts/ChatPaginationContext";
-import {
   useWebSocket,
   MessageCreatedEvent,
+  MessageStatusUpdatedEvent,
   TicketResolvedEvent,
 } from "@/contexts/WebSocketContext";
 import { useDatabase } from "@/database/context";
 import { DAOManager } from "@/database/dao";
+import { MessageWithUsers } from "@/database/dao/types/message";
 import MessageBubble from "@/components/chat/message-bubble";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
-import chatUtils, { Message } from "@/utils/chat";
+import { Message } from "@/utils/chat";
 import { formatDateLabel } from "@/utils/time";
+import TicketRespondedStatus from "@/components/inbox/ticket-responded-status";
+import { useAuth } from "@/contexts/AuthContext";
+import MessageSyncService from "@/services/messageSync";
+import { MessageFrom } from "@/constants/messageSource";
 
-const dummyMessages = chatUtils.generateDummyMessages(10);
+// Helper function to convert MessageWithUsers to Message
+const convertToUIMessage = (
+  msg: MessageWithUsers,
+  currentUserName?: string
+): Message => {
+  // Determine if message is from customer or user/llm
+  // from_source: 1=CUSTOMER, 2=USER, 3=LLM
+  // Customer messages show as "customer", USER and LLM messages show as "user"
+  const isCustomerMessage = msg.from_source === MessageFrom.CUSTOMER;
+  console.log(
+    `[Chat] Converting message id=${msg.id} text={${msg.body}} from_source=${
+      msg.from_source
+    } to UI message as ${isCustomerMessage ? "customer" : "user"}`
+  );
+  return {
+    id: msg.id,
+    name: isCustomerMessage ? msg.customer_name : currentUserName || "You",
+    text: msg.body,
+    sender: isCustomerMessage ? "customer" : "user",
+    timestamp: msg.createdAt,
+  };
+};
 
-const dummyAISuggestion =
-  "Effective crop management is essential for maximizing yield and ensuring sustainability. It involves planning, monitoring, and controlling various agricultural practices. Key components include soil health assessment, pest and weed control, and efficient water usage. By utilizing precision agriculture techniques, farmers can optimize inputs and enhance productivity while minimizing environmental impact.";
+interface DateSection {
+  date: string;
+  title: string;
+  messages: Message[];
+}
 
 const ChatScreen = () => {
   const { ticketNumber } = useLocalSearchParams<{
     ticketNumber?: string;
   }>();
-  const [messages, setMessages] = useState<Message[]>(dummyMessages);
-  // how many message items (not counting date separators) are visible
-  const [visibleMessageCount, setVisibleMessageCount] = useState<number>(2);
-  // when > 0 we show the last `visibleDayCount` full day groups (date separators
-  // + all messages for that day). When 0 we use visibleMessageCount to show the
-  // last N messages only.
-  const [visibleDayCount, setVisibleDayCount] = useState<number>(0);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [aiSuggestions, setAiSuggestions] = useState<string>(dummyAISuggestion);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [oldestTimestamp, setOldestTimestamp] = useState<string | null>(null);
   const [text, setText] = useState<string>("");
-  const listRef = useRef<any | null>(null);
+  const flatListRef = useRef<any | null>(null);
   const db = useDatabase();
   const daoManager = React.useMemo(() => new DAOManager(db), [db]);
-  const { joinTicket, leaveTicket, onMessageCreated, onTicketResolved } =
-    useWebSocket();
-  const [ticketId, setTicketId] = useState<number | null>(null);
+  const { user } = useAuth();
+  const {
+    joinTicket,
+    leaveTicket,
+    onMessageCreated,
+    onMessageStatusUpdated,
+    onTicketResolved,
+  } = useWebSocket();
+  const [ticket, setTicket] = useState<{
+    id: number | null;
+    ticketNumber?: string;
+    customer?: { id: number; name: string } | null;
+    resolver?: { id: number; name: string } | null;
+    resolvedAt?: string | null;
+    createdAt?: string | null;
+  }>({ id: null });
 
-  // compute which sections to display based on pagination state
-  const displayedSections = React.useMemo(() => {
-    const groups = chatUtils.groupMessagesByDate(messages); // [{date, items}]
-    if (groups.length === 0) {
-      return [];
-    }
+  // Group messages by date for section headers
+  const groupMessagesByDate = useCallback((msgs: Message[]): DateSection[] => {
+    const groups: { [key: string]: Message[] } = {};
 
-    if (visibleDayCount > 0) {
-      // if visibleDayCount covers all groups, return everything
-      if (visibleDayCount >= groups.length) {
-        return groups.map((g) => ({
-          title: formatDateLabel(g.date),
-          data: g.items,
-        }));
+    msgs.forEach((msg) => {
+      const date = new Date(msg.timestamp).toDateString();
+      if (!groups[date]) {
+        groups[date] = [];
       }
-      const chosen = groups.slice(-visibleDayCount);
-      const sections = chosen.map((g) => ({
-        title: formatDateLabel(g.date),
-        data: g.items,
+      groups[date].push(msg);
+    });
+
+    return Object.keys(groups)
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+      .map((date) => ({
+        date,
+        title: formatDateLabel(date),
+        messages: groups[date],
       }));
-      // mark the first section (oldest visible) if there are more groups available
-      if (groups.length > chosen.length && sections.length > 0) {
-        // attach a flag to indicate load earlier should show
-        (sections[0] as any).showLoadEarlier = true;
-      }
-      return sections;
-    }
+  }, []);
 
-    // when not paginating by day, show only the last group's last N messages
-    const last = groups[groups.length - 1];
-    const items = last.items.slice(-visibleMessageCount);
-    const sections = [{ title: formatDateLabel(last.date), data: items }];
-    if (groups.length > 1) {
-      (sections[0] as any).showLoadEarlier = true;
-    }
-    return sections;
-  }, [messages, visibleDayCount, visibleMessageCount]);
+  // Flatten sections for FlatList
+  // With inverted={true}, we need to reverse the data order
+  // so newest messages appear at the bottom
+  const flattenedData = React.useMemo(() => {
+    const sections = groupMessagesByDate(messages);
+    const result: { type: "header" | "message"; data: any }[] = [];
 
-  const scrollToBottom = useCallback(
-    (animated = false) => {
-      // Use requestAnimationFrame to ensure the SectionList has rendered
-      requestAnimationFrame(() => {
-        setTimeout(
-          () => {
-            const sections = displayedSections;
-            if (!sections || sections.length === 0) {
-              return;
-            }
-
-            const sectionIndex = sections.length - 1;
-            const lastSection = sections[sectionIndex];
-            const itemIndex = Math.max(0, (lastSection.data?.length || 1) - 1);
-
-            try {
-              listRef.current?.scrollToLocation({
-                sectionIndex,
-                itemIndex,
-                viewPosition: 1,
-                animated,
-              });
-            } catch {
-              // Fallback: scroll to end of list
-              console.warn("ScrollToLocation failed, using fallback");
-              listRef.current?.scrollToEnd({ animated });
-            }
-          },
-          animated ? 100 : 50,
-        );
+    sections.forEach((section: DateSection) => {
+      result.push({ type: "header", data: section.title });
+      section.messages.forEach((msg: Message) => {
+        result.push({ type: "message", data: msg });
       });
-    },
-    [displayedSections],
-  );
+    });
 
-  // use context-based pagination store (in-memory) instead of AsyncStorage
-  const { getVisibleDayCount, setVisibleDayCountFor } = useChatPagination();
+    // Reverse for inverted list (newest messages at bottom)
+    return result.reverse();
+  }, [messages, groupMessagesByDate]);
 
-  // sync initial visibleDayCount from context for this ticket
+  const scrollToBottom = useCallback((animated = false) => {
+    setTimeout(() => {
+      // With inverted list, scroll to offset 0 to show newest messages
+      flatListRef.current?.scrollToOffset({ offset: 0, animated });
+    }, 100);
+  }, []);
+
+  // Load ticket and initial messages from API
   useEffect(() => {
-    const v = getVisibleDayCount(ticketNumber as string | undefined);
-    if (v && v > 0) {
-      setVisibleDayCount(v);
+    const loadTicketAndMessages = async () => {
+      if (!ticketNumber || !user?.accessToken) {
+        console.log(
+          `[Chat] Missing ticketNumber or accessToken, skipping load`
+        );
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Fetch ticket from database to get ID
+        const ticketData = daoManager.ticket.findByTicketNumber(
+          db,
+          ticketNumber
+        );
+
+        console.log(
+          `[Chat] Found ticket data:`,
+          ticketData ? `id=${ticketData.id}` : "null"
+        );
+
+        if (ticketData) {
+          setTicket({
+            id: ticketData.id,
+            ticketNumber: ticketData.ticketNumber,
+            customer: ticketData.customer,
+            resolver: ticketData.resolver,
+            resolvedAt: ticketData.resolvedAt,
+            createdAt: ticketData.createdAt,
+          });
+
+          // Load initial messages using MessageSyncService
+          // This fetches from API: /api/tickets/{ticket_id}/messages
+          // and stores them in SQLite for offline access
+          console.log(
+            `[Chat] Calling MessageSyncService.loadInitialMessages for ticket ${ticketData.id}`
+          );
+          const result = await MessageSyncService.loadInitialMessages(
+            db,
+            user.accessToken,
+            ticketData.id,
+            ticketData.customer?.id || 0,
+            ticketData.createdAt || new Date().toISOString(),
+            user?.id,
+            20
+          );
+          console.log(
+            `[Chat] MessageSyncService returned ${result.messages.length} messages`
+          );
+
+          // Convert to UI message format
+          const uiMessages = result.messages.map((msg) =>
+            convertToUIMessage(msg, user?.fullName)
+          );
+          setMessages(uiMessages);
+          setHasMore(result.hasMore);
+          setOldestTimestamp(result.oldestTimestamp);
+
+          console.log(
+            `[Chat] Loaded ${uiMessages.length} messages for ticket ${ticketNumber}`
+          );
+
+          // Scroll to bottom after loading
+          setTimeout(() => scrollToBottom(false), 300);
+        } else {
+          console.warn(`[Chat] Ticket not found: ${ticketNumber}`);
+        }
+      } catch (error) {
+        console.error("[Chat] Error loading ticket and messages:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTicketAndMessages();
+  }, [ticketNumber, db, daoManager, user, scrollToBottom]);
+
+  // Load older messages when scrolling up (pagination)
+  // Uses before_ts parameter for lazy loading behavior
+  const loadOlderMessages = async () => {
+    if (
+      !ticket?.id ||
+      !user?.accessToken ||
+      !oldestTimestamp ||
+      !hasMore ||
+      loadingMore
+    ) {
+      return;
     }
-  }, [getVisibleDayCount, ticketNumber]);
-  useEffect(() => {
-    // scroll to bottom on mount and when displayedSections change
-    scrollToBottom();
-  }, [scrollToBottom, displayedSections]);
-  // Sample messages for demonstration
-  // In a real app, fetch messages from an API or database
+
+    try {
+      setLoadingMore(true);
+
+      // MessageSyncService.loadOlderMessages uses before_ts parameter
+      // API call: /api/tickets/{ticket_id}/messages?before_ts={oldestTimestamp}&limit=20
+      const result = await MessageSyncService.loadOlderMessages(
+        db,
+        user.accessToken,
+        ticket.id,
+        ticket.customer?.id || 0,
+        oldestTimestamp,
+        user?.id,
+        20
+      );
+
+      // Convert to UI message format
+      const uiMessages = result.messages.map((msg) =>
+        convertToUIMessage(msg, user?.fullName)
+      );
+      setMessages(uiMessages);
+      setHasMore(result.hasMore);
+      setOldestTimestamp(result.oldestTimestamp);
+
+      console.log(`[Chat] Loaded ${result.messages.length} older messages`);
+    } catch (error) {
+      console.error("[Chat] Error loading older messages:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Handle real-time message_created events
   useEffect(() => {
     const unsubscribe = onMessageCreated(async (event: MessageCreatedEvent) => {
       // Only process if this is for the current ticket
-      if (!ticketId || event.ticket_id !== ticketId) {
+      if (!ticket?.id || event.ticket_id !== ticket?.id) {
         return;
       }
 
       console.log("[Chat] Received new message:", event);
 
       try {
-        // TODO: Save message to SQLite database
-        // For now, just add to local state
-        const newMessage: Message = {
-          id: event.message_id,
-          name: event.kind === "customer" ? "Customer" : "Agent",
-          text: event.body,
-          timestamp: event.ts, // Already ISO string
-          sender: event.kind === "customer" ? "customer" : "user",
-        };
+        const message_sid = `msg_${event.message_id}_${Date.parse(event.ts)}`;
 
-        setMessages((prev: Message[]) => [...prev, newMessage]);
+        // Get user ID from auth context, fallback to 0 if not available
+        const userId = user?.id || 0;
 
-        // Scroll to bottom to show new message after a short delay
-        setTimeout(() => {
-          try {
-            scrollToBottom(true);
-          } catch (error) {
-            console.warn("[Chat] Error scrolling to bottom:", error);
+        // Save message to SQLite database (idempotent upsert)
+        // Use the message_id from backend as the SQLite ID
+        const savedMessage = daoManager.message.upsert(db, {
+          id: event.message_id, // Use backend message ID
+          from_source:
+            event.kind === "customer" ? MessageFrom.CUSTOMER : MessageFrom.USER,
+          message_sid: message_sid,
+          customer_id: event.customer_id,
+          user_id: event.kind === "customer" ? null : userId,
+          body: event.body,
+          message_type: "text",
+          createdAt: event.ts, // Use timestamp from WebSocket event
+        });
+
+        if (savedMessage) {
+          // Fetch message with user details
+          const dbMessage = daoManager.message.findByIdWithUsers(
+            db,
+            savedMessage.id
+          );
+
+          if (dbMessage) {
+            const uiMessage = convertToUIMessage(dbMessage, user?.fullName);
+
+            // Check if message already exists in state (avoid duplicates by SQLite ID)
+            setMessages((prev: Message[]) => {
+              const exists = prev.some((m) => m.id === uiMessage.id);
+              if (exists) {
+                console.log(
+                  `[Chat] Message ${uiMessage.id} already exists, skipping`
+                );
+                return prev;
+              }
+              console.log(`[Chat] Adding new message ${uiMessage.id} to UI`);
+              return [...prev, uiMessage];
+            });
+
+            // Scroll to bottom to show new message after a short delay
+            setTimeout(() => {
+              try {
+                scrollToBottom(true);
+              } catch (error) {
+                console.warn("[Chat] Error scrolling to bottom:", error);
+              }
+            }, 200);
           }
-        }, 200);
+        }
       } catch (error) {
         console.error("[Chat] Error handling new message:", error);
       }
     });
 
     return unsubscribe;
-  }, [onMessageCreated, ticketId, scrollToBottom]);
+  }, [onMessageCreated, ticket?.id, scrollToBottom, db, daoManager, user]);
 
-  // Load ticket ID from ticket number
+  // Handle real-time message_status_updated events
   useEffect(() => {
-    const loadTicketId = async () => {
-      if (!ticketNumber) {
-        return;
-      }
-      try {
-        // Fetch ticket from database to get ID
-        const ticket = await daoManager.ticket.findByTicketNumber(
-          db,
-          ticketNumber,
-        );
-        if (ticket) {
-          setTicketId(ticket.id);
+    const unsubscribe = onMessageStatusUpdated(
+      async (event: MessageStatusUpdatedEvent) => {
+        // Only process if this is for the current ticket
+        if (!ticket?.id || event.ticket_id !== ticket?.id) {
+          return;
         }
-      } catch (error) {
-        console.error("[Chat] Error loading ticket ID:", error);
+
+        console.log("[Chat] Message status updated:", event);
+
+        try {
+          // TODO: Update message status in database if needed
+          // For now, just log the event
+          // This could be used to show delivery/read receipts in the UI
+        } catch (error) {
+          console.error("[Chat] Error handling message status update:", error);
+        }
       }
-    };
-    loadTicketId();
-  }, [ticketNumber, db, daoManager]);
+    );
+
+    return unsubscribe;
+  }, [onMessageStatusUpdated, ticket?.id]);
 
   // Join/leave ticket room when screen mounts/unmounts
   useEffect(() => {
-    if (!ticketId) {
+    if (!ticket?.id) {
       return;
     }
 
-    console.log(`[Chat] Joining ticket room: ${ticketId}`);
-    joinTicket(ticketId);
+    console.log(`[Chat] Joining ticket room: ${ticket?.id}`);
+    joinTicket(ticket?.id);
 
     return () => {
-      console.log(`[Chat] Leaving ticket room: ${ticketId}`);
-      leaveTicket(ticketId);
+      console.log(`[Chat] Leaving ticket room: ${ticket?.id}`);
+      leaveTicket(ticket?.id);
     };
-  }, [ticketId, joinTicket, leaveTicket]);
+  }, [ticket?.id, joinTicket, leaveTicket]);
 
   // Handle real-time ticket_resolved events
   useEffect(() => {
     const unsubscribe = onTicketResolved(async (event: TicketResolvedEvent) => {
       // Only process if this is for the current ticket
-      if (!ticketId || event.ticket_id !== ticketId) {
+      if (!ticket?.id || event.ticket_id !== ticket?.id) {
         return;
       }
 
       console.log("[Chat] Ticket resolved:", event);
 
-      // TODO: Update UI to show ticket is resolved
-      // Could show a banner or disable input
+      try {
+        // Update ticket in database
+        daoManager.ticket.update(db, ticket.id, {
+          resolvedAt: event.resolved_at,
+          status: "resolved",
+        });
+
+        // Update local ticket state to show resolved status
+        setTicket((prev: typeof ticket) => ({
+          ...prev,
+          resolvedAt: event.resolved_at,
+        }));
+      } catch (error) {
+        console.error("[Chat] Error handling ticket resolved:", error);
+      }
     });
 
     return unsubscribe;
-  }, [onTicketResolved, ticketId]);
+  }, [onTicketResolved, ticket?.id, db, daoManager]);
+
+  const renderItem = ({ item }: { item: any }) => {
+    if (item.type === "header") {
+      return <DateSeparator date={item.data} />;
+    }
+    return <MessageBubble message={item.data} />;
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) {
+      return null;
+    }
+    return (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color={themeColors["green-500"]} />
+        <Text style={[typography.caption, { marginLeft: 8 }]}>
+          Loading earlier messages...
+        </Text>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={styles.container}
+        edges={["left", "right", "bottom"]}
+      >
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator size="large" color={themeColors["green-500"]} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
-      <View style={styles.header}>
-        <Text style={[typography.body3, { color: themeColors.dark5 }]}>
-          Ticket: {ticketNumber}
-        </Text>
-      </View>
+      <TicketRespondedStatus
+        ticketNumber={ticket?.ticketNumber}
+        respondedBy={ticket?.resolver}
+        resolvedAt={ticket?.resolvedAt}
+        containerStyle={styles.header}
+      />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
       >
         <View style={styles.messagesContainer}>
-          <SectionList
-            ref={(r: any) => (listRef.current = r)}
-            sections={displayedSections}
-            keyExtractor={(item: Message) => `${item.id}`}
-            renderItem={({ item }: { item: Message }) => (
-              <MessageBubble message={item} />
-            )}
-            onScrollToIndexFailed={(info: {
-              index: number;
-              highestMeasuredFrameIndex: number;
-              averageItemLength: number;
-            }) => {
-              // Wait for the list to render the items, then retry scrolling
-              const wait = new Promise((resolve) => setTimeout(resolve, 500));
-              wait.then(() => {
-                const sections = displayedSections;
-                if (sections.length > 0) {
-                  const sectionIndex = sections.length - 1;
-                  const lastSection = sections[sectionIndex];
-                  const itemIndex = Math.max(
-                    0,
-                    (lastSection.data?.length || 1) - 1,
-                  );
-                  try {
-                    listRef.current?.scrollToLocation({
-                      sectionIndex,
-                      itemIndex,
-                      viewPosition: 1,
-                      animated: true,
-                    });
-                  } catch {
-                    // Final fallback: scroll to end
-                    listRef.current?.scrollToEnd({ animated: true });
-                  }
-                }
-              });
+          <FlatList
+            ref={flatListRef}
+            data={flattenedData}
+            keyExtractor={(item: any, index: number) =>
+              item.type === "header"
+                ? `header-${index}`
+                : `message-${item.data.id}`
+            }
+            renderItem={renderItem}
+            contentContainerStyle={{ padding: 12, paddingBottom: 20 }}
+            onEndReached={() => {
+              // In inverted mode, onEndReached fires when scrolling up to load older messages
+              if (hasMore && !loadingMore) {
+                loadOlderMessages();
+              }
             }}
-            renderSectionHeader={({ section }: any) => {
-              const showLoad = !!section.showLoadEarlier;
-              return (
-                <View>
-                  {showLoad && (
-                    <View style={{ alignItems: "center", marginBottom: 8 }}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          const groups =
-                            chatUtils.groupMessagesByDate(messages);
-                          if (visibleDayCount === 0) {
-                            const next = Math.min(2, groups.length);
-                            setVisibleDayCount(next);
-                            setVisibleDayCountFor(
-                              ticketNumber as string | undefined,
-                              next,
-                            );
-                          } else {
-                            setVisibleDayCount((v: number) => {
-                              const next = Math.min(groups.length, v + 1);
-                              setVisibleDayCountFor(
-                                ticketNumber as string | undefined,
-                                next,
-                              );
-                              return next;
-                            });
-                          }
-                        }}
-                        style={styles.loadEarlier}
-                      >
-                        <Text style={typography.body3}>Load earlier</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                  <DateSeparator date={section.title} />
-                </View>
-              );
-            }}
-            contentContainerStyle={{ padding: 12, paddingBottom: 200 }}
-            refreshing={refreshing}
-            onRefresh={() => {
-              // Pull-to-refresh now expands the visible day groups.
-              setRefreshing(true);
-              setTimeout(() => {
-                const groups = chatUtils.groupMessagesByDate(messages);
-                if (visibleDayCount === 0) {
-                  // first pull: switch to day pagination and show today + yesterday
-                  const next = Math.min(2, groups.length);
-                  setVisibleDayCount(next);
-                  setVisibleDayCountFor(
-                    ticketNumber as string | undefined,
-                    next,
-                  );
-                } else {
-                  // subsequent pulls: load one more earlier day
-                  setVisibleDayCount((v: number) => {
-                    const next = Math.min(groups.length, v + 1);
-                    setVisibleDayCountFor(
-                      ticketNumber as string | undefined,
-                      next,
-                    );
-                    return next;
-                  });
-                }
-                setRefreshing(false);
-              }, 700);
-            }}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={renderFooter}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            inverted={true}
           />
         </View>
-        {/* AI suggestion chip */}
-        {aiSuggestions?.trim()?.length > 0 && (
-          <View style={styles.suggestionContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <TouchableOpacity
-                onPress={() => {
-                  setText(aiSuggestions);
-                  setAiSuggestions("");
-                }}
-                style={styles.suggestionChip}
-              >
-                <Text numberOfLines={2} style={typography.body3}>
-                  {aiSuggestions}
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        )}
 
         <View style={styles.inputRow}>
           <TextInput
@@ -393,51 +499,65 @@ const ChatScreen = () => {
             multiline
           />
           <TouchableOpacity
-            onPress={() => {
-              if (text.trim().length === 0) {
+            onPress={async () => {
+              if (
+                text.trim().length === 0 ||
+                !ticket?.id ||
+                !ticket?.customer?.id ||
+                !user?.id
+              ) {
                 return;
               }
 
-              const now = new Date();
-              const newMsg: Message = {
-                id: messages.length + 1,
-                name: "You",
-                text: text.trim(),
-                sender: "user",
-                timestamp: now.toLocaleString(), // Keep consistent with dummy messages
-              };
-
+              const messageText = text.trim();
               setText("");
 
-              // Update messages first
-              const updatedMessages = [...messages, newMsg];
-              setMessages(updatedMessages);
+              try {
+                const message_sid = `msg_user_${Date.now()}`;
+                const now = new Date().toISOString();
 
-              // Then update pagination state in the next tick to avoid render conflicts
-              requestAnimationFrame(() => {
-                const groups = chatUtils.groupMessagesByDate(updatedMessages);
+                // Save message to database first
+                const savedMessage = daoManager.message.create(db, {
+                  from_source: MessageFrom.USER,
+                  message_sid: message_sid,
+                  customer_id: ticket.customer.id,
+                  user_id: user.id,
+                  body: messageText,
+                  message_type: "text",
+                  createdAt: now, // Include timestamp for consistency
+                });
 
-                // Always show all days to ensure new message is visible
-                setVisibleDayCount(groups.length);
-                setVisibleMessageCount(updatedMessages.length);
-
-                // Update context pagination state
-                setVisibleDayCountFor(
-                  ticketNumber as string | undefined,
-                  groups.length,
+                // Fetch message with user details
+                const dbMessage = daoManager.message.findByIdWithUsers(
+                  db,
+                  savedMessage.id
                 );
 
-                // Scroll to bottom after state updates
-                setTimeout(() => scrollToBottom(true), 100);
-              });
+                if (dbMessage) {
+                  const uiMessage = convertToUIMessage(
+                    dbMessage,
+                    user?.fullName
+                  );
+
+                  // Update messages
+                  setMessages((prev: Message[]) => [...prev, uiMessage]);
+
+                  // Scroll to bottom
+                  setTimeout(() => scrollToBottom(true), 100);
+                }
+
+                // TODO: Send message to backend API
+                // await api.sendMessage(ticket.id, messageText);
+              } catch (error) {
+                console.error("[Chat] Error sending message:", error);
+                // Optionally show error to user
+              }
             }}
             style={styles.sendButton}
           >
             <Feathericons name="send" size={20} color={themeColors.white} />
           </TouchableOpacity>
         </View>
-
-        {/* helper components and functions */}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -445,7 +565,9 @@ const ChatScreen = () => {
 
 const DateSeparator = ({ date }: { date: string }) => (
   <View style={styles.dateSeparator}>
-    <Text style={typography.caption}>{date}</Text>
+    <View style={styles.separatorLine} />
+    <Text style={[typography.caption, styles.separatorText]}>{date}</Text>
+    <View style={styles.separatorLine} />
   </View>
 );
 
@@ -454,27 +576,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: themeColors.background,
   },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
   messagesContainer: {
     flex: 1,
     marginBottom: 10,
   },
-  loadEarlier: {
-    alignSelf: "center",
-    padding: 8,
-    marginBottom: 8,
-  },
-  suggestionContainer: {
-    borderTopWidth: 1,
-    borderColor: themeColors.mutedBorder,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: themeColors.background,
-  },
-  suggestionChip: {
-    backgroundColor: themeColors["green-50"],
-    padding: 8,
-    borderRadius: 8,
-    maxWidth: 300,
+  loadingFooter: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 12,
   },
   inputRow: {
     flexDirection: "row",
@@ -501,15 +615,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   dateSeparator: {
+    flexDirection: "row",
     alignItems: "center",
-    marginVertical: 8,
+    marginVertical: 12,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: themeColors.mutedBorder,
+  },
+  separatorText: {
+    marginHorizontal: 12,
+    color: themeColors.dark3,
+  },
+  header: {
+    minHeight: 60,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderColor: themeColors.mutedBorder,
+    backgroundColor: themeColors.white,
   },
 });
 
-const ChatScreenWithProvider = () => (
-  <ChatPaginationProvider>
-    <ChatScreen />
-  </ChatPaginationProvider>
-);
-
-export default ChatScreenWithProvider;
+export default ChatScreen;
