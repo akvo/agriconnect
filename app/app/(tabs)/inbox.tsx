@@ -21,6 +21,7 @@ import {
   useWebSocket,
   MessageCreatedEvent,
   TicketResolvedEvent,
+  TicketCreatedEvent,
 } from "@/contexts/WebSocketContext";
 import { DAOManager } from "@/database/dao";
 
@@ -50,7 +51,8 @@ const Inbox: React.FC = () => {
   const isInitialMount = React.useRef(true); // track initial mount
   const db = useDatabase();
   const { updateTicket } = useTicket();
-  const { isConnected, onMessageCreated, onTicketResolved } = useWebSocket();
+  const { isConnected, onMessageCreated, onTicketResolved, onTicketCreated } =
+    useWebSocket();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
   const filtered = useMemo(() => {
@@ -293,6 +295,27 @@ const Inbox: React.FC = () => {
 
     return unsubscribe;
   }, [onTicketResolved, tickets, db, daoManager, activeTab]);
+
+  // Handle real-time ticket_created events
+  useEffect(() => {
+    const unsubscribe = onTicketCreated(async (event: TicketCreatedEvent) => {
+      console.log("[Inbox] Received ticket_created event:", event);
+
+      try {
+        // Only refresh if we're on the first page of pending tickets
+        // to avoid disrupting pagination
+        if (activeTab === Tabs.PENDING && page === 1) {
+          console.log("[Inbox] Refreshing ticket list for new ticket");
+          // Refetch tickets to include the new one
+          await fetchTickets(activeTab, 1, false, false);
+        }
+      } catch (error) {
+        console.error("[Inbox] Error handling ticket_created event:", error);
+      }
+    });
+
+    return unsubscribe;
+  }, [onTicketCreated, activeTab, page, fetchTickets]);
 
   // Reset list when tab changes
   useEffect(() => {

@@ -46,6 +46,13 @@ export interface TicketResolvedEvent {
   resolved_at: string;
 }
 
+export interface TicketCreatedEvent {
+  ticket_id: number;
+  customer_id: number;
+  administrative_id: number;
+  created_at: string;
+}
+
 interface WebSocketContextType {
   isConnected: boolean;
   socket: Socket | null;
@@ -60,6 +67,7 @@ interface WebSocketContextType {
   onTicketResolved: (
     callback: (data: TicketResolvedEvent) => void,
   ) => () => void;
+  onTicketCreated: (callback: (data: TicketCreatedEvent) => void) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -88,10 +96,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     message_created: Set<(data: MessageCreatedEvent) => void>;
     message_status_updated: Set<(data: MessageStatusUpdatedEvent) => void>;
     ticket_resolved: Set<(data: TicketResolvedEvent) => void>;
+    ticket_created: Set<(data: TicketCreatedEvent) => void>;
   }>({
     message_created: new Set(),
     message_status_updated: new Set(),
     ticket_resolved: new Set(),
+    ticket_created: new Set(),
   });
 
   // Connect to WebSocket
@@ -168,6 +178,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     socket.on("ticket_resolved", (data: TicketResolvedEvent) => {
       console.log("[WebSocket] ticket_resolved:", data);
       eventHandlersRef.current.ticket_resolved.forEach((handler) =>
+        handler(data),
+      );
+    });
+
+    socket.on("ticket_created", (data: TicketCreatedEvent) => {
+      console.log("[WebSocket] ticket_created:", data);
+      eventHandlersRef.current.ticket_created.forEach((handler) =>
         handler(data),
       );
     });
@@ -280,6 +297,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     [],
   );
 
+  // Register event handler for ticket_created
+  const onTicketCreated = useCallback(
+    (callback: (data: TicketCreatedEvent) => void) => {
+      eventHandlersRef.current.ticket_created.add(callback);
+      return () => {
+        eventHandlersRef.current.ticket_created.delete(callback);
+      };
+    },
+    [],
+  );
+
   // Connect when user logs in
   useEffect(() => {
     if (user?.accessToken) {
@@ -328,6 +356,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     onMessageCreated,
     onMessageStatusUpdated,
     onTicketResolved,
+    onTicketCreated,
   };
 
   return (
