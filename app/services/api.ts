@@ -165,6 +165,59 @@ class ApiClient {
 
     return response.json();
   }
+
+  async sendMessage(
+    token: string,
+    ticketId: number,
+    body: string,
+    fromSource: number,
+  ): Promise<any> {
+    const url = `${this.baseUrl}/messages`;
+    const payload = {
+      ticket_id: ticketId,
+      body,
+      from_source: fromSource,
+    };
+
+    console.log("[API] Sending message:", {
+      url,
+      payload,
+      hasToken: !!token,
+    });
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    console.log("[API] Response status:", response.status);
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.error("[API] Unauthorized - token may be invalid");
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+          } catch (e) {
+            console.error("unauthorizedHandler error:", e);
+          }
+        }
+      }
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to send message" }));
+      console.error("[API] Error response:", error);
+      throw new Error(error.detail || "Failed to send message");
+    }
+
+    const responseData = await response.json();
+    console.log("[API] Success response:", responseData);
+    return responseData;
+  }
 }
 
 export const api = new ApiClient();
