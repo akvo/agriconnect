@@ -38,14 +38,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       ? db.prepareSync(
           `INSERT INTO messages (
             id, from_source, message_sid, customer_id, user_id, body,
-            message_type, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            message_type, status, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
       : db.prepareSync(
           `INSERT INTO messages (
             from_source, message_sid, customer_id, user_id, body,
-            message_type, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            message_type, status, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         );
 
     try {
@@ -58,6 +58,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.user_id,
             data.body,
             data.message_type || null,
+            data.status || 1, // Default to PENDING (1)
             data.createdAt,
           ]
         : [
@@ -67,6 +68,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.user_id,
             data.body,
             data.message_type || null,
+            data.status || 1, // Default to PENDING (1)
             data.createdAt,
           ];
 
@@ -122,11 +124,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         updates.push("message_type = ?");
         values.push(data.message_type);
       }
+      if (data.status !== undefined) {
+        updates.push("status = ?");
+        values.push(data.status);
+      }
 
       if (updates.length === 0) {
         return false;
       }
-      values.push(new Date().toISOString());
       values.push(id);
 
       const stmt = db.prepareSync(

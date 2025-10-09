@@ -1,6 +1,7 @@
 // Message types and interfaces
 // Note: from_source uses MessageFrom constants (1=CUSTOMER, 2=USER, 3=LLM)
-// Import from @/constants/messageSource when needed
+// Note: status uses MessageStatus constants (1=PENDING, 2=REPLIED, 3=RESOLVED)
+// Import from @/constants/messageSource and @/constants/messageStatus when needed
 export interface Message {
   id: number;
   from_source: number; // 1=CUSTOMER, 2=USER, 3=LLM
@@ -9,6 +10,7 @@ export interface Message {
   user_id: number | null;
   body: string;
   message_type: number;
+  status: number; // 1=PENDING, 2=REPLIED, 3=RESOLVED
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +23,7 @@ export interface CreateMessageData {
   body: string;
   createdAt: string;
   message_type?: number;
+  status?: number; // Use MessageStatus constants (default: PENDING=1)
 }
 
 export interface UpdateMessageData {
@@ -30,6 +33,7 @@ export interface UpdateMessageData {
   user_id?: number | null;
   body?: string;
   message_type?: number;
+  status?: number; // Use MessageStatus constants
 }
 
 // Extended message interface with user details (for inbox/conversation views)

@@ -36,7 +36,7 @@ export interface MessageCreatedEvent {
 export interface MessageStatusUpdatedEvent {
   ticket_id: number;
   message_id: number;
-  status: string;
+  status: number; // INTEGER: 1=PENDING, 2=REPLIED, 3=RESOLVED (matches backend MessageStatus)
   updated_at: string;
   updated_by?: number;
 }
