@@ -20,7 +20,7 @@ from routers.ws import (
     disconnect,
     join_ticket,
     leave_ticket,
-    get_user_ward_ids,
+    get_user_adm_ids,
     check_rate_limit,
     emit_message_created,
     # emit_message_status_updated,
@@ -31,6 +31,7 @@ from routers.ws import (
 from models.user import User, UserType
 from models.administrative import UserAdministrative
 from models.ticket import Ticket
+from models.message import MessageFrom
 
 
 class TestWebSocketConnection:
@@ -104,7 +105,7 @@ class TestWebSocketConnection:
         # Add test connection
         connections["test_sid"] = {
             "user_id": 1,
-            "ward_ids": [1, 2],
+            "administrative_ids": [1, 2],
             "last_action": datetime.utcnow(),
         }
         rate_limits["test_sid"] = {
@@ -219,7 +220,7 @@ class TestTicketRoomManagement:
         # Setup connection state
         connections["test_sid"] = {
             "user_id": sample_eo_user.id,
-            "ward_ids": [sample_administrative.id],
+            "administrative_ids": [sample_administrative.id],
             "user_type": UserType.EXTENSION_OFFICER.value,
             "last_action": datetime.utcnow(),
         }
@@ -256,7 +257,7 @@ class TestTicketRoomManagement:
         # Setup connection state with different ward
         connections["test_sid"] = {
             "user_id": sample_eo_user.id,
-            "ward_ids": [999],  # Different ward
+            "administrative_ids": [999],  # Different ward
             "user_type": UserType.EXTENSION_OFFICER.value,
             "last_action": datetime.utcnow(),
         }
@@ -280,7 +281,7 @@ class TestTicketRoomManagement:
 
         connections["test_sid"] = {
             "user_id": 1,
-            "ward_ids": [1],
+            "administrative_ids": [1],
             "user_type": UserType.EXTENSION_OFFICER.value,
             "last_action": datetime.utcnow(),
         }
@@ -336,11 +337,12 @@ class TestEventEmissions:
             await emit_message_created(
                 ticket_id=1,
                 message_id=100,
+                message_sid="SM123456",
                 customer_id=50,
                 body="Test message",
-                kind="customer",
+                from_source=MessageFrom.CUSTOMER,
                 ts="2024-01-01T12:00:00",
-                ward_id=10,
+                administrative_id=10,
             )
 
             # Should emit to ticket room, ward room, and admin room
@@ -362,7 +364,8 @@ class TestEventEmissions:
 
         with patch("routers.ws.sio", mock_sio):
             await emit_ticket_resolved(
-                ticket_id=1, resolved_at="2024-01-01T12:00:00", ward_id=10
+                ticket_id=1, resolved_at="2024-01-01T12:00:00",
+                administrative_id=10
             )
 
             # Should emit to ticket room, ward room, and admin room
@@ -373,7 +376,7 @@ class TestEventEmissions:
 class TestHelperFunctions:
     """Test helper functions"""
 
-    def test_get_user_ward_ids_for_eo(
+    def test_get_user_adm_ids_for_eo(
         self, db_session, sample_eo_user, sample_administrative
     ):
         """Test getting ward IDs for EO user"""
@@ -384,15 +387,21 @@ class TestHelperFunctions:
         db_session.add(ward_assignment)
         db_session.commit()
 
-        ward_ids = get_user_ward_ids(sample_eo_user, db_session)
+        administrative_ids = get_user_adm_ids(
+            sample_eo_user, db_session
+        )
 
-        assert sample_administrative.id in ward_ids
+        assert sample_administrative.id in administrative_ids
 
-    def test_get_user_ward_ids_for_admin(self, sample_admin_user, db_session):
+    def test_get_user_adm_ids_for_admin(
+        self, sample_admin_user, db_session
+    ):
         """Test admin returns empty list (marker for all access)"""
-        ward_ids = get_user_ward_ids(sample_admin_user, db_session)
+        administrative_ids = get_user_adm_ids(
+            sample_admin_user, db_session
+        )
 
-        assert ward_ids == []
+        assert administrative_ids == []
 
 
 # Fixtures for tests

@@ -43,7 +43,7 @@ sio_app = socketio.ASGIApp(
 
 
 # In-memory storage for connection metadata
-# Format: {sid: {"user_id": int, "ward_ids": [int], "last_action": datetime}}
+
 connections: Dict[str, dict] = {}
 
 # Rate limiting storage
@@ -57,7 +57,7 @@ MAX_JOINS_PER_WINDOW = 30
 MAX_LEAVES_PER_WINDOW = 30
 
 
-def get_user_ward_ids(user: User, db: Session) -> list[int]:
+def get_user_adm_ids(user: User, db: Session) -> list[int]:
     """Get list of ward (administrative) IDs accessible by the user."""
     if user.user_type == UserType.ADMIN:
         # Admin can access all wards - return empty list as a marker
@@ -115,7 +115,7 @@ async def connect(sid: str, environ: dict, auth: Optional[dict] = None):
     """
     logger.info(f"Client attempting to connect: {sid}")
     logger.info(f"Auth dict: {auth}")
-    auth_header = environ.get('HTTP_AUTHORIZATION', 'NOT PRESENT')
+    auth_header = environ.get("HTTP_AUTHORIZATION", "NOT PRESENT")
     logger.info(f"HTTP_AUTHORIZATION header: {auth_header}")
 
     try:
@@ -161,12 +161,12 @@ async def connect(sid: str, environ: dict, auth: Optional[dict] = None):
                 return False
 
             # Get user's ward IDs
-            ward_ids = get_user_ward_ids(user, db)
+            administrative_ids = get_user_adm_ids(user, db)
 
             # Store connection metadata
             connections[sid] = {
                 "user_id": user.id,
-                "ward_ids": ward_ids,
+                "administrative_ids": administrative_ids,
                 "last_action": datetime.utcnow(),
                 "user_type": user.user_type.value,
             }
@@ -177,8 +177,8 @@ async def connect(sid: str, environ: dict, auth: Optional[dict] = None):
                 await sio.enter_room(sid, "ward:admin")
                 logger.info(f"Admin user {user.id} joined ward:admin room")
             else:
-                for ward_id in ward_ids:
-                    room_name = f"ward:{ward_id}"
+                for administrative_id in administrative_ids:
+                    room_name = f"ward:{administrative_id}"
                     await sio.enter_room(sid, room_name)
                     logger.info(
                         f"User {user.id} joined room {room_name} (sid: {sid})"
@@ -186,7 +186,7 @@ async def connect(sid: str, environ: dict, auth: Optional[dict] = None):
 
             logger.info(
                 f"Client connected successfully: {sid}, "
-                f"user_id: {user.id}, wards: {ward_ids}"
+                f"user_id: {user.id}, wards: {administrative_ids}"
             )
             return True
 
@@ -250,8 +250,8 @@ async def join_ticket(sid: str, data: dict):
 
             # Check access: admin has access to all, EO only to their wards
             if user_type != UserType.ADMIN.value:
-                ward_ids = user_info.get("ward_ids", [])
-                if ticket.administrative_id not in ward_ids:
+                administrative_ids = user_info.get("administrative_ids", [])
+                if ticket.administrative_id not in administrative_ids:
                     logger.warning(
                         f"User {user_info['user_id']} denied access "
                         f"to ticket {ticket_id}"
@@ -322,11 +322,12 @@ async def leave_ticket(sid: str, data: dict):
 async def emit_message_created(
     ticket_id: int,
     message_id: int,
+    message_sid: str,
     customer_id: int,
     body: str,
-    kind: str,
+    from_source: int,
     ts: str,
-    ward_id: Optional[int] = None,
+    administrative_id: Optional[int] = None,
 ):
     """
     Emit message_created event to ticket room and ward room.
@@ -335,9 +336,10 @@ async def emit_message_created(
     event_data = {
         "ticket_id": ticket_id,
         "message_id": message_id,
+        "message_sid": message_sid,
         "customer_id": customer_id,
         "body": body,
-        "kind": kind,
+        "from_source": from_source,
         "ts": ts,
     }
 
@@ -345,8 +347,10 @@ async def emit_message_created(
     await sio.emit("message_created", event_data, room=f"ticket:{ticket_id}")
 
     # Emit to ward room (for inbox updates)
-    if ward_id:
-        await sio.emit("message_created", event_data, room=f"ward:{ward_id}")
+    if administrative_id:
+        await sio.emit(
+            "message_created", event_data, room=f"ward:{administrative_id}"
+        )
 
     # Emit to admin room
     await sio.emit("message_created", event_data, room="ward:admin")
@@ -363,7 +367,7 @@ async def emit_message_status_updated(
     status: str,
     updated_at: str,
     updated_by: Optional[int] = None,
-    ward_id: Optional[int] = None,
+    administrative_id: Optional[int] = None,
 ):
     """
     Emit message_status_updated event to ticket room and ward room.
@@ -383,9 +387,11 @@ async def emit_message_status_updated(
     )
 
     # Emit to ward room (for inbox updates)
-    if ward_id:
+    if administrative_id:
         await sio.emit(
-            "message_status_updated", event_data, room=f"ward:{ward_id}"
+            "message_status_updated",
+            event_data,
+            room=f"ward:{administrative_id}",
         )
 
     # Emit to admin room
@@ -398,7 +404,7 @@ async def emit_message_status_updated(
 
 
 async def emit_ticket_resolved(
-    ticket_id: int, resolved_at: str, ward_id: Optional[int] = None
+    ticket_id: int, resolved_at: str, administrative_id: Optional[int] = None
 ):
     """
     Emit ticket_resolved event to ticket room and ward room.
@@ -413,8 +419,10 @@ async def emit_ticket_resolved(
     await sio.emit("ticket_resolved", event_data, room=f"ticket:{ticket_id}")
 
     # Emit to ward room (for inbox updates)
-    if ward_id:
-        await sio.emit("ticket_resolved", event_data, room=f"ward:{ward_id}")
+    if administrative_id:
+        await sio.emit(
+            "ticket_resolved", event_data, room=f"ward:{administrative_id}"
+        )
 
     # Emit to admin room
     await sio.emit("ticket_resolved", event_data, room="ward:admin")

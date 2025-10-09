@@ -322,8 +322,8 @@ class TestWhatsAppWebhook:
             assert (
                 call_kwargs["body"] == "New message for open ticket"
             )
-            assert call_kwargs["kind"] == "customer"
-            assert call_kwargs["ward_id"] is None
+            assert call_kwargs["from_source"] == MessageFrom.CUSTOMER
+            assert call_kwargs["administrative_id"] is None
 
             # Welcome message should not be sent for existing customer
             mock_service.send_welcome_message.assert_not_called()

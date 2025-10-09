@@ -421,7 +421,7 @@ async def mark_ticket_resolved(
         emit_ticket_resolved(
             ticket_id=ticket.id,
             resolved_at=resolved_dt.isoformat(),
-            ward_id=ticket.administrative_id,
+            administrative_id=ticket.administrative_id,
         )
     )
 

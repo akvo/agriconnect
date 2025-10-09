@@ -86,13 +86,14 @@ async def whatsapp_webhook(
                 emit_message_created(
                     ticket_id=ticket.id,
                     message_id=message.id,
+                    message_sid=MessageSid,
                     customer_id=customer.id,
                     body=Body,
-                    kind="customer",
+                    from_source=MessageFrom.CUSTOMER,
                     ts=message.created_at.isoformat()
                     if message.created_at
                     else None,
-                    ward_id=ward_id,
+                    administrative_id=ward_id,
                 )
             )
 
