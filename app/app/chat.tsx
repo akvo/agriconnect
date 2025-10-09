@@ -273,22 +273,14 @@ const ChatScreen = () => {
       console.log("[Chat] Received new message:", event);
 
       try {
-        const message_sid = `msg_${event.message_id}_${Date.parse(event.ts)}`;
-
-        // Get user ID from auth context, fallback to 0 if not available
-        const userId = user?.id || 0;
-
         // Save message to SQLite database (idempotent upsert)
         // Use the message_id from backend as the SQLite ID
         const savedMessage = daoManager.message.upsert(db, {
           id: event.message_id, // Use backend message ID
-          from_source:
-            event.kind === "customer" ? MessageFrom.CUSTOMER : MessageFrom.USER,
-          message_sid: message_sid,
+          from_source: event.from_source,
+          message_sid: event.message_sid,
           customer_id: event.customer_id,
-          user_id: event.kind === "customer" ? null : userId,
           body: event.body,
-          message_type: "text",
           createdAt: event.ts, // Use timestamp from WebSocket event
         });
 
@@ -502,7 +494,7 @@ const ChatScreen = () => {
               setText("");
 
               try {
-                const message_sid = `msg_user_${Date.now()}`;
+                const message_sid = `SYS${Date.now()}`;
                 const now = new Date().toISOString();
 
                 // Save message to database first
@@ -512,7 +504,6 @@ const ChatScreen = () => {
                   customer_id: ticket.customer.id,
                   user_id: user.id,
                   body: messageText,
-                  message_type: "text",
                   createdAt: now, // Include timestamp for consistency
                 });
 

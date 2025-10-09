@@ -8,7 +8,7 @@ export interface Message {
   customer_id: number;
   user_id: number | null;
   body: string;
-  message_type: string;
+  message_type: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,7 +20,7 @@ export interface CreateMessageData {
   user_id: number | null;
   body: string;
   createdAt: string;
-  message_type?: string;
+  message_type?: number;
 }
 
 export interface UpdateMessageData {
@@ -29,7 +29,7 @@ export interface UpdateMessageData {
   customer_id?: number;
   user_id?: number | null;
   body?: string;
-  message_type?: string;
+  message_type?: number;
 }
 
 // Extended message interface with user details (for inbox/conversation views)

@@ -264,7 +264,7 @@ class TicketSyncService {
         customer_id: messageData.customer_id,
         user_id: null, // Customer messages don't have user_id
         body: messageData.body || messageData.content || "",
-        message_type: messageData.message_type || "text",
+        message_type: messageData.message_type || null,
         createdAt: messageData.created_at || new Date().toISOString(),
       });
       return created.id;

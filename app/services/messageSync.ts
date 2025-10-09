@@ -9,7 +9,7 @@ interface MessageResponse {
   message_sid: string;
   body: string;
   from_source: string; // "whatsapp", "system", or "llm" from API
-  message_type: string;
+  message_type: number; // 1=REPLY, 2=WHISPER
   created_at: string;
 }
 
@@ -119,8 +119,8 @@ class MessageSyncService {
         );
 
       // Get oldest timestamp from the fetched messages for next pagination
-      // API returns messages in ascending order (oldest first based on logs)
-      // Take the first message's timestamp as the oldest for pagination
+      // API returns messages in DESCENDING order (newest first) per tickets.py:354
+      // Take the last message's timestamp as the oldest for pagination
       const oldestTimestamp =
         apiData.messages.length > 0
           ? apiData.messages[apiData.messages.length - 1].created_at

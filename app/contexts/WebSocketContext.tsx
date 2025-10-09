@@ -26,9 +26,10 @@ import { useAuth } from "./AuthContext";
 export interface MessageCreatedEvent {
   ticket_id: number;
   message_id: number;
+  message_sid: string;
   customer_id: number;
   body: string;
-  kind: string;
+  from_source: number;
   ts: string;
 }
 

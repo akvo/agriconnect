@@ -57,7 +57,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.customer_id,
             data.user_id,
             data.body,
-            data.message_type || "text",
+            data.message_type || null,
             data.createdAt,
           ]
         : [
@@ -66,7 +66,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.customer_id,
             data.user_id,
             data.body,
-            data.message_type || "text",
+            data.message_type || null,
             data.createdAt,
           ];
 
