@@ -430,6 +430,34 @@ async def emit_ticket_resolved(
     logger.info(f"Emitted ticket_resolved event for ticket {ticket_id}")
 
 
+async def emit_ticket_created(
+    ticket_id: int,
+    customer_id: int,
+    administrative_id: int,
+    created_at: str,
+):
+    """
+    Emit ticket_created event to ward room.
+    Called when a new ticket is created via REST API.
+    """
+    event_data = {
+        "ticket_id": ticket_id,
+        "customer_id": customer_id,
+        "administrative_id": administrative_id,
+        "created_at": created_at,
+    }
+
+    # Emit to ward room (for inbox updates)
+    await sio.emit(
+        "ticket_created", event_data, room=f"ward:{administrative_id}"
+    )
+
+    # Emit to admin room
+    await sio.emit("ticket_created", event_data, room="ward:admin")
+
+    logger.info(f"Emitted ticket_created event for ticket {ticket_id}")
+
+
 # Export for use in other routers
 __all__ = [
     "sio",

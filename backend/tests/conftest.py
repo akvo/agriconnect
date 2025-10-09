@@ -162,3 +162,4 @@ def mock_websocket_emitters(monkeypatch):
         "routers.messages.emit_message_status_updated", mock_emit
     )
     monkeypatch.setattr("routers.messages.emit_ticket_resolved", mock_emit)
+    monkeypatch.setattr("routers.tickets.emit_ticket_created", mock_emit)
