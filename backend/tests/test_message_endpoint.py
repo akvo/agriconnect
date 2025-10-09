@@ -1,5 +1,6 @@
 import uuid
 import pytest
+from unittest.mock import patch, MagicMock
 from passlib.context import CryptContext
 
 from models.user import User, UserType
@@ -466,3 +467,179 @@ class TestMessageEndpoints:
 
         # Should return 401 or 403 depending on auth implementation
         assert response.status_code in [401, 403]
+
+    @patch("routers.messages.WhatsAppService")
+    def test_create_message_sends_whatsapp(self, mock_whatsapp_service):
+        """Test that creating a USER message sends WhatsApp to customer"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        # Setup mock WhatsApp service
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message.return_value = {
+            "sid": "SM1234567890",
+            "status": "queued",
+            "to": f"whatsapp:{self.customer.phone_number}",
+            "body": "Test reply message",
+        }
+        mock_whatsapp_service.return_value = mock_service_instance
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "Test reply message",
+            "from_source": MessageFrom.USER,
+        }
+
+        response = self.client.post(
+            "/api/messages",
+            json=payload,
+            headers=headers,
+        )
+
+        assert response.status_code == 201
+
+        # Verify WhatsApp service was called
+        mock_whatsapp_service.assert_called_once()
+        mock_service_instance.send_message.assert_called_once_with(
+            to_number=self.customer.phone_number,
+            message_body=payload["body"],
+        )
+
+        # Verify message_sid was updated with Twilio SID
+        data = response.json()
+        assert data["message_sid"] == "SM1234567890"
+
+    @patch("routers.messages.WhatsAppService")
+    def test_create_message_llm_does_not_send_whatsapp(
+        self, mock_whatsapp_service
+    ):
+        """Test that LLM messages do NOT trigger WhatsApp send"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        mock_service_instance = MagicMock()
+        mock_whatsapp_service.return_value = mock_service_instance
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "AI-generated suggestion",
+            "from_source": MessageFrom.LLM,
+        }
+
+        response = self.client.post(
+            "/api/messages",
+            json=payload,
+            headers=headers,
+        )
+
+        assert response.status_code == 201
+
+        # Verify WhatsApp service was NOT called for LLM messages
+        mock_whatsapp_service.assert_not_called()
+        mock_service_instance.send_message.assert_not_called()
+
+    @patch("routers.messages.WhatsAppService")
+    def test_create_message_customer_does_not_send_whatsapp(
+        self, mock_whatsapp_service
+    ):
+        """Test that CUSTOMER messages do NOT trigger WhatsApp send"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        mock_service_instance = MagicMock()
+        mock_whatsapp_service.return_value = mock_service_instance
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "Customer message",
+            "from_source": MessageFrom.CUSTOMER,
+        }
+
+        response = self.client.post(
+            "/api/messages",
+            json=payload,
+            headers=headers,
+        )
+
+        assert response.status_code == 201
+
+        # Verify WhatsApp service was NOT called for CUSTOMER messages
+        mock_whatsapp_service.assert_not_called()
+        mock_service_instance.send_message.assert_not_called()
+
+    @patch("routers.messages.WhatsAppService")
+    def test_create_message_whatsapp_failure_does_not_block(
+        self, mock_whatsapp_service
+    ):
+        """Test that WhatsApp failure does not block message creation"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        # Setup mock to raise exception
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message.side_effect = Exception(
+            "Twilio API error"
+        )
+        mock_whatsapp_service.return_value = mock_service_instance
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "Message that fails WhatsApp",
+            "from_source": MessageFrom.USER,
+        }
+
+        response = self.client.post(
+            "/api/messages",
+            json=payload,
+            headers=headers,
+        )
+
+        # Should still succeed even if WhatsApp fails
+        assert response.status_code == 201
+        data = response.json()
+        assert data["body"] == payload["body"]
+
+        # Verify message was saved in database
+        saved_message = (
+            self.db.query(Message).filter(Message.id == data["id"]).first()
+        )
+        assert saved_message is not None
+        assert saved_message.body == payload["body"]
+
+    @patch("routers.messages.WhatsAppService")
+    def test_create_message_updates_message_sid_with_twilio_sid(
+        self, mock_whatsapp_service
+    ):
+        """Test that message_sid is updated with Twilio SID on success"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        # Setup mock with specific Twilio SID
+        twilio_sid = "SMabcdef1234567890"
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message.return_value = {
+            "sid": twilio_sid,
+            "status": "queued",
+            "to": f"whatsapp:{self.customer.phone_number}",
+            "body": "Test message",
+        }
+        mock_whatsapp_service.return_value = mock_service_instance
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "Test message",
+            "from_source": MessageFrom.USER,
+        }
+
+        response = self.client.post(
+            "/api/messages",
+            json=payload,
+            headers=headers,
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+
+        # Verify message_sid was updated with Twilio SID
+        assert data["message_sid"] == twilio_sid
+
+        # Verify in database
+        saved_message = (
+            self.db.query(Message).filter(Message.id == data["id"]).first()
+        )
+        assert saved_message.message_sid == twilio_sid

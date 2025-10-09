@@ -10,6 +10,7 @@ from models.ticket import Ticket
 from models.user import User, UserType
 from models.administrative import UserAdministrative
 from utils.auth_dependencies import get_current_user
+from services.whatsapp_service import WhatsAppService
 from routers.ws import (
     emit_message_created,
     emit_message_status_updated,
@@ -39,6 +40,7 @@ class MessageResponse(BaseModel):
     body: str
     from_source: int
     status: int
+    message_sid: str
     created_at: datetime
 
 
@@ -163,6 +165,7 @@ async def update_message_status(
         body=message.body,
         from_source=message.from_source,
         status=message.status,
+        message_sid=message.message_sid,
         created_at=message.created_at,
     )
 
@@ -252,6 +255,37 @@ async def create_message(
     db.commit()
     db.refresh(new_message)
 
+    # Send WhatsApp message to customer when User replies
+    if message_data.from_source == MessageFrom.USER:
+        try:
+            # Get customer phone number from ticket
+            customer_phone = ticket.customer.phone_number
+
+            # Send WhatsApp message
+            whatsapp_service = WhatsAppService()
+            response = whatsapp_service.send_message(
+                to_number=customer_phone,
+                message_body=new_message.body,
+            )
+
+            print(
+                f"WhatsApp reply sent to {customer_phone}: "
+                f"{response.get('sid')}"
+            )
+
+            # Optional: Update message_sid with Twilio SID for tracking
+            # This helps correlate backend messages with Twilio messages
+            if response.get("sid"):
+                new_message.message_sid = response.get("sid")
+                db.commit()
+                db.refresh(new_message)
+
+        except Exception as e:
+            # Log error but don't fail the request
+            # Message is already saved in DB and can be retried later
+            print(f"Failed to send WhatsApp reply: {e}")
+            # TODO: Implement retry queue or dead letter queue for failed sends
+
     # Emit WebSocket event for new message
     await emit_message_created(
         ticket_id=ticket.id,
@@ -285,5 +319,6 @@ async def create_message(
         body=new_message.body,
         from_source=new_message.from_source,
         status=new_message.status,
+        message_sid=new_message.message_sid,
         created_at=new_message.created_at,
     )
