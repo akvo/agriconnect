@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException
@@ -72,8 +73,6 @@ async def whatsapp_webhook(
 
         if ticket:
             # Emit WebSocket event for new message in existing ticket
-            import asyncio
-
             ward_id = None
             if (
                 hasattr(customer, "customer_administrative")
