@@ -107,9 +107,14 @@ const Inbox: React.FC = () => {
       );
     }
     // Navigate to the chat screen, passing ticketNumber as query param
-    router.push(
-      `/chat?ticketNumber=${encodeURIComponent(ticket.ticketNumber)}`,
-    );
+    router.push({
+      pathname: "/chat",
+      params: {
+        ticketNumber: ticket.ticketNumber,
+        name: ticket.customer?.name || "Chat",
+        messageId: ticket.message?.id || undefined,
+      },
+    });
   };
 
   const fetchTickets = useCallback(
