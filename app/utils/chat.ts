@@ -1,5 +1,6 @@
 export interface Message {
   id: number;
+  message_sid: string; // Twilio message SID or system-generated ID
   name: string; // sender's name
   text: string;
   sender: "user" | "customer";
