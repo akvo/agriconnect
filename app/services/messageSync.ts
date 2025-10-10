@@ -1,8 +1,7 @@
 import { SQLiteDatabase } from "expo-sqlite";
+import { api } from "./api";
 import { DAOManager } from "@/database/dao";
 import { MessageFrom, stringToMessageFrom } from "@/constants/messageSource";
-
-const API_BASE_URL = process.env.AGRICONNECT_SERVER_URL || "";
 
 interface MessageResponse {
   id: number;
@@ -34,6 +33,7 @@ interface SyncResult {
 class MessageSyncService {
   /**
    * Fetch messages for a ticket from API
+   * Uses centralized api client which handles 401 errors with unauthorizedHandler
    * @param accessToken - User authentication token
    * @param ticketId - Ticket ID
    * @param beforeTs - Optional timestamp to fetch messages before (for pagination)
@@ -47,23 +47,17 @@ class MessageSyncService {
     limit: number = 20,
   ): Promise<MessagesApiResponse> {
     try {
-      const beforeParam = beforeTs
-        ? `&before_ts=${encodeURIComponent(beforeTs)}`
-        : "";
-      const url = `${API_BASE_URL}/tickets/${ticketId}/messages?limit=${limit}${beforeParam}`;
-      console.log(`[MessageSync] Fetching messages from API: ${url}`);
+      console.log(
+        `[MessageSync] Fetching messages from API for ticket ${ticketId}`,
+      );
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch messages: ${response.status}`);
-      }
-
-      const data = await response.json();
+      // Use centralized api client which handles 401 errors
+      const data = await api.getMessages(
+        accessToken,
+        ticketId,
+        beforeTs,
+        limit,
+      );
       return data;
     } catch (error) {
       console.error("[MessageSync] Error fetching messages from API:", error);

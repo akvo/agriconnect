@@ -166,6 +166,62 @@ class ApiClient {
     return response.json();
   }
 
+  async getMessages(
+    token: string,
+    ticketId: number,
+    beforeTs?: string,
+    limit: number = 20,
+  ): Promise<any> {
+    const beforeParam = beforeTs
+      ? `&before_ts=${encodeURIComponent(beforeTs)}`
+      : "";
+    const url = `${this.baseUrl}/tickets/${ticketId}/messages?limit=${limit}${beforeParam}`;
+
+    console.log("[API] Fetching messages:", { ticketId, beforeTs, limit });
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.log(
+          "[API] ✅ Unauthorized (401) - triggering unauthorizedHandler",
+        );
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+            console.log("[API] ✅ unauthorizedHandler called successfully");
+          } catch (e) {
+            console.error("[API] ❌ unauthorizedHandler error:", e);
+          }
+        } else {
+          console.warn("[API] ⚠️ No unauthorizedHandler registered!");
+        }
+      }
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch messages" }));
+      console.error("[API] Error response:", error);
+
+      // Create error with status code attached
+      const err = new Error(
+        error.detail || "Failed to fetch messages",
+      ) as Error & { status?: number };
+      err.status = response.status;
+      throw err;
+    }
+
+    const responseData = await response.json();
+    console.log(
+      "[API] Fetched messages:",
+      `${responseData.messages?.length || 0} messages`,
+    );
+    return responseData;
+  }
+
   async sendMessage(
     token: string,
     ticketId: number,
