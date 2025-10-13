@@ -274,6 +274,42 @@ class ApiClient {
     console.log("[API] Success response:", responseData);
     return responseData;
   }
+
+  async registerDevice(
+    token: string,
+    deviceData: {
+      push_token: string;
+      platform: string;
+      app_version: string;
+    },
+  ): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/api/devices`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(deviceData),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+          } catch (e) {
+            console.error("unauthorizedHandler error:", e);
+          }
+        }
+      }
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to register device" }));
+      throw new Error(error.detail || "Failed to register device");
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();
