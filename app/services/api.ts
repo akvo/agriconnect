@@ -283,7 +283,7 @@ class ApiClient {
       app_version: string;
     },
   ): Promise<any> {
-    const response = await fetch(`${this.baseUrl}/api/devices`, {
+    const response = await fetch(`${this.baseUrl}/devices`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
