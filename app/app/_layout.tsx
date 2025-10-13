@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { Stack } from "expo-router";
@@ -9,12 +9,18 @@ import { TicketProvider } from "@/contexts/TicketContext";
 import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import HeaderOptions from "@/components/chat/header-options";
 import HeaderTitle from "@/components/chat/header-title";
+import { initializeFirebase } from "@/config/firebase";
 
 export const unstable_settings = {
   anchor: "(tabs)/inbox",
 };
 
 export default function RootLayout() {
+  // Initialize Firebase on app start
+  useEffect(() => {
+    initializeFirebase();
+  }, []);
+
   return (
     <SQLiteProvider
       databaseName={DATABASE_NAME}
