@@ -165,6 +165,10 @@ async def create_ticket(payload: TicketCreate, db: Session = Depends(get_db)):
             customer_id=customer.id,
             administrative_id=ticket.administrative_id,
             created_at=ticket.created_at.isoformat(),
+            ticket_number=ticket.ticket_number,
+            customer_name=customer.full_name,
+            message_id=message.id,
+            message_preview=message.body,
         )
     )
 

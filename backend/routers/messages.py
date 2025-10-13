@@ -287,6 +287,11 @@ async def create_message(
             # TODO: Implement retry queue or dead letter queue for failed sends
 
     # Emit WebSocket event for new message
+    sender_id = (
+        current_user.id
+        if message_data.from_source == MessageFrom.USER
+        else None
+    )
     await emit_message_created(
         ticket_id=ticket.id,
         message_id=new_message.id,
@@ -296,6 +301,9 @@ async def create_message(
         from_source=message_data.from_source,
         ts=new_message.created_at.isoformat(),
         administrative_id=ticket.administrative_id,
+        ticket_number=ticket.ticket_number,
+        customer_name=ticket.customer.full_name,
+        sender_user_id=sender_id,
     )
 
     # If escalated message status changed, emit status update
