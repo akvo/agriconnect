@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import MDCommunityicons from "@expo/vector-icons/MaterialCommunityIcons";
-import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 
 type AvatarProps = {
@@ -19,6 +18,7 @@ const Avatar: React.FC<AvatarProps> = ({
 }) => {
   const borderRadius = Math.round(size / 2);
   const badgeSize = Math.round(size * 0.56);
+  const textSize = Math.round(size / 2.5);
   return (
     <View style={{ width: size, height: size, position: "relative" }}>
       {showAdminBadge && (
@@ -55,7 +55,7 @@ const Avatar: React.FC<AvatarProps> = ({
           },
         ]}
       >
-        <Text style={[typography.body1, { color: themeColors.white }]}>
+        <Text style={[{ color: themeColors.white, fontSize: textSize }]}>
           {initials}
         </Text>
       </View>

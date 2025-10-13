@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,7 +9,7 @@ from datetime import datetime, timezone
 from database import get_db
 from models.ticket import Ticket
 from models.customer import Customer
-from models.message import Message
+from models.message import Message, MessageFrom
 from models.user import User, UserType
 from models.administrative import UserAdministrative, Administrative
 from schemas.ticket import (
@@ -19,6 +20,7 @@ from schemas.ticket import (
     TicketStatus,
 )
 from utils.auth_dependencies import get_current_user
+from routers.ws import emit_ticket_resolved, emit_ticket_created
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -90,12 +92,15 @@ def _serialize_ticket(
             else None
         ),
         "message": (
-            {"id": message.id, "body": message.body} if message else None
+            {
+                "id": message.id,
+                "body": message.body,
+                "message_sid": message.message_sid,
+                "created_at": message.created_at.isoformat()
+            } if message else None
         ),
         "status": "resolved" if ticket.resolved_at else "open",
-        "created_at": (
-            ticket.created_at.isoformat() if ticket.created_at else None
-        ),
+        "created_at": ticket.created_at.isoformat(),
         "resolved_at": (
             ticket.resolved_at.isoformat() if ticket.resolved_at else None
         ),
@@ -152,6 +157,16 @@ async def create_ticket(payload: TicketCreate, db: Session = Depends(get_db)):
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
+
+    # Emit WebSocket event for new ticket
+    asyncio.create_task(
+        emit_ticket_created(
+            ticket_id=ticket.id,
+            customer_id=customer.id,
+            administrative_id=ticket.administrative_id,
+            created_at=ticket.created_at.isoformat(),
+        )
+    )
 
     return {"ticket": _serialize_ticket(ticket, db)}
 
@@ -274,6 +289,23 @@ async def get_ticket_header(
     return {"ticket": _serialize_ticket(ticket)}
 
 
+# Helper to convert from_source integer to string
+def get_from_source_string(from_source: int) -> str:
+    """Convert from_source integer to string representation.
+    Uses MessageFrom constants:
+    - CUSTOMER = 1 -> "whatsapp"
+    - USER = 2 -> "system"
+    - LLM = 3 -> "llm"
+    """
+    if from_source == MessageFrom.CUSTOMER:
+        return "whatsapp"
+    elif from_source == MessageFrom.USER:
+        return "system"
+    elif from_source == MessageFrom.LLM:
+        return "llm"
+    return "unknown"
+
+
 @router.get("/{ticket_id}/messages", response_model=TicketMessagesResponse)
 async def get_ticket_conversation(
     ticket_id: int,
@@ -283,6 +315,15 @@ async def get_ticket_conversation(
     db: Session = Depends(get_db),
 ):
     """Get ticket conversation messages.
+
+    Returns messages from the ticket's escalation point onwards.
+    - Without before_ts: messages from ticket.message_id to latest
+    - With before_ts: older messages before that timestamp (pagination)
+
+    Shows ALL messages in the ticket conversation
+    (from customer, all users, and LLM)
+    so that agents can see the full conversation history including messages
+    from other agents.
 
     Admin users can access any ticket.
     EO users can only access tickets in their assigned administrative areas.
@@ -294,17 +335,33 @@ async def get_ticket_conversation(
     # Check access for EO users
     _check_ticket_access(ticket, current_user, db)
 
-    # get messages for the ticket's customer ordered by created_at desc
+    # Get the ticket's base message to determine the starting point
+    ticket_message = ticket.message
+
+    # Get ALL messages for the ticket's customer
+    # This includes:
+    # 1. Messages from CUSTOMER (from_source = CUSTOMER)
+    # 2. Messages from ALL users (from_source = USER)
+    # 3. Messages from LLM (from_source = LLM)
+    # This allows all agents to see the full conversation history
     msgs_query = db.query(Message).filter(
         Message.customer_id == ticket.customer_id
     )
+
     if before_ts:
+        # Pagination: get older messages before the given timestamp
         try:
             before_dt = datetime.fromisoformat(before_ts)
             msgs_query = msgs_query.filter(Message.created_at < before_dt)
         except Exception:
-            # ignore invalid before_ts, return from head
+            # ignore invalid before_ts, return from ticket start
             pass
+    else:
+        # Default: start from ticket's escalation message onwards
+        if ticket_message and ticket_message.created_at:
+            msgs_query = msgs_query.filter(
+                Message.created_at >= ticket_message.created_at
+            )
 
     msgs = msgs_query.order_by(Message.created_at.desc()).limit(limit).all()
 
@@ -313,10 +370,23 @@ async def get_ticket_conversation(
             "id": m.id,
             "message_sid": m.message_sid,
             "body": m.body,
-            "from_source": m.from_source,
+            "from_source": get_from_source_string(m.from_source),
             "message_type": (
                 getattr(m, "message_type", None).name
                 if getattr(m, "message_type", None)
+                else None
+            ),
+            "status": getattr(m, "status", None),
+            "user_id": m.user_id,
+            "user": (
+                {
+                    "id": m.user.id,
+                    "full_name": m.user.full_name,
+                    "email": m.user.email,
+                    "phone_number": m.user.phone_number,
+                    "user_type": m.user.user_type,
+                }
+                if m.user_id and m.user
                 else None
             ),
             "created_at": m.created_at.isoformat() if m.created_at else None,
@@ -370,5 +440,14 @@ async def mark_ticket_resolved(
     ticket.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(ticket)
+
+    # Emit WebSocket event for ticket resolution
+    asyncio.create_task(
+        emit_ticket_resolved(
+            ticket_id=ticket.id,
+            resolved_at=resolved_dt.isoformat(),
+            administrative_id=ticket.administrative_id,
+        )
+    )
 
     return {"ticket": _serialize_ticket(ticket)}

@@ -16,8 +16,10 @@ class TicketCustomer(BaseModel):
 
 
 class TicketMessage(BaseModel):
-    id: Optional[int]
-    body: Optional[str]
+    id: int
+    body: str
+    message_sid: str
+    created_at: datetime
 
 
 class TicketModel(BaseModel):

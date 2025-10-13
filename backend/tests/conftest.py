@@ -148,3 +148,18 @@ def auth_headers_factory(db_session):
         return {"Authorization": f"Bearer {token}"}, user
 
     return _create_auth_headers
+
+
+@pytest.fixture(autouse=True)
+def mock_websocket_emitters(monkeypatch):
+    """Mock WebSocket emitters for all tests to avoid async issues."""
+
+    async def mock_emit(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr("routers.messages.emit_message_created", mock_emit)
+    monkeypatch.setattr(
+        "routers.messages.emit_message_status_updated", mock_emit
+    )
+    monkeypatch.setattr("routers.messages.emit_ticket_resolved", mock_emit)
+    monkeypatch.setattr("routers.tickets.emit_ticket_created", mock_emit)

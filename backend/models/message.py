@@ -20,6 +20,12 @@ class MessageFrom:
     LLM = 3
 
 
+class MessageStatus:
+    PENDING = 1
+    REPLIED = 2
+    RESOLVED = 3
+
+
 class Message(Base):
     __tablename__ = "messages"
 
@@ -30,6 +36,12 @@ class Message(Base):
     body = Column(Text, nullable=False)
     from_source = Column(Integer, nullable=False)
     message_type = Column(Enum(MessageType), nullable=True)
+    status = Column(
+        Integer,
+        nullable=False,
+        server_default=str(MessageStatus.PENDING),
+        index=True,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     customer = relationship("Customer", back_populates="messages")

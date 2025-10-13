@@ -5,7 +5,6 @@ import {
   CreateMessageData,
   UpdateMessageData,
   MessageWithUsers,
-  ConversationSummary,
 } from "./types/message";
 
 export class MessageDAO extends BaseDAOImpl<Message> {
@@ -13,32 +12,83 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     super("messages");
   }
 
-  create(db: SQLiteDatabase, data: CreateMessageData): Message {
-    const stmt = db.prepareSync(
-      `INSERT INTO messages (
-        from_source, message_sid, customer_id, user_id, body, 
-        message_type, createdAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    );
-    try {
-      const now = new Date().toISOString();
-      const result = stmt.executeSync([
-        data.from_source,
-        data.message_sid,
-        data.customer_id,
-        data.user_id,
-        data.body,
-        data.message_type || "text",
-        now,
-      ]);
+  create(
+    db: SQLiteDatabase,
+    data: CreateMessageData & { id?: number },
+  ): Message {
+    const hasId = data.id !== undefined;
 
-      const message = this.findById(db, result.lastInsertRowId);
+    console.log(
+      `[MessageDAO.create] Attempting to create message - id=${data.id}, from_source=${data.from_source}, body="${data.body.substring(0, 50)}..."`,
+    );
+
+    // Check if message with this ID already exists (for backend messages)
+    if (hasId) {
+      const existingById = this.findById(db, data.id!);
+      if (existingById) {
+        console.log(
+          `[MessageDAO.create] Message with id=${data.id} already exists, returning existing message`,
+        );
+        return existingById;
+      }
+    }
+
+    // Prepare insert statement
+    const stmt = hasId
+      ? db.prepareSync(
+          `INSERT INTO messages (
+            id, from_source, message_sid, customer_id, user_id, body,
+            message_type, status, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+      : db.prepareSync(
+          `INSERT INTO messages (
+            from_source, message_sid, customer_id, user_id, body,
+            message_type, status, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        );
+
+    try {
+      const params = hasId
+        ? [
+            data.id,
+            data.from_source,
+            data.message_sid,
+            data.customer_id,
+            data.user_id,
+            data.body,
+            data.message_type || null,
+            data.status || 1, // Default to PENDING (1)
+            data.createdAt,
+          ]
+        : [
+            data.from_source,
+            data.message_sid,
+            data.customer_id,
+            data.user_id,
+            data.body,
+            data.message_type || null,
+            data.status || 1, // Default to PENDING (1)
+            data.createdAt,
+          ];
+
+      const result = stmt.executeSync(params);
+      const messageId = hasId ? data.id! : result.lastInsertRowId;
+
+      console.log(
+        `[MessageDAO.create] Successfully created message - id=${messageId}, from_source=${data.from_source}, body="${data.body.substring(0, 50)}..."`,
+      );
+
+      const message = this.findById(db, messageId as number);
       if (!message) {
         throw new Error("Failed to retrieve created message");
       }
       return message;
     } catch (error) {
-      console.error("Error creating message:", error);
+      console.error(
+        `[MessageDAO.create] Error creating message - id=${data.id}, from_source=${data.from_source}, body="${data.body.substring(0, 50)}...":`,
+        error,
+      );
       throw error;
     } finally {
       stmt.finalizeSync();
@@ -74,11 +124,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         updates.push("message_type = ?");
         values.push(data.message_type);
       }
+      if (data.status !== undefined) {
+        updates.push("status = ?");
+        values.push(data.status);
+      }
 
       if (updates.length === 0) {
         return false;
       }
-      values.push(new Date().toISOString());
       values.push(id);
 
       const stmt = db.prepareSync(
@@ -96,146 +149,6 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     }
   }
 
-  // Get conversation between specific customer and EO
-  getConversation(
-    db: SQLiteDatabase,
-    customerId: number,
-    eoId: number,
-    limit: number = 50,
-  ): MessageWithUsers[] {
-    const stmt = db.prepareSync(
-      `SELECT 
-        m.*,
-        f.fullName as customer_name,
-        f.phoneNumber as customer_phone,
-        e.fullName as eo_name,
-        e.email as eo_email
-      FROM messages m
-      JOIN customer_users f ON m.customer_id = f.id
-      JOIN users u ON m.user_id = u.id
-      WHERE m.customer_id = ? AND m.user_id = ?
-      ORDER BY m.createdAt DESC
-      LIMIT ?`,
-    );
-    try {
-      const result = stmt.executeSync<MessageWithUsers>([
-        customerId,
-        eoId,
-        limit,
-      ]);
-      return result.getAllSync();
-    } catch (error) {
-      console.error("Error getting conversation:", error);
-      return [];
-    } finally {
-      stmt.finalizeSync();
-    }
-  }
-
-  // Get inbox - recent conversations for an EO
-  getInbox(
-    db: SQLiteDatabase,
-    eoId: number,
-    limit: number = 20,
-  ): ConversationSummary[] {
-    const stmt = db.prepareSync(
-      `SELECT 
-        m1.customer_id,
-        m1.user_id,
-        f.fullName as customer_name,
-        f.phoneNumber as customer_phone,
-        e.fullName as eo_name,
-        e.email as eo_email,
-        m1.body as last_message,
-        m1.message_type as last_message_type,
-        m1.createdAt as last_message_time,
-        0 as unread_count
-      FROM messages m1
-      JOIN customer_users f ON m1.customer_id = f.id
-      JOIN users u ON m1.user_id = u.id
-      WHERE m1.user_id = ? 
-      AND m1.createdAt = (
-        SELECT MAX(m2.createdAt) 
-        FROM messages m2 
-        WHERE m2.customer_id = m1.customer_id 
-        AND m2.user_id = m1.user_id
-      )
-      ORDER BY m1.createdAt DESC
-      LIMIT ?`,
-    );
-    try {
-      const result = stmt.executeSync<ConversationSummary>([eoId, limit]);
-      return result.getAllSync();
-    } catch (error) {
-      console.error("Error getting inbox:", error);
-      return [];
-    } finally {
-      stmt.finalizeSync();
-    }
-  }
-
-  // Get messages by customer
-  getMessagesByCustomer(
-    db: SQLiteDatabase,
-    customerId: number,
-    limit: number = 50,
-  ): MessageWithUsers[] {
-    const stmt = db.prepareSync(
-      `SELECT 
-        m.*,
-        f.fullName as customer_name,
-        f.phoneNumber as customer_phone,
-        e.fullName as eo_name,
-        e.email as eo_email
-      FROM messages m
-      JOIN customer_users f ON m.customer_id = f.id
-      JOIN users u ON m.user_id = u.id
-      WHERE m.customer_id = ?
-      ORDER BY m.createdAt DESC
-      LIMIT ?`,
-    );
-    try {
-      const result = stmt.executeSync<MessageWithUsers>([customerId, limit]);
-      return result.getAllSync();
-    } catch (error) {
-      console.error("Error getting messages by customer:", error);
-      return [];
-    } finally {
-      stmt.finalizeSync();
-    }
-  }
-
-  // Get messages by EO
-  getMessagesByEO(
-    db: SQLiteDatabase,
-    eoId: number,
-    limit: number = 50,
-  ): MessageWithUsers[] {
-    const stmt = db.prepareSync(
-      `SELECT 
-        m.*,
-        f.fullName as customer_name,
-        f.phoneNumber as customer_phone,
-        e.fullName as eo_name,
-        e.email as eo_email
-      FROM messages m
-      JOIN customer_users f ON m.customer_id = f.id
-      JOIN users u ON m.user_id = u.id
-      WHERE m.user_id = ?
-      ORDER BY m.createdAt DESC
-      LIMIT ?`,
-    );
-    try {
-      const result = stmt.executeSync<MessageWithUsers>([eoId, limit]);
-      return result.getAllSync();
-    } catch (error) {
-      console.error("Error getting messages by EO:", error);
-      return [];
-    } finally {
-      stmt.finalizeSync();
-    }
-  }
-
   // Find message by WhatsApp message SID
   findByMessageSid(db: SQLiteDatabase, messageSid: string): Message | null {
     const stmt = db.prepareSync("SELECT * FROM messages WHERE message_sid = ?");
@@ -250,63 +163,119 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     }
   }
 
-  // Get recent messages (for debugging/admin)
-  getRecentMessages(
-    db: SQLiteDatabase,
-    limit: number = 10,
-  ): MessageWithUsers[] {
+  // Find message with user details by ID
+  findByIdWithUsers(db: SQLiteDatabase, id: number): MessageWithUsers | null {
     const stmt = db.prepareSync(
-      `SELECT 
+      `SELECT
         m.*,
         f.fullName as customer_name,
         f.phoneNumber as customer_phone,
-        e.fullName as eo_name,
-        e.email as eo_email
+        u.fullName as user_name,
+        u.email as user_email
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
-      JOIN users u ON m.user_id = u.id
+      LEFT JOIN users u ON m.user_id = u.id
+      WHERE m.id = ?`,
+    );
+    try {
+      const result = stmt.executeSync<MessageWithUsers>([id]);
+      return result.getFirstSync() || null;
+    } catch (error) {
+      console.error("Error finding message with users by ID:", error);
+      return null;
+    } finally {
+      stmt.finalizeSync();
+    }
+  }
+
+  // Get messages by ticket ID
+  // Gets the customer_id from the ticket first, then fetches all messages for that customer
+  getMessagesByTicketId(
+    db: SQLiteDatabase,
+    ticketId: number,
+    limit: number = 100,
+  ): MessageWithUsers[] {
+    // First, get the customer_id from the ticket
+    const ticketStmt = db.prepareSync(
+      "SELECT customerId FROM tickets WHERE id = ?",
+    );
+    let customerId: number | null = null;
+
+    try {
+      const ticketResult = ticketStmt.executeSync<{ customerId: number }>([
+        ticketId,
+      ]);
+      const ticket = ticketResult.getFirstSync();
+      customerId = ticket?.customerId || null;
+    } catch (error) {
+      console.error("Error getting ticket customer_id:", error);
+      return [];
+    } finally {
+      ticketStmt.finalizeSync();
+    }
+
+    if (!customerId) {
+      console.error(`Ticket ${ticketId} not found or has no customer`);
+      return [];
+    }
+
+    // Now get all messages for that customer
+    // Order by createdAt DESC to get the newest messages first, then reverse to ASC for UI display
+    const stmt = db.prepareSync(
+      `SELECT
+        m.*,
+        f.fullName as customer_name,
+        f.phoneNumber as customer_phone,
+        u.fullName as user_name,
+        u.email as user_email
+      FROM messages m
+      JOIN customer_users f ON m.customer_id = f.id
+      LEFT JOIN users u ON m.user_id = u.id
+      WHERE m.customer_id = ?
       ORDER BY m.createdAt DESC
       LIMIT ?`,
     );
     try {
-      const result = stmt.executeSync<MessageWithUsers>([limit]);
-      return result.getAllSync();
+      const result = stmt.executeSync<MessageWithUsers>([customerId, limit]);
+      const messages = result.getAllSync();
+      // Reverse to return in ASC order (oldest to newest) for UI display
+      return messages.reverse();
     } catch (error) {
-      console.error("Error getting recent messages:", error);
+      console.error("Error getting messages by customer ID:", error);
       return [];
     } finally {
       stmt.finalizeSync();
     }
   }
 
-  // Search messages by content
-  searchMessages(
+  // Upsert message (insert or update based on ID or message_sid)
+  upsert(
     db: SQLiteDatabase,
-    query: string,
-    limit: number = 20,
-  ): MessageWithUsers[] {
-    const stmt = db.prepareSync(
-      `SELECT 
-        m.*,
-        f.fullName as customer_name,
-        f.phoneNumber as customer_phone,
-        e.fullName as eo_name,
-        e.email as eo_email
-      FROM messages m
-      JOIN customer_users f ON m.customer_id = f.id
-      JOIN users u ON m.user_id = u.id
-      WHERE m.body LIKE ?
-      ORDER BY m.createdAt DESC
-      LIMIT ?`,
-    );
+    data: CreateMessageData & { id?: number },
+  ): Message | null {
     try {
-      const result = stmt.executeSync<MessageWithUsers>([`%${query}%`, limit]);
-      return result.getAllSync();
+      // Check if message exists by ID first (if provided)
+      let existing: Message | null = null;
+      if (data.id !== undefined) {
+        existing = this.findById(db, data.id);
+      }
+
+      // If not found by ID, check by message_sid
+      if (!existing) {
+        existing = this.findByMessageSid(db, data.message_sid);
+      }
+
+      if (existing) {
+        // Message already exists, return it without updating
+        console.log(`[MessageDAO] Message already exists: ${existing.id}`);
+        return existing;
+      } else {
+        // Create new message with backend ID if provided
+        return this.create(db, data);
+      }
     } catch (error) {
-      console.error("Error searching messages:", error);
-      return [];
-    } finally {
-      stmt.finalizeSync();
+      console.error("Error upserting message:", error);
+      return null;
     }
   }
 }

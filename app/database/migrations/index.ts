@@ -3,6 +3,7 @@ import { customerUsersMigration } from "./002_create_customer_users_table";
 import { messagesMigration } from "./003_create_messages_table";
 import { profileMigration } from "./004_create_profile_table";
 import { ticketMigration } from "./005_create_tickets_table";
+import { alterMessagesAddStatusMigration } from "./006_alter_messages_add_status";
 
 // Type definition for migration objects
 export interface Migration {
@@ -19,9 +20,14 @@ export const allMigrations: Migration[] = [
   { version: 1, name: "messages", migration: messagesMigration },
   { version: 1, name: "profile", migration: profileMigration },
   { version: 2, name: "tickets", migration: ticketMigration },
+  {
+    version: 3,
+    name: "alter_messages_add_status",
+    migration: alterMessagesAddStatusMigration,
+  },
 
-  // Future version 2 migrations can be added here
-  // { version: 2, name: 'some_new_table', migration: someNewTableMigration },
+  // Future migrations can be added here
+  // { version: 4, name: 'some_new_feature', migration: someNewFeatureMigration },
 ];
 
 // Helper function to get migrations by version

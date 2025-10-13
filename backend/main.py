@@ -7,9 +7,11 @@ from routers import (
     callbacks,
     customers,
     knowledge_base,
+    messages,
     service_tokens,
     whatsapp,
     tickets,
+    ws,
 )
 
 app = FastAPI(
@@ -36,11 +38,19 @@ app.include_router(administrative.router, prefix="/api")
 app.include_router(callbacks.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(knowledge_base.router, prefix="/api")
+app.include_router(messages.router, prefix="/api")
 app.include_router(service_tokens.router, prefix="/api")
 app.include_router(whatsapp.router, prefix="/api")
 app.include_router(tickets.router, prefix="/api")
 
 
+# Health check endpoint
 @app.get("/api/health-check", tags=["health-check"])
 def read_root():
     return {"Status": "OK"}
+
+
+# Mount Socket.IO at /ws/socket.io path
+# Socket.IO will handle /ws/socket.io/* requests
+# Must be mounted AFTER all FastAPI routes are defined
+app.mount("/ws/socket.io", ws.sio_app)

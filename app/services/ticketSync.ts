@@ -2,6 +2,7 @@ import { SQLiteDatabase } from "expo-sqlite";
 import { api } from "./api";
 import { DAOManager } from "@/database/dao";
 import { Ticket } from "@/database/dao/types/ticket";
+import { MessageFrom } from "@/constants/messageSource";
 
 interface SyncResult {
   tickets: Ticket[];
@@ -145,35 +146,15 @@ class TicketSyncService {
         }
 
         // 2. Sync initial message if available
-        let messageId: number | null = null;
+
         if (apiTicket.message) {
-          messageId = await this.syncMessage(db, {
+          await this.syncMessage(db, {
             ...apiTicket.message,
             customer_id: customerId,
-            user_id: userId || null,
           });
-        } else if (apiTicket.message_id) {
-          // Handle case where only message_id is provided
-          messageId = apiTicket.message_id;
         }
 
-        // 3. Sync ticket - even if customer/message are missing
-        // This ensures we don't lose ticket data
-        if (customerId && messageId) {
-          await this.syncTicket(db, {
-            ...apiTicket,
-            customerId,
-            messageId,
-          });
-        } else {
-          console.warn(
-            `Skipping ticket ${
-              apiTicket.ticketNumber || apiTicket.ticket_number
-            }: missing customer or message`,
-          );
-        }
-
-        // 4. Sync resolver user if available
+        // 3. Sync resolver user if available
         if (apiTicket.resolver?.id) {
           // Simple upsert by id
           const existingUser = dao.user.findById(db, apiTicket.resolver.id);
@@ -186,6 +167,22 @@ class TicketSyncService {
               userType: apiTicket.resolver.user_type,
             });
           }
+        }
+
+        // 4. Sync ticket - even if customer/message are missing
+        // This ensures we don't lose ticket data
+        if (customerId && apiTicket.message?.id) {
+          await this.syncTicket(db, {
+            ...apiTicket,
+            messageId: apiTicket.message.id,
+            customerId,
+          });
+        } else {
+          console.warn(
+            `Skipping ticket ${
+              apiTicket.ticketNumber || apiTicket.ticket_number
+            }: missing customer or message`,
+          );
         }
       }
     } catch (error) {
@@ -248,6 +245,7 @@ class TicketSyncService {
 
   /**
    * Sync a single message to local database
+   * This is used for initial ticket messages (always from CUSTOMER)
    */
   private static async syncMessage(
     db: SQLiteDatabase,
@@ -257,35 +255,19 @@ class TicketSyncService {
       // Create DAO manager instance
       const dao = new DAOManager(db);
 
-      // Try to find existing message by message_sid if available
-      let existing = null;
-
-      if (messageData.message_sid) {
-        const stmt = db.prepareSync(
-          "SELECT * FROM messages WHERE message_sid = ? LIMIT 1",
-        );
-        try {
-          const result = stmt.executeSync<any>([messageData.message_sid]);
-          existing = result.getFirstSync();
-        } finally {
-          stmt.finalizeSync();
-        }
-      }
-
-      if (existing) {
-        return existing.id;
-      } else {
-        // Create new message
-        const created = dao.message.create(db, {
-          from_source: messageData.from_source || "whatsapp",
-          message_sid: messageData.message_sid || `msg_${Date.now()}`,
-          customer_id: messageData.customer_id,
-          user_id: messageData.user_id || null,
-          body: messageData.body || messageData.content || "",
-          message_type: messageData.message_type || "text",
-        });
-        return created.id;
-      }
+      // Create message with backend ID
+      // Initial ticket messages are ALWAYS from CUSTOMER
+      const created = dao.message.create(db, {
+        id: messageData.id, // Use backend message ID
+        from_source: MessageFrom.CUSTOMER, // Initial messages are always from customer
+        message_sid: messageData.message_sid,
+        customer_id: messageData.customer_id,
+        user_id: null, // Customer messages don't have user_id
+        body: messageData.body || messageData.content || "",
+        message_type: messageData.message_type || null,
+        createdAt: messageData.created_at || new Date().toISOString(),
+      });
+      return created.id;
     } catch (error) {
       console.error("Error syncing message:", error);
       throw error;

@@ -2,10 +2,11 @@ import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
-import { formatTime, formatResolved } from "@/utils/time";
+import { formatTime } from "@/utils/time";
 import { initialsFromName } from "@/utils/string";
 import Avatar from "@/components/avatar";
 import { Ticket } from "@/database/dao/types/ticket";
+import TicketRespondedStatus from "./ticket-responded-status";
 
 const TicketItem: React.FC<{
   ticket: Ticket;
@@ -95,35 +96,12 @@ const TicketItem: React.FC<{
           </View>
         </View>
       </View>
-      <View style={styles.ticketFooter}>
-        <Text style={[typography.caption1, { color: themeColors.dark3 }]}>
-          {ticket.ticketNumber}
-        </Text>
-        <View style={[styles.flexRow]}>
-          <Text style={[typography.body4, { color: themeColors.textPrimary }]}>
-            Responded by:
-          </Text>
-          {respondedBy ? (
-            <View style={[styles.flexRow, { justifyContent: "space-between" }]}>
-              <Text style={[typography.body4, { color: themeColors.dark5 }]}>
-                {respondedBy.name}
-              </Text>
-              <Text style={[typography.caption2, { color: themeColors.dark4 }]}>
-                {formatResolved(ticket.resolved_at)}
-              </Text>
-            </View>
-          ) : (
-            <Text
-              style={[
-                typography.body4,
-                { color: themeColors.error, fontWeight: 500 },
-              ]}
-            >
-              No response yet
-            </Text>
-          )}
-        </View>
-      </View>
+      <TicketRespondedStatus
+        ticketNumber={ticket.ticketNumber}
+        respondedBy={respondedBy}
+        resolvedAt={ticket?.resolvedAt}
+        containerStyle={styles.ticketFooter}
+      />
     </Pressable>
   );
 };
@@ -168,11 +146,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   ticketFooter: {
-    width: "100%",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 4,
     borderWidth: 1,
     borderColor: themeColors.mutedBorder,
     borderRadius: 8,
