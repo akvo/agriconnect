@@ -51,6 +51,14 @@
           "enableFTS": false,
           "useSQLCipher": true
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff",
+          "sounds": []
+        }
       ]
     ],
     "androidNavigationBar": {
@@ -60,6 +68,11 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "platforms": ["ios", "android", "web"]
+    "platforms": ["ios", "android", "web"],
+    "extra": {
+      "eas": {
+        "projectId": "bd031b01-b8a5-47d7-9678-0307138fec19"
+      }
+    }
   }
 }
