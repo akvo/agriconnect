@@ -39,7 +39,9 @@ export default function RootLayout() {
                   }) => ({
                     headerShown: true,
                     headerTitleAlign: "left",
-                    headerTitle: () => <HeaderTitle name={route?.params?.name} />,
+                    headerTitle: () => (
+                      <HeaderTitle name={route?.params?.name} />
+                    ),
                     headerRight: () => (
                       <HeaderOptions ticketID={route?.params?.ticketNumber} />
                     ),
