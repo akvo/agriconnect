@@ -154,7 +154,22 @@ class TicketSyncService {
           });
         }
 
-        // 3. Sync ticket - even if customer/message are missing
+        // 3. Sync resolver user if available
+        if (apiTicket.resolver?.id) {
+          // Simple upsert by id
+          const existingUser = dao.user.findById(db, apiTicket.resolver.id);
+          if (!existingUser) {
+            dao.user.create(db, {
+              id: apiTicket.resolver.id,
+              fullName: apiTicket.resolver.name,
+              email: apiTicket.resolver.email,
+              phoneNumber: apiTicket.resolver.phone_number,
+              userType: apiTicket.resolver.user_type,
+            });
+          }
+        }
+
+        // 4. Sync ticket - even if customer/message are missing
         // This ensures we don't lose ticket data
         if (customerId && apiTicket.message?.id) {
           await this.syncTicket(db, {
@@ -168,21 +183,6 @@ class TicketSyncService {
               apiTicket.ticketNumber || apiTicket.ticket_number
             }: missing customer or message`,
           );
-        }
-
-        // 4. Sync resolver user if available
-        if (apiTicket.resolver?.id) {
-          // Simple upsert by id
-          const existingUser = dao.user.findById(db, apiTicket.resolver.id);
-          if (!existingUser) {
-            dao.user.create(db, {
-              id: apiTicket.resolver.id,
-              fullName: apiTicket.resolver.name,
-              email: apiTicket.resolver.email,
-              phoneNumber: apiTicket.resolver.phone_number,
-              userType: apiTicket.resolver.user_type,
-            });
-          }
         }
       }
     } catch (error) {
