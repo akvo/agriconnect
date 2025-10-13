@@ -18,13 +18,17 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
     return (
       <View style={[styles.messageRow, styles.rowRight]}>
         <View style={[styles.bubble]}>
+          {/* Show sender name header for user messages */}
+          <Text style={[typography.body4, styles.senderName]}>
+            {message.name}
+          </Text>
           <View style={[styles.bubbleRight]}>
             <Text style={[typography.body3, styles.userText]}>
               {message.text}
             </Text>
           </View>
           <View style={styles.footer}>
-            <Text style={[typography.caption, styles.timestamp]}>
+            <Text style={[typography.caption1, styles.timestamp]}>
               {formatMessageTimestamp(message.timestamp)}
             </Text>
           </View>
@@ -117,6 +121,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 11,
     color: themeColors.dark3,
+    alignSelf: "flex-end",
+  },
+  senderName: {
+    color: themeColors.textPrimary,
+    fontWeight: "600",
+    marginBottom: 4,
     alignSelf: "flex-end",
   },
 });

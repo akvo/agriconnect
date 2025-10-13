@@ -40,6 +40,8 @@ export interface UpdateMessageData {
 export interface MessageWithUsers extends Message {
   customer_name: string;
   customer_phone: string;
+  user_name: string | null; // Full name of user who sent the message (for USER messages)
+  user_email: string | null; // Email of user who sent the message (for USER messages)
 }
 
 // Conversation summary for inbox

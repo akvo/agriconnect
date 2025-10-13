@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,21 +38,37 @@ import { api } from "@/services/api";
 // Helper function to convert MessageWithUsers to Message
 const convertToUIMessage = (
   msg: MessageWithUsers,
-  currentUserName?: string,
+  currentUserId?: number,
 ): Message => {
   // Determine if message is from customer or user/llm
   // from_source: 1=CUSTOMER, 2=USER, 3=LLM
   // Customer messages show as "customer", USER and LLM messages show as "user"
   const isCustomerMessage = msg.from_source === MessageFrom.CUSTOMER;
+
+  // Determine the sender name for user messages
+  // If msg has user_name (from database), use it
+  // If user_id matches current user, show "You"
+  // Otherwise show "Unknown User"
+  let userName = "You";
+  if (!isCustomerMessage) {
+    if (msg.user_name) {
+      // Use the name from database (could be from any user)
+      userName = msg.user_id === currentUserId ? "You" : msg.user_name;
+    } else {
+      // Fallback for messages without user info
+      userName = "You";
+    }
+  }
+
   console.log(
     `[Chat] Converting message id=${msg.id} text={${msg.body}} from_source=${
       msg.from_source
-    } to UI message as ${isCustomerMessage ? "customer" : "user"}`,
+    } user_id=${msg.user_id} user_name=${msg.user_name} to UI message as ${isCustomerMessage ? "customer" : "user"} name="${isCustomerMessage ? msg.customer_name : userName}"`,
   );
   return {
     id: msg.id,
     message_sid: msg.message_sid,
-    name: isCustomerMessage ? msg.customer_name : currentUserName || "You",
+    name: isCustomerMessage ? msg.customer_name : userName,
     text: msg.body,
     sender: isCustomerMessage ? "customer" : "user",
     timestamp: msg.createdAt,
@@ -71,6 +88,7 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [oldestTimestamp, setOldestTimestamp] = useState<string | null>(null);
   const [text, setText] = useState<string>("");
   const [stickyMessage, setStickyMessage] = useState<Message | null>(null);
@@ -117,8 +135,7 @@ const ChatScreen = () => {
   }, []);
 
   // Flatten sections for FlatList
-  // With inverted={true}, we need to reverse the data order
-  // so newest messages appear at the bottom
+  // Messages are ordered oldest to newest (chronological order)
   const flattenedData = React.useMemo(() => {
     const sections = groupMessagesByDate(messages);
     const result: { type: "header" | "message"; data: any }[] = [];
@@ -130,114 +147,143 @@ const ChatScreen = () => {
       });
     });
 
-    // Reverse for inverted list (newest messages at bottom)
-    return result.reverse();
+    return result;
   }, [messages, groupMessagesByDate]);
 
   const scrollToBottom = useCallback((animated = false) => {
     setTimeout(() => {
-      // With inverted list, scroll to offset 0 to show newest messages
-      flatListRef.current?.scrollToOffset({ offset: 0, animated });
+      // Scroll to end of list to show newest messages
+      flatListRef.current?.scrollToEnd({ animated });
     }, 100);
   }, []);
 
-  // Load ticket and initial messages from API
-  const loadTicketAndMessages = useCallback(async () => {
-    if (!ticketNumber || !user?.accessToken) {
-      console.log(`[Chat] Missing ticketNumber or accessToken, skipping load`);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Fetch ticket from database to get ID
-      const ticketData = daoManager.ticket.findByTicketNumber(db, ticketNumber);
-
-      console.log(
-        `[Chat] Found ticket data:`,
-        ticketData ? `id=${ticketData.id}` : "null",
-      );
-
-      if (ticketData) {
-        setTicket({
-          id: ticketData.id,
-          ticketNumber: ticketData.ticketNumber,
-          customer: ticketData.customer,
-          resolver: ticketData.resolver,
-          resolvedAt: ticketData.resolvedAt,
-          createdAt: ticketData.createdAt,
-        });
-
-        // Load initial messages using MessageSyncService
-        // This fetches from API: /api/tickets/{ticket_id}/messages
-        // and stores them in SQLite for offline access
+  // Load ticket and initial messages
+  // forceRefresh=false by default for offline-first behavior
+  const loadTicketAndMessages = useCallback(
+    async (forceRefresh: boolean = false) => {
+      if (!ticketNumber || !user?.accessToken) {
         console.log(
-          `[Chat] Calling MessageSyncService.loadInitialMessages for ticket ${ticketData.id}`,
+          `[Chat] Missing ticketNumber or accessToken, skipping load`,
         );
-        const result = await MessageSyncService.loadInitialMessages(
-          db,
-          user.accessToken,
-          ticketData.id,
-          ticketData.customer?.id || 0,
-          ticketData.createdAt || new Date().toISOString(),
-          user?.id,
-          20,
-        );
-        console.log(
-          `[Chat] MessageSyncService returned ${result.messages.length} messages`,
-        );
-
-        // Convert to UI message format
-        const uiMessages = result.messages.map((msg) =>
-          convertToUIMessage(msg, user?.fullName),
-        );
-        setMessages(uiMessages);
-        setOldestTimestamp(result.oldestTimestamp);
-
-        console.log(
-          `[Chat] Loaded ${uiMessages.length} messages for ticket ${ticketNumber}`,
-        );
-        // Show sticky bubble if messageId matches a customer message
-        if (messageId) {
-          const targetMessage = uiMessages.find(
-            (msg) =>
-              msg.id === parseInt(messageId, 10) && msg.sender === "customer",
-          );
-          if (targetMessage) {
-            setStickyMessage(targetMessage);
-            console.log(
-              `[Chat] Setting sticky bubble for customer message id=${messageId}`,
-            );
-          }
-        }
-
-        // Scroll to bottom after loading
-        setTimeout(() => scrollToBottom(false), 300);
-      } else {
-        console.warn(`[Chat] Ticket not found: ${ticketNumber}`);
-      }
-    } catch (error: any) {
-      // Check if this is a 401 Unauthorized error
-      if (error?.status === 401) {
-        console.log(
-          "[Chat] 401 Unauthorized - user session expired, logging out...",
-        );
-        // Don't log error - the unauthorizedHandler will handle logout
+        setLoading(false);
         return;
       }
-      console.error("[Chat] Error loading ticket and messages:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [ticketNumber, db, daoManager, user, scrollToBottom, messageId]);
+
+      try {
+        if (!forceRefresh) {
+          setLoading(true);
+        }
+
+        // Fetch ticket from database to get ID
+        const ticketData = daoManager.ticket.findByTicketNumber(
+          db,
+          ticketNumber,
+        );
+
+        console.log(
+          `[Chat] Found ticket data:`,
+          ticketData ? `id=${ticketData.id}` : "null",
+        );
+
+        if (ticketData) {
+          setTicket({
+            id: ticketData.id,
+            ticketNumber: ticketData.ticketNumber,
+            customer: ticketData.customer,
+            resolver: ticketData.resolver,
+            resolvedAt: ticketData.resolvedAt,
+            createdAt: ticketData.createdAt,
+          });
+
+          // Load initial messages using MessageSyncService
+          // OFFLINE-FIRST: Uses cached messages unless forceRefresh=true
+          // On initial load (forceRefresh=false): returns cached messages if available
+          // On pull-to-refresh (forceRefresh=true): always fetches from API
+          console.log(
+            `[Chat] Calling MessageSyncService.loadInitialMessages for ticket ${ticketData.id} (forceRefresh=${forceRefresh})`,
+          );
+          const result = await MessageSyncService.loadInitialMessages(
+            db,
+            user.accessToken,
+            ticketData.id,
+            ticketData.customer?.id || 0,
+            ticketData.createdAt || new Date().toISOString(),
+            user?.id,
+            20,
+            forceRefresh, // Pass forceRefresh parameter
+          );
+          console.log(
+            `[Chat] MessageSyncService returned ${result.messages.length} messages`,
+          );
+
+          // Convert to UI message format
+          const uiMessages = result.messages.map((msg) =>
+            convertToUIMessage(msg, user?.id),
+          );
+          setMessages(uiMessages);
+          setOldestTimestamp(result.oldestTimestamp);
+
+          console.log(
+            `[Chat] Loaded ${uiMessages.length} messages for ticket ${ticketNumber} (${forceRefresh ? "from API" : "from cache or API"})`,
+          );
+          // Show sticky bubble if messageId matches a customer message
+          if (messageId) {
+            const targetMessage = uiMessages.find(
+              (msg) =>
+                msg.id === parseInt(messageId, 10) && msg.sender === "customer",
+            );
+            if (targetMessage) {
+              setStickyMessage(targetMessage);
+              console.log(
+                `[Chat] Setting sticky bubble for customer message id=${messageId}`,
+              );
+            }
+          }
+
+          // Scroll to bottom after loading (only on initial load)
+          if (!forceRefresh) {
+            setTimeout(() => scrollToBottom(false), 300);
+          }
+        } else {
+          console.warn(`[Chat] Ticket not found: ${ticketNumber}`);
+        }
+      } catch (error: any) {
+        // Check if this is a 401 Unauthorized error
+        if (error?.status === 401) {
+          console.log(
+            "[Chat] 401 Unauthorized - user session expired, logging out...",
+          );
+          // Don't log error - the unauthorizedHandler will handle logout
+          return;
+        }
+        console.error("[Chat] Error loading ticket and messages:", error);
+      } finally {
+        if (!forceRefresh) {
+          setLoading(false);
+        }
+      }
+    },
+    [ticketNumber, db, daoManager, user, scrollToBottom, messageId],
+  );
 
   useEffect(() => {
     loadTicketAndMessages();
   }, [loadTicketAndMessages]);
 
-  // Load older messages when scrolling up (pagination)
+  // Handle pull-to-refresh to force fetch fresh messages from API
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadTicketAndMessages(true); // forceRefresh=true
+      console.log("[Chat] Pull-to-refresh completed");
+    } catch (error) {
+      console.error("[Chat] Error during pull-to-refresh:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadTicketAndMessages]);
+
+  // Load older messages when scrolling to top (pagination)
   // Uses before_ts parameter for lazy loading behavior
   const loadOlderMessages = async () => {
     if (!ticket?.id || !user?.accessToken || !oldestTimestamp || loadingMore) {
@@ -261,17 +307,17 @@ const ChatScreen = () => {
 
       // Convert to UI message format
       const uiMessages = result.messages.map((msg) =>
-        convertToUIMessage(msg, user?.fullName),
+        convertToUIMessage(msg, user?.id),
       );
 
-      // Prepend older messages to the existing messages list
+      // Prepend older messages to the beginning of the list
       // Filter out duplicates by checking message IDs
       setMessages((prev: Message[]) => {
         const existingIds = new Set(prev.map((m: Message) => m.id));
         const newMessages = uiMessages.filter(
           (m: Message) => !existingIds.has(m.id),
         );
-        return [...newMessages, ...prev]; // Prepend older messages
+        return [...newMessages, ...prev]; // Prepend older messages at the top
       });
       setOldestTimestamp(result.oldestTimestamp);
 
@@ -317,7 +363,7 @@ const ChatScreen = () => {
           );
 
           if (dbMessage) {
-            const uiMessage = convertToUIMessage(dbMessage, user?.fullName);
+            const uiMessage = convertToUIMessage(dbMessage, user?.id);
 
             // Check if message already exists in state (avoid duplicates)
             // Check by both ID and message_sid to handle optimistic updates
@@ -429,18 +475,12 @@ const ChatScreen = () => {
     console.log(`[Chat] Joining ticket room: ${ticket.id}`);
     joinTicket(ticket.id);
 
-    // Set active ticket to suppress notifications while viewing
-    setActiveTicket(ticket.id);
-
     return () => {
       if (!ticket?.id) {
         return;
       }
       console.log(`[Chat] Leaving ticket room: ${ticket.id}`);
       leaveTicket(ticket.id);
-
-      // Clear active ticket when leaving chat
-      setActiveTicket(null);
     };
   }, [ticket?.id, joinTicket, leaveTicket, setActiveTicket]);
 
@@ -546,17 +586,25 @@ const ChatScreen = () => {
               paddingBottom: 20,
             }}
             style={{ marginTop: stickyMessage ? 40 : 0 }}
-            onEndReached={() => {
-              // In inverted mode, onEndReached fires when scrolling up to load older messages
-              if (!loadingMore) {
+            onScroll={(event) => {
+              const { contentOffset } = event.nativeEvent;
+              // Check if scrolled to top (with small threshold)
+              if (contentOffset.y <= 100 && !loadingMore && oldestTimestamp) {
                 loadOlderMessages();
               }
             }}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={renderFooter}
+            scrollEventThrottle={400}
+            ListHeaderComponent={renderFooter}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            inverted={true}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[themeColors["green-500"]]}
+                tintColor={themeColors["green-500"]}
+              />
+            }
           />
         </View>
 
@@ -595,7 +643,7 @@ const ChatScreen = () => {
                 const optimisticMessage: Message = {
                   id: tempId,
                   message_sid: `TEMP${tempId}`, // Temporary message_sid
-                  name: user?.fullName || "You",
+                  name: "You",
                   text: messageText,
                   sender: "user",
                   timestamp: now,

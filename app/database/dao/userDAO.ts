@@ -207,4 +207,39 @@ export class UserDAO extends BaseDAOImpl<User> {
       stmt.finalizeSync();
     }
   }
+
+  // Upsert user (insert or update if exists)
+  upsert(
+    db: SQLiteDatabase,
+    data: CreateUserData & { id: number },
+  ): User | null {
+    try {
+      // Check if user exists
+      const existing = this.findById(db, data.id);
+
+      if (existing) {
+        // Update existing user
+        const updated = this.update(db, data.id, {
+          email: data.email,
+          fullName: data.fullName,
+          phoneNumber: data.phoneNumber,
+          userType: data.userType,
+          isActive: data.isActive,
+          invitationStatus: data.invitationStatus,
+          administrativeLocation: data.administrativeLocation,
+        });
+
+        if (updated) {
+          return this.findById(db, data.id);
+        }
+        return existing;
+      } else {
+        // Create new user
+        return this.create(db, data);
+      }
+    } catch (error) {
+      console.error("Error upserting user:", error);
+      return null;
+    }
+  }
 }
