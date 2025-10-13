@@ -320,6 +320,11 @@ async def get_ticket_conversation(
     - Without before_ts: messages from ticket.message_id to latest
     - With before_ts: older messages before that timestamp (pagination)
 
+    Shows ALL messages in the ticket conversation
+    (from customer, all users, and LLM)
+    so that agents can see the full conversation history including messages
+    from other agents.
+
     Admin users can access any ticket.
     EO users can only access tickets in their assigned administrative areas.
     """
@@ -333,17 +338,14 @@ async def get_ticket_conversation(
     # Get the ticket's base message to determine the starting point
     ticket_message = ticket.message
 
-    # Get messages for the ticket's customer
-    # Filter messages where:
-    # 1. from_source = CUSTOMER (customer messages) OR
-    # 2. user_id = current_user.id (messages from current user)
-    # This ensures each user only sees their own conversation with the customer
+    # Get ALL messages for the ticket's customer
+    # This includes:
+    # 1. Messages from CUSTOMER (from_source = CUSTOMER)
+    # 2. Messages from ALL users (from_source = USER)
+    # 3. Messages from LLM (from_source = LLM)
+    # This allows all agents to see the full conversation history
     msgs_query = db.query(Message).filter(
-        Message.customer_id == ticket.customer_id,
-        (
-            (Message.from_source == MessageFrom.CUSTOMER) |
-            (Message.user_id == current_user.id)
-        )
+        Message.customer_id == ticket.customer_id
     )
 
     if before_ts:
@@ -372,6 +374,19 @@ async def get_ticket_conversation(
             "message_type": (
                 getattr(m, "message_type", None).name
                 if getattr(m, "message_type", None)
+                else None
+            ),
+            "status": getattr(m, "status", None),
+            "user_id": m.user_id,
+            "user": (
+                {
+                    "id": m.user.id,
+                    "full_name": m.user.full_name,
+                    "email": m.user.email,
+                    "phone_number": m.user.phone_number,
+                    "user_type": m.user.user_type,
+                }
+                if m.user_id and m.user
                 else None
             ),
             "created_at": m.created_at.isoformat() if m.created_at else None,
