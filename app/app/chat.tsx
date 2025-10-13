@@ -32,7 +32,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import MessageSyncService from "@/services/messageSync";
 import { MessageFrom } from "@/constants/messageSource";
 import { api } from "@/services/api";
-import { Ticket } from "@/database/dao/types/ticket";
 
 // Helper function to convert MessageWithUsers to Message
 const convertToUIMessage = (
@@ -65,10 +64,9 @@ interface DateSection {
 }
 
 const ChatScreen = () => {
-  const { ticketNumber, messageId } = useLocalSearchParams<{
-    ticketNumber?: string;
-    messageId?: number;
-  }>();
+  const params = useLocalSearchParams();
+  const ticketNumber = params.ticketNumber as string | undefined;
+  const messageId = params.messageId as string | undefined;
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
@@ -202,7 +200,8 @@ const ChatScreen = () => {
         // Show sticky bubble if messageId matches a customer message
         if (messageId) {
           const targetMessage = uiMessages.find(
-            (msg) => `${msg.id}` === messageId && msg.sender === "customer",
+            (msg) =>
+              msg.id === parseInt(messageId, 10) && msg.sender === "customer",
           );
           if (targetMessage) {
             setStickyMessage(targetMessage);
@@ -300,6 +299,10 @@ const ChatScreen = () => {
           from_source: event.from_source,
           message_sid: event.message_sid,
           customer_id: event.customer_id,
+          user_id:
+            event.from_source === MessageFrom.CUSTOMER
+              ? null
+              : user?.id || null,
           body: event.body,
           createdAt: event.ts, // Use timestamp from WebSocket event
         });
@@ -421,12 +424,15 @@ const ChatScreen = () => {
       return;
     }
 
-    console.log(`[Chat] Joining ticket room: ${ticket?.id}`);
-    joinTicket(ticket?.id);
+    console.log(`[Chat] Joining ticket room: ${ticket.id}`);
+    joinTicket(ticket.id);
 
     return () => {
-      console.log(`[Chat] Leaving ticket room: ${ticket?.id}`);
-      leaveTicket(ticket?.id);
+      if (!ticket?.id) {
+        return;
+      }
+      console.log(`[Chat] Leaving ticket room: ${ticket.id}`);
+      leaveTicket(ticket.id);
     };
   }, [ticket?.id, joinTicket, leaveTicket]);
 
@@ -474,7 +480,7 @@ const ChatScreen = () => {
     return (
       <View style={styles.loadingFooter}>
         <ActivityIndicator size="small" color={themeColors["green-500"]} />
-        <Text style={[typography.caption, { marginLeft: 8 }]}>
+        <Text style={[typography.caption1, { marginLeft: 8 }]}>
           Loading earlier messages...
         </Text>
       </View>
@@ -502,10 +508,19 @@ const ChatScreen = () => {
         keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
       >
         <View style={styles.messagesContainer}>
-          {stickyMessage && (
+          {stickyMessage && ticket.ticketNumber && (
             <StickyCustomerBubble
               message={stickyMessage}
-              ticket={ticket}
+              ticket={
+                ticket as {
+                  id: number | null;
+                  ticketNumber: string;
+                  customer: { id: number; name: string } | null;
+                  resolver: { id: number; name: string } | null;
+                  resolvedAt?: string | null;
+                  createdAt?: string | null;
+                }
+              }
               onClose={() => setStickyMessage(null)}
             />
           )}
@@ -518,7 +533,11 @@ const ChatScreen = () => {
                 : `message-${item.data.id}`
             }
             renderItem={renderItem}
-            contentContainerStyle={{ padding: 12, paddingBottom: 20 }}
+            contentContainerStyle={{
+              padding: 12,
+              paddingBottom: 20,
+            }}
+            style={{ marginTop: stickyMessage ? 40 : 0 }}
             onEndReached={() => {
               // In inverted mode, onEndReached fires when scrolling up to load older messages
               if (!loadingMore) {
@@ -586,7 +605,7 @@ const ChatScreen = () => {
                 );
                 try {
                   const response = await api.sendMessage(
-                    user.accessToken,
+                    user?.accessToken || "",
                     ticket.id,
                     messageText,
                     MessageFrom.USER,
@@ -603,7 +622,7 @@ const ChatScreen = () => {
                     from_source: MessageFrom.USER,
                     message_sid: response.message_sid,
                     customer_id: ticket.customer.id,
-                    user_id: user.id,
+                    user_id: user?.id || null,
                     body: messageText,
                     createdAt: response.created_at,
                   });
@@ -685,7 +704,7 @@ const ChatScreen = () => {
 const DateSeparator = ({ date }: { date: string }) => (
   <View style={styles.dateSeparator}>
     <View style={styles.separatorLine} />
-    <Text style={[typography.caption, styles.separatorText]}>{date}</Text>
+    <Text style={[typography.caption1, styles.separatorText]}>{date}</Text>
     <View style={styles.separatorLine} />
   </View>
 );
@@ -696,7 +715,14 @@ const StickyCustomerBubble = ({
   onClose,
 }: {
   message: Message;
-  ticket: Ticket;
+  ticket: {
+    id: number | null;
+    ticketNumber: string;
+    customer: { id: number; name: string } | null;
+    resolver: { id: number; name: string } | null;
+    resolvedAt?: string | null;
+    createdAt?: string | null;
+  };
   onClose: () => void;
 }) => (
   <View style={styles.stickyBubbleContainer}>
