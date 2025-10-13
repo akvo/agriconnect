@@ -20,8 +20,14 @@ REFRESH_SECRET_KEY = os.getenv(
     "refresh_secret_key_different_from_access_token_secret",
 )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+# Access token expiration: 24 hours (1440 minutes) - full day coverage
+# Can be overridden with ACCESS_TOKEN_EXPIRE_MINUTES environment variable
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
+)
+# Refresh token expiration: 30 days - allows automatic renewal for a month
+# Can be overridden with REFRESH_TOKEN_EXPIRE_DAYS environment variable
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
