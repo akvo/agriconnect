@@ -169,9 +169,12 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       `SELECT
         m.*,
         f.fullName as customer_name,
-        f.phoneNumber as customer_phone
+        f.phoneNumber as customer_phone,
+        u.fullName as user_name,
+        u.email as user_email
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
+      LEFT JOIN users u ON m.user_id = u.id
       WHERE m.id = ?`,
     );
     try {
@@ -186,28 +189,59 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   }
 
   // Get messages by ticket ID
+  // Gets the customer_id from the ticket first, then fetches all messages for that customer
   getMessagesByTicketId(
     db: SQLiteDatabase,
     ticketId: number,
     limit: number = 100,
   ): MessageWithUsers[] {
+    // First, get the customer_id from the ticket
+    const ticketStmt = db.prepareSync(
+      "SELECT customerId FROM tickets WHERE id = ?",
+    );
+    let customerId: number | null = null;
+
+    try {
+      const ticketResult = ticketStmt.executeSync<{ customerId: number }>([
+        ticketId,
+      ]);
+      const ticket = ticketResult.getFirstSync();
+      customerId = ticket?.customerId || null;
+    } catch (error) {
+      console.error("Error getting ticket customer_id:", error);
+      return [];
+    } finally {
+      ticketStmt.finalizeSync();
+    }
+
+    if (!customerId) {
+      console.error(`Ticket ${ticketId} not found or has no customer`);
+      return [];
+    }
+
+    // Now get all messages for that customer
+    // Order by createdAt DESC to get the newest messages first, then reverse to ASC for UI display
     const stmt = db.prepareSync(
       `SELECT
         m.*,
         f.fullName as customer_name,
-        f.phoneNumber as customer_phone
+        f.phoneNumber as customer_phone,
+        u.fullName as user_name,
+        u.email as user_email
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
-      JOIN tickets t ON t.customerId = m.customer_id
-      WHERE t.id = ?
-      ORDER BY m.createdAt ASC
+      LEFT JOIN users u ON m.user_id = u.id
+      WHERE m.customer_id = ?
+      ORDER BY m.createdAt DESC
       LIMIT ?`,
     );
     try {
-      const result = stmt.executeSync<MessageWithUsers>([ticketId, limit]);
-      return result.getAllSync();
+      const result = stmt.executeSync<MessageWithUsers>([customerId, limit]);
+      const messages = result.getAllSync();
+      // Reverse to return in ASC order (oldest to newest) for UI display
+      return messages.reverse();
     } catch (error) {
-      console.error("Error getting messages by ticket ID:", error);
+      console.error("Error getting messages by customer ID:", error);
       return [];
     } finally {
       stmt.finalizeSync();
