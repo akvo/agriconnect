@@ -43,6 +43,7 @@ def db_session(test_db):
             AdministrativeLevel,
             Customer,
             CustomerAdministrative,
+            Device,
             KnowledgeBase,
             Message,
             ServiceToken,
@@ -63,6 +64,8 @@ def db_session(test_db):
         db.query(Administrative).delete()
         db.query(AdministrativeLevel).delete()
         db.query(ServiceToken).delete()
+        # Device must be deleted before User (foreign key constraint)
+        db.query(Device).delete()
         db.query(User).delete()
         db.commit()
         db.close()
