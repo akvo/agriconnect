@@ -94,6 +94,9 @@ async def whatsapp_webhook(
                     if message.created_at
                     else None,
                     administrative_id=ward_id,
+                    ticket_number=ticket.ticket_number,
+                    customer_name=customer.full_name,
+                    sender_user_id=None
                 )
             )
 
