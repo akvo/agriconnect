@@ -31,3 +31,4 @@ class User(Base):
     user_administrative = relationship(
         "UserAdministrative", back_populates="user"
     )
+    devices = relationship("Device", back_populates="user")
