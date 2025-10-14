@@ -68,6 +68,8 @@ Create `.env` file based on `.env.example`:
 - **Twilio Integration**: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER`
 - **Email Service**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_USE_TLS`
 - **Web Domain**: `WEBDOMAIN` for email links
+- **Push Notifications**: `EXPO_TOKEN` for Expo push notification service
+- **Firebase**: `GOOGLE_SERVICES_JSON` path to google-services.json for Android FCM configuration
 
 ## Code Style & Standards
 
@@ -89,8 +91,8 @@ Create `.env` file based on `.env.example`:
 - **FastAPI** framework with SQLAlchemy ORM
 - **Alembic** for database migrations
 - **JWT authentication** system
-- **Modular routers**: `auth.py`, `customers.py`, `admin_users.py`, `knowledge_base.py`, `whatsapp.py`
-- **Services layer** for business logic
+- **Modular routers**: `auth.py`, `customers.py`, `admin_users.py`, `knowledge_base.py`, `whatsapp.py`, `devices.py`, `ws.py`
+- **Services layer** for business logic (including push notification service)
 - **Tests** in `/tests/` directory
 
 ### Frontend (`/frontend/`)
@@ -109,6 +111,9 @@ Create `.env` file based on `.env.example`:
 - **Expo UI** components and utilities
 - **SQLite** local database with expo-sqlite
 - **DAO pattern** for database operations
+- **Firebase Cloud Messaging (FCM)** for push notifications
+- **Expo Notifications** for notification handling
+- **WebSocket (Socket.IO)** for real-time chat updates
 
 #### Mobile App Database Architecture
 
@@ -171,6 +176,9 @@ function MyComponent() {
 - **Email notification system**
 - **Service token management** for API access
 - **Webhook callbacks** for real-time updates
+- **WebSocket (Socket.IO)** for real-time chat communication
+- **Push notifications** via Expo Push Notification service
+- **Device registration** associated with administrative areas (wards)
 
 ## Development Workflow
 
@@ -188,10 +196,18 @@ function MyComponent() {
 - Never open multiple database connections
 - All database utility functions require `db` parameter
 
+**Push Notifications Setup:**
+- **Firebase Configuration**: Place `google-services.json` in `app/` directory for Android FCM
+- **Expo Token**: Set `EXPO_TOKEN` in `.env` file for push notification service
+- **Device Registration**: Devices register with administrative areas (wards) on first app launch
+- **Notification Context**: Use `NotificationContext` to manage notification state and active tickets
+- **Testing**: Use development builds (`./build-android.sh`) to test push notifications (not available in Expo Go)
+
 **Common Issues:**
 - **NullPointerException in SQLite**: Caused by multiple concurrent connections. Solution: Always use database from context, never call `openDatabaseSync()` directly
 - **Metro cache issues**: Clear cache with `./dc.sh exec mobileapp rm -rf .expo node_modules/.cache`
 - **Hot reload not working**: Restart service with `./dc.sh stop mobileapp && ./dc.sh up -d mobileapp`
+- **Push notifications not working**: Ensure you're using a development/production build, not Expo Go. Check Firebase configuration and `EXPO_TOKEN` is set
 
 ## Testing
 
