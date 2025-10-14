@@ -375,10 +375,19 @@ async def emit_message_created(
 
             # Check if there are active WebSocket connections viewing
             # this ticket. If so, skip push to avoid duplicate notifications
-            active_viewers = [
-                sid for sid, conn in connections.items()
-                if f"ticket:{ticket_id}" in conn.get("rooms", [])
-            ]
+            # Use Socket.IO's manager to check room membership
+            room_name = f"ticket:{ticket_id}"
+            try:
+                active_viewers = list(
+                    sio.manager.get_participants("/", room_name)
+                )
+            except (AttributeError, KeyError):
+                # Fallback if method not available
+                active_viewers = []
+
+            logger.info(
+                f"Active viewers for ticket {ticket_id}: {len(active_viewers)}"
+            )
 
             if active_viewers:
                 logger.info(
@@ -409,7 +418,7 @@ async def emit_message_created(
         finally:
             db.close()
     else:
-        logger.debug(
+        logger.warning(
             f"Skipping push notifications for message {message_id} - "
             "missing required data"
         )
