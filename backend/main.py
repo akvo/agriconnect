@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 
 from routers import (
@@ -45,6 +46,9 @@ app.include_router(service_tokens.router, prefix="/api")
 app.include_router(whatsapp.router, prefix="/api")
 app.include_router(tickets.router, prefix="/api")
 app.include_router(storage.router)
+
+# Ensure storage directory exists before mounting
+os.makedirs("storage", exist_ok=True)
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 
