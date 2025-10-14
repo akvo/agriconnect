@@ -35,8 +35,6 @@ jobs:
   build-mobile:
     name: Build Mobile App (APK)
     runs-on: ubuntu-latest
-    needs: [check-app-changes]
-    if: needs.check-app-changes.outputs.app-changed == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
