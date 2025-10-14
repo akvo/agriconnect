@@ -5,6 +5,7 @@ from .administrative import (
     UserAdministrative,
 )
 from .customer import Customer, CustomerLanguage
+from .device import Device
 from .knowledge_base import KnowledgeBase
 from .message import Message, MessageFrom
 from .service_token import ServiceToken
@@ -17,6 +18,7 @@ __all__ = [
     "UserType",
     "Customer",
     "CustomerLanguage",
+    "Device",
     "KnowledgeBase",
     "Message",
     "MessageFrom",

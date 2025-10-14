@@ -30,6 +30,7 @@ import { Message } from "@/utils/chat";
 import { formatDateLabel } from "@/utils/time";
 import TicketRespondedStatus from "@/components/inbox/ticket-responded-status";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import MessageSyncService from "@/services/messageSync";
 import { MessageFrom } from "@/constants/messageSource";
 import { api } from "@/services/api";
@@ -97,6 +98,7 @@ const ChatScreen = () => {
   const db = useDatabase();
   const daoManager = React.useMemo(() => new DAOManager(db), [db]);
   const { user } = useAuth();
+  const { setActiveTicket } = useNotifications();
   const {
     joinTicket,
     leaveTicket,
@@ -526,7 +528,7 @@ const ChatScreen = () => {
       console.log(`[Chat] Leaving ticket room: ${ticket.id}`);
       leaveTicket(ticket.id);
     };
-  }, [ticket?.id, joinTicket, leaveTicket]);
+  }, [ticket?.id, joinTicket, leaveTicket, setActiveTicket]);
 
   // Handle real-time ticket_resolved events
   useEffect(() => {

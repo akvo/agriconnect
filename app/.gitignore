@@ -43,3 +43,7 @@ app-example
 /android
 # react-native-config codegen
 ios/tmp.xcconfig
+
+# Firebase
+google-services.json
+GoogleService-Info.plist

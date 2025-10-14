@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User, UserType
 from models.administrative import UserAdministrative
+from services.push_notification_service import PushNotificationService
 from utils.auth import verify_token
 
 logger = logging.getLogger(__name__)
@@ -328,10 +329,14 @@ async def emit_message_created(
     from_source: int,
     ts: str,
     administrative_id: Optional[int] = None,
+    ticket_number: str = None,
+    customer_name: str = None,
+    sender_user_id: Optional[int] = None,
 ):
     """
     Emit message_created event to ticket room and ward room.
     Called when a new message is created via REST API.
+    Also sends push notifications to users in the ward (excluding sender).
     """
     event_data = {
         "ticket_id": ticket_id,
@@ -359,6 +364,64 @@ async def emit_message_created(
         f"Emitted message_created event for message {message_id} "
         f"in ticket {ticket_id}"
     )
+
+    # Send push notifications if we have the required data
+    # Only send for messages in open tickets
+    if all([administrative_id, ticket_number, customer_name]):
+        try:
+            # Get database session
+            db = next(get_db())
+            push_service = PushNotificationService(db)
+
+            # Check if there are active WebSocket connections viewing
+            # this ticket. If so, skip push to avoid duplicate notifications
+            # Use Socket.IO's manager to check room membership
+            room_name = f"ticket:{ticket_id}"
+            try:
+                active_viewers = list(
+                    sio.manager.get_participants("/", room_name)
+                )
+            except (AttributeError, KeyError):
+                # Fallback if method not available
+                active_viewers = []
+
+            logger.info(
+                f"Active viewers for ticket {ticket_id}: {len(active_viewers)}"
+            )
+
+            if active_viewers:
+                logger.info(
+                    f"Skipping push notifications for message {message_id} - "
+                    f"{len(active_viewers)} users actively viewing ticket"
+                )
+            else:
+                # Send push notifications (excluding the sender)
+                push_service.notify_new_message(
+                    ticket_id=ticket_id,
+                    ticket_number=ticket_number,
+                    customer_name=customer_name,
+                    administrative_id=administrative_id,
+                    message_id=message_id,
+                    message_body=body,
+                    sender_user_id=sender_user_id,
+                )
+
+                logger.info(
+                    f"Sent push notifications for new message "
+                    f"in ticket {ticket_number}"
+                )
+        except Exception as e:
+            # Don't fail the WebSocket event if push notification fails
+            logger.error(
+                f"Failed to send push notifications: {e}", exc_info=True
+            )
+        finally:
+            db.close()
+    else:
+        logger.warning(
+            f"Skipping push notifications for message {message_id} - "
+            "missing required data"
+        )
 
 
 async def emit_message_status_updated(
@@ -435,10 +498,15 @@ async def emit_ticket_created(
     customer_id: int,
     administrative_id: int,
     created_at: str,
+    ticket_number: str = None,
+    customer_name: str = None,
+    message_id: int = None,
+    message_preview: str = None,
 ):
     """
     Emit ticket_created event to ward room.
     Called when a new ticket is created via REST API.
+    Also sends push notifications to users in the ward.
     """
     event_data = {
         "ticket_id": ticket_id,
@@ -456,6 +524,39 @@ async def emit_ticket_created(
     await sio.emit("ticket_created", event_data, room="ward:admin")
 
     logger.info(f"Emitted ticket_created event for ticket {ticket_id}")
+
+    # Send push notifications if we have the required data
+    if all([ticket_number, customer_name, message_id, message_preview]):
+        try:
+            # Get database session
+            db = next(get_db())
+            push_service = PushNotificationService(db)
+
+            # Send push notifications
+            push_service.notify_new_ticket(
+                ticket_id=ticket_id,
+                ticket_number=ticket_number,
+                customer_name=customer_name,
+                administrative_id=administrative_id,
+                message_id=message_id,
+                message_preview=message_preview,
+            )
+
+            logger.info(
+                f"Sent push notifications for new ticket {ticket_number}"
+            )
+        except Exception as e:
+            # Don't fail the WebSocket event if push notification fails
+            logger.error(
+                f"Failed to send push notifications: {e}", exc_info=True
+            )
+        finally:
+            db.close()
+    else:
+        logger.warning(
+            f"Skipping push notifications for ticket {ticket_id} - "
+            "missing required data"
+        )
 
 
 # Export for use in other routers

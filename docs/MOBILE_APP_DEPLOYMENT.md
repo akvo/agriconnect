@@ -88,7 +88,7 @@ This ensures the mobile app passes quality checks during CI/CD.
 
 ### GitHub Secrets
 
-The following secret must be configured in GitHub repository settings:
+The following secrets must be configured in GitHub repository settings:
 
 | Secret Name | Description | How to Obtain |
 |-------------|-------------|---------------|
@@ -108,6 +108,51 @@ Ensure the Expo project is properly configured:
 1. **Expo Account**: Project must be linked to an Expo account
 2. **EAS CLI**: EAS Build must be enabled for the project
 3. **Project Slug**: Matches `app.json` configuration (`agriconnect`)
+
+### Firebase Configuration (Required for Push Notifications)
+
+Push notifications require Firebase Cloud Messaging (FCM) configuration for Android:
+
+1. **Create Firebase Project:**
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Create new project or select existing one
+
+2. **Add Android App:**
+   - Click "Add app" → Select Android
+   - **Package name**: `com.agriconnect` (must match `app.json`)
+   - App nickname: "AgriConnect" (optional)
+   - Click "Register app"
+
+3. **Download Configuration:**
+   - Download `google-services.json`
+   - Place in: `app/google-services.json`
+   - **IMPORTANT**: Do NOT commit this file (already in `.gitignore`)
+
+4. **Update Environment:**
+   Add to `.env` file:
+   ```bash
+   GOOGLE_SERVICES_JSON=./google-services.json
+   EXPO_TOKEN=your_expo_token_here
+   ```
+
+5. **Verify Configuration:**
+   Ensure `app.json` includes:
+   ```json
+   {
+     "android": {
+       "googleServicesFile": "./google-services.json",
+       "package": "com.agriconnect"
+     }
+   }
+   ```
+
+6. **Upload Credentials to EAS:**
+   For production builds, upload Firebase credentials:
+   ```bash
+   eas credentials -p android
+   ```
+
+**Note**: EAS Build will automatically include `google-services.json` if specified in `app.json`
 
 ---
 
@@ -223,6 +268,39 @@ eas login
 eas build --platform android --profile preview --local
 ```
 
+### Testing Push Notifications
+
+Push notifications require a development or production build (they do NOT work in Expo Go):
+
+1. **Build Development APK:**
+   ```bash
+   cd app
+   ./build-android.sh
+   ```
+
+2. **Install on Physical Device:**
+   ```bash
+   adb install app/build-*.apk
+   ```
+
+3. **Test Notification Flow:**
+   - Log in to the app
+   - Device will automatically register with backend
+   - Check backend logs for successful registration:
+     ```bash
+     ./dc.sh logs -f backend | grep "Device Registration"
+     ```
+   - Create a test ticket via WhatsApp or web interface
+   - Verify notification appears on device
+
+4. **Debug Notifications:**
+   ```bash
+   # View device logs
+   adb logcat | grep -E "Notification|Firebase|FCM"
+   ```
+
+See [Push Notifications Guide](PUSH_NOTIFICATIONS.md) for detailed troubleshooting.
+
 ---
 
 ## Current Limitations
@@ -230,6 +308,7 @@ eas build --platform android --profile preview --local
 1. **No Artifact Download**: Pipeline uses `--no-wait`, so APK is not automatically downloaded
 2. **Manual Distribution**: APK must be manually downloaded from Expo dashboard
 3. **No Version Bumping**: Version must be manually updated in `app.json`
+4. **Firebase Credentials**: Must be configured manually for push notifications to work
 
 ---
 
@@ -291,6 +370,43 @@ eas build --platform android --profile preview --local
 2. Verify all dependencies are compatible with Expo SDK 54
 3. Test locally: `cd app && yarn install --frozen-lockfile`
 
+### Push Notifications Not Working
+
+**Problem:** App builds successfully but push notifications don't arrive
+
+**Solution:**
+1. **Verify Firebase Configuration:**
+   - Ensure `google-services.json` exists in `app/` directory
+   - Check package name matches: `com.agriconnect`
+   - Verify Firebase project is active
+
+2. **Check Backend Configuration:**
+   - Ensure `EXPO_TOKEN` is set in `.env`
+   - Verify device is registered: check backend logs
+   - Confirm push notification service is running
+
+3. **Test with Development Build:**
+   - Push notifications **DO NOT** work in Expo Go
+   - Use `./build-android.sh` to create development build
+   - Install APK on physical device
+
+4. **Debug Device Registration:**
+   ```bash
+   # Check backend logs
+   ./dc.sh logs -f backend | grep "Device Registration"
+
+   # View mobile app logs
+   adb logcat | grep -E "Notification|Device Registration"
+   ```
+
+5. **Verify EAS Credentials:**
+   ```bash
+   eas credentials -p android
+   # Ensure google-services.json is uploaded
+   ```
+
+See [Push Notifications Guide](PUSH_NOTIFICATIONS.md) for comprehensive troubleshooting.
+
 ### Build Stuck in Queue
 
 **Problem:** Build never starts on EAS
@@ -329,6 +445,7 @@ eas build --platform android --profile preview --local
 ### Documentation
 - `/CLAUDE.md` - Project architecture and development guide
 - `/docs/MOBILE_APP_DEPLOYMENT.md` - This file
+- `/docs/PUSH_NOTIFICATIONS.md` - Push notification setup and troubleshooting
 
 ---
 
@@ -339,6 +456,12 @@ eas build --platform android --profile preview --local
 - [EAS Build Configuration](https://docs.expo.dev/build-reference/eas-json/)
 - [Android Builds](https://docs.expo.dev/build-reference/android-builds/)
 - [GitHub Actions Integration](https://docs.expo.dev/build-reference/github-actions/)
+- [Expo Push Notifications](https://docs.expo.dev/push-notifications/overview/)
+
+### Firebase Documentation
+- [Firebase Cloud Messaging](https://firebase.google.com/docs/cloud-messaging)
+- [Firebase Android Setup](https://firebase.google.com/docs/android/setup)
+- [FCM with Expo](https://docs.expo.dev/push-notifications/fcm-credentials/)
 
 ### GitHub Actions
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
