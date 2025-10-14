@@ -93,3 +93,11 @@ Once the environment is running, you can access:
 - Backend API: http://localhost:8000
 - pgAdmin: http://localhost:5050
 - Mobile app development via [Expo GO](https://play.google.com/store/apps/details?id=host.exp.exponent&hl=en): exp://<your_ip_address>:14000
+
+## Documentation
+
+Additional documentation is available in the `docs/` directory:
+
+- **[Mobile App Deployment](docs/MOBILE_APP_DEPLOYMENT.md)**: Complete guide for building and deploying the mobile app using EAS Build and GitHub Actions
+- **[Mobile Build Quick Reference](docs/MOBILE_BUILD_QUICK_REFERENCE.md)**: Quick commands and troubleshooting for mobile app builds
+- **[CLAUDE.md](CLAUDE.md)**: Project architecture and development guidelines for Claude Code
