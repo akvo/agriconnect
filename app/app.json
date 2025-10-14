@@ -10,6 +10,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "android": {
+      "package": "com.akvo.agriconnect",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
