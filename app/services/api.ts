@@ -279,7 +279,7 @@ class ApiClient {
     token: string,
     deviceData: {
       push_token: string;
-      platform: string;
+      administrative_id: number;
       app_version: string;
     },
   ): Promise<any> {

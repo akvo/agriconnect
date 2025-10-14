@@ -29,7 +29,7 @@ export const useNotifications = () => {
   const context = useContext(NotificationContext);
   if (!context) {
     throw new Error(
-      "useNotifications must be used within a NotificationProvider"
+      "useNotifications must be used within a NotificationProvider",
     );
   }
   return context;
@@ -43,13 +43,14 @@ Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     // Check if notification is for the currently active ticket
     const data = notification.request.content.data;
-    const ticketId = typeof data?.ticketId === 'number' ? data.ticketId : null;
-    const isActiveTicket = ticketId !== null && currentActiveTicket === ticketId;
+    const ticketId = typeof data?.ticketId === "number" ? data.ticketId : null;
+    const isActiveTicket =
+      ticketId !== null && currentActiveTicket === ticketId;
 
     // Suppress notification if user is actively viewing this ticket
     if (isActiveTicket) {
       console.log(
-        `[Notifications] Suppressing notification for active ticket ${ticketId}`
+        `[Notifications] Suppressing notification for active ticket ${ticketId}`,
       );
       return {
         shouldShowAlert: false,
@@ -151,22 +152,48 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
   // Register device with backend when user logs in and token is available
   const registerDevice = useCallback(async () => {
     if (!user?.accessToken || !expoPushToken) {
+      console.log("[Device Registration] Skipping - missing token or user");
+      return;
+    }
+
+    // Check if user has administrative location
+    if (!user.administrativeLocation?.id) {
+      console.warn(
+        "[Device Registration] Cannot register device: user has no administrative location",
+      );
+      console.warn(
+        "[Device Registration] User object:",
+        JSON.stringify(user, null, 2),
+      );
       return;
     }
 
     try {
-      const platform = Platform.OS;
       const appVersion = Constants.expoConfig?.version || "1.0.0";
+
+      console.log("[Device Registration] Attempting to register device...");
+      console.log(
+        "[Device Registration] Push token:",
+        expoPushToken.substring(0, 30) + "...",
+      );
+      console.log(
+        "[Device Registration] Administrative ID:",
+        user.administrativeLocation.id,
+      );
+      console.log("[Device Registration] App version:", appVersion);
 
       await api.registerDevice(user.accessToken, {
         push_token: expoPushToken,
-        platform,
+        administrative_id: user.administrativeLocation.id,
         app_version: appVersion,
       });
 
-      console.log("Device registered successfully");
+      console.log("[Device Registration] ✅ Device registered successfully");
     } catch (error) {
-      console.error("Failed to register device:", error);
+      console.error(
+        "[Device Registration] ❌ Failed to register device:",
+        error,
+      );
     }
   }, [user, expoPushToken]);
 
@@ -211,13 +238,17 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         const data = response.notification.request.content.data;
 
         // Type guard for notification data
-        const ticketNumber = typeof data?.ticketNumber === 'string' || typeof data?.ticketNumber === 'number'
-          ? String(data.ticketNumber)
-          : null;
-        const name = typeof data?.name === 'string' ? data.name : 'Chat';
-        const messageId = typeof data?.messageId === 'string' || typeof data?.messageId === 'number'
-          ? String(data.messageId)
-          : undefined;
+        const ticketNumber =
+          typeof data?.ticketNumber === "string" ||
+          typeof data?.ticketNumber === "number"
+            ? String(data.ticketNumber)
+            : null;
+        const name = typeof data?.name === "string" ? data.name : "Chat";
+        const messageId =
+          typeof data?.messageId === "string" ||
+          typeof data?.messageId === "number"
+            ? String(data.messageId)
+            : undefined;
 
         // Deep link to chat screen with ticket details
         if (ticketNumber) {
