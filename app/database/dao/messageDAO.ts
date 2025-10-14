@@ -191,9 +191,11 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   // Get ALL messages by ticket ID (for offline-first display)
   // Gets the customer_id from the ticket first, then fetches ALL messages for that customer
   // Returns messages in ASC order (oldest to newest)
+  // Default limit: 10 messages for better scroll-to-bottom performance
   getAllMessagesByTicketId(
     db: SQLiteDatabase,
     ticketId: number,
+    limit: number = 10,
   ): MessageWithUsers[] {
     // First, get the customer_id from the ticket
     const ticketStmt = db.prepareSync(
@@ -219,7 +221,8 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       return [];
     }
 
-    // Get ALL messages for that customer, ordered by createdAt ASC (oldest to newest)
+    // Get the most recent N messages for that customer
+    // First order DESC to get newest, then reverse to ASC for UI display
     const stmt = db.prepareSync(
       `SELECT
         m.*,
@@ -231,11 +234,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       JOIN customer_users f ON m.customer_id = f.id
       LEFT JOIN users u ON m.user_id = u.id
       WHERE m.customer_id = ?
-      ORDER BY m.createdAt ASC`,
+      ORDER BY m.createdAt DESC
+      LIMIT ?`,
     );
     try {
-      const result = stmt.executeSync<MessageWithUsers>([customerId]);
-      return result.getAllSync();
+      const result = stmt.executeSync<MessageWithUsers>([customerId, limit]);
+      const messages = result.getAllSync();
+      // Reverse to return in ASC order (oldest to newest) for UI display
+      return messages.reverse();
     } catch (error) {
       console.error("Error getting all messages by ticket ID:", error);
       return [];
