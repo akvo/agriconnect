@@ -188,12 +188,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     }
   }
 
-  // Get messages by ticket ID
-  // Gets the customer_id from the ticket first, then fetches all messages for that customer
-  getMessagesByTicketId(
+  // Get ALL messages by ticket ID (for offline-first display)
+  // Gets the customer_id from the ticket first, then fetches ALL messages for that customer
+  // Returns messages in ASC order (oldest to newest)
+  // Default limit: 10 messages for better scroll-to-bottom performance
+  getAllMessagesByTicketId(
     db: SQLiteDatabase,
     ticketId: number,
-    limit: number = 100,
+    limit: number = 10,
   ): MessageWithUsers[] {
     // First, get the customer_id from the ticket
     const ticketStmt = db.prepareSync(
@@ -219,8 +221,8 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       return [];
     }
 
-    // Now get all messages for that customer
-    // Order by createdAt DESC to get the newest messages first, then reverse to ASC for UI display
+    // Get the most recent N messages for that customer
+    // First order DESC to get newest, then reverse to ASC for UI display
     const stmt = db.prepareSync(
       `SELECT
         m.*,
@@ -241,8 +243,115 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       // Reverse to return in ASC order (oldest to newest) for UI display
       return messages.reverse();
     } catch (error) {
-      console.error("Error getting messages by customer ID:", error);
+      console.error("Error getting all messages by ticket ID:", error);
       return [];
+    } finally {
+      stmt.finalizeSync();
+    }
+  }
+
+  // Get messages by ticket ID with pagination (for scroll-to-top loading older messages)
+  // Returns messages in ASC order (oldest to newest)
+  // limit: number of messages to return
+  // offset: number of messages to skip from the oldest
+  getMessagesByTicketId(
+    db: SQLiteDatabase,
+    ticketId: number,
+    limit: number = 20,
+    offset: number = 0,
+  ): MessageWithUsers[] {
+    // First, get the customer_id from the ticket
+    const ticketStmt = db.prepareSync(
+      "SELECT customerId FROM tickets WHERE id = ?",
+    );
+    let customerId: number | null = null;
+
+    try {
+      const ticketResult = ticketStmt.executeSync<{ customerId: number }>([
+        ticketId,
+      ]);
+      const ticket = ticketResult.getFirstSync();
+      customerId = ticket?.customerId || null;
+    } catch (error) {
+      console.error("Error getting ticket customer_id:", error);
+      return [];
+    } finally {
+      ticketStmt.finalizeSync();
+    }
+
+    if (!customerId) {
+      console.error(`Ticket ${ticketId} not found or has no customer`);
+      return [];
+    }
+
+    // Get messages with pagination, ordered by createdAt ASC (oldest to newest)
+    const stmt = db.prepareSync(
+      `SELECT
+        m.*,
+        f.fullName as customer_name,
+        f.phoneNumber as customer_phone,
+        u.fullName as user_name,
+        u.email as user_email
+      FROM messages m
+      JOIN customer_users f ON m.customer_id = f.id
+      LEFT JOIN users u ON m.user_id = u.id
+      WHERE m.customer_id = ?
+      ORDER BY m.createdAt ASC
+      LIMIT ? OFFSET ?`,
+    );
+    try {
+      const result = stmt.executeSync<MessageWithUsers>([
+        customerId,
+        limit,
+        offset,
+      ]);
+      return result.getAllSync();
+    } catch (error) {
+      console.error(
+        "Error getting messages by ticket ID with pagination:",
+        error,
+      );
+      return [];
+    } finally {
+      stmt.finalizeSync();
+    }
+  }
+
+  // Get total message count for a ticket (for pagination)
+  getMessageCountByTicketId(db: SQLiteDatabase, ticketId: number): number {
+    // First, get the customer_id from the ticket
+    const ticketStmt = db.prepareSync(
+      "SELECT customerId FROM tickets WHERE id = ?",
+    );
+    let customerId: number | null = null;
+
+    try {
+      const ticketResult = ticketStmt.executeSync<{ customerId: number }>([
+        ticketId,
+      ]);
+      const ticket = ticketResult.getFirstSync();
+      customerId = ticket?.customerId || null;
+    } catch (error) {
+      console.error("Error getting ticket customer_id:", error);
+      return 0;
+    } finally {
+      ticketStmt.finalizeSync();
+    }
+
+    if (!customerId) {
+      return 0;
+    }
+
+    const stmt = db.prepareSync(
+      "SELECT COUNT(*) as count FROM messages WHERE customer_id = ?",
+    );
+    try {
+      const result = stmt.executeSync<{ count: number }>([customerId]);
+      const row = result.getFirstSync();
+      return row?.count || 0;
+    } catch (error) {
+      console.error("Error getting message count:", error);
+      return 0;
     } finally {
       stmt.finalizeSync();
     }
