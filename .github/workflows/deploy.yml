@@ -58,6 +58,23 @@ jobs:
         working-directory: app
         run: yarn install --frozen-lockfile
 
+      - name: Auto-increment version
+        working-directory: app
+        run: |
+          # Get current remote version
+          CURRENT_VERSION=$(eas build:version:get --platform android)
+          echo "Current version: $CURRENT_VERSION"
+
+          # Parse version and increment patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "New version: $NEW_VERSION"
+
+          # Set new version
+          eas build:version:set --platform android $NEW_VERSION
+          echo "Version updated to $NEW_VERSION"
+
       - name: Build Android APK
         working-directory: app
         run: eas build --platform android --profile production --non-interactive --no-wait
