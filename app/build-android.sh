@@ -15,7 +15,6 @@ if [ -f "/.dockerenv" ]; then
     echo "❌ ERROR: This script should be run on HOST machine, not inside Docker!"
     echo ""
     echo "Exit Docker container and run:"
-    echo "  cd /home/iwan/Akvo/agriconnect/app"
     echo "  ./build-android.sh"
     exit 1
 fi
