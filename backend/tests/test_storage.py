@@ -1,5 +1,4 @@
 import os
-import shutil
 from io import BytesIO
 
 import pytest
@@ -13,6 +12,7 @@ def storage_secret(monkeypatch):
     # Reload the storage router to pick up new env var
     import importlib
     from routers import storage
+
     importlib.reload(storage)
     return "test_secret_key_123"
 
@@ -28,7 +28,7 @@ def temp_storage_dir(monkeypatch):
     # Clean storage directory before test
     for filename in os.listdir(storage_dir):
         file_path = os.path.join(storage_dir, filename)
-        if os.path.isfile(file_path) and not filename.startswith('.'):
+        if os.path.isfile(file_path) and not filename.startswith("."):
             os.remove(file_path)
 
     yield storage_dir
@@ -36,7 +36,7 @@ def temp_storage_dir(monkeypatch):
     # Clean storage directory after test
     for filename in os.listdir(storage_dir):
         file_path = os.path.join(storage_dir, filename)
-        if os.path.isfile(file_path) and not filename.startswith('.'):
+        if os.path.isfile(file_path) and not filename.startswith("."):
             os.remove(file_path)
 
 
@@ -50,9 +50,7 @@ def test_list_storage_files_empty(client: TestClient, temp_storage_dir):
     assert "<table>" in response.text
 
 
-def test_list_storage_files_with_files(
-    client: TestClient, temp_storage_dir
-):
+def test_list_storage_files_with_files(client: TestClient, temp_storage_dir):
     """Test listing storage files when files exist"""
     # Create test files
     with open(os.path.join(temp_storage_dir, "test1.txt"), "w") as f:
@@ -75,14 +73,12 @@ def test_upload_file_success(
 ):
     """Test successful file upload with valid secret"""
     file_content = b"test file content"
-    files = {"file": ("test.apk", BytesIO(file_content), "application/octet-stream")}
+    files = {
+        "file": ("test.apk", BytesIO(file_content), "application/octet-stream")
+    }
     headers = {"X-Storage-Secret": storage_secret}
 
-    response = client.post(
-        "/api/storage/upload",
-        files=files,
-        headers=headers
-    )
+    response = client.post("/api/storage/upload", files=files, headers=headers)
 
     assert response.status_code == 200
     data = response.json()
@@ -97,15 +93,18 @@ def test_upload_file_with_custom_filename(
 ):
     """Test file upload with custom filename"""
     file_content = b"test file content"
-    files = {"file": ("original.apk", BytesIO(file_content), "application/octet-stream")}
+    files = {
+        "file": (
+            "original.apk",
+            BytesIO(file_content),
+            "application/octet-stream",
+        )
+    }
     data = {"filename": "custom-name.apk"}
     headers = {"X-Storage-Secret": storage_secret}
 
     response = client.post(
-        "/api/storage/upload",
-        files=files,
-        data=data,
-        headers=headers
+        "/api/storage/upload", files=files, data=data, headers=headers
     )
 
     assert response.status_code == 200
@@ -118,7 +117,9 @@ def test_upload_file_with_custom_filename(
 def test_upload_file_missing_secret(client: TestClient, storage_secret):
     """Test file upload without X-Storage-Secret header"""
     file_content = b"test file content"
-    files = {"file": ("test.apk", BytesIO(file_content), "application/octet-stream")}
+    files = {
+        "file": ("test.apk", BytesIO(file_content), "application/octet-stream")
+    }
 
     response = client.post("/api/storage/upload", files=files)
 
@@ -129,14 +130,12 @@ def test_upload_file_missing_secret(client: TestClient, storage_secret):
 def test_upload_file_invalid_secret(client: TestClient, storage_secret):
     """Test file upload with invalid secret"""
     file_content = b"test file content"
-    files = {"file": ("test.apk", BytesIO(file_content), "application/octet-stream")}
+    files = {
+        "file": ("test.apk", BytesIO(file_content), "application/octet-stream")
+    }
     headers = {"X-Storage-Secret": "wrong_secret"}
 
-    response = client.post(
-        "/api/storage/upload",
-        files=files,
-        headers=headers
-    )
+    response = client.post("/api/storage/upload", files=files, headers=headers)
 
     assert response.status_code == 401
     assert "Invalid or missing storage secret" in response.json()["detail"]
@@ -149,17 +148,16 @@ def test_upload_file_no_secret_configured(client: TestClient, monkeypatch):
     # Reload the storage router
     import importlib
     from routers import storage
+
     importlib.reload(storage)
 
     file_content = b"test file content"
-    files = {"file": ("test.apk", BytesIO(file_content), "application/octet-stream")}
+    files = {
+        "file": ("test.apk", BytesIO(file_content), "application/octet-stream")
+    }
     headers = {"X-Storage-Secret": "any_secret"}
 
-    response = client.post(
-        "/api/storage/upload",
-        files=files,
-        headers=headers
-    )
+    response = client.post("/api/storage/upload", files=files, headers=headers)
 
     assert response.status_code == 500
     assert "Storage secret not configured" in response.json()["detail"]
@@ -174,13 +172,10 @@ def test_upload_file_no_filename(
     files = {"file": (None, BytesIO(file_content), "application/octet-stream")}
     headers = {"X-Storage-Secret": storage_secret}
 
-    response = client.post(
-        "/api/storage/upload",
-        files=files,
-        headers=headers
-    )
+    response = client.post("/api/storage/upload", files=files, headers=headers)
 
-    # FastAPI returns 422 for validation errors, but our custom logic returns 400
+    # FastAPI returns 422 for validation errors
+    # but our custom logic returns 400
     assert response.status_code in [400, 422]
     if response.status_code == 400:
         assert "Filename must be provided" in response.json()["detail"]
@@ -192,13 +187,17 @@ def test_storage_workflow_integration(
     """Test full workflow: upload file and verify in listing"""
     # 1. Upload a file
     file_content = b"integration test content"
-    files = {"file": ("integration.apk", BytesIO(file_content), "application/octet-stream")}
+    files = {
+        "file": (
+            "integration.apk",
+            BytesIO(file_content),
+            "application/octet-stream",
+        )
+    }
     headers = {"X-Storage-Secret": storage_secret}
 
     upload_response = client.post(
-        "/api/storage/upload",
-        files=files,
-        headers=headers
+        "/api/storage/upload", files=files, headers=headers
     )
 
     assert upload_response.status_code == 200
@@ -221,18 +220,14 @@ def test_upload_multiple_files_same_name(
     # Upload first file
     files1 = {"file": ("duplicate.txt", BytesIO(b"first"), "text/plain")}
     response1 = client.post(
-        "/api/storage/upload",
-        files=files1,
-        headers=headers
+        "/api/storage/upload", files=files1, headers=headers
     )
     assert response1.status_code == 200
 
     # Upload second file with same name
     files2 = {"file": ("duplicate.txt", BytesIO(b"second"), "text/plain")}
     response2 = client.post(
-        "/api/storage/upload",
-        files=files2,
-        headers=headers
+        "/api/storage/upload", files=files2, headers=headers
     )
     assert response2.status_code == 200
     assert response2.json()["filename"] == "duplicate.txt"
@@ -244,14 +239,16 @@ def test_upload_large_file(
     """Test uploading a large file"""
     # Create a 1MB file
     large_content = b"x" * (1024 * 1024)
-    files = {"file": ("large.apk", BytesIO(large_content), "application/octet-stream")}
+    files = {
+        "file": (
+            "large.apk",
+            BytesIO(large_content),
+            "application/octet-stream",
+        )
+    }
     headers = {"X-Storage-Secret": storage_secret}
 
-    response = client.post(
-        "/api/storage/upload",
-        files=files,
-        headers=headers
-    )
+    response = client.post("/api/storage/upload", files=files, headers=headers)
 
     assert response.status_code == 200
     data = response.json()

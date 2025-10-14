@@ -20,11 +20,13 @@ def list_storage_files():
             file_path = os.path.join(storage_path, filename)
             if os.path.isfile(file_path):
                 stat = os.stat(file_path)
-                files.append({
-                    "name": filename,
-                    "size": stat.st_size,
-                    "modified": datetime.fromtimestamp(stat.st_mtime)
-                })
+                files.append(
+                    {
+                        "name": filename,
+                        "size": stat.st_size,
+                        "modified": datetime.fromtimestamp(stat.st_mtime),
+                    }
+                )
 
     # Sort by name
     files.sort(key=lambda x: x["name"])
@@ -39,7 +41,11 @@ def list_storage_files():
             body { font-family: monospace; margin: 40px; }
             h1 { font-size: 24px; margin-bottom: 20px; }
             table { border-collapse: collapse; width: 100%; }
-            th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #ddd; }
+            th, td {
+                text-align: left;
+                padding: 8px 12px;
+                border-bottom: 1px solid #ddd;
+            }
             th { background-color: #f5f5f5; font-weight: bold; }
             tr:hover { background-color: #f9f9f9; }
             a { color: #0066cc; text-decoration: none; }
@@ -62,16 +68,18 @@ def list_storage_files():
     """
 
     for file in files:
-        size_kb = file['size'] / 1024
-        size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB"
-        modified_str = file['modified'].strftime('%Y-%m-%d %H:%M:%S')
+        size_kb = file["size"] / 1024
+        size_str = (
+            f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB"
+        )
+        modified_str = file["modified"].strftime("%Y-%m-%d %H:%M:%S")
 
         html_content += f"""
-                <tr>
-                    <td><a href="/storage/{file['name']}">{file['name']}</a></td>
-                    <td class="size">{size_str}</td>
-                    <td class="date">{modified_str}</td>
-                </tr>
+        <tr>
+            <td><a href="/storage/{file['name']}">{file['name']}</a></td>
+            <td class="size">{size_str}</td>
+            <td class="date">{modified_str}</td>
+        </tr>
         """
 
     html_content += """
@@ -98,14 +106,12 @@ async def upload_file(
     # Validate secret
     if not STORAGE_SECRET:
         raise HTTPException(
-            status_code=500,
-            detail="Storage secret not configured"
+            status_code=500, detail="Storage secret not configured"
         )
 
     if not x_storage_secret or x_storage_secret != STORAGE_SECRET:
         raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing storage secret"
+            status_code=401, detail="Invalid or missing storage secret"
         )
 
     # Use provided filename or original filename
@@ -113,8 +119,7 @@ async def upload_file(
 
     if not target_filename:
         raise HTTPException(
-            status_code=400,
-            detail="Filename must be provided"
+            status_code=400, detail="Filename must be provided"
         )
 
     # Ensure storage directory exists
@@ -133,10 +138,9 @@ async def upload_file(
             "success": True,
             "filename": target_filename,
             "size": len(content),
-            "url": f"/storage/{target_filename}"
+            "url": f"/storage/{target_filename}",
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to save file: {str(e)}"
+            status_code=500, detail=f"Failed to save file: {str(e)}"
         )
