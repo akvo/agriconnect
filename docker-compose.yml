@@ -51,5 +51,6 @@ services:
     working_dir: /app
     environment:
       - BACKEND_IP_ADDRESS=${IP_ADDRESS}
+      - EXPO_TOKEN=${EXPO_TOKEN}
 volumes:
   pg-data:
