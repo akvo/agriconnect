@@ -3,6 +3,7 @@
     "name": "agriconnect",
     "slug": "agriconnect",
     "version": "1.0.0",
+    "owner": "akvo",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "agriconnect",
@@ -57,6 +58,11 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "platforms": ["android", "web"]
+    "platforms": ["android", "web"],
+    "extra": {
+      "eas": {
+        "projectId": "bd031b01-b8a5-47d7-9678-0307138fec19"
+      }
+    }
   }
 }
