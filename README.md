@@ -100,4 +100,5 @@ Additional documentation is available in the `docs/` directory:
 
 - **[Mobile App Deployment](docs/MOBILE_APP_DEPLOYMENT.md)**: Complete guide for building and deploying the mobile app using EAS Build and GitHub Actions
 - **[Mobile Build Quick Reference](docs/MOBILE_BUILD_QUICK_REFERENCE.md)**: Quick commands and troubleshooting for mobile app builds
+- **[Storage System](docs/STORAGE_SYSTEM.md)**: File upload and storage system configuration and usage guide
 - **[CLAUDE.md](CLAUDE.md)**: Project architecture and development guidelines for Claude Code
