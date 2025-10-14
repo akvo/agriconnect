@@ -126,7 +126,7 @@ ci/
 
 - **Expo SDK**: 54
 - **React Native**: 0.81.4
-- **Node**: 18
+- **Node**: 24
 - **Build Type**: APK (Android)
 
 ---
