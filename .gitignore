@@ -27,3 +27,5 @@ yarn-error.log*
 # Firebase
 google-services.json
 GoogleService-Info.plist
+# Storage folder - handled by Docker volume (dev) and K8s PVC (prod)
+backend/storage/
