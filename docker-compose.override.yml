@@ -25,7 +25,10 @@ services:
   backend:
     command: ["./dev.sh"]
     network_mode: service:mainnetwork
+    volumes:
+      - storage-data:/app/storage
   mobileapp:
     network_mode: service:mainnetwork
 volumes:
   pg-admin-data:
+  storage-data:

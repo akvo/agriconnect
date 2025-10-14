@@ -23,3 +23,6 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Storage folder - handled by Docker volume (dev) and K8s PVC (prod)
+backend/storage/

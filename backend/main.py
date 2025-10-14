@@ -12,7 +12,9 @@ from routers import (
     whatsapp,
     tickets,
     ws,
+    storage,
 )
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
     title="AgriConnect API",
@@ -42,6 +44,8 @@ app.include_router(messages.router, prefix="/api")
 app.include_router(service_tokens.router, prefix="/api")
 app.include_router(whatsapp.router, prefix="/api")
 app.include_router(tickets.router, prefix="/api")
+app.include_router(storage.router)
+app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 
 # Health check endpoint

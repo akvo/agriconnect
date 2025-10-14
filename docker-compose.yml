@@ -30,6 +30,7 @@ services:
       - SMTP_PASS=${SMTP_PASS}
       - SMTP_USE_TLS=${SMTP_USE_TLS}
       - WEBDOMAIN=${WEBDOMAIN:-localhost}
+      - STORAGE_SECRET=${STORAGE_SECRET}
     command: ["./dev.sh"]
     working_dir: /app
     volumes:
