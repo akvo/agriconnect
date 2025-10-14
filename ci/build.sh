@@ -44,5 +44,26 @@ backend_build() {
         backend ./check.sh
 }
 
+mobileapp_build() {
+    echo "Building mobile app..."
+
+    # Install dependencies
+    dc -f docker-compose.yml run \
+        --rm \
+        --no-deps \
+        mobileapp \
+        yarn install --frozen-lockfile
+
+    # Run linter
+    dc -f docker-compose.yml run \
+        --rm \
+        --no-deps \
+        mobileapp \
+        yarn lint
+
+    echo "Mobile app build and lint completed successfully"
+}
+
 backend_build
 frontend_build
+mobileapp_build

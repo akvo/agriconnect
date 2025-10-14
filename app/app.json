@@ -3,15 +3,14 @@
     "name": "agriconnect",
     "slug": "agriconnect",
     "version": "1.0.0",
+    "owner": "akvo",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "agriconnect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
+      "package": "com.akvo.agriconnect",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -22,7 +21,6 @@
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
       "googleServicesFile": "./google-services.json",
-      "package": "com.akvo.agriconnect",
       "useNextNotificationsApi": true
     },
     "web": {
@@ -71,7 +69,7 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "platforms": ["ios", "android", "web"],
+    "platforms": ["android", "web"],
     "extra": {
       "eas": {
         "projectId": "bd031b01-b8a5-47d7-9678-0307138fec19"
