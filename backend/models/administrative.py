@@ -41,6 +41,7 @@ class Administrative(Base):
         "CustomerAdministrative", back_populates="administrative"
     )
     tickets = relationship("Ticket", back_populates="ticket_administrative")
+    devices = relationship("Device", back_populates="administrative")
 
 
 class UserAdministrative(Base):

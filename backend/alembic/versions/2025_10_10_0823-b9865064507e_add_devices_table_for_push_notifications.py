@@ -23,21 +23,10 @@ def upgrade() -> None:
     op.create_table(
         'devices',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
+        sa.Column('administrative_id', sa.Integer(), nullable=False),
         sa.Column('push_token', sa.String(), nullable=False),
-        sa.Column(
-            'platform',
-            sa.Enum('IOS', 'ANDROID', name='deviceplatform'),
-            nullable=False
-        ),
         sa.Column('app_version', sa.String(), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column(
-            'last_seen_at',
-            sa.DateTime(timezone=True),
-            server_default=sa.text('now()'),
-            nullable=True
-        ),
         sa.Column(
             'created_at',
             sa.DateTime(timezone=True),
@@ -50,16 +39,16 @@ def upgrade() -> None:
             server_default=sa.text('now()'),
             nullable=True
         ),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+        sa.ForeignKeyConstraint(['administrative_id'], ['administrative.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
 
     # Create indexes
     op.create_index(op.f('ix_devices_id'), 'devices', ['id'], unique=False)
     op.create_index(
-        op.f('ix_devices_user_id'),
+        op.f('ix_devices_administrative_id'),
         'devices',
-        ['user_id'],
+        ['administrative_id'],
         unique=False
     )
     op.create_index(
@@ -73,11 +62,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Drop indexes
     op.drop_index(op.f('ix_devices_push_token'), table_name='devices')
-    op.drop_index(op.f('ix_devices_user_id'), table_name='devices')
+    op.drop_index(op.f('ix_devices_administrative_id'), table_name='devices')
     op.drop_index(op.f('ix_devices_id'), table_name='devices')
-
-    # Drop enum type
-    op.execute('DROP TYPE deviceplatform')
 
     # Drop table
     op.drop_table('devices')

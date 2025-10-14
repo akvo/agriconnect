@@ -6,7 +6,6 @@ for Expo push notifications.
 """
 
 import logging
-from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from database import get_db
 from models.device import Device
 from models.user import User
+from models.administrative import UserAdministrative
 from schemas.device import (
     DeviceRegisterRequest,
     DeviceResponse,
@@ -41,11 +41,28 @@ def register_device(
     """
     Register a device for push notifications.
 
-    - If push_token already exists for this user, update it (upsert behavior)
-    - If push_token exists for a different user, return 409 conflict
-    - Updates last_seen_at on every registration
+    - Devices are associated with administrative areas (wards)
+    - If push_token already exists, update it (upsert behavior)
+    - Same device can be used by different users in the same ward
     """
     try:
+        # Verify user has access to this administrative area
+        user_admin = (
+            db.query(UserAdministrative)
+            .filter(
+                UserAdministrative.user_id == current_user.id,
+                UserAdministrative.administrative_id ==
+                device_data.administrative_id,
+            )
+            .first()
+        )
+
+        if not user_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this administrative area",
+            )
+
         # Check if this push token already exists
         existing_device = (
             db.query(Device)
@@ -54,46 +71,34 @@ def register_device(
         )
 
         if existing_device:
-            # If token belongs to current user, update it
-            if existing_device.user_id == current_user.id:
-                existing_device.platform = device_data.platform
-                existing_device.app_version = device_data.app_version
-                existing_device.is_active = True
-                existing_device.last_seen_at = datetime.now(timezone.utc)
-                db.commit()
-                db.refresh(existing_device)
+            # Update existing device
+            existing_device.administrative_id = device_data.administrative_id
+            existing_device.app_version = device_data.app_version
+            existing_device.is_active = True
+            db.commit()
+            db.refresh(existing_device)
 
-                logger.info(
-                    f"Updated device {existing_device.id} "
-                    f"for user {current_user.id}"
-                )
+            logger.info(
+                f"Updated device {existing_device.id} "
+                f"for administrative_id {device_data.administrative_id}"
+            )
 
-                return DeviceResponse(
-                    id=existing_device.id,
-                    user_id=existing_device.user_id,
-                    push_token=existing_device.push_token,
-                    platform=existing_device.platform.value,
-                    app_version=existing_device.app_version,
-                    is_active=existing_device.is_active,
-                    last_seen_at=existing_device.last_seen_at,
-                    created_at=existing_device.created_at,
-                    updated_at=existing_device.updated_at,
-                )
-            else:
-                # Token belongs to different user - conflict
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Push token already registered to another user",
-                )
+            return DeviceResponse(
+                id=existing_device.id,
+                administrative_id=existing_device.administrative_id,
+                push_token=existing_device.push_token,
+                app_version=existing_device.app_version,
+                is_active=existing_device.is_active,
+                created_at=existing_device.created_at,
+                updated_at=existing_device.updated_at,
+            )
 
         # Create new device registration
         new_device = Device(
-            user_id=current_user.id,
+            administrative_id=device_data.administrative_id,
             push_token=device_data.push_token,
-            platform=device_data.platform,
             app_version=device_data.app_version,
             is_active=True,
-            last_seen_at=datetime.now(timezone.utc),
         )
 
         db.add(new_device)
@@ -102,17 +107,15 @@ def register_device(
 
         logger.info(
             f"Registered new device {new_device.id} "
-            f"for user {current_user.id}"
+            f"for administrative_id {device_data.administrative_id}"
         )
 
         return DeviceResponse(
             id=new_device.id,
-            user_id=new_device.user_id,
+            administrative_id=new_device.administrative_id,
             push_token=new_device.push_token,
-            platform=new_device.platform.value,
             app_version=new_device.app_version,
             is_active=new_device.is_active,
-            last_seen_at=new_device.last_seen_at,
             created_at=new_device.created_at,
             updated_at=new_device.updated_at,
         )
@@ -142,26 +145,36 @@ def list_user_devices(
     db: Session = Depends(get_db),
 ):
     """
-    List all devices registered for the current user.
+    List all devices in administrative areas assigned to current user.
 
-    Returns both active and inactive devices.
+    Returns devices from all wards where the user has access.
     """
+    # Get all administrative IDs for current user
+    user_admin_ids = (
+        db.query(UserAdministrative.administrative_id)
+        .filter(UserAdministrative.user_id == current_user.id)
+        .all()
+    )
+
+    admin_ids = [ua.administrative_id for ua in user_admin_ids]
+
+    if not admin_ids:
+        return []
+
     devices = (
         db.query(Device)
-        .filter(Device.user_id == current_user.id)
-        .order_by(Device.last_seen_at.desc())
+        .filter(Device.administrative_id.in_(admin_ids))
+        .order_by(Device.created_at.desc())
         .all()
     )
 
     return [
         DeviceResponse(
             id=device.id,
-            user_id=device.user_id,
+            administrative_id=device.administrative_id,
             push_token=device.push_token,
-            platform=device.platform.value,
             app_version=device.app_version,
             is_active=device.is_active,
-            last_seen_at=device.last_seen_at,
             created_at=device.created_at,
             updated_at=device.updated_at,
         )
@@ -179,7 +192,7 @@ def update_device(
     """
     Update a device (typically to disable push notifications).
 
-    Users can only update their own devices.
+    Users can only update devices in their assigned administrative areas.
     """
     device = db.query(Device).filter(Device.id == device_id).first()
 
@@ -189,11 +202,20 @@ def update_device(
             detail="Device not found",
         )
 
-    # Check ownership
-    if device.user_id != current_user.id:
+    # Check if user has access to this administrative area
+    user_admin = (
+        db.query(UserAdministrative)
+        .filter(
+            UserAdministrative.user_id == current_user.id,
+            UserAdministrative.administrative_id == device.administrative_id,
+        )
+        .first()
+    )
+
+    if not user_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only update your own devices",
+            detail="You can only update devices in your assigned areas",
         )
 
     # Update fields
@@ -203,16 +225,14 @@ def update_device(
     db.commit()
     db.refresh(device)
 
-    logger.info(f"Updated device {device_id} for user {current_user.id}")
+    logger.info(f"Updated device {device_id} by user {current_user.id}")
 
     return DeviceResponse(
         id=device.id,
-        user_id=device.user_id,
+        administrative_id=device.administrative_id,
         push_token=device.push_token,
-        platform=device.platform.value,
         app_version=device.app_version,
         is_active=device.is_active,
-        last_seen_at=device.last_seen_at,
         created_at=device.created_at,
         updated_at=device.updated_at,
     )
@@ -227,7 +247,7 @@ def delete_device(
     """
     Delete a device registration.
 
-    Users can only delete their own devices.
+    Users can only delete devices in their assigned administrative areas.
     This will stop all push notifications to this device.
     """
     device = db.query(Device).filter(Device.id == device_id).first()
@@ -238,16 +258,25 @@ def delete_device(
             detail="Device not found",
         )
 
-    # Check ownership
-    if device.user_id != current_user.id:
+    # Check if user has access to this administrative area
+    user_admin = (
+        db.query(UserAdministrative)
+        .filter(
+            UserAdministrative.user_id == current_user.id,
+            UserAdministrative.administrative_id == device.administrative_id,
+        )
+        .first()
+    )
+
+    if not user_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delete your own devices",
+            detail="You can only delete devices in your assigned areas",
         )
 
     db.delete(device)
     db.commit()
 
-    logger.info(f"Deleted device {device_id} for user {current_user.id}")
+    logger.info(f"Deleted device {device_id} by user {current_user.id}")
 
     return None

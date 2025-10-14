@@ -3,8 +3,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from models.device import DevicePlatform
-
 
 class DeviceRegisterRequest(BaseModel):
     """Request schema for registering a device for push notifications."""
@@ -14,9 +12,9 @@ class DeviceRegisterRequest(BaseModel):
         description="Expo push token for the device (ExponentPushToken[...])",
         min_length=1,
     )
-    platform: DevicePlatform = Field(
+    administrative_id: int = Field(
         ...,
-        description="Device platform (ios or android)",
+        description="Administrative area ID (ward) where device is registered",
     )
     app_version: Optional[str] = Field(
         None,
@@ -29,12 +27,10 @@ class DeviceResponse(BaseModel):
     """Response schema for device operations."""
 
     id: int
-    user_id: int
+    administrative_id: int
     push_token: str
-    platform: str
     app_version: Optional[str]
     is_active: bool
-    last_seen_at: datetime
     created_at: datetime
     updated_at: Optional[datetime]
 
