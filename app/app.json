@@ -8,9 +8,6 @@
     "scheme": "agriconnect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -60,6 +57,6 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "platforms": ["ios", "android", "web"]
+    "platforms": ["android", "web"]
   }
 }
