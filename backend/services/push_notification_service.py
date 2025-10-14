@@ -256,33 +256,28 @@ class PushNotificationService:
         exclude_user_ids: Optional[List[int]] = None,
     ) -> List[str]:
         """
-        Get all active push tokens for users in a ward.
+        Get all active push tokens for devices in a ward.
+
+        Note: exclude_user_ids parameter is kept for backward compatibility
+        but is not used since devices are now associated with administrative
+        areas rather than users.
 
         Args:
             administrative_id: Ward (administrative) ID
-            exclude_user_ids: Optional list of user IDs to exclude
+            exclude_user_ids: Optional list of user IDs
+                (not used, kept for compatibility)
 
         Returns:
             List of active push tokens
         """
-        # Get all users assigned to this ward
+        # Get all devices registered to this ward
         query = (
             self.db.query(Device.push_token)
-            .join(User, Device.user_id == User.id)
-            .join(
-                UserAdministrative,
-                User.id == UserAdministrative.user_id,
-            )
             .filter(
-                UserAdministrative.administrative_id == administrative_id,
+                Device.administrative_id == administrative_id,
                 Device.is_active == True,  # noqa: E712
-                User.is_active == True,  # noqa: E712
             )
         )
-
-        # Exclude specific users if provided (e.g., message sender)
-        if exclude_user_ids:
-            query = query.filter(~User.id.in_(exclude_user_ids))
 
         devices = query.all()
         return [device.push_token for device in devices]
@@ -291,27 +286,45 @@ class PushNotificationService:
         self, exclude_user_ids: Optional[List[int]] = None
     ) -> List[str]:
         """
-        Get all active push tokens for admin users.
+        Get all active push tokens for devices in administrative areas
+        where admin users are assigned.
+
+        Note: exclude_user_ids parameter is kept for backward compatibility
+        but is not used since devices are now associated with administrative
+        areas rather than users.
 
         Args:
-            exclude_user_ids: Optional list of user IDs to exclude
+            exclude_user_ids: Optional list of user IDs
+                (not used, kept for compatibility)
 
         Returns:
-            List of active push tokens
+            List of active push tokens for admin user wards
         """
-        query = (
-            self.db.query(Device.push_token)
-            .join(User, Device.user_id == User.id)
+        # Get all administrative IDs where admin users are assigned
+        admin_areas = (
+            self.db.query(UserAdministrative.administrative_id)
+            .join(User, UserAdministrative.user_id == User.id)
             .filter(
                 User.user_type == UserType.ADMIN,
-                Device.is_active == True,  # noqa: E712
                 User.is_active == True,  # noqa: E712
             )
+            .distinct()
+            .all()
         )
 
-        # Exclude specific users if provided
-        if exclude_user_ids:
-            query = query.filter(~User.id.in_(exclude_user_ids))
+        admin_area_ids = [area.administrative_id for area in admin_areas]
+
+        if not admin_area_ids:
+            return []
+
+        # Get all devices in these administrative areas
+        query = (
+            self.db.query(Device.push_token)
+            .filter(
+                Device.administrative_id.in_(admin_area_ids),
+                Device.is_active == True,  # noqa: E712
+            )
+        )
 
         devices = query.all()
         return [device.push_token for device in devices]

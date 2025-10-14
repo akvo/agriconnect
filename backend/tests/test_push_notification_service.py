@@ -321,16 +321,35 @@ class TestGetAdminUserTokens:
 
     def test_get_admin_user_tokens_success(self, push_service, mock_db):
         """Test fetching tokens for admin users."""
-        mock_query = Mock()
-        mock_db.query.return_value = mock_query
-        mock_query.join.return_value = mock_query
-        mock_query.filter.return_value = mock_query
+        # Mock the first query chain (get admin areas)
+        mock_admin_areas_query = Mock()
+        mock_admin_areas_query.join.return_value = mock_admin_areas_query
+        mock_admin_areas_query.filter.return_value = mock_admin_areas_query
+        mock_admin_areas_query.distinct.return_value = mock_admin_areas_query
 
+        # Mock admin areas (UserAdministrative results)
+        mock_admin_areas = [
+            Mock(administrative_id=1),
+            Mock(administrative_id=2),
+        ]
+        mock_admin_areas_query.all.return_value = mock_admin_areas
+
+        # Mock the second query chain (get devices)
+        mock_devices_query = Mock()
+        mock_devices_query.filter.return_value = mock_devices_query
+
+        # Mock devices with push tokens
         mock_devices = [
             Mock(push_token="ExponentPushToken[admin1]"),
             Mock(push_token="ExponentPushToken[admin2]"),
         ]
-        mock_query.all.return_value = mock_devices
+        mock_devices_query.all.return_value = mock_devices
+
+        # Configure mock_db.query to return different mocks for each call
+        mock_db.query.side_effect = [
+            mock_admin_areas_query,  # First call (UserAdministrative)
+            mock_devices_query,       # Second call (Device)
+        ]
 
         tokens = push_service.get_admin_user_tokens()
 
