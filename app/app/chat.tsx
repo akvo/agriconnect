@@ -62,7 +62,9 @@ const convertToUIMessage = (
   console.log(
     `[Chat] Converting message id=${msg.id} text={${msg.body}} from_source=${
       msg.from_source
-    } user_id=${msg.user_id} user_name=${msg.user_name} to UI message as ${isCustomerMessage ? "customer" : "user"} name="${isCustomerMessage ? msg.customer_name : userName}"`,
+    } user_id=${msg.user_id} user_name=${msg.user_name} to UI message as ${
+      isCustomerMessage ? "customer" : "user"
+    } name="${isCustomerMessage ? msg.customer_name : userName}"`,
   );
   return {
     id: msg.id,
@@ -155,8 +157,9 @@ const ChatScreen = () => {
     }, 100);
   }, []);
 
-  // Load ticket and initial messages
-  // forceRefresh=false by default for offline-first behavior
+  // Load ticket and initial messages - TRUE OFFLINE-FIRST
+  // Step 1: Load from SQLite (instant)
+  // Step 2: Sync newer messages from API in background
   const loadTicketAndMessages = useCallback(
     async (forceRefresh: boolean = false) => {
       if (!ticketNumber || !user?.accessToken) {
@@ -193,12 +196,9 @@ const ChatScreen = () => {
             createdAt: ticketData.createdAt,
           });
 
-          // Load initial messages using MessageSyncService
-          // OFFLINE-FIRST: Uses cached messages unless forceRefresh=true
-          // On initial load (forceRefresh=false): returns cached messages if available
-          // On pull-to-refresh (forceRefresh=true): always fetches from API
+          // STEP 1: Load ALL messages from SQLite immediately (instant display)
           console.log(
-            `[Chat] Calling MessageSyncService.loadInitialMessages for ticket ${ticketData.id} (forceRefresh=${forceRefresh})`,
+            `[Chat] Loading cached messages from SQLite for ticket ${ticketData.id}`,
           );
           const result = await MessageSyncService.loadInitialMessages(
             db,
@@ -208,10 +208,11 @@ const ChatScreen = () => {
             ticketData.createdAt || new Date().toISOString(),
             user?.id,
             20,
-            forceRefresh, // Pass forceRefresh parameter
+            forceRefresh,
           );
+
           console.log(
-            `[Chat] MessageSyncService returned ${result.messages.length} messages`,
+            `[Chat] Loaded ${result.messages.length} cached messages from SQLite`,
           );
 
           // Convert to UI message format
@@ -221,9 +222,6 @@ const ChatScreen = () => {
           setMessages(uiMessages);
           setOldestTimestamp(result.oldestTimestamp);
 
-          console.log(
-            `[Chat] Loaded ${uiMessages.length} messages for ticket ${ticketNumber} (${forceRefresh ? "from API" : "from cache or API"})`,
-          );
           // Show sticky bubble if messageId matches a customer message
           if (messageId) {
             const targetMessage = uiMessages.find(
@@ -238,10 +236,52 @@ const ChatScreen = () => {
             }
           }
 
-          // Scroll to bottom after loading (only on initial load)
+          // Scroll to bottom after loading cached messages
           if (!forceRefresh) {
             setTimeout(() => scrollToBottom(false), 300);
           }
+
+          // STEP 2: Sync newer messages from API in background
+          // This catches up with any new messages that arrived while offline
+          console.log(
+            `[Chat] Starting background sync for ticket ${ticketData.id}`,
+          );
+          MessageSyncService.syncNewerMessages(
+            db,
+            user.accessToken,
+            ticketData.id,
+            ticketData.customer?.id || 0,
+            user?.id,
+          )
+            .then((newCount) => {
+              if (newCount > 0) {
+                console.log(
+                  `[Chat] Background sync found ${newCount} new messages, reloading`,
+                );
+                // Reload messages from SQLite to show newly synced messages
+                const updatedMessages =
+                  daoManager.message.getAllMessagesByTicketId(
+                    db,
+                    ticketData.id,
+                  );
+                const updatedUIMessages = updatedMessages.map((msg) =>
+                  convertToUIMessage(msg, user?.id),
+                );
+                setMessages(updatedUIMessages);
+                // Update oldest timestamp
+                if (updatedMessages.length > 0) {
+                  setOldestTimestamp(updatedMessages[0].createdAt);
+                }
+                // Scroll to bottom to show new messages
+                setTimeout(() => scrollToBottom(true), 100);
+              } else {
+                console.log(`[Chat] Background sync complete, no new messages`);
+              }
+            })
+            .catch((error) => {
+              console.error("[Chat] Background sync failed:", error);
+              // Don't throw - background sync failure is non-fatal
+            });
         } else {
           console.warn(`[Chat] Ticket not found: ${ticketNumber}`);
         }
@@ -268,21 +308,8 @@ const ChatScreen = () => {
     loadTicketAndMessages();
   }, [loadTicketAndMessages]);
 
-  // Handle pull-to-refresh to force fetch fresh messages from API
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await loadTicketAndMessages(true); // forceRefresh=true
-      console.log("[Chat] Pull-to-refresh completed");
-    } catch (error) {
-      console.error("[Chat] Error during pull-to-refresh:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadTicketAndMessages]);
-
   // Load older messages when scrolling to top (pagination)
-  // Uses before_ts parameter for lazy loading behavior
+  // Fetches from API using before_ts and stores in SQLite
   const loadOlderMessages = async () => {
     if (!ticket?.id || !user?.accessToken || !oldestTimestamp || loadingMore) {
       return;
@@ -290,9 +317,12 @@ const ChatScreen = () => {
 
     try {
       setLoadingMore(true);
+      setRefreshing(true);
 
-      // MessageSyncService.loadOlderMessages uses before_ts parameter
-      // API call: /api/tickets/{ticket_id}/messages?before_ts={oldestTimestamp}&limit=20
+      console.log(`[Chat] Loading older messages before ${oldestTimestamp}`);
+
+      // Fetch older messages from API and store in SQLite
+      // This is called iteratively as user scrolls to top
       const result = await MessageSyncService.loadOlderMessages(
         db,
         user.accessToken,
@@ -302,6 +332,12 @@ const ChatScreen = () => {
         user?.id,
         20,
       );
+
+      if (result.messages.length === 0) {
+        console.log("[Chat] No more older messages available");
+        setOldestTimestamp(null); // No more messages to load
+        return;
+      }
 
       // Convert to UI message format
       const uiMessages = result.messages.map((msg) =>
@@ -315,15 +351,25 @@ const ChatScreen = () => {
         const newMessages = uiMessages.filter(
           (m: Message) => !existingIds.has(m.id),
         );
+        console.log(
+          `[Chat] Adding ${newMessages.length} older messages (${
+            result.messages.length
+          } fetched, ${result.messages.length - newMessages.length} duplicates)`,
+        );
         return [...newMessages, ...prev]; // Prepend older messages at the top
       });
+
+      // Update oldest timestamp for next pagination
       setOldestTimestamp(result.oldestTimestamp);
 
-      console.log(`[Chat] Loaded ${result.messages.length} older messages`);
+      console.log(
+        `[Chat] Loaded ${result.messages.length} older messages, new oldest timestamp: ${result.oldestTimestamp}`,
+      );
     } catch (error) {
       console.error("[Chat] Error loading older messages:", error);
     } finally {
       setLoadingMore(false);
+      setRefreshing(false);
     }
   };
 
@@ -586,6 +632,7 @@ const ChatScreen = () => {
             style={{ marginTop: stickyMessage ? 40 : 0 }}
             onScroll={(event) => {
               const { contentOffset } = event.nativeEvent;
+              // Trigger load older messages when scrolled near top
               // Check if scrolled to top (with small threshold)
               if (contentOffset.y <= 100 && !loadingMore && oldestTimestamp) {
                 loadOlderMessages();
@@ -598,7 +645,7 @@ const ChatScreen = () => {
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={handleRefresh}
+                onRefresh={loadOlderMessages}
                 colors={[themeColors["green-500"]]}
                 tintColor={themeColors["green-500"]}
               />
