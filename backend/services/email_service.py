@@ -2,7 +2,13 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+from fastapi_mail import (
+    ConnectionConfig,
+    FastMail,
+    MessageSchema,
+    MessageType,
+    MultipartSubtypeEnum,
+)
 from jinja2 import Environment, FileSystemLoader
 from pydantic import EmailStr
 
@@ -98,6 +104,7 @@ class EmailService:
                 body=html_content,
                 alternative_body=text_content,
                 subtype=MessageType.html,
+                multipart_subtype=MultipartSubtypeEnum.alternative,
             )
 
             if self.disable_sending:
@@ -153,6 +160,7 @@ class EmailService:
                 body=html_content,
                 alternative_body=text_content,
                 subtype=MessageType.html,
+                multipart_subtype=MultipartSubtypeEnum.alternative,
             )
 
             if self.disable_sending:
