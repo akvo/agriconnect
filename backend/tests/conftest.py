@@ -1,12 +1,14 @@
 import os
 
 import pytest
+import sqlalchemy as sa
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from database import Base, get_db
 from main import app
+from models.customer import AgeGroup, CropType
 
 # Set testing environment
 os.environ["TESTING"] = "true"
@@ -23,11 +25,22 @@ TestingSessionLocal = sessionmaker(
 
 @pytest.fixture(scope="session")
 def test_db():
+    # Create enum types before creating tables
+    crop_type_enum = sa.Enum(CropType, name="croptype")
+    age_group_enum = sa.Enum(AgeGroup, name="agegroup")
+
+    crop_type_enum.create(engine, checkfirst=True)
+    age_group_enum.create(engine, checkfirst=True)
+
     # Create tables
     Base.metadata.create_all(bind=engine)
     yield
     # Drop tables
     Base.metadata.drop_all(bind=engine)
+
+    # Drop enum types
+    crop_type_enum.drop(engine, checkfirst=True)
+    age_group_enum.drop(engine, checkfirst=True)
 
 
 @pytest.fixture
