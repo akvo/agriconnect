@@ -12,6 +12,21 @@ class CustomerLanguage(enum.Enum):
     SW = "sw"
 
 
+class CropType(enum.Enum):
+    AVOCADO = "avocado"
+    IRISH_POTATO = "irish_potato"
+    DAIRY = "dairy"
+    MAIZE = "maize"
+    COFFEE = "coffee"
+    OTHER = "other"
+
+
+class AgeGroup(enum.Enum):
+    AGE_20_35 = "20-35"
+    AGE_36_50 = "36-50"
+    AGE_51_PLUS = "51+"
+
+
 class Customer(Base):
     __tablename__ = "customers"
 
@@ -19,6 +34,8 @@ class Customer(Base):
     phone_number = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=True)
     language = Column(Enum(CustomerLanguage), default=CustomerLanguage.EN)
+    crop_type = Column(Enum(CropType), nullable=True)
+    age_group = Column(Enum(AgeGroup), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
