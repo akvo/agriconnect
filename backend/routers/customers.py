@@ -1,15 +1,46 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
+from models.administrative import UserAdministrative
 from models.customer import Customer
-from schemas.customer import CustomerCreate, CustomerResponse, CustomerUpdate
+from models.user import User, UserType
+from schemas.customer import (
+    CustomerCreate,
+    CustomerListResponse,
+    CustomerResponse,
+    CustomerUpdate,
+)
 from services.customer_service import CustomerService
-from utils.auth_dependencies import admin_required
+from utils.auth_dependencies import admin_required, get_current_user
 
 router = APIRouter(prefix="/customers", tags=["customers"])
+
+
+def _get_user_administrative_ids(user: User, db: Session) -> List[int]:
+    """Get list of administrative IDs accessible by the user.
+
+    Args:
+        user: The current authenticated user
+        db: Database session
+
+    Returns:
+        Empty list for ADMIN (can access all), list of ward IDs for EO
+    """
+    if user.user_type == UserType.ADMIN:
+        # Admin can access all customers
+        return []
+
+    # EO can only access customers in their assigned administrative areas
+    user_admins = (
+        db.query(UserAdministrative)
+        .filter(UserAdministrative.user_id == user.id)
+        .all()
+    )
+
+    return [ua.administrative_id for ua in user_admins]
 
 
 @router.post("/", response_model=CustomerResponse)
@@ -49,9 +80,60 @@ async def create_customer(
 async def get_all_customers(
     db: Session = Depends(get_db), current_user=Depends(admin_required)
 ):
-    """Get all customers (admin only)."""
+    """Get all customers (admin only) - Legacy endpoint."""
     customers = db.query(Customer).all()
     return customers
+
+
+@router.get("/list", response_model=CustomerListResponse)
+async def get_customers_list(
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(10, ge=1, le=100, description="Items per page"),
+    search: Optional[str] = Query(None, description="Search by name or phone"),
+    crop_types: Optional[List[str]] = Query(
+        None, description="Filter by crop types"
+    ),
+    age_groups: Optional[List[str]] = Query(
+        None, description="Filter by age groups"
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get paginated list of customers with optional filters.
+
+    - **Admin users**: Can see all customers
+    - **EO users**: Only see customers in their assigned ward(s)
+    - Supports search by name/phone
+    - Supports filtering by crop types and age groups
+    - Returns ward information for each customer
+    """
+    customer_service = CustomerService(db)
+
+    # Get administrative IDs based on user role
+    administrative_ids = _get_user_administrative_ids(current_user, db)
+
+    # For EO users, if they have no ward assignments, return empty list
+    if (
+        current_user.user_type == UserType.EXTENSION_OFFICER
+        and not administrative_ids
+    ):
+        return CustomerListResponse(
+            customers=[], total=0, page=page, size=size
+        )
+
+    # Get customers list (pass None for admin, ward IDs for EO)
+    customers, total = customer_service.get_customers_list(
+        page=page,
+        size=size,
+        search=search,
+        administrative_ids=administrative_ids if administrative_ids else None,
+        crop_types=crop_types,
+        age_groups=age_groups,
+    )
+
+    return CustomerListResponse(
+        customers=customers, total=total, page=page, size=size
+    )
 
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
