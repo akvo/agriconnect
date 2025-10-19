@@ -35,6 +35,10 @@ interface TokenResponse {
 class ApiClient {
   private baseUrl: string;
   private unauthorizedHandler?: () => void;
+  private refreshTokenHandler?: () => Promise<string>;
+  private clearSessionHandler?: () => void;
+  private isRefreshing = false;
+  private refreshPromise: Promise<string> | null = null;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
@@ -44,14 +48,113 @@ class ApiClient {
     this.unauthorizedHandler = handler;
   }
 
+  setRefreshTokenHandler(handler?: () => Promise<string>) {
+    this.refreshTokenHandler = handler;
+  }
+
+  setClearSessionHandler(handler?: () => void) {
+    this.clearSessionHandler = handler;
+  }
+
+  /**
+   * Refresh the access token using the refresh token endpoint
+   */
+  private async refreshAccessToken(): Promise<string> {
+    // If already refreshing, return the existing promise
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        if (!this.refreshTokenHandler) {
+          throw new Error("Refresh token handler not set");
+        }
+
+        const newAccessToken = await this.refreshTokenHandler();
+        return newAccessToken;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  /**
+   * Wrapper for fetch requests with automatic token refresh on 401 errors
+   */
+  private async fetchWithRetry(
+    url: string,
+    options: RequestInit & { _retry?: boolean } = {},
+    isAuthEndpoint: boolean = false,
+  ): Promise<Response> {
+    const response = await fetch(url, options);
+
+    // Only handle 401 errors for non-auth endpoints and if not already retried
+    if (
+      response.status === 401 &&
+      !options._retry &&
+      !isAuthEndpoint &&
+      this.refreshTokenHandler
+    ) {
+      try {
+        console.log("[API] 401 error - attempting token refresh");
+
+        // Try to refresh the access token
+        const newAccessToken = await this.refreshAccessToken();
+
+        console.log(
+          "[API] Token refresh successful - retrying original request",
+        );
+
+        // Retry the original request with new token
+        const retryOptions = {
+          ...options,
+          _retry: true,
+          headers: {
+            ...options.headers,
+            Authorization: `Bearer ${newAccessToken}`,
+          },
+        };
+
+        return fetch(url, retryOptions);
+      } catch (refreshError) {
+        console.error("[API] Token refresh failed:", refreshError);
+
+        // Refresh failed, clear session and trigger unauthorized handler
+        if (this.clearSessionHandler) {
+          this.clearSessionHandler();
+        }
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+          } catch (e) {
+            console.error("unauthorizedHandler error:", e);
+          }
+        }
+
+        throw refreshError;
+      }
+    }
+
+    return response;
+  }
+
   async login(credentials: LoginCredentials): Promise<TokenResponse> {
-    const response = await fetch(`${this.baseUrl}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/auth/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(credentials),
       },
-      body: JSON.stringify(credentials),
-    });
+      true, // isAuthEndpoint = true (don't retry auth endpoints)
+    );
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -76,7 +179,7 @@ class ApiClient {
   }
 
   async getProfile(token: string): Promise<UserResponse> {
-    const response = await fetch(`${this.baseUrl}/auth/profile`, {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/auth/profile`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -96,7 +199,7 @@ class ApiClient {
     size?: number,
   ): Promise<any> {
     const sizeQuery = size ? `&size=${size}` : "";
-    const response = await fetch(
+    const response = await this.fetchWithRetry(
       `${this.baseUrl}/tickets/?status=${status}&page=${page}${sizeQuery}`,
       {
         headers: {
@@ -106,15 +209,7 @@ class ApiClient {
     );
 
     if (!response.ok) {
-      if (response.status === 401) {
-        if (this.unauthorizedHandler) {
-          try {
-            this.unauthorizedHandler();
-          } catch (e) {
-            console.error("unauthorizedHandler error:", e);
-          }
-        }
-      }
+      // Note: 401 errors are now handled by fetchWithRetry
       // return HTTP status code and error message
       const error = await response
         .json()
@@ -136,27 +231,22 @@ class ApiClient {
   }
 
   async closeTicket(token: string, ticketID: number): Promise<any> {
-    const response = await fetch(`${this.baseUrl}/tickets/${ticketID}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/tickets/${ticketID}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          resolved_at: new Date().toISOString().replace("Z", "+00:00"),
+        }),
       },
-      body: JSON.stringify({
-        resolved_at: new Date().toISOString().replace("Z", "+00:00"),
-      }),
-    });
+    );
 
     if (!response.ok) {
-      if (response.status === 401) {
-        if (this.unauthorizedHandler) {
-          try {
-            this.unauthorizedHandler();
-          } catch (e) {
-            console.error("unauthorizedHandler error:", e);
-          }
-        }
-      }
+      // Note: 401 errors are now handled by fetchWithRetry
       const error = await response
         .json()
         .catch(() => ({ detail: "Failed to close ticket" }));
@@ -179,28 +269,14 @@ class ApiClient {
 
     console.log("[API] Fetching messages:", { ticketId, beforeTs, limit });
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        console.log(
-          "[API] ✅ Unauthorized (401) - triggering unauthorizedHandler",
-        );
-        if (this.unauthorizedHandler) {
-          try {
-            this.unauthorizedHandler();
-            console.log("[API] ✅ unauthorizedHandler called successfully");
-          } catch (e) {
-            console.error("[API] ❌ unauthorizedHandler error:", e);
-          }
-        } else {
-          console.warn("[API] ⚠️ No unauthorizedHandler registered!");
-        }
-      }
+      // Note: 401 errors are now handled by fetchWithRetry
       const error = await response
         .json()
         .catch(() => ({ detail: "Failed to fetch messages" }));
@@ -241,7 +317,7 @@ class ApiClient {
       hasToken: !!token,
     });
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -253,16 +329,7 @@ class ApiClient {
     console.log("[API] Response status:", response.status);
 
     if (!response.ok) {
-      if (response.status === 401) {
-        console.error("[API] Unauthorized - token may be invalid");
-        if (this.unauthorizedHandler) {
-          try {
-            this.unauthorizedHandler();
-          } catch (e) {
-            console.error("unauthorizedHandler error:", e);
-          }
-        }
-      }
+      // Note: 401 errors are now handled by fetchWithRetry
       const error = await response
         .json()
         .catch(() => ({ detail: "Failed to send message" }));
@@ -283,7 +350,7 @@ class ApiClient {
       app_version: string;
     },
   ): Promise<any> {
-    const response = await fetch(`${this.baseUrl}/devices`, {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/devices`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -293,15 +360,7 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        if (this.unauthorizedHandler) {
-          try {
-            this.unauthorizedHandler();
-          } catch (e) {
-            console.error("unauthorizedHandler error:", e);
-          }
-        }
-      }
+      // Note: 401 errors are now handled by fetchWithRetry
       const error = await response
         .json()
         .catch(() => ({ detail: "Failed to register device" }));
@@ -350,26 +409,50 @@ class ApiClient {
 
     const url = `${this.baseUrl}/customers/list?${queryParams.toString()}`;
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        if (this.unauthorizedHandler) {
-          try {
-            this.unauthorizedHandler();
-          } catch (e) {
-            console.error("unauthorizedHandler error:", e);
-          }
-        }
-      }
+      // Note: 401 errors are now handled by fetchWithRetry
       const error = await response
         .json()
         .catch(() => ({ detail: "Failed to fetch customers list" }));
       throw new Error(error.detail || "Failed to fetch customers list");
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Fetch administrative locations
+   * @param token
+   * @param level "country" | "region" | "district" | "ward"
+   * @returns
+   */
+  async getAdministrativeLocations(
+    token: string,
+    level: string = "ward",
+  ): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/administrative/?level=${level}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      // Note: 401 errors are now handled by fetchWithRetry
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch administrative locations" }));
+      throw new Error(
+        error.detail || "Failed to fetch administrative locations",
+      );
     }
 
     return response.json();
