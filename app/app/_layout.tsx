@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { NetworkProvider } from "@/contexts/NetworkContext";
 import { Stack } from "expo-router";
 import { SQLiteProvider, defaultDatabaseDirectory } from "expo-sqlite";
 import { DATABASE_NAME } from "@/database/config";
@@ -27,38 +28,47 @@ export default function RootLayout() {
       directory={defaultDatabaseDirectory}
       onInit={migrateDbIfNeeded}
     >
-      <AuthProvider>
-        <NotificationProvider>
-          <WebSocketProvider>
-            <TicketProvider>
-              <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="login" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="chat"
-                  options={({
-                    navigation,
-                    route,
-                  }: {
-                    navigation: any;
-                    route: any;
-                  }) => ({
-                    headerShown: true,
-                    headerTitleAlign: "left",
-                    headerTitle: () => (
-                      <HeaderTitle name={route?.params?.name} />
-                    ),
-                    headerRight: () => (
-                      <HeaderOptions ticketID={route?.params?.ticketNumber} />
-                    ),
-                  })}
-                />
-              </Stack>
-            </TicketProvider>
-          </WebSocketProvider>
-        </NotificationProvider>
-      </AuthProvider>
+      <NetworkProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <WebSocketProvider>
+              <TicketProvider>
+                <Stack>
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="(tabs)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="login" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="chat"
+                    options={({
+                      navigation,
+                      route,
+                    }: {
+                      navigation: any;
+                      route: any;
+                    }) => ({
+                      headerShown: true,
+                      headerTitleAlign: "left",
+                      headerTitle: () => (
+                        <HeaderTitle name={route?.params?.name} />
+                      ),
+                      headerRight: () => (
+                        <HeaderOptions ticketID={route?.params?.ticketNumber} />
+                      ),
+                    })}
+                  />
+                  <Stack.Screen
+                    name="broadcast"
+                    options={{ headerShown: false }}
+                  />
+                </Stack>
+              </TicketProvider>
+            </WebSocketProvider>
+          </NotificationProvider>
+        </AuthProvider>
+      </NetworkProvider>
     </SQLiteProvider>
   );
 }

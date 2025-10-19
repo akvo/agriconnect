@@ -21,6 +21,7 @@ import React, {
 import { AppState, AppStateStatus } from "react-native";
 import io, { Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
+import { useNetwork } from "./NetworkContext";
 
 // WebSocket event types
 export interface MessageCreatedEvent {
@@ -88,6 +89,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   children,
 }) => {
   const { user } = useAuth();
+  const { isOnline } = useNetwork();
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectAttempts = useRef(0);
@@ -108,6 +110,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const connect = useCallback(() => {
     if (!user?.accessToken) {
       console.log("[WebSocket] No access token available");
+      return;
+    }
+
+    if (!isOnline) {
+      console.log("[WebSocket] Device is offline, skipping connection");
       return;
     }
 
@@ -150,12 +157,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     });
 
     socket.on("connect_error", (error) => {
-      console.error("[WebSocket] Connection error:", error.message);
+      // Only log errors if device is online (suppress errors when offline)
+      if (isOnline) {
+        console.error("[WebSocket] Connection error:", error.message);
+      } else {
+        console.log("[WebSocket] Connection error (device offline)");
+      }
       setIsConnected(false);
       reconnectAttempts.current++;
 
       if (reconnectAttempts.current >= maxReconnectAttempts) {
-        console.error("[WebSocket] Max reconnection attempts reached");
+        if (isOnline) {
+          console.error("[WebSocket] Max reconnection attempts reached");
+        }
         socket.disconnect();
       }
     });
@@ -204,7 +218,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       console.error("[WebSocket] Reconnection failed");
       setIsConnected(false);
     });
-  }, [user?.accessToken]);
+  }, [user?.accessToken, isOnline]);
 
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {
@@ -320,6 +334,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       disconnect();
     };
   }, [user?.accessToken, connect, disconnect]);
+
+  // Handle network state changes
+  useEffect(() => {
+    if (!user?.accessToken) {
+      return;
+    }
+
+    if (isOnline) {
+      // Network came back online, reconnect if not connected
+      console.log("[WebSocket] Network online, attempting to connect...");
+      if (!socketRef.current?.connected) {
+        connect();
+      }
+    } else {
+      // Network went offline, disconnect gracefully
+      console.log("[WebSocket] Network offline, disconnecting gracefully...");
+      disconnect();
+    }
+  }, [isOnline, user?.accessToken, connect, disconnect]);
 
   // Handle app state changes (foreground/background)
   useEffect(() => {
