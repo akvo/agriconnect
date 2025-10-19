@@ -33,17 +33,18 @@ const Search: React.FC<{ value: string; onChange: (v: string) => void }> = ({
 
 const styles = StyleSheet.create({
   searchContainer: {
+    width: "100%",
     position: "relative",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
   },
   searchIcon: {
     position: "absolute",
-    top: "25%",
-    left: 24,
+    top: "50%",
+    left: 8,
     zIndex: 1,
+    transform: [{ translateY: -10 }], // Center the icon vertically
   },
   searchInput: {
+    width: "100%", // Ensure full width
     backgroundColor: themeColors.white,
     borderRadius: 40,
     paddingVertical: 8,

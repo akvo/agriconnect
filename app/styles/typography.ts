@@ -66,6 +66,9 @@ type TextStyles = {
   body4: TextStyle;
   caption1: TextStyle;
   caption2: TextStyle;
+  bold: TextStyle;
+  textPrimary: TextStyle;
+  textGreen500: TextStyle;
 };
 
 const baseFontFamily = typographyTokens.familyPrimary;
