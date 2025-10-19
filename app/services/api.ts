@@ -310,6 +310,70 @@ class ApiClient {
 
     return response.json();
   }
+
+  /**
+   * Fetch customers list with filters
+   */
+  async getCustomersList(
+    token: string,
+    params: {
+      page?: number;
+      size?: number;
+      search?: string;
+      crop_types?: string[];
+      age_groups?: string[];
+      administrative_id?: number[];
+    },
+  ): Promise<any> {
+    const queryParams = new URLSearchParams();
+
+    if (params.page) {
+      queryParams.append("page", params.page.toString());
+    }
+    if (params.size) {
+      queryParams.append("size", params.size.toString());
+    }
+    if (params.search) {
+      queryParams.append("search", params.search);
+    }
+    if (params.crop_types) {
+      params.crop_types.forEach((ct) => queryParams.append("crop_types", ct));
+    }
+    if (params.age_groups) {
+      params.age_groups.forEach((ag) => queryParams.append("age_groups", ag));
+    }
+    if (params.administrative_id) {
+      params.administrative_id.forEach((aid) =>
+        queryParams.append("administrative_id", aid.toString()),
+      );
+    }
+
+    const url = `${this.baseUrl}/customers/list?${queryParams.toString()}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (this.unauthorizedHandler) {
+          try {
+            this.unauthorizedHandler();
+          } catch (e) {
+            console.error("unauthorizedHandler error:", e);
+          }
+        }
+      }
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch customers list" }));
+      throw new Error(error.detail || "Failed to fetch customers list");
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();
