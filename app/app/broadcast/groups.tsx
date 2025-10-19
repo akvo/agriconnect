@@ -246,8 +246,6 @@ const SavedGroups = () => {
 
   return (
     <View style={styles.container}>
-      {/* Top padding for tabs */}
-      <View style={{ height: 88 }} />
       {/* Search */}
       <View style={styles.header}>
         <Search value={searchQuery} onChange={setSearchQuery} />

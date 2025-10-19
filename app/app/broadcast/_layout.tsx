@@ -1,7 +1,7 @@
 /**
  *
  * Layout for broadcast routes
- * Using standard Expo Router Tabs with custom tab button at top
+ * Using standard Expo Router Tabs with custom tabs positioned at top
  * Replicating styles from @components/inbox/tabs-buttons.tsx
  * Place tabs at top of the screen and centered
  * Default active tab is "Farmer list" @index.tsx
@@ -11,110 +11,77 @@
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import React from "react";
-import { Tabs } from "expo-router";
+import { Tabs, usePathname, useRouter } from "expo-router";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
 
 const BroadcastLayout = () => {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Determine active tab based on pathname
+  const activeTab = pathname.includes("/broadcast/groups") ? "groups" : "index";
+
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: themeColors.background,
-        position: "relative",
-      }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }}>
+      {/* Custom Tabs at Top */}
+      <View style={styles.tabsContainer}>
+        <View style={styles.tabList}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={activeTab === "index" ? { selected: true } : {}}
+            onPress={() => router.push("/broadcast")}
+            style={[
+              styles.tabItem,
+              activeTab === "index" ? styles.tabActive : styles.tabInactive,
+            ]}
+          >
+            <Text
+              style={
+                activeTab === "index"
+                  ? [typography.body3, typography.textGreen500]
+                  : [typography.body3, { color: themeColors.dark3 }]
+              }
+            >
+              Farmer list
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={
+              activeTab === "groups" ? { selected: true } : {}
+            }
+            onPress={() => router.push("/broadcast/groups")}
+            style={[
+              styles.tabItem,
+              activeTab === "groups" ? styles.tabActive : styles.tabInactive,
+            ]}
+          >
+            <Text
+              style={
+                activeTab === "groups"
+                  ? [typography.body3, typography.textGreen500]
+                  : [typography.body3, { color: themeColors.dark3 }]
+              }
+            >
+              Saved groups
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Content */}
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarShowLabel: false,
-          tabBarStyle: {
-            borderRadius: 40,
-            borderWidth: 1,
-            borderColor: "#E7E8E8",
-            backgroundColor: "#FFF",
-            shadowColor: "#141414",
-            shadowOffset: {
-              width: 0,
-              height: 4,
-            },
-            shadowOpacity: 0.1,
-            shadowRadius: 6,
-            elevation: 8, // For Android shadow
-            height: 80,
-            marginHorizontal: 16,
-            marginBottom: 16,
-            position: "absolute",
-            top: 36,
-            left: 0,
-            right: 0,
-          },
-        }}
-        tabBar={(props) => {
-          const { state, descriptors, navigation } = props;
-
-          return (
-            <View style={styles.tabsContainer}>
-              <View style={styles.tabList}>
-                {state.routes.map((route, index) => {
-                  const { options } = descriptors[route.key];
-                  const label = options.title || route.name;
-                  const isFocused = state.index === index;
-
-                  const onPress = () => {
-                    const event = navigation.emit({
-                      type: "tabPress",
-                      target: route.key,
-                      canPreventDefault: true,
-                    });
-
-                    if (!isFocused && !event.defaultPrevented) {
-                      navigation.navigate(route.name);
-                    }
-                  };
-
-                  return (
-                    <TouchableOpacity
-                      key={route.key}
-                      accessibilityRole="button"
-                      accessibilityState={isFocused ? { selected: true } : {}}
-                      onPress={onPress}
-                      style={[
-                        styles.tabItem,
-                        isFocused ? styles.tabActive : styles.tabInactive,
-                      ]}
-                    >
-                      <Text
-                        style={
-                          isFocused
-                            ? [typography.body3, typography.textGreen500]
-                            : [typography.body3, { color: themeColors.dark3 }]
-                        }
-                      >
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          );
+          tabBarStyle: { display: "none" },
         }}
       >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Farmer list",
-          }}
-        />
-        <Tabs.Screen
-          name="groups"
-          options={{
-            title: "Saved groups",
-          }}
-        />
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="groups" />
       </Tabs>
     </SafeAreaView>
   );
@@ -124,6 +91,8 @@ const styles = StyleSheet.create({
   tabsContainer: {
     paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 16,
+    backgroundColor: themeColors.background,
   },
   tabList: {
     width: "100%",
