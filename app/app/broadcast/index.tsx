@@ -199,11 +199,10 @@ const BroadcastFarmerListTab = () => {
 
   // Filter handlers
   const toggleCropType = useCallback((cropType: string) => {
-    setSelectedCropTypes((prev) =>
-      prev.includes(cropType)
-        ? prev.filter((ct) => ct !== cropType)
-        : [...prev, cropType],
-    );
+    /*
+    Set as single selection for crop types
+    */
+    setSelectedCropTypes((prev) => (prev.includes(cropType) ? [] : [cropType]));
   }, []);
 
   const toggleAgeGroup = useCallback((ageGroup: string) => {
@@ -276,23 +275,28 @@ const BroadcastFarmerListTab = () => {
               >
                 {displayName}
               </Text>
-              <Text
-                style={[typography.body3, { color: themeColors.textSecondary }]}
-                numberOfLines={1}
-              >
-                {item.phone_number}
-              </Text>
-              {item.crop_type && (
-                <Text style={[typography.body4, { color: themeColors.dark4 }]}>
-                  {capitalizeFirstLetter(item.crop_type)}
+              {item.administrative?.path && isAdmin && (
+                <Text
+                  style={[
+                    typography.body3,
+                    { color: themeColors.textSecondary, marginBottom: 8 },
+                  ]}
+                >
+                  {item.administrative.path}
                 </Text>
               )}
+
+              <Text style={[typography.body4, { color: themeColors.dark4 }]}>
+                {item?.crop_type
+                  ? capitalizeFirstLetter(item.crop_type)
+                  : item.phone_number}
+              </Text>
             </View>
           </View>
         </TouchableOpacity>
       );
     },
-    [selectedIds, toggleSelection],
+    [selectedIds, isAdmin, toggleSelection],
   );
 
   const keyExtractor = useCallback((item: Customer) => item.id.toString(), []);
@@ -609,31 +613,32 @@ const BroadcastFarmerListTab = () => {
                 >
                   Crop Types
                 </Text>
-                {CROP_TYPES.map((cropType) => (
-                  <TouchableOpacity
-                    key={cropType}
-                    style={styles.checkboxRow}
-                    onPress={() => toggleCropType(cropType)}
-                  >
-                    <Checkbox
-                      value={selectedCropTypes.includes(cropType)}
-                      onValueChange={() => toggleCropType(cropType)}
-                      color={
-                        selectedCropTypes.includes(cropType)
-                          ? themeColors["green-500"]
-                          : undefined
-                      }
-                    />
-                    <Text
+                <View style={styles.filterPillsRow}>
+                  {CROP_TYPES.map((cropType) => (
+                    <TouchableOpacity
+                      key={cropType}
                       style={[
-                        typography.body2,
-                        { color: themeColors.textPrimary, marginLeft: 8 },
+                        styles.filterPill,
+                        selectedCropTypes.includes(cropType) &&
+                          styles.filterPillActive,
                       ]}
+                      onPress={() => toggleCropType(cropType)}
                     >
-                      {capitalizeFirstLetter(cropType)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text
+                        style={[
+                          typography.body2,
+                          {
+                            color: selectedCropTypes.includes(cropType)
+                              ? themeColors.white
+                              : themeColors.textPrimary,
+                          },
+                        ]}
+                      >
+                        {capitalizeFirstLetter(cropType)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               {/* Age Groups */}
@@ -775,6 +780,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginRight: 8,
     marginBottom: 8,
+  },
+  filterPillActive: {
+    backgroundColor: themeColors["green-500"],
+    color: themeColors.white,
   },
   clearAllButton: {
     marginLeft: "auto",
