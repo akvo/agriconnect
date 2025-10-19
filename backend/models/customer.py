@@ -13,12 +13,9 @@ class CustomerLanguage(enum.Enum):
 
 
 class CropType(enum.Enum):
-    AVOCADO = "avocado"
-    IRISH_POTATO = "irish_potato"
-    DAIRY = "dairy"
-    MAIZE = "maize"
+    RICE = "rice"
     COFFEE = "coffee"
-    OTHER = "other"
+    CHILLI = "chilli"
 
 
 class AgeGroup(enum.Enum):

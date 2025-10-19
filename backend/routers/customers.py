@@ -90,6 +90,9 @@ async def get_customers_list(
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(10, ge=1, le=100, description="Items per page"),
     search: Optional[str] = Query(None, description="Search by name or phone"),
+    administrative_ids: Optional[List[int]] = Query(
+        None, description="Filter by ward IDs (admin only, multiple supported)"
+    ),
     crop_types: Optional[List[str]] = Query(
         None, description="Filter by crop types"
     ),
@@ -101,7 +104,7 @@ async def get_customers_list(
 ):
     """Get paginated list of customers with optional filters.
 
-    - **Admin users**: Can see all customers
+    - **Admin users**: Can see all customers, can filter by specific ward(s)
     - **EO users**: Only see customers in their assigned ward(s)
     - Supports search by name/phone
     - Supports filtering by crop types and age groups
@@ -110,23 +113,31 @@ async def get_customers_list(
     customer_service = CustomerService(db)
 
     # Get administrative IDs based on user role
-    administrative_ids = _get_user_administrative_ids(current_user, db)
+    user_administrative_ids = _get_user_administrative_ids(current_user, db)
 
-    # For EO users, if they have no ward assignments, return empty list
-    if (
-        current_user.user_type == UserType.EXTENSION_OFFICER
-        and not administrative_ids
-    ):
-        return CustomerListResponse(
-            customers=[], total=0, page=page, size=size
-        )
+    # Determine which administrative IDs to filter by
+    if current_user.user_type == UserType.ADMIN:
+        # Admin can optionally filter by specific ward(s)
+        if administrative_ids:
+            filter_administrative_ids = administrative_ids
+        else:
+            # No filter - show all customers
+            filter_administrative_ids = None
+    else:
+        # EO users - always filter by their assigned wards
+        if not user_administrative_ids:
+            # EO has no ward assignments, return empty list
+            return CustomerListResponse(
+                customers=[], total=0, page=page, size=size
+            )
+        filter_administrative_ids = user_administrative_ids
 
-    # Get customers list (pass None for admin, ward IDs for EO)
+    # Get customers list
     customers, total = customer_service.get_customers_list(
         page=page,
         size=size,
         search=search,
-        administrative_ids=administrative_ids if administrative_ids else None,
+        administrative_ids=filter_administrative_ids,
         crop_types=crop_types,
         age_groups=age_groups,
     )
