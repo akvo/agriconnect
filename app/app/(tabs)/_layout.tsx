@@ -1,11 +1,16 @@
 import Feathericons from "@expo/vector-icons/Feather";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import React from "react";
+import { TouchableOpacity } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 export default function TabLayout() {
+  const router = useRouter();
+  const { isOnline } = useNetwork();
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <Tabs
@@ -64,6 +69,30 @@ export default function TabLayout() {
           name="inbox"
           options={{
             title: "Inbox",
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: "#FFF",
+            },
+            headerTitleStyle: {
+              fontSize: 20,
+              fontWeight: 600,
+              fontFamily: "Inter",
+              color: "#222222",
+            },
+            headerRight: () => (
+              <TouchableOpacity
+                onPress={() => isOnline && router.push("/broadcast")}
+                style={{ marginRight: 16, opacity: isOnline ? 1 : 0.5 }}
+                disabled={!isOnline}
+                testID="send-bulk-message-button"
+              >
+                <Feathericons
+                  size={24}
+                  name="radio"
+                  color={isOnline ? "#027E5D" : "#666666"}
+                />
+              </TouchableOpacity>
+            ),
             tabBarIcon: ({ color }: { color: string }) => (
               <Feathericons size={24} name="message-circle" color={color} />
             ),

@@ -126,7 +126,11 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.twoColumnContainer}>
-          <View style={[styles.card, styles.cardHalf, { minHeight: 160 }]}>
+          <TouchableOpacity
+            style={[styles.card, styles.cardHalf, { minHeight: 160 }]}
+            onPress={() => router.push("/broadcast")}
+            testID="send-bulk-message-button"
+          >
             <View style={[styles.twoColumnContainer]}>
               <View
                 style={{
@@ -163,7 +167,7 @@ export default function HomeScreen() {
             >
               Send bulk message
             </Text>
-          </View>
+          </TouchableOpacity>
           <View style={[styles.card, styles.cardHalf, { minHeight: 160 }]}>
             <View style={[styles.twoColumnContainer]}>
               <View
