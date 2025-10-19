@@ -406,8 +406,6 @@ const BroadcastFarmerListTab = () => {
 
   return (
     <View style={styles.container}>
-      {/* Top padding for tabs */}
-      <View style={{ height: 88 }} />
       {/* Search and Filter */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
@@ -805,7 +803,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 120,
+    paddingBottom: 100,
   },
   listHeader: {
     marginBottom: 16,
@@ -867,11 +865,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 32,
     backgroundColor: themeColors.white,
     borderTopWidth: 1,
     borderTopColor: themeColors.mutedBorder,
-    paddingBottom: 100,
   },
   nextButton: {
     flexDirection: "row",
