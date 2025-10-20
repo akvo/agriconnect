@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import { useRouter } from "expo-router";
 import Feather from "@expo/vector-icons/Feather";
 
 import Search from "@/components/search";
@@ -88,6 +89,8 @@ const SavedGroups = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
+  const router = useRouter();
+
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -150,7 +153,19 @@ const SavedGroups = () => {
   // Render group card
   const renderItem = useCallback(({ item }: { item: SavedGroup }) => {
     return (
-      <TouchableOpacity style={styles.groupCard} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.groupCard}
+        activeOpacity={0.7}
+        onPress={() => {
+          router.push({
+            pathname: "/broadcast/group/[chatId]",
+            params: {
+              chatId: item.id,
+              name: item.name,
+            },
+          });
+        }}
+      >
         <View style={styles.groupHeader}>
           <Text
             style={[
@@ -192,7 +207,7 @@ const SavedGroups = () => {
         </View>
       </TouchableOpacity>
     );
-  }, []);
+  }, [router]);
 
   const keyExtractor = useCallback((item: SavedGroup) => item.id, []);
 

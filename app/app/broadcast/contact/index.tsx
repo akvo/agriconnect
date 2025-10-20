@@ -18,6 +18,7 @@ import Search from "@/components/search";
 import Avatar from "@/components/avatar";
 import { api } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBroadcast } from "@/contexts/BroadcastContext";
 import { CROP_TYPES, AGE_GROUPS } from "@/constants/customer";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
@@ -60,6 +61,7 @@ const capitalizeFirstLetter = (str: string | null): string => {
 const BroadcastFarmerListTab = () => {
   const router = useRouter();
   const { user } = useAuth();
+  const { setSelectedMembers } = useBroadcast();
   const isAdmin = user?.userType === "admin";
 
   // State
@@ -231,12 +233,14 @@ const BroadcastFarmerListTab = () => {
 
   // Navigation handler
   const handleNext = useCallback(() => {
-    const selectedCustomers = Array.from(selectedIds);
-    router.push({
-      pathname: "/broadcast/compose",
-      params: { customerIds: JSON.stringify(selectedCustomers) },
+    // Get selected customers from the full list
+    const selectedCustomers = customers.filter((c) => selectedIds.has(c.id));
+
+    // Update context with selected members and navigate after state is committed
+    setSelectedMembers(selectedCustomers, () => {
+      router.push("/broadcast/create");
     });
-  }, [selectedIds, router]);
+  }, [selectedIds, customers, setSelectedMembers, router]);
 
   // Render item
   const renderItem = useCallback(
