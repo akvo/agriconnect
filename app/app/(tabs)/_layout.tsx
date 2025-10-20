@@ -1,4 +1,5 @@
 import Feathericons from "@expo/vector-icons/Feather";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import React from "react";
@@ -74,21 +75,20 @@ export default function TabLayout() {
               backgroundColor: "#FFF",
             },
             headerTitleStyle: {
-              fontSize: 20,
-              fontWeight: 600,
+              fontWeight: "bold",
               fontFamily: "Inter",
-              color: "#222222",
             },
+            headerTitleAlign: "center",
             headerRight: () => (
               <TouchableOpacity
-                onPress={() => isOnline && router.push("/broadcast")}
+                onPress={() => isOnline && router.push("/broadcast/contact")}
                 style={{ marginRight: 16, opacity: isOnline ? 1 : 0.5 }}
                 disabled={!isOnline}
                 testID="send-bulk-message-button"
               >
-                <Feathericons
+                <Ionicons
+                  name="megaphone-outline"
                   size={24}
-                  name="radio"
                   color={isOnline ? "#027E5D" : "#666666"}
                 />
               </TouchableOpacity>
