@@ -2,6 +2,8 @@
 """
 Apply fastapi-mail Pydantic 2.12 compatibility fix
 Fix for: https://github.com/sabuhish/fastapi-mail/issues/236
+TODO: Remove once fixed in fastapi-mail package
+https://github.com/sabuhish/fastapi-mail/issues/236
 """
 import os
 import sys
@@ -10,6 +12,7 @@ import sys
 def apply_fix():
     try:
         import fastapi_mail
+
         schemas_path = os.path.join(
             os.path.dirname(fastapi_mail.__file__), "schemas.py"
         )
