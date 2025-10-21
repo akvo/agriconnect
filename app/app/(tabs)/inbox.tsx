@@ -11,12 +11,11 @@ import { useDatabase } from "@/database/context";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
 import InboxTabs from "@/components/inbox/tabs-button";
-import Search from "@/components/inbox/search";
+import Search from "@/components/search";
 import TicketItem from "@/components/inbox/ticket-item";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ticket } from "@/database/dao/types/ticket";
 import TicketSyncService from "@/services/ticketSync";
-import { useTicket } from "@/contexts/TicketContext";
 import {
   useWebSocket,
   MessageCreatedEvent,
@@ -50,7 +49,7 @@ const Inbox: React.FC = () => {
   const isFetchingRef = React.useRef(false); // prevent duplicate fetches
   const isInitialMount = React.useRef(true); // track initial mount
   const db = useDatabase();
-  const { updateTicket } = useTicket();
+  // const { updateTicket } = useTicket();
   const { isConnected, onMessageCreated, onTicketResolved, onTicketCreated } =
     useWebSocket();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
@@ -100,7 +99,6 @@ const Inbox: React.FC = () => {
         ...ticket,
         unreadCount: _unreadCount,
       };
-      updateTicket(ticket.id, { unreadCount: _unreadCount });
       // update local state immediately for responsiveness
       setTickets((prev: Ticket[]) =>
         prev.map((t: Ticket) => (t.id === ticket.id ? updated : t)),
@@ -395,7 +393,7 @@ const Inbox: React.FC = () => {
       {/* Connection Status Indicator */}
       {!isConnected && (
         <View style={styles.connectionBanner}>
-          <Text style={[typography.caption, { color: themeColors.error }]}>
+          <Text style={[typography.caption1, { color: themeColors.error }]}>
             ⚠️ Reconnecting...
           </Text>
         </View>
@@ -410,7 +408,9 @@ const Inbox: React.FC = () => {
       </View>
 
       {/* Search */}
-      <Search value={query} onChange={setQuery} />
+      <View style={{ paddingHorizontal: 16 }}>
+        <Search value={query} onChange={setQuery} />
+      </View>
 
       {/* List */}
       <FlatList<Ticket>

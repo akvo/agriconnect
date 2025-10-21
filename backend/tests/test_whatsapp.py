@@ -15,6 +15,17 @@ class TestWhatsAppWebhook:
     def test_webhook_new_customer_english(
         self, client: TestClient, db_session: Session
     ):
+        # Seed administrative data (required for ticket creation)
+        rows = [
+            {
+                "code": "NATIONAL",
+                "name": "National",
+                "level": "National",
+                "parent_code": "",
+            }
+        ]
+        seed_administrative_data(db_session, rows)
+
         with patch("routers.whatsapp.WhatsAppService") as mock_whatsapp:
             mock_service = Mock()
             mock_whatsapp.return_value = mock_service
@@ -436,3 +447,215 @@ class TestWhatsAppWebhook:
 
             # emit_message_created should NOT be called when no ticket exists
             mock_emit.assert_not_called()
+
+    def test_webhook_creates_ticket_when_none_exists(
+        self, client: TestClient, db_session: Session
+    ):
+        """Test that system automatically creates a ticket when customer
+        has no open ticket."""
+
+        # Seed administrative data (required for ticket creation)
+        rows = [
+            {
+                "code": "NATIONAL",
+                "name": "National",
+                "level": "National",
+                "parent_code": "",
+            },
+            {
+                "code": "WARD3",
+                "name": "Test Ward 3",
+                "level": "Ward",
+                "parent_code": "NATIONAL",
+            },
+        ]
+        seed_administrative_data(db_session, rows)
+
+        national_admin = (
+            db_session.query(Administrative).filter_by(code="NATIONAL").first()
+        )
+        assert national_admin is not None
+
+        # Create customer with existing message (not a new customer)
+        customer = Customer(
+            phone_number="+255888888888", full_name="Charlie Farmer"
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        old_message = Message(
+            message_sid="SM_OLD_CHARLIE",
+            customer_id=customer.id,
+            body="Old message",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(old_message)
+        db_session.commit()
+
+        # Verify no ticket exists initially
+        ticket_count_before = (
+            db_session.query(Ticket)
+            .filter(Ticket.customer_id == customer.id)
+            .count()
+        )
+        assert ticket_count_before == 0
+
+        with patch("routers.whatsapp.WhatsAppService") as mock_whatsapp, patch(
+            "routers.whatsapp.emit_ticket_created", new_callable=AsyncMock
+        ) as mock_emit_ticket:
+            mock_service = Mock()
+            mock_whatsapp.return_value = mock_service
+
+            response = client.post(
+                "/api/whatsapp/webhook",
+                data={
+                    "From": "whatsapp:+255888888888",
+                    "Body": "I need help with my crops",
+                    "MessageSid": "SM_NEW_TICKET_CREATE",
+                },
+            )
+
+            assert response.status_code == 200
+            assert response.json()["status"] == "success"
+
+            # Verify a new ticket was created
+            ticket = (
+                db_session.query(Ticket)
+                .filter(Ticket.customer_id == customer.id)
+                .first()
+            )
+            assert ticket is not None
+            assert ticket.resolved_at is None  # Ticket should be open
+            assert ticket.customer_id == customer.id
+            assert ticket.administrative_id == national_admin.id
+
+            # Verify the new message is stored
+            new_message = (
+                db_session.query(Message)
+                .filter(Message.message_sid == "SM_NEW_TICKET_CREATE")
+                .first()
+            )
+            assert new_message is not None
+            assert new_message.body == "I need help with my crops"
+            assert new_message.customer_id == customer.id
+
+            # Verify ticket is linked to the new message
+            assert ticket.message_id == new_message.id
+
+            # Verify emit_ticket_created was called
+            mock_emit_ticket.assert_called_once()
+            call_kwargs = mock_emit_ticket.call_args.kwargs
+            assert call_kwargs["ticket_id"] == ticket.id
+            assert call_kwargs["customer_id"] == customer.id
+            assert call_kwargs["administrative_id"] == national_admin.id
+            assert call_kwargs["ticket_number"] == ticket.ticket_number
+            assert call_kwargs["customer_name"] == customer.full_name
+            assert call_kwargs["message_id"] == new_message.id
+            assert (
+                call_kwargs["message_preview"] == "I need help with my crops"
+            )
+
+            # Welcome message should not be sent for existing customer
+            mock_service.send_welcome_message.assert_not_called()
+
+    def test_webhook_auto_creates_ticket_when_none_exists(
+        self, client: TestClient, db_session: Session
+    ):
+        """Test new ticket created when customer has no open ticket."""
+
+        # Seed administrative data
+        rows = [
+            {
+                "code": "WARD3",
+                "name": "Test Ward 3",
+                "level": "Ward",
+                "parent_code": "",
+            }
+        ]
+        seed_administrative_data(db_session, rows)
+
+        admin = (
+            db_session.query(Administrative).filter_by(code="WARD3").first()
+        )
+
+        # Create customer with existing message (not new)
+        customer = Customer(
+            phone_number="+255888888888", full_name="Charlie Farmer"
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        old_message = Message(
+            message_sid="SM_OLD_CHARLIE",
+            customer_id=customer.id,
+            body="Old message",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(old_message)
+        db_session.commit()
+
+        # Verify no ticket exists initially
+        initial_ticket_count = (
+            db_session.query(Ticket)
+            .filter(Ticket.customer_id == customer.id)
+            .count()
+        )
+        assert initial_ticket_count == 0
+
+        with patch("routers.whatsapp.WhatsAppService") as mock_whatsapp, patch(
+            "routers.whatsapp.emit_ticket_created", new_callable=AsyncMock
+        ) as mock_emit_ticket:
+            mock_service = Mock()
+            mock_whatsapp.return_value = mock_service
+
+            response = client.post(
+                "/api/whatsapp/webhook",
+                data={
+                    "From": "whatsapp:+255888888888",
+                    "Body": "I need help with my crops",
+                    "MessageSid": "SM_NEW_TICKET_AUTO",
+                },
+            )
+
+            assert response.status_code == 200
+            assert response.json()["status"] == "success"
+
+            # Verify a new ticket was created
+            tickets = (
+                db_session.query(Ticket)
+                .filter(Ticket.customer_id == customer.id)
+                .all()
+            )
+            assert len(tickets) == 1
+
+            new_ticket = tickets[0]
+            assert new_ticket.resolved_at is None  # Ticket should be open
+            assert new_ticket.customer_id == customer.id
+            assert new_ticket.administrative_id == admin.id
+
+            # Verify the new message is stored
+            new_message = (
+                db_session.query(Message)
+                .filter(Message.message_sid == "SM_NEW_TICKET_AUTO")
+                .first()
+            )
+            assert new_message is not None
+            assert new_message.body == "I need help with my crops"
+            assert new_message.customer_id == customer.id
+
+            # Verify emit_ticket_created was called
+            mock_emit_ticket.assert_called_once()
+            call_kwargs = mock_emit_ticket.call_args.kwargs
+            assert call_kwargs["ticket_id"] == new_ticket.id
+            assert call_kwargs["customer_id"] == customer.id
+            assert call_kwargs["administrative_id"] == admin.id
+            assert call_kwargs["ticket_number"] == new_ticket.ticket_number
+            assert call_kwargs["customer_name"] == customer.full_name
+            assert call_kwargs["message_id"] == new_message.id
+            assert (
+                call_kwargs["message_preview"]
+                == "I need help with my crops"
+            )
+
+            # Welcome message should not be sent for existing customer
+            mock_service.send_welcome_message.assert_not_called()

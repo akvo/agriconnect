@@ -52,6 +52,11 @@ const colors = {
   // text colors (moved from typography tokens)
   adminType: "#c10007", // red
   extensionOfficerType: "#ffdf20", // yellow
+
+  // group icon background
+  groupIconBackground: "#ECEFF4",
+  groupIconForeground: "#74777A",
+
 };
 
 export default colors;

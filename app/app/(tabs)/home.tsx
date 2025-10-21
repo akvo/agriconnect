@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNetwork } from "@/contexts/NetworkContext";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
@@ -12,6 +13,7 @@ import Avatar from "@/components/avatar";
 export default function HomeScreen() {
   const router = useRouter();
   const { logout, user } = useAuth();
+  const { isOnline } = useNetwork();
 
   const handleLogout = async () => {
     try {
@@ -126,7 +128,22 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.twoColumnContainer}>
-          <View style={[styles.card, styles.cardHalf, { minHeight: 160 }]}>
+          <TouchableOpacity
+            style={[
+              styles.card,
+              styles.cardHalf,
+              {
+                minHeight: 160,
+                opacity: isOnline ? 1 : 0.5,
+                backgroundColor: isOnline
+                  ? themeColors.white
+                  : themeColors.mutedBorder,
+              },
+            ]}
+            onPress={() => router.push("/broadcast/contact")}
+            testID="send-bulk-message-button"
+            disabled={!isOnline}
+          >
             <View style={[styles.twoColumnContainer]}>
               <View
                 style={{
@@ -142,14 +159,16 @@ export default function HomeScreen() {
                 <Feathericons
                   name="message-circle"
                   size={24}
-                  color={themeColors["green-500"]}
+                  color={
+                    isOnline ? themeColors["green-500"] : themeColors.dark3
+                  }
                 />
               </View>
               <TouchableOpacity>
                 <Feathericons
                   name="arrow-up-right"
                   size={24}
-                  color={themeColors.dark10}
+                  color={isOnline ? themeColors.dark10 : themeColors.dark3}
                 />
               </TouchableOpacity>
             </View>
@@ -163,7 +182,7 @@ export default function HomeScreen() {
             >
               Send bulk message
             </Text>
-          </View>
+          </TouchableOpacity>
           <View style={[styles.card, styles.cardHalf, { minHeight: 160 }]}>
             <View style={[styles.twoColumnContainer]}>
               <View
@@ -405,7 +424,6 @@ const styles = StyleSheet.create({
   locationText: {
     ...typography.body4,
     color: themeColors.white,
-    textWrap: "wrap",
   },
   userTypeLabel: {
     fontSize: 12,

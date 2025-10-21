@@ -5,7 +5,8 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.user import User
+from models.user import User, UserType
+from models.administrative import Administrative
 from schemas.user import (
     AcceptInvitationRequest,
     InvitationStatusResponse,
@@ -68,6 +69,18 @@ def login_user(
     admin_info = UserService._get_user_administrative_info(db, user.id)
     # Build user response with administrative location
     user_response = UserResponse.model_validate(user)
+    # If no administrative info and user is admin, assign national level
+    if not admin_info.get('id') and user.user_type == UserType.ADMIN:
+        national_adm = (
+            db.query(Administrative)
+            .filter(Administrative.parent_id.is_(None))
+            .first()
+        )
+        if national_adm:
+            admin_info = {
+                'id': national_adm.id,
+                'full_path': national_adm.name
+            }
     user_response.administrative_location = admin_info
 
     return TokenResponse(

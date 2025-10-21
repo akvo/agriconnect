@@ -2286,6 +2286,11 @@
     prompts "^2.4.2"
     semver "^7.5.2"
 
+"@react-native-community/netinfo@^11.4.1":
+  version "11.4.1"
+  resolved "https://registry.yarnpkg.com/@react-native-community/netinfo/-/netinfo-11.4.1.tgz#a3c247aceab35f75dd0aa4bfa85d2be5a4508688"
+  integrity sha512-B0BYAkghz3Q2V09BF88RA601XursIEA111tnc2JOaN7axJWmNefmfjZqw/KdSxKZp7CZUuPpjBmz/WCR9uaHYg==
+
 "@react-native-firebase/app@^23.4.0":
   version "23.4.0"
   resolved "https://registry.npmjs.org/@react-native-firebase/app/-/app-23.4.0.tgz"
@@ -4430,6 +4435,11 @@ expo-asset@~12.0.9:
   dependencies:
     "@expo/image-utils" "^0.8.7"
     expo-constants "~18.0.9"
+
+expo-checkbox@^5.0.7:
+  version "5.0.7"
+  resolved "https://registry.yarnpkg.com/expo-checkbox/-/expo-checkbox-5.0.7.tgz#0079a7956b1cea599405d71877e400430ffa3d13"
+  integrity sha512-oACH1MwJ5816ovT5bKQcaPr/5AAK3l+nlC9FxxAhtANXNBav+BjRJT1IqYTfp33b7+FMKx9ZkLmqJHfubolJrQ==
 
 expo-constants@~18.0.8, expo-constants@~18.0.9:
   version "18.0.9"

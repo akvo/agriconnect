@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from database import get_db
 from models.device import Device
-from models.user import User
+from models.user import User, UserType
 from models.administrative import UserAdministrative
 from schemas.device import (
     DeviceRegisterRequest,
@@ -57,7 +57,7 @@ def register_device(
             .first()
         )
 
-        if not user_admin:
+        if not user_admin and current_user.user_type != UserType.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have access to this administrative area",
