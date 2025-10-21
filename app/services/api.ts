@@ -457,6 +457,20 @@ class ApiClient {
 
     return response.json();
   }
+
+  /**
+   * Fetch crop types
+   */
+  async getCropTypes(): Promise<any> {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/crop-types/`);
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch crop types" }));
+      throw new Error(error.detail || "Failed to fetch crop types");
+    }
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();

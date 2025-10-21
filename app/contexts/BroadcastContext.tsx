@@ -8,12 +8,17 @@ import React, {
 } from "react";
 
 // Customer type matching the one from broadcast/index.tsx
+export interface CropType {
+  id: number;
+  name: string;
+}
+
 export interface Customer {
   id: number;
   full_name: string | null;
   phone_number: string;
   language: string;
-  crop_type: string | null;
+  crop_type: CropType | null;
   age_group: string | null;
   administrative: {
     id: number | null;

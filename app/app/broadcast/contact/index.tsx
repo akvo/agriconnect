@@ -19,7 +19,7 @@ import Avatar from "@/components/avatar";
 import { api } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBroadcast } from "@/contexts/BroadcastContext";
-import { CROP_TYPES, AGE_GROUPS } from "@/constants/customer";
+import { AGE_GROUPS } from "@/constants/customer";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
 import { initialsFromName } from "@/utils/string";
@@ -29,18 +29,22 @@ const PAGE_SIZE = 10;
 const DEBOUNCE_DELAY = 300;
 
 // Types
+interface CropType {
+  id: number;
+  name: string;
+}
 interface Customer {
   id: number;
   full_name: string | null;
   phone_number: string;
   language: string;
-  crop_type: string | null;
   age_group: string | null;
   administrative: {
     id: number | null;
     name: string | null;
     path: string | null;
   };
+  crop_type: CropType | null;
 }
 
 interface CustomerListResponse {
@@ -76,10 +80,26 @@ const BroadcastFarmerListTab = () => {
   const [hasMore, setHasMore] = useState(true);
 
   // Filter state
-  const [selectedCropTypes, setSelectedCropTypes] = useState<string[]>([]);
+  const [cropTypes, setCropTypes] = useState<CropType[]>([]);
+  const [selectedCropTypes, setSelectedCropTypes] = useState<number[]>([]);
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const [selectedAdminIds, setSelectedAdminIds] = useState<number[]>([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
+
+  // Fetch crop types on mount
+  const fetchCropTypes = useCallback(async () => {
+    try {
+      const response = await api.getCropTypes();
+      // API returns array directly, not wrapped in object
+      setCropTypes(response);
+    } catch (err) {
+      console.error("Error fetching crop types:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCropTypes();
+  }, [fetchCropTypes]);
 
   // Debounce search input
   useEffect(() => {
@@ -159,6 +179,7 @@ const BroadcastFarmerListTab = () => {
   useEffect(() => {
     setPage(1);
     setCustomers([]);
+    setSelectedIds(new Set()); // Clear selections when filters change
     fetchCustomers(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, selectedCropTypes, selectedAgeGroups, selectedAdminIds]);
@@ -200,12 +221,22 @@ const BroadcastFarmerListTab = () => {
     customers.length > 0 && selectedIds.size === customers.length;
 
   // Filter handlers
-  const toggleCropType = useCallback((cropType: string) => {
-    /*
-    Set as single selection for crop types
-    */
-    setSelectedCropTypes((prev) => (prev.includes(cropType) ? [] : [cropType]));
-  }, []);
+  const toggleCropType = useCallback(
+    (cropTypeID: number) => {
+      setSelectedCropTypes((cropTypeIds) => {
+        const cropTypeObj = cropTypes.find((ct) => ct.id === cropTypeID);
+        if (!cropTypeObj) {
+          return cropTypeIds;
+        }
+
+        /**
+         * Set single crop type selection
+         */
+        return cropTypeIds.includes(cropTypeID) ? [] : [cropTypeID];
+      });
+    },
+    [cropTypes],
+  );
 
   const toggleAgeGroup = useCallback((ageGroup: string) => {
     setSelectedAgeGroups((prev) =>
@@ -291,8 +322,8 @@ const BroadcastFarmerListTab = () => {
               )}
 
               <Text style={[typography.body4, { color: themeColors.dark4 }]}>
-                {item?.crop_type
-                  ? capitalizeFirstLetter(item.crop_type)
+                {item?.crop_type?.name
+                  ? capitalizeFirstLetter(item.crop_type.name)
                   : item.phone_number}
               </Text>
             </View>
@@ -412,6 +443,12 @@ const BroadcastFarmerListTab = () => {
     );
   }, [loading, error, fetchCustomers]);
 
+  const ListSelectedCropTypes = useMemo(() => {
+    return cropTypes.filter((cropType) =>
+      selectedCropTypes.includes(cropType.id),
+    );
+  }, [selectedCropTypes, cropTypes]);
+
   return (
     <View style={styles.container}>
       {/* Search and Filter */}
@@ -453,19 +490,19 @@ const BroadcastFarmerListTab = () => {
           <View style={styles.filterPillsContainer}>
             <View style={styles.filterPillsRow}>
               {/* Crop Type Pills */}
-              {selectedCropTypes.map((cropType) => (
+              {ListSelectedCropTypes.map((cropType) => (
                 <TouchableOpacity
-                  key={`crop-${cropType}`}
+                  key={`crop-${cropType.id}`}
                   style={styles.filterPill}
-                  onPress={() => toggleCropType(cropType)}
-                  testID={`selected-filter-pill-crop-${cropType}`}
-                  accessibilityLabel={`Remove ${cropType} filter`}
+                  onPress={() => toggleCropType(cropType.id)}
+                  testID={`selected-filter-pill-crop-${cropType.id}`}
+                  accessibilityLabel={`Remove ${cropType.name} filter`}
                   accessibilityRole="button"
                 >
                   <Text
                     style={[typography.body4, { color: themeColors.dark4 }]}
                   >
-                    {capitalizeFirstLetter(cropType)}
+                    {capitalizeFirstLetter(cropType.name)}
                   </Text>
                   <Feather
                     name="x"
@@ -618,27 +655,27 @@ const BroadcastFarmerListTab = () => {
                   Crop Types
                 </Text>
                 <View style={styles.filterPillsRow}>
-                  {CROP_TYPES.map((cropType) => (
+                  {cropTypes.map((cropType) => (
                     <TouchableOpacity
-                      key={cropType}
+                      key={cropType.id}
                       style={[
                         styles.filterPill,
-                        selectedCropTypes.includes(cropType) &&
+                        selectedCropTypes.includes(cropType.id) &&
                           styles.filterPillActive,
                       ]}
-                      onPress={() => toggleCropType(cropType)}
+                      onPress={() => toggleCropType(cropType.id)}
                     >
                       <Text
                         style={[
                           typography.body2,
                           {
-                            color: selectedCropTypes.includes(cropType)
+                            color: selectedCropTypes.includes(cropType.id)
                               ? themeColors.white
                               : themeColors.textPrimary,
                           },
                         ]}
                       >
-                        {capitalizeFirstLetter(cropType)}
+                        {capitalizeFirstLetter(cropType.name)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -683,7 +720,7 @@ const BroadcastFarmerListTab = () => {
               </View>
 
               {/* Admin-only: Administrative Areas - Placeholder for future implementation */}
-              {isAdmin && (
+              {/*isAdmin && (
                 <View style={styles.filterSection}>
                   <Text
                     style={[
@@ -700,7 +737,7 @@ const BroadcastFarmerListTab = () => {
                     future update.
                   </Text>
                 </View>
-              )}
+              )*/}
             </ScrollView>
 
             <View style={styles.modalFooter}>

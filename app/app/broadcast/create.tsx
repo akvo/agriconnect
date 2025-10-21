@@ -161,8 +161,8 @@ const CreateGroupScreen = () => {
             {displayName}
           </Text>
           <Text style={[typography.body4, { color: themeColors.dark4 }]}>
-            {item?.crop_type
-              ? capitalizeFirstLetter(item.crop_type)
+            {item?.crop_type?.name
+              ? capitalizeFirstLetter(item.crop_type.name)
               : item.phone_number}
           </Text>
         </View>

@@ -151,63 +151,74 @@ const SavedGroups = () => {
   }, [loadingMore, loading, hasMore, page, fetchGroups]);
 
   // Render group card
-  const renderItem = useCallback(({ item }: { item: SavedGroup }) => {
-    return (
-      <TouchableOpacity
-        style={styles.groupCard}
-        activeOpacity={0.7}
-        onPress={() => {
-          router.push({
-            pathname: "/broadcast/group/[chatId]",
-            params: {
-              chatId: item.id,
-              name: item.name,
-            },
-          });
-        }}
-      >
-        <View style={styles.groupHeader}>
-          <Text
-            style={[
-              typography.label1,
-              typography.bold,
-              { color: themeColors.textPrimary },
-            ]}
-          >
-            {item.name}
-          </Text>
-          <View style={styles.memberBadge}>
-            <Feather name="users" size={14} color={themeColors["green-500"]} />
+  const renderItem = useCallback(
+    ({ item }: { item: SavedGroup }) => {
+      return (
+        <TouchableOpacity
+          style={styles.groupCard}
+          activeOpacity={0.7}
+          onPress={() => {
+            router.push({
+              pathname: "/broadcast/group/[chatId]",
+              params: {
+                chatId: item.id,
+                name: item.name,
+              },
+            });
+          }}
+        >
+          <View style={styles.groupHeader}>
             <Text
               style={[
-                typography.body4,
-                { color: themeColors["green-500"], marginLeft: 4 },
+                typography.label1,
+                typography.bold,
+                { color: themeColors.textPrimary },
               ]}
             >
-              {item.memberCount}
+              {item.name}
             </Text>
+            <View style={styles.memberBadge}>
+              <Feather
+                name="users"
+                size={14}
+                color={themeColors["green-500"]}
+              />
+              <Text
+                style={[
+                  typography.body4,
+                  { color: themeColors["green-500"], marginLeft: 4 },
+                ]}
+              >
+                {item.memberCount}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        <View style={styles.tagsContainer}>
-          {item.cropTypes.map((crop, idx) => (
-            <View key={`crop-${idx}`} style={styles.tag}>
-              <Text style={[typography.caption1, { color: themeColors.dark4 }]}>
-                {crop}
-              </Text>
-            </View>
-          ))}
-          {item.ageGroups.map((age, idx) => (
-            <View key={`age-${idx}`} style={styles.tag}>
-              <Text style={[typography.caption1, { color: themeColors.dark4 }]}>
-                {age}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </TouchableOpacity>
-    );
-  }, [router]);
+          <View style={styles.tagsContainer}>
+            {item.cropTypes.map((crop, idx) => (
+              <View key={`crop-${idx}`} style={styles.tag}>
+                <Text
+                  style={[typography.caption1, { color: themeColors.dark4 }]}
+                >
+                  {crop}
+                </Text>
+              </View>
+            ))}
+            {item.ageGroups.map((age, idx) => (
+              <View key={`age-${idx}`} style={styles.tag}>
+                <Text
+                  style={[typography.caption1, { color: themeColors.dark4 }]}
+                >
+                  {age}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [router],
+  );
 
   const keyExtractor = useCallback((item: SavedGroup) => item.id, []);
 

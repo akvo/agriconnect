@@ -18,7 +18,18 @@ const BroadcastLayout = () => {
             headerTitleAlign: "center",
           }}
         />
-        <Stack.Screen name="create" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="create"
+          options={{
+            headerShown: true,
+            title: "New group",
+            headerTitleStyle: {
+              fontWeight: "bold",
+              fontFamily: "Inter",
+            },
+            headerTitleAlign: "center",
+          }}
+        />
         <Stack.Screen
           name="group/[chatId]"
           options={({
