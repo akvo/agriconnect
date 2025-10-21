@@ -142,7 +142,7 @@ class CustomerService:
         size: int = 10,
         search: str = None,
         administrative_ids: List[int] = None,
-        crop_types: List[str] = None,
+        crop_types: List[int] = None,
         age_groups: List[str] = None,
     ) -> Tuple[List[dict], int]:
         """Get paginated list of customers with optional filters.
@@ -153,7 +153,7 @@ class CustomerService:
             search: Optional search term (searches name and phone)
             administrative_ids: Optional list of administrative IDs
                 to filter by. If None or empty, no filtering applied.
-            crop_types: Optional list of crop types to filter by
+            crop_types: Optional list of crop type IDs to filter by
             age_groups: Optional list of age groups to filter by
 
         Returns:
@@ -163,7 +163,8 @@ class CustomerService:
         query = self.db.query(Customer).options(
             joinedload(Customer.customer_administrative).joinedload(
                 CustomerAdministrative.administrative
-            )
+            ),
+            joinedload(Customer.crop_type)
         )
 
         # Filter by administrative areas (wards) if provided
@@ -184,16 +185,18 @@ class CustomerService:
                 )
             )
 
-        # Filter by crop types (convert strings to enum objects)
+        # Filter by crop types (convert names to IDs)
         if crop_types:
-            crop_type_enums = [
-                CropType(ct)
-                for ct in crop_types
-                if ct in [e.value for e in CropType]
-            ]
-            if crop_type_enums:
+            # Convert crop type names to IDs
+            crop_type_ids = (
+                self.db.query(CropType.id)
+                .filter(CropType.id.in_(crop_types))
+                .all()
+            )
+            crop_type_id_list = [ct_id[0] for ct_id in crop_type_ids]
+            if crop_type_id_list:
                 query = query.filter(
-                    Customer.crop_type.in_(crop_type_enums)
+                    Customer.crop_type_id.in_(crop_type_id_list)
                 )
 
         # Filter by age groups (convert strings to enum objects)
@@ -243,8 +246,12 @@ class CustomerService:
                 "full_name": customer.full_name,
                 "phone_number": customer.phone_number,
                 "language": customer.language,
-                "crop_type": customer.crop_type,
+                "crop_type": {
+                    "id": customer.crop_type.id,
+                    "name": customer.crop_type.name
+                } if customer.crop_type else None,
                 "age_group": customer.age_group,
+                "age": customer.age,
                 "administrative": admin_info,
             }
             customer_data.append(customer_dict)

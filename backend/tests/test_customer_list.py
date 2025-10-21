@@ -7,6 +7,7 @@ from models import (
     CustomerAdministrative,
 )
 from models.customer import AgeGroup, CropType, CustomerLanguage
+from seeder.crop_type import seed_crop_types
 
 
 class TestCustomersEndpoint:
@@ -87,15 +88,39 @@ class TestCustomersEndpoint:
 
     @pytest.fixture
     def setup_customers(self, db_session, setup_administrative_hierarchy):
+        # Seed crop types
+        seed_crop_types(db_session)
+
         """Create test customers with various attributes"""
         wards = setup_administrative_hierarchy
 
-        # Customer in Ward 1
+        # Get crop types by name for clarity
+        rice = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Rice")
+            .first()
+        )
+        coffee = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Coffee")
+            .first()
+        )
+        chilli = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Chilli")
+            .first()
+        )
+
+        assert rice is not None, "Rice crop type should exist"
+        assert coffee is not None, "Coffee crop type should exist"
+        assert chilli is not None, "Chilli crop type should exist"
+
+        # Customer in Ward 1 with Rice
         customer1 = Customer(
             phone_number="+254700000001",
             full_name="John Doe",
             language=CustomerLanguage.EN,
-            crop_type=CropType.RICE,
+            crop_type_id=rice.id,
             age_group=AgeGroup.AGE_20_35,
         )
         db_session.add(customer1)
@@ -106,13 +131,14 @@ class TestCustomersEndpoint:
         )
         db_session.add(customer_admin1)
 
-        # Customer in Ward 1 with different crop type
+        # Customer in Ward 1 with Coffee
         customer2 = Customer(
             phone_number="+254700000002",
             full_name="Jane Smith",
             language=CustomerLanguage.SW,
-            crop_type=CropType.COFFEE,
+            crop_type_id=coffee.id,
             age_group=AgeGroup.AGE_36_50,
+            age=37
         )
         db_session.add(customer2)
         db_session.commit()
@@ -122,12 +148,12 @@ class TestCustomersEndpoint:
         )
         db_session.add(customer_admin2)
 
-        # Customer in Ward 2
+        # Customer in Ward 2 with Chilli
         customer3 = Customer(
             phone_number="+254700000003",
             full_name="Peter Brown",
             language=CustomerLanguage.EN,
-            crop_type=CropType.CHILLI,
+            crop_type_id=chilli.id,
             age_group=AgeGroup.AGE_51_PLUS,
         )
         db_session.add(customer3)
@@ -312,30 +338,45 @@ class TestCustomersEndpoint:
         assert data["customers"][0]["full_name"] == "John Doe"
 
     def test_filter_by_crop_type(
-        self, client, auth_headers_factory, setup_customers
+        self, client, auth_headers_factory, setup_customers, db_session
     ):
         """Test filtering by single crop type"""
         headers, _ = auth_headers_factory(user_type="admin")
 
+        ct = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Rice")
+            .first()
+        )
         response = client.get(
-            f"/api/customers/list?crop_types={CropType.RICE.value}",
+            f"/api/customers/list?crop_types={ct.id}",
             headers=headers
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
-        assert data["customers"][0]["crop_type"] == "rice"
+        assert data["customers"][0]["crop_type"]["name"] == "Rice"
         assert data["customers"][0]["full_name"] == "John Doe"
 
     def test_filter_by_multiple_crop_types(
-        self, client, auth_headers_factory, setup_customers
+        self, client, auth_headers_factory, setup_customers, db_session
     ):
         """Test filtering by multiple crop types"""
         headers, _ = auth_headers_factory(user_type="admin")
 
+        ct1 = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Rice")
+            .first()
+        )
+        ct2 = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Coffee")
+            .first()
+        )
         response = client.get(
-            "/api/customers/list?crop_types=rice&crop_types=coffee",
+            f"/api/customers/list?crop_types={ct1.id}&crop_types={ct2.id}",
             headers=headers,
         )
 
@@ -343,9 +384,9 @@ class TestCustomersEndpoint:
         data = response.json()
         assert data["total"] == 2
 
-        crop_types = [c["crop_type"] for c in data["customers"]]
-        assert "rice" in crop_types
-        assert "coffee" in crop_types
+        crop_types = [c["crop_type"]["name"] for c in data["customers"]]
+        assert "Rice" in crop_types
+        assert "Coffee" in crop_types
 
     def test_filter_by_age_group(
         self, client, auth_headers_factory, setup_customers
@@ -362,6 +403,7 @@ class TestCustomersEndpoint:
         assert data["total"] == 1
         assert data["customers"][0]["age_group"] == "36-50"
         assert data["customers"][0]["full_name"] == "Jane Smith"
+        assert data["customers"][0]["age"] is not None
 
     def test_filter_by_multiple_age_groups(
         self, client, auth_headers_factory, setup_customers
@@ -383,13 +425,18 @@ class TestCustomersEndpoint:
         assert "51+" in age_groups
 
     def test_combined_filters(
-        self, client, auth_headers_factory, setup_customers
+        self, client, auth_headers_factory, setup_customers, db_session
     ):
         """Test combining search with crop type filter"""
         headers, _ = auth_headers_factory(user_type="admin")
 
+        ct = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Rice")
+            .first()
+        )
         response = client.get(
-            "/api/customers/list?search=John&crop_types=rice",
+            f"/api/customers/list?search=John&crop_types={ct.id}",
             headers=headers,
         )
 
@@ -397,7 +444,7 @@ class TestCustomersEndpoint:
         data = response.json()
         assert data["total"] == 1
         assert data["customers"][0]["full_name"] == "John Doe"
-        assert data["customers"][0]["crop_type"] == "rice"
+        assert data["customers"][0]["crop_type"]["name"] == "Rice"
 
     def test_eo_filters_with_ward_restriction(
         self,
@@ -405,36 +452,47 @@ class TestCustomersEndpoint:
         auth_headers_factory,
         setup_customers,
         setup_administrative_hierarchy,
+        db_session
     ):
         """Test that EO filters only apply to their assigned wards"""
         wards = setup_administrative_hierarchy
 
-        # EO assigned to Ward 1 (has rice and coffee)
+        # EO assigned to Ward 1 (has Rice and Coffee)
         headers, _ = auth_headers_factory(
             user_type="eo",
             email="eo4@example.com",
             administrative_ids=[wards["ward1"].id],
         )
 
-        # Filter by chilli (which only exists in Ward 2)
+        # Filter by Chilli (which only exists in Ward 2)
+        ct = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Chilli")
+            .first()
+        )
         response = client.get(
-            "/api/customers/list?crop_types=chilli", headers=headers
+            f"/api/customers/list?crop_types={ct.id}", headers=headers
         )
 
         assert response.status_code == 200
         data = response.json()
-        # Should return 0 because chilli is in Ward 2, not Ward 1
+        # Should return 0 because Chilli is in Ward 2, not Ward 1
         assert data["total"] == 0
 
-        # Filter by rice (exists in Ward 1)
+        # Filter by Rice (exists in Ward 1)
+        ct = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Rice")
+            .first()
+        )
         response = client.get(
-            "/api/customers/list?crop_types=rice", headers=headers
+            f"/api/customers/list?crop_types={ct.id}", headers=headers
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
-        assert data["customers"][0]["crop_type"] == "rice"
+        assert data["customers"][0]["crop_type"]["name"] == "Rice"
 
     def test_customer_response_structure(
         self, client, auth_headers_factory, setup_customers
@@ -580,15 +638,21 @@ class TestCustomersEndpoint:
         auth_headers_factory,
         setup_customers,
         setup_administrative_hierarchy,
+        db_session
     ):
         """Test admin can combine multiple ward filter with crop type"""
         wards = setup_administrative_hierarchy
         headers, _ = auth_headers_factory(user_type="admin")
 
-        # Filter by Ward 1 and Ward 2, crop type = chilli (only in Ward 2)
+        # Filter by Ward 1 and Ward 2, crop type = Chilli (only in Ward 2)
+        ct = (
+            db_session.query(CropType)
+            .filter(CropType.name == "Chilli")
+            .first()
+        )
         response = client.get(
             f"/api/customers/list?administrative_ids={wards['ward1'].id}"
-            f"&administrative_ids={wards['ward2'].id}&crop_types=chilli",
+            f"&administrative_ids={wards['ward2'].id}&crop_types={ct.id}",
             headers=headers,
         )
 
@@ -596,7 +660,7 @@ class TestCustomersEndpoint:
         data = response.json()
         assert data["total"] == 1
         assert data["customers"][0]["full_name"] == "Peter Brown"
-        assert data["customers"][0]["crop_type"] == "chilli"
+        assert data["customers"][0]["crop_type"]["name"] == "Chilli"
         assert (
             data["customers"][0]["administrative"]["id"] == wards["ward2"].id
         )
