@@ -10,6 +10,8 @@ from models.administrative import (
     CustomerAdministrative,
 )
 from models.customer import AgeGroup, CropType, Customer, CustomerLanguage
+from models.ticket import Ticket
+from datetime import datetime, timezone
 
 
 class CustomerService:
@@ -298,3 +300,36 @@ class CustomerService:
                 path_names.append(area.name)
 
         return " - ".join(path_names) if path_names else None
+
+    def create_ticket_for_customer(
+        self, customer: Customer, message_id: int
+    ) -> Ticket:
+        """Create a new ticket for the customer."""
+        national_adm = (
+            self.db.query(Administrative.id)
+            .filter(Administrative.parent_id.is_(None))
+            .first()
+        )
+        admin_id = None
+        if national_adm:
+            admin_id = national_adm.id
+        if (
+            hasattr(customer, "customer_administrative")
+            and len(customer.customer_administrative) > 0
+        ):
+            admin_id = customer.customer_administrative[0].administrative_id
+        # Skip if admin_id is still None
+        if admin_id is None:
+            return None
+        now = datetime.now(timezone.utc)
+        ticket_number = now.strftime("%Y%m%d%H%M%S")
+        ticket = Ticket(
+            ticket_number=ticket_number,
+            administrative_id=admin_id,
+            customer_id=customer.id,
+            message_id=message_id,
+        )
+        self.db.add(ticket)
+        self.db.commit()
+        self.db.refresh(ticket)
+        return ticket

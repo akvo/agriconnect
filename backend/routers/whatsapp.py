@@ -9,7 +9,7 @@ from models.message import Message, MessageFrom
 from models.ticket import Ticket
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
-from routers.ws import emit_message_created
+from routers.ws import emit_message_created, emit_ticket_created
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
@@ -99,6 +99,26 @@ async def whatsapp_webhook(
                     sender_user_id=None
                 )
             )
+
+        # TODO: Will need to implement more
+        # advanced ticket assignment logic later
+        else:
+            ticket = customer_service.create_ticket_for_customer(
+                customer=customer, message_id=message.id
+            )
+            if ticket:
+                asyncio.create_task(
+                    emit_ticket_created(
+                        ticket_id=ticket.id,
+                        customer_id=customer.id,
+                        administrative_id=ticket.administrative_id,
+                        created_at=ticket.created_at.isoformat(),
+                        ticket_number=ticket.ticket_number,
+                        customer_name=customer.full_name,
+                        message_id=message.id,
+                        message_preview=message.body,
+                    )
+                )
 
         if is_new_customer:
             try:
