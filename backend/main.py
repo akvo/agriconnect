@@ -15,6 +15,7 @@ from routers import (
     tickets,
     ws,
     storage,
+    crop_types,
 )
 from fastapi.staticfiles import StaticFiles
 
@@ -48,6 +49,7 @@ app.include_router(service_tokens.router, prefix="/api")
 app.include_router(whatsapp.router, prefix="/api")
 app.include_router(tickets.router, prefix="/api")
 app.include_router(storage.router)
+app.include_router(crop_types.router, prefix="/api")
 
 # Ensure storage directory exists before mounting
 os.makedirs("storage", exist_ok=True)
