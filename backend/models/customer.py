@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, Integer, String
+from sqlalchemy import Column, DateTime, Enum, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -10,12 +10,6 @@ from database import Base
 class CustomerLanguage(enum.Enum):
     EN = "en"
     SW = "sw"
-
-
-class CropType(enum.Enum):
-    RICE = "rice"
-    COFFEE = "coffee"
-    CHILLI = "chilli"
 
 
 class AgeGroup(enum.Enum):
@@ -31,8 +25,9 @@ class Customer(Base):
     phone_number = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=True)
     language = Column(Enum(CustomerLanguage), default=CustomerLanguage.EN)
-    crop_type = Column(Enum(CropType), nullable=True)
+    crop_type_id = Column(Integer, ForeignKey("crop_types.id"), nullable=True)
     age_group = Column(Enum(AgeGroup), nullable=True)
+    age = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -43,3 +38,18 @@ class Customer(Base):
         "CustomerAdministrative", back_populates="customer"
     )
     tickets = relationship("Ticket", back_populates="customer")
+    crop_type = relationship(
+        "CropType", back_populates="customers"
+    )
+
+
+class CropType(Base):
+    __tablename__ = "crop_types"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    customers = relationship(
+        "Customer", back_populates="crop_type"
+    )
