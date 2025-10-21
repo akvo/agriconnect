@@ -11,11 +11,18 @@ from models.administrative import Administrative, CustomerAdministrative
 from models.customer import (
     AgeGroup, Base, CropType, Customer, CustomerLanguage
 )
+from seeder.crop_type import seed_crop_types
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # Tanzanian and Kenyan names
+"""
+This is a small sample of common Tanzanian and Kenyan names
+for generating fake customer data.
+This seeder aim to create realistic names for testing purposes.
+Especially when the mobile app have limited data.
+"""
 TANZANIAN_NAMES = [
     ("Amani", "Mwangi"),
     ("Neema", "Kibwana"),
@@ -65,22 +72,19 @@ def generate_customer_data(index: int, country: str = "tanzania"):
         else CustomerLanguage.SW
     )
 
-    # Random crop type (80% with crop, 20% null)
-    crop_type = None
-    if random.random() < 0.8:
-        crop_type = random.choice(list(CropType))
-
-    # Random age group (70% with age group, 30% null)
-    age_group = None
-    if random.random() < 0.7:
-        age_group = random.choice(list(AgeGroup))
+    age_group = random.choice(list(AgeGroup))
+    [age_start, age_end] = age_group.value.split("-") \
+        if "-" in age_group.value else [age_group.value, 70]
+    age_start = age_start.strip().replace("+", "")
+    age = random.randint(int(age_start), int(age_end)) \
+        if age_group else None
 
     return {
         "phone_number": phone_number,
         "full_name": full_name,
         "language": language,
-        "crop_type": crop_type,
         "age_group": age_group,
+        "age": age,
     }
 
 
@@ -108,6 +112,11 @@ def create_fake_customers(
     for i in range(count):
         # Generate customer data
         customer_data = generate_customer_data(i, country)
+        # Add crop type randomly
+        crop_types = db.query(CropType).all()
+        if crop_types:
+            crop_type = random.choice(crop_types)
+            customer_data["crop_type_id"] = crop_type.id
 
         # Check if phone number already exists
         existing = (
@@ -167,6 +176,8 @@ def main():
 
     # Create database session
     db = SessionLocal()
+    # Seed crop types if not already seeded
+    seed_crop_types(db)
 
     try:
         created_count = create_fake_customers(db, count, country)
