@@ -1,7 +1,7 @@
 {
 	"name": "agriconnect",
 	"main": "./App.js",
-	"version": "1.0.0",
+	"version": "1.0.4",
 	"scripts": {
 		"start": "expo start --port 19000",
 		"start-dev": "expo start --dev-client --port 8081",
