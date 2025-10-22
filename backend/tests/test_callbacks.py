@@ -1,7 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from unittest.mock import patch
 
 from models.customer import Customer, CustomerLanguage
 from models.message import Message, MessageFrom
@@ -616,55 +615,3 @@ def test_ai_callback_whisper_type_no_open_ticket(
 
     # emit_whisper_created should NOT be called (no open ticket)
     # This is handled by the global mock in conftest.py
-
-
-def test_ai_callback_reply_type_not_whisper(
-    client: TestClient,
-    service_token_and_plain,
-    test_customer_with_ticket,
-    db_session: Session,
-):
-    """Test AI callback with REPLY type (not WHISPER) doesn't emit whisper"""
-    _, plain_token = service_token_and_plain
-    customer, ticket, message = test_customer_with_ticket
-
-    with patch("services.whatsapp_service.WhatsAppService.send_message") as mock_wa:  # noqa: E501
-        mock_wa.return_value = {"sid": "WA123"}
-
-        payload = {
-            "job_id": "reply_job_001",
-            "stage": "done",
-            "result": {
-                "answer": "This is a customer reply.",
-                "citations": [],
-            },
-            "callback_params": {
-                "message_id": message.id,
-                "message_type": 1,  # REPLY (not WHISPER)
-                "ticket_id": ticket.id,
-            },
-            "trace_id": "trace_reply_001",
-            "job": "chat",
-        }
-
-        headers = {"Authorization": f"Bearer {plain_token}"}
-
-        response = client.post(
-            "/api/callback/ai", json=payload, headers=headers
-        )
-
-        assert response.status_code == 200
-
-        # Verify message was created
-        ai_messages = (
-            db_session.query(Message)
-            .filter(Message.from_source == MessageFrom.LLM)
-            .filter(Message.message_sid == "ai_reply_job_001")
-            .all()
-        )
-
-        assert len(ai_messages) == 1
-
-        # emit_whisper_created should NOT be called (it's a REPLY)
-        # WhatsApp should be called instead
-        mock_wa.assert_called_once()

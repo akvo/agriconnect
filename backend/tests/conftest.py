@@ -165,10 +165,24 @@ def auth_headers_factory(db_session):
 
 @pytest.fixture(autouse=True)
 def mock_websocket_emitters(monkeypatch):
-    """Mock WebSocket emitters for all tests to avoid async issues."""
+    """Mock WebSocket emitters and push notifications for all tests."""
 
     async def mock_emit(*args, **kwargs):
         pass
+
+    # Mock a push notification service that does nothing
+    class MockPushNotificationService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def notify_new_ticket(self, *args, **kwargs):
+            pass
+
+        def notify_ticket_resolved(self, *args, **kwargs):
+            pass
+
+        def notify_message_status(self, *args, **kwargs):
+            pass
 
     monkeypatch.setattr("routers.messages.emit_message_created", mock_emit)
     monkeypatch.setattr(
@@ -177,3 +191,7 @@ def mock_websocket_emitters(monkeypatch):
     monkeypatch.setattr("routers.messages.emit_ticket_resolved", mock_emit)
     monkeypatch.setattr("routers.tickets.emit_ticket_created", mock_emit)
     monkeypatch.setattr("routers.callbacks.emit_whisper_created", mock_emit)
+    monkeypatch.setattr(
+        "routers.ws.PushNotificationService",
+        MockPushNotificationService
+    )
