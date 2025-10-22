@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 
 from models.customer import Customer, CustomerLanguage
 from models.message import Message, MessageFrom
@@ -460,64 +460,55 @@ def test_ai_callback_whisper_type_with_ticket_id(
     _, plain_token = service_token_and_plain
     customer, ticket, message = test_customer_with_ticket
 
-    with patch("routers.callbacks.emit_whisper_created") as mock_emit:
-        mock_emit.return_value = AsyncMock()
+    payload = {
+        "job_id": "whisper_job_001",
+        "stage": "done",
+        "result": {
+            "answer": "Plant rice in well-drained soil with sunlight.",
+            "citations": [
+                {
+                    "title": "Rice Growing Guide",
+                    "url": "https://example.com/rice"
+                }
+            ],
+        },
+        "callback_params": {
+            "message_id": message.id,
+            "message_type": 2,  # WHISPER
+            "ticket_id": ticket.id,
+        },
+        "trace_id": "trace_whisper_001",
+        "job": "chat",
+    }
 
-        payload = {
-            "job_id": "whisper_job_001",
-            "stage": "done",
-            "result": {
-                "answer": "Plant rice in well-drained soil with sunlight.",
-                "citations": [
-                    {
-                        "title": "Rice Growing Guide",
-                        "url": "https://example.com/rice"
-                    }
-                ],
-            },
-            "callback_params": {
-                "message_id": message.id,
-                "message_type": 2,  # WHISPER
-                "ticket_id": ticket.id,
-            },
-            "trace_id": "trace_whisper_001",
-            "job": "chat",
-        }
+    headers = {"Authorization": f"Bearer {plain_token}"}
 
-        headers = {"Authorization": f"Bearer {plain_token}"}
+    response = client.post(
+        "/api/callback/ai", json=payload, headers=headers
+    )
 
-        response = client.post(
-            "/api/callback/ai", json=payload, headers=headers
-        )
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "received",
+        "job_id": "whisper_job_001"
+    }
 
-        assert response.status_code == 200
-        assert response.json() == {
-            "status": "received",
-            "job_id": "whisper_job_001"
-        }
+    # Verify whisper message was created
+    whisper_messages = (
+        db_session.query(Message)
+        .filter(Message.from_source == MessageFrom.LLM)
+        .filter(Message.customer_id == customer.id)
+        .all()
+    )
 
-        # Verify whisper message was created
-        whisper_messages = (
-            db_session.query(Message)
-            .filter(Message.from_source == MessageFrom.LLM)
-            .filter(Message.customer_id == customer.id)
-            .all()
-        )
-
-        assert len(whisper_messages) == 1
-        whisper_msg = whisper_messages[0]
-        assert whisper_msg.body == "Plant rice in well-drained soil with sunlight."  # noqa: E501
-        assert whisper_msg.message_sid == "ai_whisper_job_001"
-        assert whisper_msg.from_source == MessageFrom.LLM
-
-        # Verify emit_whisper_created was called
-        # Wait a bit for async task to complete
-        import time
-        time.sleep(0.1)
-
-        # Note: In actual tests, asyncio.create_task makes this hard to assert
-        # The mock would need to be set up differently
-        # For now, we verify the message was stored correctly
+    assert len(whisper_messages) == 1
+    whisper_msg = whisper_messages[0]
+    assert whisper_msg.body == "Plant rice in well-drained soil with sunlight."  # noqa: E501
+    assert whisper_msg.message_sid == "ai_whisper_job_001"
+    assert whisper_msg.from_source == MessageFrom.LLM
+    # Import MessageType to check the value
+    from schemas.callback import MessageType
+    assert whisper_msg.message_type == MessageType.WHISPER
 
 
 def test_ai_callback_whisper_type_without_ticket_id(
@@ -530,50 +521,47 @@ def test_ai_callback_whisper_type_without_ticket_id(
     _, plain_token = service_token_and_plain
     customer, ticket, message = test_customer_with_ticket
 
-    with patch("routers.callbacks.emit_whisper_created") as mock_emit:
-        mock_emit.return_value = AsyncMock()
+    payload = {
+        "job_id": "whisper_job_002",
+        "stage": "done",
+        "result": {
+            "answer": "Use nitrogen-rich fertilizers for rice.",
+            "citations": [
+                {
+                    "title": "Rice Fertilizer Guide",
+                    "url": "https://example.com/rice-fert"
+                }
+            ],
+        },
+        "callback_params": {
+            "message_id": message.id,
+            "message_type": 2,  # WHISPER
+            # No ticket_id provided - should find from customer
+        },
+        "trace_id": "trace_whisper_002",
+        "job": "chat",
+    }
 
-        payload = {
-            "job_id": "whisper_job_002",
-            "stage": "done",
-            "result": {
-                "answer": "Use nitrogen-rich fertilizers for rice.",
-                "citations": [
-                    {
-                        "title": "Rice Fertilizer Guide",
-                        "url": "https://example.com/rice-fert"
-                    }
-                ],
-            },
-            "callback_params": {
-                "message_id": message.id,
-                "message_type": 2,  # WHISPER
-                # No ticket_id provided - should find from customer
-            },
-            "trace_id": "trace_whisper_002",
-            "job": "chat",
-        }
+    headers = {"Authorization": f"Bearer {plain_token}"}
 
-        headers = {"Authorization": f"Bearer {plain_token}"}
+    response = client.post(
+        "/api/callback/ai", json=payload, headers=headers
+    )
 
-        response = client.post(
-            "/api/callback/ai", json=payload, headers=headers
-        )
+    assert response.status_code == 200
 
-        assert response.status_code == 200
+    # Verify whisper message was created
+    whisper_messages = (
+        db_session.query(Message)
+        .filter(Message.from_source == MessageFrom.LLM)
+        .filter(Message.message_sid == "ai_whisper_job_002")
+        .all()
+    )
 
-        # Verify whisper message was created
-        whisper_messages = (
-            db_session.query(Message)
-            .filter(Message.from_source == MessageFrom.LLM)
-            .filter(Message.message_sid == "ai_whisper_job_002")
-            .all()
-        )
-
-        assert len(whisper_messages) == 1
-        whisper_msg = whisper_messages[0]
-        assert whisper_msg.body == "Use nitrogen-rich fertilizers for rice."
-        assert whisper_msg.customer_id == customer.id
+    assert len(whisper_messages) == 1
+    whisper_msg = whisper_messages[0]
+    assert whisper_msg.body == "Use nitrogen-rich fertilizers for rice."
+    assert whisper_msg.customer_id == customer.id
 
 
 def test_ai_callback_whisper_type_no_open_ticket(
@@ -592,46 +580,42 @@ def test_ai_callback_whisper_type_no_open_ticket(
     ticket.resolved_at = datetime.now(timezone.utc)
     db_session.commit()
 
-    with patch("routers.callbacks.emit_whisper_created") as mock_emit:
-        mock_emit.return_value = AsyncMock()
+    payload = {
+        "job_id": "whisper_job_003",
+        "stage": "done",
+        "result": {
+            "answer": "This suggestion won't be sent anywhere.",
+            "citations": [],
+        },
+        "callback_params": {
+            "message_id": message.id,
+            "message_type": 2,  # WHISPER
+            # No ticket_id - should try to find open ticket but fail
+        },
+        "trace_id": "trace_whisper_003",
+        "job": "chat",
+    }
 
-        payload = {
-            "job_id": "whisper_job_003",
-            "stage": "done",
-            "result": {
-                "answer": "This suggestion won't be sent anywhere.",
-                "citations": [],
-            },
-            "callback_params": {
-                "message_id": message.id,
-                "message_type": 2,  # WHISPER
-                # No ticket_id - should try to find open ticket but fail
-            },
-            "trace_id": "trace_whisper_003",
-            "job": "chat",
-        }
+    headers = {"Authorization": f"Bearer {plain_token}"}
 
-        headers = {"Authorization": f"Bearer {plain_token}"}
+    response = client.post(
+        "/api/callback/ai", json=payload, headers=headers
+    )
 
-        response = client.post(
-            "/api/callback/ai", json=payload, headers=headers
-        )
+    assert response.status_code == 200
 
-        assert response.status_code == 200
+    # Verify whisper message was created
+    whisper_messages = (
+        db_session.query(Message)
+        .filter(Message.from_source == MessageFrom.LLM)
+        .filter(Message.message_sid == "ai_whisper_job_003")
+        .all()
+    )
 
-        # Verify whisper message was created
-        whisper_messages = (
-            db_session.query(Message)
-            .filter(Message.from_source == MessageFrom.LLM)
-            .filter(Message.message_sid == "ai_whisper_job_003")
-            .all()
-        )
+    assert len(whisper_messages) == 1
 
-        assert len(whisper_messages) == 1
-
-        # emit_whisper_created should NOT be called (no open ticket)
-        # This is harder to verify due to asyncio.create_task
-        # but the code will log "ticket_id: None" and not call emit
+    # emit_whisper_created should NOT be called (no open ticket)
+    # This is handled by the global mock in conftest.py
 
 
 def test_ai_callback_reply_type_not_whisper(
@@ -644,9 +628,7 @@ def test_ai_callback_reply_type_not_whisper(
     _, plain_token = service_token_and_plain
     customer, ticket, message = test_customer_with_ticket
 
-    with patch("routers.callbacks.emit_whisper_created") as mock_emit, \
-         patch("services.whatsapp_service.WhatsAppService.send_message") as mock_wa:  # noqa: E501
-        mock_emit.return_value = AsyncMock()
+    with patch("services.whatsapp_service.WhatsAppService.send_message") as mock_wa:  # noqa: E501
         mock_wa.return_value = {"sid": "WA123"}
 
         payload = {
