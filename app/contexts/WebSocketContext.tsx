@@ -54,6 +54,12 @@ export interface TicketCreatedEvent {
   created_at: string;
 }
 
+export interface WhisperCreatedEvent {
+  message_id: number;
+  ticket_id: number;
+  suggestion: string;
+}
+
 interface WebSocketContextType {
   isConnected: boolean;
   socket: Socket | null;
@@ -69,6 +75,9 @@ interface WebSocketContextType {
     callback: (data: TicketResolvedEvent) => void,
   ) => () => void;
   onTicketCreated: (callback: (data: TicketCreatedEvent) => void) => () => void;
+  onWhisperCreated: (
+    callback: (data: WhisperCreatedEvent) => void,
+  ) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -99,11 +108,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     message_status_updated: Set<(data: MessageStatusUpdatedEvent) => void>;
     ticket_resolved: Set<(data: TicketResolvedEvent) => void>;
     ticket_created: Set<(data: TicketCreatedEvent) => void>;
+    whisper_created: Set<(data: WhisperCreatedEvent) => void>;
   }>({
     message_created: new Set(),
     message_status_updated: new Set(),
     ticket_resolved: new Set(),
     ticket_created: new Set(),
+    whisper_created: new Set(),
   });
 
   // Connect to WebSocket
@@ -199,6 +210,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     socket.on("ticket_created", (data: TicketCreatedEvent) => {
       console.log("[WebSocket] ticket_created:", data);
       eventHandlersRef.current.ticket_created.forEach((handler) =>
+        handler(data),
+      );
+    });
+
+    socket.on("whisper_created", (data: WhisperCreatedEvent) => {
+      console.log("[WebSocket] whisper_created:", data);
+      eventHandlersRef.current.whisper_created.forEach((handler) =>
         handler(data),
       );
     });
@@ -322,6 +340,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     [],
   );
 
+  // Register event handler for whisper_created
+  const onWhisperCreated = useCallback(
+    (callback: (data: WhisperCreatedEvent) => void) => {
+      eventHandlersRef.current.whisper_created.add(callback);
+      return () => {
+        eventHandlersRef.current.whisper_created.delete(callback);
+      };
+    },
+    [],
+  );
+
   // Connect when user logs in
   useEffect(() => {
     if (user?.accessToken) {
@@ -390,6 +419,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     onMessageStatusUpdated,
     onTicketResolved,
     onTicketCreated,
+    onWhisperCreated,
   };
 
   return (

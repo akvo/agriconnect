@@ -19,6 +19,7 @@ import {
   MessageCreatedEvent,
   MessageStatusUpdatedEvent,
   TicketResolvedEvent,
+  WhisperCreatedEvent,
 } from "@/contexts/WebSocketContext";
 import { useDatabase } from "@/database/context";
 import { DAOManager } from "@/database/dao";
@@ -29,6 +30,7 @@ import themeColors from "@/styles/colors";
 import { Message } from "@/utils/chat";
 import { formatDateLabel } from "@/utils/time";
 import TicketRespondedStatus from "@/components/inbox/ticket-responded-status";
+import AISuggestionChip from "@/components/chat/ai-suggestion-chip";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import MessageSyncService from "@/services/messageSync";
@@ -44,33 +46,24 @@ const convertToUIMessage = (
   // from_source: 1=CUSTOMER, 2=USER, 3=LLM
   // Customer messages show as "customer", USER and LLM messages show as "user"
   const isCustomerMessage = msg.from_source === MessageFrom.CUSTOMER;
+  const isLLMMessage = msg.from_source === MessageFrom.LLM;
 
   // Determine the sender name for user messages
   // If msg has user_name (from database), use it
   // If user_id matches current user, show "You"
   // Otherwise show "Unknown User"
-  let userName = "You";
-  if (!isCustomerMessage) {
-    if (msg.user_name) {
-      // Use the name from database (could be from any user)
-      userName = msg.user_id === currentUserId ? "You" : msg.user_name;
-    } else {
-      // Fallback for messages without user info
-      userName = "You";
-    }
-  }
+  const userName = isCustomerMessage
+    ? msg.customer_name
+    : isLLMMessage
+      ? "AI reply"
+      : msg.user_id === currentUserId
+        ? "You"
+        : msg?.user_name || "You";
 
-  console.log(
-    `[Chat] Converting message id=${msg.id} text={${msg.body}} from_source=${
-      msg.from_source
-    } user_id=${msg.user_id} user_name=${msg.user_name} to UI message as ${
-      isCustomerMessage ? "customer" : "user"
-    } name="${isCustomerMessage ? msg.customer_name : userName}"`,
-  );
   return {
     id: msg.id,
     message_sid: msg.message_sid,
-    name: isCustomerMessage ? msg.customer_name : userName,
+    name: userName,
     text: msg.body,
     sender: isCustomerMessage ? "customer" : "user",
     timestamp: msg.createdAt,
@@ -94,6 +87,8 @@ const ChatScreen = () => {
   const [oldestTimestamp, setOldestTimestamp] = useState<string | null>(null);
   const [text, setText] = useState<string>("");
   const [stickyMessage, setStickyMessage] = useState<Message | null>(null);
+  const [aiSuggestion, setAISuggestion] = useState<string | null>(null);
+  const [postload, setPostload] = useState<boolean>(true);
   const flatListRef = useRef<any | null>(null);
   const db = useDatabase();
   const daoManager = React.useMemo(() => new DAOManager(db), [db]);
@@ -105,6 +100,7 @@ const ChatScreen = () => {
     onMessageCreated,
     onMessageStatusUpdated,
     onTicketResolved,
+    onWhisperCreated,
   } = useWebSocket();
   const [ticket, setTicket] = useState<{
     id: number | null;
@@ -114,6 +110,12 @@ const ChatScreen = () => {
     resolvedAt?: string | null;
     createdAt?: string | null;
   }>({ id: null });
+
+  // handle accept AI suggestion
+  const handleAcceptSuggestion = (suggestion: string) => {
+    setText(suggestion);
+    setAISuggestion(null);
+  };
 
   // Group messages by date for section headers
   const groupMessagesByDate = useCallback((msgs: Message[]): DateSection[] => {
@@ -309,6 +311,36 @@ const ChatScreen = () => {
   useEffect(() => {
     loadTicketAndMessages();
   }, [loadTicketAndMessages]);
+
+  const loadDataOnPostload = useCallback(async () => {
+    /**
+     * Ensure customer ID is available before loading AI suggestion
+     */
+    if (!ticket?.customer?.id || loading) {
+      return;
+    }
+
+    if (postload) {
+      setPostload(false);
+      return;
+    }
+    /**
+     * Load last AI suggestion from database for this customer
+     */
+    const aiSuggestion =
+      await daoManager.message.getLastAISuggestionByCustomerId(
+        db,
+        ticket.customer.id,
+      );
+
+    if (aiSuggestion?.body) {
+      setAISuggestion(aiSuggestion.body);
+    }
+  }, [db, daoManager, postload, loading, ticket?.customer?.id]);
+
+  useEffect(() => {
+    loadDataOnPostload();
+  }, [loadDataOnPostload]);
 
   // Load older messages when scrolling to top (pagination)
   // Fetches from API using before_ts and stores in SQLite
@@ -560,6 +592,25 @@ const ChatScreen = () => {
     return unsubscribe;
   }, [onTicketResolved, ticket?.id, db, daoManager]);
 
+  // Handle real-time AI suggestion from whisper_created event
+  useEffect(() => {
+    const unsubscribe = onWhisperCreated((event: WhisperCreatedEvent) => {
+      // Only process if this is for the current ticket
+      if (!ticket?.id || event.ticket_id !== ticket?.id) {
+        return;
+      }
+      console.log("[Chat] AI suggestion created:", event);
+      // Update local state with new AI suggestion
+      setAISuggestion(event.suggestion);
+      // Refresh messages to include the new whisper message
+      loadTicketAndMessages(true).catch((error) => {
+        console.error("[Chat] Error reloading messages after whisper:", error);
+      });
+    });
+
+    return unsubscribe;
+  }, [onWhisperCreated, loadTicketAndMessages, ticket?.id]);
+
   const renderItem = ({ item }: { item: any }) => {
     if (item.type === "header") {
       return <DateSeparator date={item.data} />;
@@ -655,6 +706,15 @@ const ChatScreen = () => {
           />
         </View>
 
+        {/* AI Suggestion Chip */}
+        {aiSuggestion && (
+          <AISuggestionChip
+            suggestion={aiSuggestion}
+            onAccept={handleAcceptSuggestion}
+          />
+        )}
+
+        {/* Message Input Row */}
         <View style={styles.inputRow}>
           <TextInput
             value={text}
