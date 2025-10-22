@@ -57,6 +57,11 @@ class AICallbackParams(BaseModel):
         description="REPLY (1) sends to customer, WHISPER (2) EO suggestion",
         example=1,
     )
+    ticket_id: Optional[int] = Field(
+        None,
+        description="ID of the ticket associated with the message",
+        example=456,
+    )
 
 
 class KBCallbackParams(BaseModel):

@@ -1,12 +1,15 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models.service_token import ServiceToken
+from models.ticket import Ticket
 from schemas.callback import AIWebhookCallback, KBWebhookCallback, MessageType
 from services.message_service import MessageService
 from services.whatsapp_service import WhatsAppService
 from utils.auth_dependencies import verify_service_token
+from routers.ws import emit_whisper_created
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
 
@@ -94,6 +97,30 @@ async def ai_callback(
                             # 1. Send notification to EO via WebSocket/SSE
                             # 2. Add to EO dashboard for suggestions
                             # 3. Send email/SMS notification to EO
+                            ticket_id = payload.callback_params.ticket_id
+                            if not ticket_id:
+                                # Find open ticket for customer
+                                ticket = (
+                                    db.query(Ticket)
+                                    .filter(
+                                        Ticket.customer_id == ai_message.customer_id,
+                                        Ticket.resolved_at.is_(None)
+                                    )
+                                    .order_by(Ticket.created_at.desc())
+                                    .first()
+                                )
+                                if ticket:
+                                    ticket_id = ticket.id
+                            print("Emitting whisper_created for ticket_id:", ticket_id)
+                            if ticket_id:
+                                # Emit WebSocket event for EO suggestion
+                                asyncio.create_task(
+                                    emit_whisper_created(
+                                        ticket_id=ticket_id,
+                                        message_id=ai_message.id,
+                                        suggestion=ai_message.body,
+                                    )
+                                )
                 else:
                     print(
                         "Failed to store AI response for message: {}".format(

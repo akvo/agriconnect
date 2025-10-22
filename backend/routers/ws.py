@@ -559,6 +559,29 @@ async def emit_ticket_created(
         )
 
 
+async def emit_whisper_created(
+    ticket_id: int,
+    message_id: int,
+    suggestion: str,
+):
+    """
+    Emit whisper_created event to ticket room.
+    Called when a new whisper message is created via REST API.
+    """
+    event_data = {
+        "ticket_id": ticket_id,
+        "message_id": message_id,
+        "suggestion": suggestion,
+    }
+
+    # Emit to ticket room (for users viewing the chat)
+    await sio.emit("whisper_created", event_data, room=f"ticket:{ticket_id}")
+
+    logger.info(
+        f"Emitted whisper_created event for message {message_id} "
+        f"in ticket {ticket_id}"
+    )
+
 # Export for use in other routers
 __all__ = [
     "sio",
@@ -566,4 +589,6 @@ __all__ = [
     "emit_message_created",
     "emit_message_status_updated",
     "emit_ticket_resolved",
+    "emit_ticket_created",
+    "emit_whisper_created",
 ]
