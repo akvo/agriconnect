@@ -1,5 +1,3 @@
-import hashlib
-import secrets
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -12,19 +10,12 @@ class ServiceTokenService:
     def create_token(
         db: Session,
         service_name: str,
-        scopes: Optional[str] = None,
         access_token: Optional[str] = None,
         chat_url: Optional[str] = None,
         upload_url: Optional[str] = None,
         active: Optional[int] = None,
-    ) -> tuple[ServiceToken, str]:
-        """Create a new service token and return the token and plain text."""
-        # Generate a secure random token (256-bit)
-        plain_token = secrets.token_urlsafe(32)
-
-        # Hash the token for storage
-        token_hash = hashlib.sha256(plain_token.encode()).hexdigest()
-
+    ) -> ServiceToken:
+        """Create a new service token configuration for external service."""
         # Check if this is the first service token - auto-activate if so
         existing_tokens_count = db.query(ServiceToken).count()
         if active is None:
@@ -38,8 +29,6 @@ class ServiceTokenService:
 
         service_token = ServiceToken(
             service_name=service_name,
-            token_hash=token_hash,
-            scopes=scopes,
             access_token=access_token,
             chat_url=chat_url,
             upload_url=upload_url,
@@ -50,18 +39,7 @@ class ServiceTokenService:
         db.commit()
         db.refresh(service_token)
 
-        return service_token, plain_token
-
-    @staticmethod
-    def verify_token(db: Session, token: str) -> Optional[ServiceToken]:
-        """Verify a service token and return the ServiceToken if valid."""
-        token_hash = hashlib.sha256(token.encode()).hexdigest()
-
-        return (
-            db.query(ServiceToken)
-            .filter(ServiceToken.token_hash == token_hash)
-            .first()
-        )
+        return service_token
 
     @staticmethod
     def get_token_by_service_name(

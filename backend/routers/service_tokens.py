@@ -16,7 +16,6 @@ router = APIRouter(prefix="/admin/service-tokens", tags=["service-tokens"])
 
 class ServiceTokenCreate(BaseModel):
     service_name: str
-    scopes: str = None
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
@@ -33,7 +32,6 @@ class ServiceTokenUpdate(BaseModel):
 class ServiceTokenResponse(BaseModel):
     id: int
     service_name: str
-    scopes: Optional[str] = None
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
@@ -45,19 +43,13 @@ class ServiceTokenResponse(BaseModel):
         from_attributes = True
 
 
-class ServiceTokenCreateResponse(BaseModel):
-    token: ServiceTokenResponse
-    plain_token: str
-    message: str
-
-
-@router.post("/", response_model=ServiceTokenCreateResponse)
+@router.post("/", response_model=ServiceTokenResponse)
 def create_service_token(
     token_data: ServiceTokenCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(admin_required),
 ):
-    """Create a new service token (Admin only)"""
+    """Create a new service token configuration (Admin only)"""
     # Check if service token already exists for this service
     existing_token = ServiceTokenService.get_token_by_service_name(
         db, token_data.service_name
@@ -71,26 +63,16 @@ def create_service_token(
             ),
         )
 
-    service_token, plain_token = ServiceTokenService.create_token(
+    service_token = ServiceTokenService.create_token(
         db,
         token_data.service_name,
-        token_data.scopes,
         token_data.access_token,
         token_data.chat_url,
         token_data.upload_url,
         token_data.active,
     )
 
-    message = (
-        "Service token created successfully. Store the plain token "
-        "securely - it won't be shown again."
-    )
-
-    return ServiceTokenCreateResponse(
-        token=ServiceTokenResponse.model_validate(service_token),
-        plain_token=plain_token,
-        message=message,
-    )
+    return ServiceTokenResponse.model_validate(service_token)
 
 
 @router.get("/", response_model=List[ServiceTokenResponse])
