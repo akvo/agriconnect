@@ -33,8 +33,7 @@ def test_service_token_creation(db_session: Session):
 def test_service_token_repr(db_session: Session):
     """Test ServiceToken string representation"""
     service_token = ServiceToken(
-        service_name="test-service",
-        access_token="akvo_token_123"
+        service_name="test-service", access_token="akvo_token_123"
     )
 
     db_session.add(service_token)
@@ -50,12 +49,16 @@ def test_service_token_repr(db_session: Session):
 def test_service_token_unique_service_name(db_session: Session):
     """Test that service_name must be unique"""
     # Create first token
-    token1 = ServiceToken(service_name="duplicate-service", access_token="token1")
+    token1 = ServiceToken(
+        service_name="duplicate-service", access_token="token1"
+    )
     db_session.add(token1)
     db_session.commit()
 
     # Try to create second token with same service_name
-    token2 = ServiceToken(service_name="duplicate-service", access_token="token2")
+    token2 = ServiceToken(
+        service_name="duplicate-service", access_token="token2"
+    )
     db_session.add(token2)
 
     with pytest.raises(Exception):  # Should raise integrity error
@@ -93,9 +96,7 @@ def test_service_token_service_delete_token(db_session: Session):
     service_name = "test-service"
 
     # Create a token
-    service_token = ServiceTokenService.create_token(
-        db_session, service_name
-    )
+    service_token = ServiceTokenService.create_token(db_session, service_name)
     token_id = service_token.id
 
     # Verify token exists
@@ -130,9 +131,7 @@ def test_service_token_service_get_token_by_service_name(db_session: Session):
     assert token is None
 
     # Create a token
-    service_token = ServiceTokenService.create_token(
-        db_session, service_name
-    )
+    service_token = ServiceTokenService.create_token(db_session, service_name)
 
     # Now it should be found
     token = ServiceTokenService.get_token_by_service_name(
@@ -147,9 +146,7 @@ def test_service_token_minimal_fields(db_session: Session):
     """Test creating service token with only service_name"""
     service_name = "simple-service"
 
-    service_token = ServiceTokenService.create_token(
-        db_session, service_name
-    )
+    service_token = ServiceTokenService.create_token(db_session, service_name)
 
     assert service_token.access_token is None
     assert service_token.chat_url is None

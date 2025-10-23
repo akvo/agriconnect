@@ -64,5 +64,3 @@ def admin_required(current_user: User = Depends(get_current_user)) -> User:
             detail=ADMIN_ACCESS_REQUIRED,
         )
     return current_user
-
-
