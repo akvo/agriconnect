@@ -3,9 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.service_token import ServiceToken
 from models.user import User, UserType
-from services.service_token_service import ServiceTokenService
 from services.user_service import UserService
 from utils.auth import verify_token
 from utils.constants import (
@@ -68,19 +66,3 @@ def admin_required(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
-def verify_service_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
-) -> ServiceToken:
-    """Verify service token for webhook callbacks"""
-    token = credentials.credentials
-
-    service_token = ServiceTokenService.verify_token(db, token)
-    if not service_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid service token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return service_token

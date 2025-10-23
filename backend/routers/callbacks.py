@@ -2,11 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.service_token import ServiceToken
 from schemas.callback import AIWebhookCallback, KBWebhookCallback, MessageType
 from services.message_service import MessageService
 from services.whatsapp_service import WhatsAppService
-from utils.auth_dependencies import verify_service_token
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
 
@@ -26,7 +24,6 @@ router = APIRouter(prefix="/callback", tags=["callbacks"])
                 }
             },
         },
-        401: {"description": "Invalid or missing service token"},
         500: {
             "description": "Internal server error during callback processing"
         },
@@ -34,13 +31,12 @@ router = APIRouter(prefix="/callback", tags=["callbacks"])
 )
 async def ai_callback(
     payload: AIWebhookCallback,
-    service_token: ServiceToken = Depends(verify_service_token),
     db: Session = Depends(get_db),
 ):
     """Handle AI processing callbacks from external platforms"""
     try:
         # Log the callback for debugging (you might want to store this in DB)
-        print(f"AI Callback received from {service_token.service_name}:")
+        print("AI Callback received:")
         print(f"Job ID: {payload.job_id}")
         print(f"Stage: {payload.stage}")
         print(f"Job Type: {payload.job}")
@@ -127,7 +123,6 @@ async def ai_callback(
                 }
             },
         },
-        401: {"description": "Invalid or missing service token"},
         500: {
             "description": "Internal server error during callback processing"
         },
@@ -135,13 +130,12 @@ async def ai_callback(
 )
 async def kb_callback(
     payload: KBWebhookCallback,
-    service_token: ServiceToken = Depends(verify_service_token),
     db: Session = Depends(get_db),
 ):
     """Handle Knowledge Base processing callbacks from external platforms"""
     try:
         # Log the callback for debugging
-        print(f"KB Callback received from {service_token.service_name}:")
+        print("KB Callback received:")
         print(f"Job ID: {payload.job_id}")
         print(f"Stage: {payload.stage}")
         print(f"Job Type: {payload.job}")

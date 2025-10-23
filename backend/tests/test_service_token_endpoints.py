@@ -64,7 +64,12 @@ def test_create_service_token_success(
     client: TestClient, admin_auth_headers, db_session: Session
 ):
     """Test creating service token as admin"""
-    payload = {"service_name": "akvo-rag", "scopes": "callback:write,kb:read"}
+    payload = {
+        "service_name": "akvo-rag",
+        "access_token": "akvo_token_123",
+        "chat_url": "https://akvo-rag.example.com/chat",
+        "upload_url": "https://akvo-rag.example.com/upload",
+    }
 
     response = client.post(
         "/api/admin/service-tokens/", json=payload, headers=admin_auth_headers
@@ -73,22 +78,13 @@ def test_create_service_token_success(
     assert response.status_code == 200
     data = response.json()
 
-    assert "token" in data
-    assert "plain_token" in data
-    assert "message" in data
-
-    token_data = data["token"]
-    assert token_data["service_name"] == "akvo-rag"
-    assert token_data["scopes"] == "callback:write,kb:read"
-    assert "id" in token_data
-    assert "created_at" in token_data
-    assert "updated_at" in token_data
-
-    plain_token = data["plain_token"]
-    assert isinstance(plain_token, str)
-    assert len(plain_token) > 0
-
-    assert "Store the plain token securely" in data["message"]
+    assert "id" in data
+    assert data["service_name"] == "akvo-rag"
+    assert data["access_token"] == "akvo_token_123"
+    assert data["chat_url"] == "https://akvo-rag.example.com/chat"
+    assert data["upload_url"] == "https://akvo-rag.example.com/upload"
+    assert "created_at" in data
+    assert "updated_at" in data
 
 
 def test_create_service_token_duplicate_service_name(
@@ -96,9 +92,9 @@ def test_create_service_token_duplicate_service_name(
 ):
     """Test creating service token with duplicate service name"""
     # Create first token
-    ServiceTokenService.create_token(db_session, "duplicate-service", "scope1")
+    ServiceTokenService.create_token(db_session, "duplicate-service")
 
-    payload = {"service_name": "duplicate-service", "scopes": "scope2"}
+    payload = {"service_name": "duplicate-service"}
 
     response = client.post(
         "/api/admin/service-tokens/", json=payload, headers=admin_auth_headers
@@ -111,11 +107,11 @@ def test_create_service_token_duplicate_service_name(
     )
 
 
-def test_create_service_token_without_scopes(
+def test_create_service_token_minimal_fields(
     client: TestClient, admin_auth_headers, db_session: Session
 ):
-    """Test creating service token without scopes"""
-    payload = {"service_name": "no-scopes-service"}
+    """Test creating service token with only service_name"""
+    payload = {"service_name": "minimal-service"}
 
     response = client.post(
         "/api/admin/service-tokens/", json=payload, headers=admin_auth_headers
@@ -124,16 +120,17 @@ def test_create_service_token_without_scopes(
     assert response.status_code == 200
     data = response.json()
 
-    token_data = data["token"]
-    assert token_data["service_name"] == "no-scopes-service"
-    assert token_data["scopes"] is None
+    assert data["service_name"] == "minimal-service"
+    assert data["access_token"] is None
+    assert data["chat_url"] is None
+    assert data["upload_url"] is None
 
 
 def test_create_service_token_non_admin(
     client: TestClient, user_auth_headers, db_session: Session
 ):
     """Test creating service token as non-admin user"""
-    payload = {"service_name": "test-service", "scopes": "test:scope"}
+    payload = {"service_name": "test-service"}
 
     response = client.post(
         "/api/admin/service-tokens/", json=payload, headers=user_auth_headers
@@ -147,7 +144,7 @@ def test_create_service_token_unauthenticated(
     client: TestClient, db_session: Session
 ):
     """Test creating service token without authentication"""
-    payload = {"service_name": "test-service", "scopes": "test:scope"}
+    payload = {"service_name": "test-service"}
 
     response = client.post("/api/admin/service-tokens/", json=payload)
 
@@ -159,8 +156,8 @@ def test_list_service_tokens_success(
 ):
     """Test listing service tokens as admin"""
     # Create some test tokens
-    ServiceTokenService.create_token(db_session, "service1", "scope1")
-    ServiceTokenService.create_token(db_session, "service2", "scope2")
+    ServiceTokenService.create_token(db_session, "service1", "token1")
+    ServiceTokenService.create_token(db_session, "service2", "token2")
     ServiceTokenService.create_token(db_session, "service3", None)
 
     response = client.get(
@@ -177,7 +174,9 @@ def test_list_service_tokens_success(
     token1 = tokens[0]
     assert "id" in token1
     assert "service_name" in token1
-    assert "scopes" in token1
+    assert "access_token" in token1
+    assert "chat_url" in token1
+    assert "upload_url" in token1
     assert "created_at" in token1
     assert "updated_at" in token1
 
@@ -220,8 +219,8 @@ def test_delete_service_token_success(
 ):
     """Test deleting service token as admin"""
     # Create a test token
-    service_token, _ = ServiceTokenService.create_token(
-        db_session, "delete-me", "scope"
+    service_token = ServiceTokenService.create_token(
+        db_session, "delete-me"
     )
     token_id = service_token.id
 
@@ -263,8 +262,8 @@ def test_delete_service_token_non_admin(
 ):
     """Test deleting service token as non-admin user"""
     # Create a test token
-    service_token, _ = ServiceTokenService.create_token(
-        db_session, "test-service", "scope"
+    service_token = ServiceTokenService.create_token(
+        db_session, "test-service"
     )
     token_id = service_token.id
 
@@ -291,7 +290,7 @@ def test_create_service_token_invalid_payload(
     """Test creating service token with invalid payload"""
     payload = {
         # Missing service_name
-        "scopes": "test:scope"
+        "access_token": "test_token"
     }
 
     response = client.post(
@@ -304,11 +303,13 @@ def test_create_service_token_invalid_payload(
 def test_service_token_workflow_integration(
     client: TestClient, admin_auth_headers, db_session: Session
 ):
-    """Test full workflow: create, list, verify, delete"""
+    """Test full workflow: create, list, delete"""
     # 1. Create a service token
     create_payload = {
         "service_name": "integration-test",
-        "scopes": "callback:write",
+        "access_token": "integration_token_123",
+        "chat_url": "https://example.com/chat",
+        "upload_url": "https://example.com/upload",
     }
 
     create_response = client.post(
@@ -319,8 +320,7 @@ def test_service_token_workflow_integration(
 
     assert create_response.status_code == 200
     create_data = create_response.json()
-    token_id = create_data["token"]["id"]
-    plain_token = create_data["plain_token"]
+    token_id = create_data["id"]
 
     # 2. Verify token appears in list
     list_response = client.get(
@@ -333,36 +333,23 @@ def test_service_token_workflow_integration(
     for token in tokens:
         if token["id"] == token_id:
             assert token["service_name"] == "integration-test"
-            assert token["scopes"] == "callback:write"
+            assert token["access_token"] == "integration_token_123"
+            assert token["chat_url"] == "https://example.com/chat"
+            assert token["upload_url"] == "https://example.com/upload"
             token_found = True
             break
 
     assert token_found, "Created token not found in list"
 
-    # 3. Verify token works for authentication
-    callback_payload = {
-        "job_id": "integration_test_job",
-        "stage": "done",
-        "job": "chat",
-    }
-
-    callback_headers = {"Authorization": f"Bearer {plain_token}"}
-    callback_response = client.post(
-        "/api/callback/ai", json=callback_payload, headers=callback_headers
-    )
-
-    assert callback_response.status_code == 200
-
-    # 4. Delete the token
+    # 3. Delete the token
     delete_response = client.delete(
         f"/api/admin/service-tokens/{token_id}", headers=admin_auth_headers
     )
 
     assert delete_response.status_code == 200
 
-    # 5. Verify token no longer works
-    callback_response = client.post(
-        "/api/callback/ai", json=callback_payload, headers=callback_headers
+    # Verify token is deleted from database
+    found_token = ServiceTokenService.get_token_by_service_name(
+        db_session, "integration-test"
     )
-
-    assert callback_response.status_code == 401
+    assert found_token is None
