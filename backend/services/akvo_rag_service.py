@@ -75,6 +75,11 @@ class AkvoRagService:
         Uses a lock to prevent concurrent registrations from multiple
         workers.
         """
+        # if testing mode, set as registered without actual registration
+        if os.getenv("TESTING"):
+            AkvoRagService._is_registered = True
+            logger.info("✓ Testing mode - skipping akvo-rag registration")
+            return True
         # Use class-level lock to prevent concurrent registrations
         async with self._registration_lock:
             # Check class-level flag first (prevents redundant checks)
