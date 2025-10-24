@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
+import os
 
 from services.akvo_rag_service import AkvoRagService, get_akvo_rag_service
 from models.message import MessageType
@@ -32,86 +33,171 @@ class TestAkvoRagServiceRegistration:
     """Tests for app registration with akvo-rag"""
 
     @pytest.mark.asyncio
+    async def test_register_app_in_testing_mode(self, akvo_rag_service):
+        """Test that registration is skipped in TESTING mode"""
+        # TESTING env var is set by default in pytest
+        assert os.getenv("TESTING") is not None
+
+        result = await akvo_rag_service.register_app()
+
+        # Should return True and mark as registered without HTTP calls
+        assert result is True
+        assert AkvoRagService._is_registered is True
+
+    @pytest.mark.asyncio
     async def test_register_app_success(
         self, akvo_rag_service, mock_httpx_client
     ):
-        """Test successful app registration"""
-        mock_client, mock_response = mock_httpx_client
-        mock_response.status_code = 201
-        mock_response.json.return_value = {
-            "app_id": "app_123",
-            "access_token": "tok_abc123",
-            "knowledge_base_id": 42,
-        }
-        mock_response.raise_for_status = MagicMock()
+        """Test successful app registration (non-testing mode)"""
+        # Temporarily disable testing mode
+        original_testing = os.environ.get("TESTING")
+        if "TESTING" in os.environ:
+            del os.environ["TESTING"]
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
+        try:
+            mock_client, mock_response = mock_httpx_client
+            mock_response.status_code = 201
+            mock_response.json.return_value = {
+                "app_id": "app_123",
+                "access_token": "tok_abc123",
+                "knowledge_base_id": 42,
+            }
+            mock_response.raise_for_status = MagicMock()
+
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                result = await akvo_rag_service.register_app()
+
+            assert result is True
+            assert akvo_rag_service.access_token == "tok_abc123"
+            assert akvo_rag_service.knowledge_base_id == 42
+
+            # Verify the request was made
+            mock_client.post.assert_called_once()
+            call_args = mock_client.post.call_args
+            assert "/api/apps/register" in call_args[0][0]
+            assert call_args[1]["json"]["app_name"]
+            assert call_args[1]["timeout"] == 30.0
+        finally:
+            # Restore original TESTING env var
+            if original_testing:
+                os.environ["TESTING"] = original_testing
+            AkvoRagService._is_registered = False
+
+    @pytest.mark.asyncio
+    async def test_register_app_already_has_token(self, akvo_rag_service):
+        """Test registration skips when access_token already exists"""
+        # Temporarily disable testing mode
+        original_testing = os.environ.get("TESTING")
+        if "TESTING" in os.environ:
+            del os.environ["TESTING"]
+
+        try:
+            # Set existing token
+            akvo_rag_service.access_token = "existing_token"
+            akvo_rag_service.knowledge_base_id = 99
+
             result = await akvo_rag_service.register_app()
 
-        assert result is True
-        assert akvo_rag_service.access_token == "tok_abc123"
-        assert akvo_rag_service.knowledge_base_id == 42
-
-        # Verify the request was made
-        mock_client.post.assert_called_once()
-        call_args = mock_client.post.call_args
-        assert "/api/apps/register" in call_args[0][0]
-        assert call_args[1]["json"]["app_name"]
-        assert call_args[1]["timeout"] == 30.0
+            # Should return True without making HTTP calls
+            assert result is True
+            assert AkvoRagService._is_registered is True
+            assert akvo_rag_service.access_token == "existing_token"
+        finally:
+            if original_testing:
+                os.environ["TESTING"] = original_testing
+            AkvoRagService._is_registered = False
 
     @pytest.mark.asyncio
     async def test_register_app_no_base_url(self, akvo_rag_service):
         """Test registration fails when base_url is not configured"""
-        akvo_rag_service.base_url = None
+        # Temporarily disable testing mode
+        original_testing = os.environ.get("TESTING")
+        if "TESTING" in os.environ:
+            del os.environ["TESTING"]
 
-        result = await akvo_rag_service.register_app()
+        try:
+            akvo_rag_service.base_url = None
 
-        assert result is False
+            result = await akvo_rag_service.register_app()
+
+            assert result is False
+        finally:
+            if original_testing:
+                os.environ["TESTING"] = original_testing
 
     @pytest.mark.asyncio
     async def test_register_app_http_error(
         self, akvo_rag_service, mock_httpx_client
     ):
         """Test registration handles HTTP errors gracefully"""
-        mock_client, mock_response = mock_httpx_client
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Bad Request",
-            request=MagicMock(),
-            response=mock_response,
-        )
+        # Temporarily disable testing mode
+        original_testing = os.environ.get("TESTING")
+        if "TESTING" in os.environ:
+            del os.environ["TESTING"]
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            result = await akvo_rag_service.register_app()
+        try:
+            mock_client, mock_response = mock_httpx_client
+            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "Bad Request",
+                request=MagicMock(),
+                response=mock_response,
+            )
 
-        assert result is False
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                result = await akvo_rag_service.register_app()
+
+            assert result is False
+        finally:
+            if original_testing:
+                os.environ["TESTING"] = original_testing
 
     @pytest.mark.asyncio
     async def test_register_app_connection_error(
         self, akvo_rag_service, mock_httpx_client
     ):
         """Test registration handles connection errors"""
-        mock_client, _ = mock_httpx_client
-        mock_client.post.side_effect = httpx.ConnectError("Connection refused")
+        # Temporarily disable testing mode
+        original_testing = os.environ.get("TESTING")
+        if "TESTING" in os.environ:
+            del os.environ["TESTING"]
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            result = await akvo_rag_service.register_app()
+        try:
+            mock_client, _ = mock_httpx_client
+            mock_client.post.side_effect = httpx.ConnectError(
+                "Connection refused"
+            )
 
-        assert result is False
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                result = await akvo_rag_service.register_app()
+
+            assert result is False
+        finally:
+            if original_testing:
+                os.environ["TESTING"] = original_testing
 
     @pytest.mark.asyncio
     async def test_register_app_timeout(
         self, akvo_rag_service, mock_httpx_client
     ):
         """Test registration handles timeout errors"""
-        mock_client, _ = mock_httpx_client
-        mock_client.post.side_effect = httpx.TimeoutException(
-            "Request timeout"
-        )
+        # Temporarily disable testing mode
+        original_testing = os.environ.get("TESTING")
+        if "TESTING" in os.environ:
+            del os.environ["TESTING"]
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            result = await akvo_rag_service.register_app()
+        try:
+            mock_client, _ = mock_httpx_client
+            mock_client.post.side_effect = httpx.TimeoutException(
+                "Request timeout"
+            )
 
-        assert result is False
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                result = await akvo_rag_service.register_app()
+
+            assert result is False
+        finally:
+            if original_testing:
+                os.environ["TESTING"] = original_testing
 
 
 class TestAkvoRagServiceChatJobs:

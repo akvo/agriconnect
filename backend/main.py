@@ -1,5 +1,6 @@
 import os
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from routers import (
@@ -23,6 +24,24 @@ from services.akvo_rag_service import get_akvo_rag_service
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup and shutdown events.
+    Replaces deprecated on_event decorator.
+    """
+    # Startup: register with akvo-rag
+    logger.info("✓ Application startup - registering with akvo-rag")
+    rag_service = get_akvo_rag_service()
+    await rag_service.register_app()
+
+    yield
+
+    # Shutdown: cleanup if needed
+    logger.info("✓ Application shutdown")
+
+
 app = FastAPI(
     title="AgriConnect API",
     version="1.0.0",
@@ -38,6 +57,7 @@ app = FastAPI(
     redoc_url="/api/redoc",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 # Include routers
@@ -64,17 +84,6 @@ app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 @app.get("/api/health-check", tags=["health-check"])
 def read_root():
     return {"Status": "OK"}
-
-
-# Startup event - register with akvo-rag
-@app.on_event("startup")
-async def startup_event():
-    """Load configuration and register with akvo-rag on startup"""
-    logger.info("✓ Application startup - registering with akvo-rag")
-
-    # Register with akvo-rag
-    rag_service = get_akvo_rag_service()
-    await rag_service.register_app()
 
 
 # Mount Socket.IO at /ws/socket.io path
