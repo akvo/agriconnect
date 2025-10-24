@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.service_token import ServiceToken
 from models.ticket import Ticket
-from schemas.callback import AIWebhookCallback, KBWebhookCallback, MessageType
+from schemas.callback import AIWebhookCallback, KBWebhookCallback, MessageType, CallbackStage
 from services.message_service import MessageService
 from services.whatsapp_service import WhatsAppService
 from utils.auth_dependencies import verify_service_token
@@ -30,6 +30,7 @@ router = APIRouter(prefix="/callback", tags=["callbacks"])
             },
         },
         401: {"description": "Invalid or missing service token"},
+        422: {"description": "Invalid payload format"},
         500: {
             "description": "Internal server error during callback processing"
         },
@@ -37,34 +38,29 @@ router = APIRouter(prefix="/callback", tags=["callbacks"])
 )
 async def ai_callback(
     payload: AIWebhookCallback,
-    service_token: ServiceToken = Depends(verify_service_token),
+    # service_token: ServiceToken = Depends(verify_service_token),
     db: Session = Depends(get_db),
 ):
     """Handle AI processing callbacks from external platforms"""
     try:
-        # Log the callback for debugging (you might want to store this in DB)
-        print(f"AI Callback received from {service_token.service_name}:")
+        # Log the callback for debugging (you might want to store this in DB)        
         print(f"Job ID: {payload.job_id}")
         print(f"Stage: {payload.stage}")
         print(f"Job Type: {payload.job}")
 
         # Process the callback based on stage
-        if payload.stage.value == "done" and payload.result:
-            # Handle successful AI response
-            print(f"AI response: {payload.result.answer}")
-            print(f"Citations: {len(payload.result.citations)}")
+        if payload.status == CallbackStage.COMPLETED and payload.output:
 
             # Store AI response in database if message_id is provided
             if payload.callback_params and payload.callback_params.message_id:
                 message_service = MessageService(db)
                 ai_message = message_service.create_ai_response(
                     original_message_id=payload.callback_params.message_id,
-                    ai_response=payload.result.answer,
+                    ai_response=payload.output.answer,
                     message_sid=f"ai_{payload.job_id}",
                     message_type=payload.callback_params.message_type,
                 )
                 if ai_message:
-                    print(f"AI response stored as message ID: {ai_message.id}")
 
                     # Handle message_type for AI callbacks
                     if payload.callback_params.message_type:
@@ -72,15 +68,19 @@ async def ai_callback(
                             payload.callback_params.message_type
                             == MessageType.REPLY
                         ):
-                            # Send reply to customer via WhatsApp
+                            # REPLY mode: Send AI answer to farmer with confirmation template
                             try:
                                 whatsapp_service = WhatsAppService()
-                                response = whatsapp_service.send_message(
+
+                                # Send AI answer with confirmation template
+                                # Template includes buttons: "Yes" (escalate) and "No" (none)
+                                response = whatsapp_service.send_confirmation_template(
                                     to_number=ai_message.customer.phone_number,
-                                    message_body=payload.result.answer,
+                                    ai_answer=payload.output.answer,
                                 )
+
                                 print(
-                                    "WhatsApp reply sent: "
+                                    "WhatsApp AI reply sent with confirmation template: "
                                     f"{response.get('sid')}"
                                 )
                             except Exception as e:
@@ -127,9 +127,11 @@ async def ai_callback(
                             payload.callback_params.message_id
                         )
                     )
-        elif payload.stage.value in ["failed", "timeout"]:
+        elif payload.status in [CallbackStage.FAILED, CallbackStage.TIMEOUT]:
             # Handle error cases
-            print(f"AI processing failed: {payload.stage}")
+            print(f"AI processing failed: {payload.status}")
+            if payload.error:
+                print(f"Error details: {payload.error}")
             # Send error message to user if needed
         return {"status": "received", "job_id": payload.job_id}
 

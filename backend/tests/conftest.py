@@ -184,6 +184,28 @@ def mock_websocket_emitters(monkeypatch):
         def notify_message_status(self, *args, **kwargs):
             pass
 
+    # Mock WhatsAppService to prevent actual API calls
+    class MockWhatsAppService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def send_confirmation_template(self, *args, **kwargs):
+            return {"sid": "mock_message_sid"}
+
+        def send_message(self, *args, **kwargs):
+            return {"sid": "mock_message_sid"}
+
+    # Mock EmailService to prevent actual email sending
+    class MockEmailService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def send_invitation_email(self, *args, **kwargs):
+            return True
+
+        async def send_password_reset_email(self, *args, **kwargs):
+            return True
+
     monkeypatch.setattr("routers.messages.emit_message_created", mock_emit)
     monkeypatch.setattr(
         "routers.messages.emit_message_status_updated", mock_emit
@@ -195,3 +217,26 @@ def mock_websocket_emitters(monkeypatch):
         "routers.ws.PushNotificationService",
         MockPushNotificationService
     )
+    monkeypatch.setattr(
+        "routers.callbacks.WhatsAppService",
+        MockWhatsAppService
+    )
+    # Mock the email_service instance (not EmailService class)
+    monkeypatch.setattr(
+        "services.user_service.email_service",
+        MockEmailService()
+    )
+
+
+@pytest.fixture
+def mock_akvo_rag_client(monkeypatch):
+    """Mock httpx client for akvo-rag service tests"""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_client = AsyncMock()
+    mock_response = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    return mock_client, mock_response

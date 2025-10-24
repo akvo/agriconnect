@@ -1,12 +1,14 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
+import json
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CallbackStage(str, Enum):
     QUEUED = "queued"
     DONE = "done"
+    COMPLETED = "completed"  # akvo-rag uses "completed" instead of "done"
     FAILED = "failed"
     TIMEOUT = "timeout"
 
@@ -22,8 +24,11 @@ class MessageType(int, Enum):
 
 
 class Citation(BaseModel):
-    title: str = Field(..., description="Title of the cited source")
-    url: str = Field(..., description="URL of the cited source")
+    document: str = Field(..., description="Title of the cited source")
+    chunk: str = Field(..., description="Content of the cited source")
+    page: Optional[str] = Field(
+        None, description="Page number or identifier of the source"
+    )
 
 
 class CallbackResult(BaseModel):
@@ -37,8 +42,12 @@ class CallbackResult(BaseModel):
         description="Sources used to generate the AI response",
         example=[
             {
-                "title": "Maize Growing Guide",
-                "url": "https://example.com/maize-guide",
+                "document": "Maize Cultivation Guide",
+                "chunk": (
+                    "Maize should be planted at "
+                    "the onset of the rainy season..."
+                ),
+                "page": "12",
             }
         ],
     )
@@ -56,6 +65,11 @@ class AICallbackParams(BaseModel):
         None,
         description="REPLY (1) sends to customer, WHISPER (2) EO suggestion",
         example=1,
+    )
+    customer_id: Optional[int] = Field(
+        None,
+        description="ID of the customer",
+        example=154,
     )
     ticket_id: Optional[int] = Field(
         None,
@@ -78,27 +92,60 @@ class KBCallbackParams(BaseModel):
 
 
 class AIWebhookCallback(BaseModel):
-    """Webhook callback payload for AI processing"""
+    """Webhook callback payload for AI processing from akvo-rag"""
 
     job_id: str = Field(..., description="Unique AI processing job identifier")
-    stage: CallbackStage = Field(..., description="Processing stage")
-    result: Optional[CallbackResult] = Field(
-        None, description="AI results (when stage='done')"
+    status: CallbackStage = Field(
+        ...,
+        description="Processing status (completed, failed, etc.)"
     )
-    callback_params: Optional[AICallbackParams] = Field(
-        None, description="AI-specific parameters"
+    output: Optional[CallbackResult] = Field(
+        None, description="AI results (when status='completed')"
+    )
+    error: Optional[str] = Field(
+        None, description="Error message (when status='failed')"
+    )
+    callback_params: Union[str, AICallbackParams] = Field(
+        ...,
+        description="AI-specific parameters (can be JSON string or object)"
     )
     trace_id: Optional[str] = Field(
         None, description="Tracing ID for debugging"
     )
-    job: JobType = Field(..., description="Job type")
+    job: JobType = Field(
+        default=JobType.CHAT,
+        description="Job type (defaults to 'chat' if not provided)"
+    )
+
+    @field_validator('callback_params', mode='before')
+    @classmethod
+    def parse_callback_params(cls, v):
+        """Parse callback_params if it's a JSON string"""
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                return AICallbackParams(**parsed)
+            except (json.JSONDecodeError, TypeError):
+                # If parsing fails, return empty params
+                return AICallbackParams()
+        return v
+
+    @property
+    def stage(self) -> CallbackStage:
+        """Alias for status to maintain backward compatibility"""
+        return self.status
+
+    @property
+    def result(self) -> Optional[CallbackResult]:
+        """Alias for output to maintain backward compatibility"""
+        return self.output
 
 
 class KBWebhookCallback(BaseModel):
     """Webhook callback payload for Knowledge Base processing"""
 
     job_id: str = Field(..., description="Unique KB processing job identifier")
-    stage: CallbackStage = Field(..., description="Processing stage")
+    status: CallbackStage = Field(..., description="Processing stage")
     callback_params: Optional[KBCallbackParams] = Field(
         None, description="KB-specific parameters"
     )
@@ -106,3 +153,8 @@ class KBWebhookCallback(BaseModel):
         None, description="Tracing ID for debugging"
     )
     job: JobType = Field(..., description="Job type")
+
+    @property
+    def stage(self) -> CallbackStage:
+        """Alias for status to maintain backward compatibility"""
+        return self.status
