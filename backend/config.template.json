@@ -1,0 +1,34 @@
+{
+	"message_limit": 10,
+	"akvo_rag": {
+		"base_url": "https://akvo-rag.akvotest.org",
+		"app_name": "agriconnect",
+		"domain": "https://agriconnect2.akvotest.org/",
+		"chat_callback": "https://agriconnect2.akvotest.org/api/callback/ai",
+		"upload_callback": "https://agriconnect2.akvotest.org/api/callback/kb",
+		"callback_token": "",
+		"default_chat_prompt": "You are an agricultural expert assistant. Provide practical, actionable farming advice based on the knowledge base. Format: Keep the full reply under 1600 characters to support WhatsApp. Prioritize actionable items and immediate next steps. Provided Context:\n{context}\n",
+		"access_token": null,
+		"knowledge_base_id": null
+	},
+	"whatsapp": {
+		"templates": {
+			"confirmation": {
+				"sid": "HX108a1cb64b05336e79335e88a5a0e23b",
+				"description": "Template sent after AI response asking if farmer needs human help",
+				"variables": {
+					"ai_answer": "ai_answer"
+				}
+			}
+		},
+		"button_payloads": {
+			"escalate": "escalate",
+			"none": "none"
+		}
+	},
+	"escalation": {
+		"chat_history_limit": 20,
+		"reply_history_limit": 10,
+		"description": "Number of recent messages to include in chat history for AI context"
+	}
+}
