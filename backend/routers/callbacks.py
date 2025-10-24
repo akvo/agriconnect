@@ -7,7 +7,6 @@ from models.ticket import Ticket
 from schemas.callback import AIWebhookCallback, KBWebhookCallback, MessageType, CallbackStage
 from services.message_service import MessageService
 from services.whatsapp_service import WhatsAppService
-from utils.auth_dependencies import verify_service_token
 from routers.ws import emit_whisper_created
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
@@ -37,7 +36,6 @@ router = APIRouter(prefix="/callback", tags=["callbacks"])
 )
 async def ai_callback(
     payload: AIWebhookCallback,
-    # service_token: ServiceToken = Depends(verify_service_token),
     db: Session = Depends(get_db),
 ):
     """Handle AI processing callbacks from external platforms"""

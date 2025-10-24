@@ -299,6 +299,7 @@ def test_create_service_token_invalid_payload(
 
     assert response.status_code == 422  # Validation error
 
+
 def test_service_token_workflow_integration(
     client: TestClient, admin_auth_headers, db_session: Session
 ):

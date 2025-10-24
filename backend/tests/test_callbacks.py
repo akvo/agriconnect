@@ -407,12 +407,10 @@ def test_customer_with_ticket(db_session: Session, test_administrative):
 
 def test_ai_callback_whisper_type_with_ticket_id(
     client: TestClient,
-    service_token_and_plain,
     test_customer_with_ticket,
     db_session: Session,
 ):
     """Test AI callback with WHISPER type and explicit ticket_id"""
-    _, plain_token = service_token_and_plain
     customer, ticket, message = test_customer_with_ticket
 
     payload = {
@@ -437,10 +435,8 @@ def test_ai_callback_whisper_type_with_ticket_id(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
     response = client.post(
-        "/api/callback/ai", json=payload, headers=headers
+        "/api/callback/ai", json=payload
     )
 
     assert response.status_code == 200
@@ -470,12 +466,10 @@ def test_ai_callback_whisper_type_with_ticket_id(
 
 def test_ai_callback_whisper_type_without_ticket_id(
     client: TestClient,
-    service_token_and_plain,
     test_customer_with_ticket,
     db_session: Session,
 ):
     """Test AI callback with WHISPER type, ticket_id found from customer"""
-    _, plain_token = service_token_and_plain
     customer, ticket, message = test_customer_with_ticket
 
     payload = {
@@ -500,10 +494,8 @@ def test_ai_callback_whisper_type_without_ticket_id(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
     response = client.post(
-        "/api/callback/ai", json=payload, headers=headers
+        "/api/callback/ai", json=payload
     )
 
     assert response.status_code == 200
@@ -524,14 +516,12 @@ def test_ai_callback_whisper_type_without_ticket_id(
 
 def test_ai_callback_whisper_type_no_open_ticket(
     client: TestClient,
-    service_token_and_plain,
     test_customer_with_ticket,
     db_session: Session,
 ):
     """Test AI callback with WHISPER type when ticket is resolved"""
     from datetime import datetime, timezone
 
-    _, plain_token = service_token_and_plain
     customer, ticket, message = test_customer_with_ticket
 
     # Resolve the ticket
@@ -554,10 +544,8 @@ def test_ai_callback_whisper_type_no_open_ticket(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
     response = client.post(
-        "/api/callback/ai", json=payload, headers=headers
+        "/api/callback/ai", json=payload
     )
 
     assert response.status_code == 200
