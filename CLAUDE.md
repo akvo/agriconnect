@@ -174,11 +174,17 @@ function MyComponent() {
 - **JWT-based authentication**
 - **Twilio WhatsApp integration** for messaging
 - **Email notification system**
-- **Service token management** for API access
-- **Webhook callbacks** for real-time updates
+- **Service token management** for outbound API access (e.g., calling Akvo RAG)
+- **Webhook callbacks** for real-time updates (AI/KB callbacks do not require authentication)
 - **WebSocket (Socket.IO)** for real-time chat communication
 - **Push notifications** via Expo Push Notification service
 - **Device registration** associated with administrative areas (wards)
+
+### Authentication Flow with Akvo RAG
+- **AgriConnect → Akvo RAG**: Uses service tokens (stored in `service_tokens` table with `access_token`, `chat_url`, `upload_url` fields)
+- **Akvo RAG → AgriConnect**: No authentication required for callback endpoints (`/api/callback/ai`, `/api/callback/kb`)
+- Service tokens manage **outbound authentication only** - no incoming authentication tokens are stored
+- This simplifies token management by eliminating bidirectional authentication
 
 ## Development Workflow
 

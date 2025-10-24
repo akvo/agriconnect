@@ -6,8 +6,8 @@ from services.service_token_service import ServiceTokenService
 def test_first_service_token_auto_activated(db_session: Session):
     """Test that the first service token is automatically activated"""
     # Create first service token
-    service_token, _ = ServiceTokenService.create_token(
-        db_session, "first-service", "callback:write"
+    service_token = ServiceTokenService.create_token(
+        db_session, "first-service", "token1"
     )
 
     assert service_token.active == 1
@@ -17,12 +17,12 @@ def test_second_service_token_not_auto_activated(db_session: Session):
     """Test that subsequent service tokens are not automatically activated"""
     # Create first service token
     ServiceTokenService.create_token(
-        db_session, "first-service", "callback:write"
+        db_session, "first-service", "token1"
     )
 
     # Create second service token
-    service_token2, _ = ServiceTokenService.create_token(
-        db_session, "second-service", "callback:write"
+    service_token2 = ServiceTokenService.create_token(
+        db_session, "second-service", "token2"
     )
 
     assert service_token2.active == 0
@@ -31,14 +31,14 @@ def test_second_service_token_not_auto_activated(db_session: Session):
 def test_explicitly_activate_service_token(db_session: Session):
     """Test explicitly activating a service token deactivates others"""
     # Create first service token (auto-activated)
-    first_token, _ = ServiceTokenService.create_token(
-        db_session, "first-service", "callback:write"
+    first_token = ServiceTokenService.create_token(
+        db_session, "first-service", "token1"
     )
     assert first_token.active == 1
 
     # Create second service token with explicit activation
-    second_token, _ = ServiceTokenService.create_token(
-        db_session, "second-service", "callback:write", active=1
+    second_token = ServiceTokenService.create_token(
+        db_session, "second-service", "token2", active=1
     )
 
     # Refresh first token from database
@@ -51,11 +51,11 @@ def test_explicitly_activate_service_token(db_session: Session):
 def test_update_token_config_activation(db_session: Session):
     """Test that updating a token to active deactivates others"""
     # Create two service tokens
-    first_token, _ = ServiceTokenService.create_token(
-        db_session, "first-service", "callback:write"
+    first_token = ServiceTokenService.create_token(
+        db_session, "first-service", "token1"
     )
-    second_token, _ = ServiceTokenService.create_token(
-        db_session, "second-service", "callback:write"
+    second_token = ServiceTokenService.create_token(
+        db_session, "second-service", "token2"
     )
 
     assert first_token.active == 1  # First one auto-activated
@@ -80,8 +80,8 @@ def test_get_active_token(db_session: Session):
     assert ServiceTokenService.get_active_token(db_session) is None
 
     # Create first service token (auto-activated)
-    first_token, _ = ServiceTokenService.create_token(
-        db_session, "first-service", "callback:write"
+    first_token = ServiceTokenService.create_token(
+        db_session, "first-service", "token1"
     )
 
     active_token = ServiceTokenService.get_active_token(db_session)
@@ -93,8 +93,8 @@ def test_get_active_token(db_session: Session):
 def test_deactivate_token(db_session: Session):
     """Test deactivating a service token"""
     # Create service token (auto-activated)
-    service_token, _ = ServiceTokenService.create_token(
-        db_session, "test-service", "callback:write"
+    service_token = ServiceTokenService.create_token(
+        db_session, "test-service", "token1"
     )
     assert service_token.active == 1
 

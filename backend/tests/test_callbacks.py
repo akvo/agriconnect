@@ -6,16 +6,6 @@ from models.customer import Customer, CustomerLanguage
 from models.message import Message, MessageFrom
 from models.ticket import Ticket
 from models.administrative import Administrative, AdministrativeLevel
-from services.service_token_service import ServiceTokenService
-
-
-@pytest.fixture
-def service_token_and_plain(db_session: Session):
-    """Create a service token for testing"""
-    service_token, plain_token = ServiceTokenService.create_token(
-        db_session, "akvo-rag", "callback:write"
-    )
-    return service_token, plain_token
 
 
 @pytest.fixture
@@ -47,11 +37,9 @@ def test_message(db_session: Session, test_customer):
 
 
 def test_ai_callback_success(
-    client: TestClient, service_token_and_plain, db_session: Session
+    client: TestClient, db_session: Session
 ):
     """Test successful AI callback"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_123",
         "status": "completed",
@@ -75,9 +63,7 @@ def test_ai_callback_success(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "job_123"}
@@ -85,13 +71,10 @@ def test_ai_callback_success(
 
 def test_ai_callback_success_with_message_storage(
     client: TestClient,
-    service_token_and_plain,
     test_message,
     db_session: Session,
 ):
     """Test successful AI callback that stores response in database"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_456",
         "status": "completed",
@@ -114,9 +97,7 @@ def test_ai_callback_success_with_message_storage(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "job_456"}
@@ -141,11 +122,9 @@ def test_ai_callback_success_with_message_storage(
 
 
 def test_ai_callback_success_invalid_message_id(
-    client: TestClient, service_token_and_plain, db_session: Session
+    client: TestClient, db_session: Session
 ):
     """Test AI callback with invalid message_id - should not store response"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_invalid",
         "status": "completed",
@@ -169,9 +148,7 @@ def test_ai_callback_success_invalid_message_id(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     # Should still return success (callback received)
     assert response.status_code == 200
@@ -189,11 +166,9 @@ def test_ai_callback_success_invalid_message_id(
 
 
 def test_ai_callback_failed_job(
-    client: TestClient, service_token_and_plain, db_session: Session
+    client: TestClient, db_session: Session
 ):
     """Test AI callback for failed job"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_456",
         "status": "failed",
@@ -206,20 +181,16 @@ def test_ai_callback_failed_job(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "job_456"}
 
 
 def test_kb_callback_success(
-    client: TestClient, service_token_and_plain, db_session: Session
+    client: TestClient, db_session: Session
 ):
     """Test successful KB callback"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "kb_job_789",
         "status": "done",
@@ -228,20 +199,16 @@ def test_kb_callback_success(
         "job": "upload",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/kb", json=payload, headers=headers)
+    response = client.post("/api/callback/kb", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "kb_job_789"}
 
 
 def test_kb_callback_timeout(
-    client: TestClient, service_token_and_plain, db_session: Session
+    client: TestClient, db_session: Session
 ):
     """Test KB callback for timeout"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "kb_job_timeout",
         "status": "timeout",
@@ -250,9 +217,7 @@ def test_kb_callback_timeout(
         "job": "upload",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/kb", json=payload, headers=headers)
+    response = client.post("/api/callback/kb", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {
@@ -261,54 +226,10 @@ def test_kb_callback_timeout(
     }
 
 
-def test_callback_invalid_token(client: TestClient):
-    """Test callback with invalid token (auth currently disabled)"""
-    payload = {
-        "job_id": "job_123",
-        "status": "completed",
-        "output": None,
-        "error": None,
-        "callback_params": (
-            '{"message_id": 123, "message_type": 1, "customer_id": 100}'
-        ),
-        "job": "chat",
-    }
-
-    headers = {"Authorization": "Bearer invalid_token"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
-
-    # Auth is currently disabled in the callback endpoint
-    assert response.status_code == 200
-    assert response.json() == {"status": "received", "job_id": "job_123"}
-
-
-def test_callback_missing_token(client: TestClient):
-    """Test callback without authorization header (auth currently disabled)"""
-    payload = {
-        "job_id": "job_123",
-        "status": "completed",
-        "output": None,
-        "error": None,
-        "callback_params": (
-            '{"message_id": 123, "message_type": 1, "customer_id": 100}'
-        ),
-        "job": "chat",
-    }
-
-    response = client.post("/api/callback/ai", json=payload)
-
-    # Auth is currently disabled in the callback endpoint
-    assert response.status_code == 200
-    assert response.json() == {"status": "received", "job_id": "job_123"}
-
-
 def test_callback_invalid_stage_enum(
-    client: TestClient, service_token_and_plain
+    client: TestClient
 ):
     """Test callback with invalid stage enum"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_123",
         "status": "invalid_stage",  # Invalid enum value
@@ -320,19 +241,15 @@ def test_callback_invalid_stage_enum(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 422  # Validation error
 
 
 def test_callback_invalid_job_enum(
-    client: TestClient, service_token_and_plain
+    client: TestClient
 ):
     """Test callback with invalid job enum"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_123",
         "status": "completed",
@@ -344,37 +261,29 @@ def test_callback_invalid_job_enum(
         "job": "invalid_job",  # Invalid enum value
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 422  # Validation error
 
 
 def test_callback_missing_required_fields(
-    client: TestClient, service_token_and_plain
+    client: TestClient
 ):
     """Test callback with missing required fields"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_123",
         # Missing status and callback_params (both required)
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 422  # Validation error
 
 
 def test_callback_with_all_optional_fields(
-    client: TestClient, service_token_and_plain
+    client: TestClient
 ):
     """Test callback with all optional fields included"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_complete",
         "status": "completed",
@@ -401,18 +310,14 @@ def test_callback_with_all_optional_fields(
         "job": "chat",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "job_complete"}
 
 
-def test_callback_queued_stage(client: TestClient, service_token_and_plain):
+def test_callback_queued_stage(client: TestClient):
     """Test callback with queued stage"""
-    _, plain_token = service_token_and_plain
-
     payload = {
         "job_id": "job_queued",
         "status": "queued",
@@ -425,9 +330,7 @@ def test_callback_queued_stage(client: TestClient, service_token_and_plain):
         "trace_id": "trace_queued",
     }
 
-    headers = {"Authorization": f"Bearer {plain_token}"}
-
-    response = client.post("/api/callback/ai", json=payload, headers=headers)
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "job_queued"}

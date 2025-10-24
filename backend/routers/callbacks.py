@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.service_token import ServiceToken
 from models.ticket import Ticket
 from schemas.callback import AIWebhookCallback, KBWebhookCallback, MessageType, CallbackStage
 from services.message_service import MessageService
@@ -156,7 +155,6 @@ async def ai_callback(
                 }
             },
         },
-        401: {"description": "Invalid or missing service token"},
         500: {
             "description": "Internal server error during callback processing"
         },
@@ -164,13 +162,12 @@ async def ai_callback(
 )
 async def kb_callback(
     payload: KBWebhookCallback,
-    service_token: ServiceToken = Depends(verify_service_token),
     db: Session = Depends(get_db),
 ):
     """Handle Knowledge Base processing callbacks from external platforms"""
     try:
         # Log the callback for debugging
-        print(f"KB Callback received from {service_token.service_name}:")
+        print("KB Callback received:")
         print(f"Job ID: {payload.job_id}")
         print(f"Stage: {payload.stage}")
         print(f"Job Type: {payload.job}")

@@ -8,13 +8,11 @@ class ServiceToken(Base):
     __tablename__ = "service_tokens"
 
     id = Column(Integer, primary_key=True, index=True)
-    service_name = Column(String, nullable=False, index=True)
-    token_hash = Column(String, nullable=False, unique=True, index=True)
-    scopes = Column(String, nullable=True)  # JSON string for scopes
-    # Fields for external service integration
+    service_name = Column(String, nullable=False, index=True, unique=True)
+    # Fields for external service integration (outbound authentication)
     access_token = Column(
         String, nullable=True
-    )  # Token provided by external service
+    )  # Token to authenticate with external service
     chat_url = Column(String, nullable=True)  # URL for chat job requests
     upload_url = Column(
         String, nullable=True
