@@ -15,11 +15,9 @@ from models.customer import Customer, CustomerLanguage
 from models.message import Message, MessageFrom
 from models.ticket import Ticket
 from models.administrative import Administrative, AdministrativeLevel
-from services.service_token_service import ServiceTokenService
 from commands.whisper import (
     get_customer_ticket_info,
     send_callback,
-    get_or_create_service_token,
     suggestions,
 )
 
@@ -97,15 +95,6 @@ def test_ticket(db_session: Session, test_customer, test_administrative):
     db_session.refresh(ticket)
 
     return ticket, message
-
-
-@pytest.fixture
-def service_token_and_plain(db_session: Session):
-    """Create a service token for testing"""
-    service_token, plain_token = ServiceTokenService.create_token(
-        db_session, "whisper-test", "callback:write"
-    )
-    return service_token, plain_token
 
 
 class TestGetCustomerTicketInfo:
@@ -196,30 +185,6 @@ class TestGetCustomerTicketInfo:
         assert result["message"].id == message2.id
 
 
-class TestGetOrCreateServiceToken:
-    """Tests for get_or_create_service_token function"""
-
-    def test_get_or_create_with_existing_active_token(
-        self, db_session: Session, service_token_and_plain
-    ):
-        """Test when an active service token already exists"""
-        service_token, _ = service_token_and_plain
-
-        result = get_or_create_service_token(db_session)
-
-        # Should return None because we can't retrieve plain token from hash
-        assert result is None
-
-    def test_get_or_create_with_no_active_token(self, db_session: Session):
-        """Test creating a new service token when none exists"""
-        result = get_or_create_service_token(db_session)
-
-        # Should create and return a new token
-        assert result is not None
-        assert isinstance(result, str)
-        assert len(result) > 20  # Token should be a reasonable length
-
-
 class TestSendCallback:
     """Tests for send_callback function"""
 
@@ -240,9 +205,8 @@ class TestSendCallback:
         result = send_callback(
             ticket_id=ticket.id,
             message_id=message.id,
-            stage="done",
+            status="completed",
             suggestion_key="maize",
-            service_token="test_token_123",
             base_url="http://localhost:8000",
         )
 
@@ -255,21 +219,19 @@ class TestSendCallback:
         call_args = mock_post.call_args
         expected_url = "http://localhost:8000/api/callback/ai"
         assert call_args.args[0] == expected_url
-        auth_header = call_args.kwargs["headers"]["Authorization"]
-        assert auth_header == "Bearer test_token_123"
         content_type = call_args.kwargs["headers"]["Content-Type"]
         assert content_type == "application/json"
 
         # Verify payload structure
         payload = call_args.kwargs["json"]
-        assert payload["stage"] == "done"
+        assert payload["status"] == "completed"
         assert payload["job"] == "chat"
         assert payload["callback_params"]["ticket_id"] == ticket.id
         assert payload["callback_params"]["message_id"] == message.id
         assert payload["callback_params"]["message_type"] == 2  # WHISPER
-        assert "result" in payload
-        assert "answer" in payload["result"]
-        assert "citations" in payload["result"]
+        assert "output" in payload
+        assert "answer" in payload["output"]
+        assert "citations" in payload["output"]
 
     @patch("commands.whisper.requests.post")
     def test_send_callback_success_failed_stage(
@@ -288,9 +250,8 @@ class TestSendCallback:
         result = send_callback(
             ticket_id=ticket.id,
             message_id=message.id,
-            stage="failed",
+            status="failed",
             suggestion_key="rice",
-            service_token="test_token_456",
             base_url="http://localhost:8000",
         )
 
@@ -299,8 +260,8 @@ class TestSendCallback:
         # Verify payload doesn't include result for failed stage
         call_args = mock_post.call_args
         payload = call_args.kwargs["json"]
-        assert payload["stage"] == "failed"
-        assert "result" not in payload
+        assert payload["status"] == "failed"
+        assert "output" not in payload
 
     @patch("commands.whisper.requests.post")
     def test_send_callback_with_different_suggestions(
@@ -318,9 +279,8 @@ class TestSendCallback:
             result = send_callback(
                 ticket_id=ticket.id,
                 message_id=message.id,
-                stage="done",
+                status="completed",
                 suggestion_key=crop_type,
-                service_token="test_token",
                 base_url="http://localhost:8000",
             )
             assert result is True
@@ -328,7 +288,7 @@ class TestSendCallback:
             # Verify suggestion text is from the correct crop type
             call_args = mock_post.call_args
             payload = call_args.kwargs["json"]
-            assert payload["result"]["answer"] in suggestions[crop_type]
+            assert payload["output"]["answer"] in suggestions[crop_type]
 
     @patch("commands.whisper.requests.post")
     def test_send_callback_request_failure(self, mock_post, test_ticket):
@@ -341,9 +301,8 @@ class TestSendCallback:
         result = send_callback(
             ticket_id=ticket.id,
             message_id=message.id,
-            stage="done",
+            status="completed",
             suggestion_key="chilli",
-            service_token="test_token",
             base_url="http://localhost:8000",
         )
 
@@ -365,9 +324,8 @@ class TestSendCallback:
         result = send_callback(
             ticket_id=ticket.id,
             message_id=message.id,
-            stage="done",
+            status="completed",
             suggestion_key="coffee",
-            service_token="test_token",
             base_url="http://localhost:8000",
         )
 
@@ -387,9 +345,8 @@ class TestSendCallback:
         result = send_callback(
             ticket_id=ticket.id,
             message_id=message.id,
-            stage="done",
+            status="completed",
             suggestion_key="unknown_crop",
-            service_token="test_token",
             base_url="http://localhost:8000",
         )
 
@@ -398,7 +355,7 @@ class TestSendCallback:
         # Verify suggestion falls back to maize
         call_args = mock_post.call_args
         payload = call_args.kwargs["json"]
-        assert payload["result"]["answer"] in suggestions["maize"]
+        assert payload["output"]["answer"] in suggestions["maize"]
 
 
 class TestSuggestions:

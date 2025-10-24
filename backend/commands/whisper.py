@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(
 from database import SessionLocal  # noqa: E402
 from models.ticket import Ticket  # noqa: E402
 from models.message import Message, MessageType  # noqa: E402
-from services.service_token_service import ServiceTokenService  # noqa: E402
 
 # Base URL for the API
 BASE_URL = os.getenv("WEBDOMAIN", "http://localhost:8000")
@@ -47,38 +46,6 @@ suggestions = {
         "Water regularly but avoid wetting leaves."
     ]
 }
-
-
-def get_or_create_service_token(db: Session) -> str:
-    """Get existing active service token or create new one for test."""
-    # Try to get active service token
-    active_token = ServiceTokenService.get_active_token(db)
-
-    if active_token:
-        print(
-            f"✓ Using existing service token: "
-            f"{active_token.service_name}"
-        )
-        # We can't retrieve the plain token from stored hash,
-        # so we need to inform user to use existing token
-        print("⚠ Note: Cannot retrieve plain token from database.")
-        print("  Please use the token that was provided when created,")
-        print("  or create a new one using the admin panel.")
-        return None
-
-    # Create a new service token for testing
-    print("Creating new service token for testing...")
-    service_token, plain_token = ServiceTokenService.create_token(
-        db,
-        service_name="whisper-test",
-        scopes="callback:write",
-        active=1
-    )
-    print(f"✓ Created service token: {service_token.service_name}")
-    print(f"  Token ID: {service_token.id}")
-    print(f"  Plain token: {plain_token[:20]}...")
-
-    return plain_token
 
 
 def get_customer_ticket_info(db: Session, phone_number: str) -> dict:
@@ -130,9 +97,8 @@ def get_customer_ticket_info(db: Session, phone_number: str) -> dict:
 def send_callback(
     ticket_id: int,
     message_id: int,
-    stage: str,
+    status: str,
     suggestion_key: str,
-    service_token: str,
     base_url: str = BASE_URL,
 ):
     """Send AI callback webhook to the backend."""
@@ -150,7 +116,7 @@ def send_callback(
     # Build the payload
     payload = {
         "job_id": job_id,
-        "stage": stage,
+        "status": status,
         "job": "chat",
         "trace_id": trace_id,
         "callback_params": {
@@ -160,9 +126,9 @@ def send_callback(
         }
     }
 
-    # Add result if stage is done
-    if stage == "done":
-        payload["result"] = {
+    # Add output if status is completed
+    if status == "completed":
+        payload["output"] = {
             "answer": suggestion_text,
             "citations": [
                 {
@@ -179,16 +145,15 @@ def send_callback(
     url = f"{base_url}/api/callback/ai"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {service_token}"
     }
 
     print(f"\nSending callback to {url}...")
     print(f"Job ID: {job_id}")
-    print(f"Stage: {stage}")
+    print(f"Status: {status}")
     print(f"Message ID: {message_id}")
     print(f"Ticket ID: {ticket_id}")
     print("Message Type: WHISPER (2)")
-    if stage == "done":
+    if status == "completed":
         print(f"Suggestion: {suggestion_text[:80]}...")
 
     try:
@@ -221,11 +186,11 @@ def main():
         help="Customer phone number (e.g., +255123456789)"
     )
     parser.add_argument(
-        "--stage",
+        "--status",
         type=str,
-        default="done",
-        choices=["queued", "done", "failed", "timeout"],
-        help="Callback stage (default: done)"
+        default="completed",
+        choices=["queued", "completed", "failed", "timeout"],
+        help="Callback status (default: completed)"
     )
     parser.add_argument(
         "--suggestion",
@@ -233,11 +198,6 @@ def main():
         default="maize",
         choices=list(suggestions.keys()),
         help="Crop type for suggestion template (default: maize)"
-    )
-    parser.add_argument(
-        "--service-token",
-        type=str,
-        help="Service token for auth (will create if not provided)"
     )
     parser.add_argument(
         "--base-url",
@@ -303,31 +263,13 @@ def main():
         print(f"  Body: {message.body[:60]}...")
         print(f"  From: {message.from_source}")
 
-        # Get or create service token
-        print("\n2. Getting service token...")
-        service_token = args.service_token
-
-        if not service_token:
-            service_token = get_or_create_service_token(db)
-            if not service_token:
-                print("\n✗ No service token available!")
-                print(
-                    "  Please provide a service token using "
-                    "--service-token option"
-                )
-                print("  or create one through the admin panel.")
-                return 1
-        else:
-            print("✓ Using provided service token")
-
         # Send the callback
         print("\n3. Sending AI callback webhook...")
         success = send_callback(
             ticket_id=ticket_id,
             message_id=message_id,
-            stage=args.stage,
+            status=args.status,
             suggestion_key=args.suggestion,
-            service_token=service_token,
             base_url=args.base_url,
         )
 
