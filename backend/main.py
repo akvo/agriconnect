@@ -1,4 +1,5 @@
 import os
+import logging
 from fastapi import FastAPI
 
 from routers import (
@@ -18,6 +19,9 @@ from routers import (
     crop_types,
 )
 from fastapi.staticfiles import StaticFiles
+from services.akvo_rag_service import get_akvo_rag_service
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="AgriConnect API",
@@ -60,6 +64,17 @@ app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 @app.get("/api/health-check", tags=["health-check"])
 def read_root():
     return {"Status": "OK"}
+
+
+# Startup event - register with akvo-rag
+@app.on_event("startup")
+async def startup_event():
+    """Load configuration and register with akvo-rag on startup"""
+    logger.info("✓ Application startup - registering with akvo-rag")
+
+    # Register with akvo-rag
+    rag_service = get_akvo_rag_service()
+    await rag_service.register_app()
 
 
 # Mount Socket.IO at /ws/socket.io path
