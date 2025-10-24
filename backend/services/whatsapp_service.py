@@ -1,7 +1,12 @@
 import json
+import logging
 import os
 from typing import Any, Dict
 from twilio.rest import Client
+
+from config import settings
+
+logger = logging.getLogger(__name__)
 
 # Store content sid that we get from Twilio console
 # How to get content sid:
@@ -108,3 +113,55 @@ class WhatsAppService:
             return {}
 
         return self.send_message(to_number, message)
+
+    def send_confirmation_template(
+        self, to_number: str, ai_answer: str
+    ) -> Dict[str, Any]:
+        """
+        Send AI answer with confirmation template
+        asking if farmer needs human help.
+
+        Template buttons:
+        - "Yes" (ButtonPayload="escalate") - Farmer wants to talk to human
+        - "No" (ButtonPayload="none") - Farmer is satisfied
+
+        Args:
+            to_number: Farmer's phone number
+            ai_answer: The AI-generated answer to include in template
+
+        Returns:
+            Response from Twilio with message SID
+        """
+        if os.getenv("TESTING"):
+            # skip sending templates in testing mode
+            return {"sid": "TESTING_MODE", "status": "sent"}
+        template_sid = settings.whatsapp_confirmation_template_sid
+
+        if not template_sid:
+            # Fallback: send plain message without template
+            logger.warning(
+                "No confirmation template SID configured -"
+                " sending plain message"
+            )
+            return self.send_message(to_number, ai_answer)
+
+        try:
+            # Send template message with AI answer as variable
+            message = self.client.messages.create(
+                from_=self.whatsapp_number,
+                to=f"whatsapp:{to_number}",
+                content_sid=template_sid,
+                content_variables=json.dumps(
+                    {"ai_answer": ai_answer}  # Template variable for AI answer
+                ),
+            )
+
+            logger.info(
+                f"✓ Sent confirmation template to {to_number}: {message.sid}"
+            )
+            return {"sid": message.sid, "status": message.status}
+
+        except Exception as e:
+            logger.error(f"✗ Error sending confirmation template: {e}")
+            # Fallback: send plain message
+            return self.send_message(to_number, ai_answer)
