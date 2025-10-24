@@ -24,6 +24,7 @@ class MessageStatus:
     PENDING = 1
     REPLIED = 2
     RESOLVED = 3
+    ESCALATED = 4  # Farmer requested human help after AI response
 
 
 class Message(Base):
