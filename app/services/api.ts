@@ -346,7 +346,7 @@ class ApiClient {
     token: string,
     deviceData: {
       push_token: string;
-      administrative_id: number;
+      administrative_id: number | undefined;
       app_version: string;
     },
   ): Promise<any> {
@@ -365,6 +365,29 @@ class ApiClient {
         .json()
         .catch(() => ({ detail: "Failed to register device" }));
       throw new Error(error.detail || "Failed to register device");
+    }
+
+    return response.json();
+  }
+
+  async logoutDevices(token: string): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/devices/logout`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      // Note: 401 errors are now handled by fetchWithRetry
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to logout devices" }));
+      throw new Error(error.detail || "Failed to logout devices");
     }
 
     return response.json();
