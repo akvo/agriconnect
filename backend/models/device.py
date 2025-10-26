@@ -17,13 +17,23 @@ class Device(Base):
     Device model for storing push notification tokens.
 
     Tracks mobile devices registered for push notifications.
-    Devices are associated with administrative areas (wards) rather than
-    individual users, since the same device might be used by different users.
+    Devices are associated with both:
+    - administrative areas (wards) for ward-based notification filtering
+    - users (current logged-in user) for user-based notification filtering
+
+    This hybrid approach allows:
+    - Efficient ward-based queries
+    - Excluding specific users (e.g., message sender)
+    - Proper session tracking (who is logged in on which device)
     """
 
     __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True, index=True
+    )
     administrative_id = Column(
         Integer, ForeignKey("administrative.id"), nullable=False, index=True
     )
@@ -36,4 +46,5 @@ class Device(Base):
     )
 
     # Relationships
+    user = relationship("User", back_populates="devices")
     administrative = relationship("Administrative", back_populates="devices")

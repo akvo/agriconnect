@@ -174,8 +174,8 @@ class TestHandleInvalidTokens:
         push_service._handle_invalid_tokens(response_data, push_tokens)
 
         # Verify only the invalid token was processed
-        mock_db.query.\
-            return_value.filter.return_value.first.assert_called_once()
+        mock_db.query.return_value\
+            .filter.return_value.first.assert_called_once()
         assert mock_device.is_active is False
 
     def test_handle_invalid_tokens_no_data(self, push_service, mock_db):
@@ -280,40 +280,46 @@ class TestGetWardUserTokens:
         # Mock database query chain
         mock_query = Mock()
         mock_db.query.return_value = mock_query
-        mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
 
-        # Mock devices with push tokens
-        mock_devices = [
-            Mock(push_token="ExponentPushToken[user1]"),
-            Mock(push_token="ExponentPushToken[user2]"),
+        # Create Row-like objects with push_token attribute
+        class MockRow:
+            def __init__(self, push_token):
+                self.push_token = push_token
+
+        mock_rows = [
+            MockRow("ExponentPushToken[user1]"),
+            MockRow("ExponentPushToken[user2]"),
         ]
-        mock_query.all.return_value = mock_devices
+        mock_query.all.return_value = mock_rows
 
         tokens = push_service.get_ward_user_tokens(administrative_id=5)
 
-        assert tokens == [
-            "ExponentPushToken[user1]",
-            "ExponentPushToken[user2]",
-        ]
+        assert len(tokens) == 2
+        assert "ExponentPushToken[user1]" in tokens
+        assert "ExponentPushToken[user2]" in tokens
 
     def test_get_ward_user_tokens_with_exclusions(self, push_service, mock_db):
         """Test fetching tokens excluding specific users."""
         mock_query = Mock()
         mock_db.query.return_value = mock_query
-        mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
-        mock_query.all.return_value = [
-            Mock(push_token="ExponentPushToken[user2]")
-        ]
+
+        class MockRow:
+            def __init__(self, push_token):
+                self.push_token = push_token
+
+        mock_query.all.return_value = [MockRow("ExponentPushToken[user2]")]
 
         tokens = push_service.get_ward_user_tokens(
             administrative_id=5, exclude_user_ids=[1, 3]
         )
 
-        # Verify filter was called with exclusion
-        assert mock_query.filter.call_count >= 1
+        # Verify filter was called
+        # (at least twice: main filter + exclusion filter)
+        assert mock_query.filter.call_count >= 2
         assert len(tokens) == 1
+        assert "ExponentPushToken[user2]" in tokens
 
 
 class TestGetAdminUserTokens:
@@ -321,39 +327,71 @@ class TestGetAdminUserTokens:
 
     def test_get_admin_user_tokens_success(self, push_service, mock_db):
         """Test fetching tokens for admin users."""
-        # Mock the first query chain (get admin areas)
-        mock_admin_areas_query = Mock()
-        mock_admin_areas_query.join.return_value = mock_admin_areas_query
-        mock_admin_areas_query.filter.return_value = mock_admin_areas_query
-        mock_admin_areas_query.distinct.return_value = mock_admin_areas_query
+        # Mock the query chain (single query with join to User)
+        mock_query = Mock()
+        mock_query.join.return_value = mock_query
+        mock_query.filter.return_value = mock_query
 
-        # Mock admin areas (UserAdministrative results)
-        mock_admin_areas = [
-            Mock(administrative_id=1),
-            Mock(administrative_id=2),
+        # Create simple objects to represent Row results with push_token
+        # When querying Device.push_token, SQLAlchemy returns Row objects
+        # that can be accessed as row.push_token or row[0]
+        class MockRow:
+            def __init__(self, push_token):
+                self.push_token = push_token
+
+        mock_rows = [
+            MockRow("ExponentPushToken[admin1]"),
+            MockRow("ExponentPushToken[admin2]"),
         ]
-        mock_admin_areas_query.all.return_value = mock_admin_areas
+        mock_query.all.return_value = mock_rows
 
-        # Mock the second query chain (get devices)
-        mock_devices_query = Mock()
-        mock_devices_query.filter.return_value = mock_devices_query
-
-        # Mock devices with push tokens
-        mock_devices = [
-            Mock(push_token="ExponentPushToken[admin1]"),
-            Mock(push_token="ExponentPushToken[admin2]"),
-        ]
-        mock_devices_query.all.return_value = mock_devices
-
-        # Configure mock_db.query to return different mocks for each call
-        mock_db.query.side_effect = [
-            mock_admin_areas_query,  # First call (UserAdministrative)
-            mock_devices_query,       # Second call (Device)
-        ]
+        # Configure mock_db.query to return the mock query
+        mock_db.query.return_value = mock_query
 
         tokens = push_service.get_admin_user_tokens()
 
+        # Verify query was called with Device.push_token
+        assert mock_db.query.called
+
+        # Verify join and filters were called
+        assert mock_query.join.called
+        assert mock_query.filter.called
+
+        # Verify tokens
         assert len(tokens) == 2
+        assert "ExponentPushToken[admin1]" in tokens
+        assert "ExponentPushToken[admin2]" in tokens
+
+    def test_get_admin_user_tokens_with_exclusions(
+        self, push_service, mock_db
+    ):
+        """Test fetching admin tokens while excluding specific users."""
+        # Mock the query chain
+        mock_query = Mock()
+        mock_query.join.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+
+        class MockRow:
+            def __init__(self, push_token):
+                self.push_token = push_token
+
+        # Only one token returned after exclusion
+        mock_rows = [
+            MockRow("ExponentPushToken[admin1]"),
+        ]
+        mock_query.all.return_value = mock_rows
+
+        mock_db.query.return_value = mock_query
+
+        # Call with exclude_user_ids
+        tokens = push_service.get_admin_user_tokens(exclude_user_ids=[2, 3])
+
+        # Verify filter was called
+        # (twice: once for main filters, once for exclusions)
+        assert mock_query.filter.call_count >= 2
+
+        # Verify tokens
+        assert len(tokens) == 1
         assert "ExponentPushToken[admin1]" in tokens
 
 

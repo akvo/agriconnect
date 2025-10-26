@@ -25,7 +25,6 @@ from sqlalchemy.orm import Session
 
 from models.device import Device
 from models.user import User, UserType
-from models.administrative import UserAdministrative
 
 logger = logging.getLogger(__name__)
 
@@ -258,14 +257,11 @@ class PushNotificationService:
         """
         Get all active push tokens for devices in a ward.
 
-        Note: exclude_user_ids parameter is kept for backward compatibility
-        but is not used since devices are now associated with administrative
-        areas rather than users.
+        Now properly excludes specific users (e.g., message sender).
 
         Args:
             administrative_id: Ward (administrative) ID
-            exclude_user_ids: Optional list of user IDs
-                (not used, kept for compatibility)
+            exclude_user_ids: Optional list of user IDs to exclude
 
         Returns:
             List of active push tokens
@@ -279,6 +275,10 @@ class PushNotificationService:
             )
         )
 
+        # Exclude specific users if provided
+        if exclude_user_ids:
+            query = query.filter(Device.user_id.notin_(exclude_user_ids))
+
         devices = query.all()
         return [device.push_token for device in devices]
 
@@ -286,45 +286,31 @@ class PushNotificationService:
         self, exclude_user_ids: Optional[List[int]] = None
     ) -> List[str]:
         """
-        Get all active push tokens for devices in administrative areas
-        where admin users are assigned.
+        Get all active push tokens for admin users.
 
-        Note: exclude_user_ids parameter is kept for backward compatibility
-        but is not used since devices are now associated with administrative
-        areas rather than users.
+        Now properly queries devices directly by user type and excludes
+        specific users (e.g., message sender).
 
         Args:
-            exclude_user_ids: Optional list of user IDs
-                (not used, kept for compatibility)
+            exclude_user_ids: Optional list of user IDs to exclude
 
         Returns:
-            List of active push tokens for admin user wards
+            List of active push tokens for admin users
         """
-        # Get all administrative IDs where admin users are assigned
-        admin_areas = (
-            self.db.query(UserAdministrative.administrative_id)
-            .join(User, UserAdministrative.user_id == User.id)
+        # Get all devices for active admin users
+        query = (
+            self.db.query(Device.push_token)
+            .join(User, Device.user_id == User.id)
             .filter(
                 User.user_type == UserType.ADMIN,
                 User.is_active == True,  # noqa: E712
-            )
-            .distinct()
-            .all()
-        )
-
-        admin_area_ids = [area.administrative_id for area in admin_areas]
-
-        if not admin_area_ids:
-            return []
-
-        # Get all devices in these administrative areas
-        query = (
-            self.db.query(Device.push_token)
-            .filter(
-                Device.administrative_id.in_(admin_area_ids),
                 Device.is_active == True,  # noqa: E712
             )
         )
+
+        # Exclude specific users if provided
+        if exclude_user_ids:
+            query = query.filter(Device.user_id.notin_(exclude_user_ids))
 
         devices = query.all()
         return [device.push_token for device in devices]

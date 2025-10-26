@@ -41,9 +41,9 @@ def register_device(
     """
     Register a device for push notifications.
 
-    - Devices are associated with administrative areas (wards)
+    - Devices are associated with both users and administrative areas
     - If push_token already exists, update it (upsert behavior)
-    - Same device can be used by different users in the same ward
+    - Tracks which user is currently logged in on the device
     """
     try:
         # Verify user has access to this administrative area
@@ -71,7 +71,8 @@ def register_device(
         )
 
         if existing_device:
-            # Update existing device
+            # Update existing device with current user
+            existing_device.user_id = current_user.id
             existing_device.administrative_id = device_data.administrative_id
             existing_device.app_version = device_data.app_version
             existing_device.is_active = True
@@ -80,11 +81,13 @@ def register_device(
 
             logger.info(
                 f"Updated device {existing_device.id} "
-                f"for administrative_id {device_data.administrative_id}"
+                f"for user_id {current_user.id}, "
+                f"administrative_id {device_data.administrative_id}"
             )
 
             return DeviceResponse(
                 id=existing_device.id,
+                user_id=existing_device.user_id,
                 administrative_id=existing_device.administrative_id,
                 push_token=existing_device.push_token,
                 app_version=existing_device.app_version,
@@ -95,6 +98,7 @@ def register_device(
 
         # Create new device registration
         new_device = Device(
+            user_id=current_user.id,
             administrative_id=device_data.administrative_id,
             push_token=device_data.push_token,
             app_version=device_data.app_version,
@@ -107,11 +111,13 @@ def register_device(
 
         logger.info(
             f"Registered new device {new_device.id} "
-            f"for administrative_id {device_data.administrative_id}"
+            f"for user_id {current_user.id}, "
+            f"administrative_id {device_data.administrative_id}"
         )
 
         return DeviceResponse(
             id=new_device.id,
+            user_id=new_device.user_id,
             administrative_id=new_device.administrative_id,
             push_token=new_device.push_token,
             app_version=new_device.app_version,
@@ -171,6 +177,7 @@ def list_user_devices(
     return [
         DeviceResponse(
             id=device.id,
+            user_id=device.user_id,
             administrative_id=device.administrative_id,
             push_token=device.push_token,
             app_version=device.app_version,
@@ -229,6 +236,7 @@ def update_device(
 
     return DeviceResponse(
         id=device.id,
+        user_id=device.user_id,
         administrative_id=device.administrative_id,
         push_token=device.push_token,
         app_version=device.app_version,
@@ -236,6 +244,53 @@ def update_device(
         created_at=device.created_at,
         updated_at=device.updated_at,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout_devices(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Deactivate all devices for the current user.
+
+    Called when user logs out to prevent notifications to inactive sessions.
+    Devices are not deleted, just marked as inactive.
+    They will be reactivated on next login.
+    """
+    try:
+        # Deactivate all devices for this user
+        updated_count = (
+            db.query(Device)
+            .filter(
+                Device.user_id == current_user.id,
+                Device.is_active == True,  # noqa: E712
+            )
+            .update({"is_active": False})
+        )
+
+        db.commit()
+
+        logger.info(
+            f"Deactivated {updated_count} device(s) for user {current_user.id}"
+        )
+
+        return {
+            "success": True,
+            "deactivated_count": updated_count,
+            "message": f"Deactivated {updated_count} device(s)",
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error deactivating devices for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to deactivate devices",
+        )
 
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
