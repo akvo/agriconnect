@@ -15,7 +15,7 @@ from models.customer import Customer, CustomerLanguage
 from models.message import Message, MessageFrom
 from models.ticket import Ticket
 from models.administrative import Administrative, AdministrativeLevel
-from commands.whisper import (
+from scripts.whisper import (
     get_customer_ticket_info,
     send_callback,
     suggestions,
@@ -188,7 +188,7 @@ class TestGetCustomerTicketInfo:
 class TestSendCallback:
     """Tests for send_callback function"""
 
-    @patch("commands.whisper.requests.post")
+    @patch("scripts.whisper.requests.post")
     def test_send_callback_success_done_stage(
         self, mock_post, test_ticket
     ):
@@ -233,7 +233,7 @@ class TestSendCallback:
         assert "answer" in payload["output"]
         assert "citations" in payload["output"]
 
-    @patch("commands.whisper.requests.post")
+    @patch("scripts.whisper.requests.post")
     def test_send_callback_success_failed_stage(
         self, mock_post, test_ticket
     ):
@@ -263,7 +263,7 @@ class TestSendCallback:
         assert payload["status"] == "failed"
         assert "output" not in payload
 
-    @patch("commands.whisper.requests.post")
+    @patch("scripts.whisper.requests.post")
     def test_send_callback_with_different_suggestions(
         self, mock_post, test_ticket
     ):
@@ -290,7 +290,7 @@ class TestSendCallback:
             payload = call_args.kwargs["json"]
             assert payload["output"]["answer"] in suggestions[crop_type]
 
-    @patch("commands.whisper.requests.post")
+    @patch("scripts.whisper.requests.post")
     def test_send_callback_request_failure(self, mock_post, test_ticket):
         """Test callback when request fails"""
         from requests.exceptions import RequestException
@@ -308,7 +308,7 @@ class TestSendCallback:
 
         assert result is False
 
-    @patch("commands.whisper.requests.post")
+    @patch("scripts.whisper.requests.post")
     def test_send_callback_http_error(self, mock_post, test_ticket):
         """Test callback when HTTP error occurs"""
         from requests.exceptions import HTTPError
@@ -331,7 +331,7 @@ class TestSendCallback:
 
         assert result is False
 
-    @patch("commands.whisper.requests.post")
+    @patch("scripts.whisper.requests.post")
     def test_send_callback_with_unknown_crop_type(
         self, mock_post, test_ticket
     ):
