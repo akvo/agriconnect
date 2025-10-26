@@ -51,7 +51,9 @@ const generateMockMessages = (count: number): BroadcastMessage[] => {
     messages.push({
       id: i + 1,
       name: i % 3 === 0 ? "You" : i % 3 === 1 ? "John Doe" : "Jane Smith",
-      text: `This is a broadcast message ${i + 1}. Testing the group chat functionality with multiple messages.`,
+      text: `This is a broadcast message ${
+        i + 1
+      }. Testing the group chat functionality with multiple messages.`,
       sender: "user",
       timestamp: timestamp.toISOString(),
     });
@@ -241,8 +243,8 @@ const BroadcastGroupChatScreen = () => {
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+        behavior="height"
+        keyboardVerticalOffset={48}
       >
         {/* Messages List */}
         <View style={styles.messagesContainer}>
@@ -329,7 +331,8 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    padding: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
     borderColor: themeColors.mutedBorder,
     backgroundColor: themeColors.background,

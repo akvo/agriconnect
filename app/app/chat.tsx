@@ -649,8 +649,8 @@ const ChatScreen = () => {
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+        behavior="height"
+        keyboardVerticalOffset={48}
       >
         <View style={styles.messagesContainer}>
           {stickyMessage && ticket.ticketNumber && (
@@ -934,7 +934,8 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    padding: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
     borderColor: themeColors.mutedBorder,
     backgroundColor: themeColors.background,

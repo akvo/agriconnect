@@ -13,7 +13,7 @@ export default function TabLayout() {
   const { isOnline } = useNetwork();
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView edges={["left", "right", "bottom"]} style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
           tabBarHideOnKeyboard: true,
