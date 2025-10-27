@@ -455,3 +455,270 @@ class TestChatHistoryIntegration:
         # Verify chat history was passed
         call_args = mock_akvo_rag_service.create_chat_job.call_args
         assert call_args[1]["chats"] == chat_history
+
+
+class TestTicketBasedMessageTypeRouting:
+    """Test message type routing based on ticket status"""
+
+    def test_customer_with_unresolved_ticket_stores_message(
+        self,
+        client: TestClient,
+        db_session: Session,
+        test_customer,
+        test_ticket,
+    ):
+        """
+        Test that a customer with an existing unresolved ticket
+        has message stored correctly (WHISPER mode path)
+        """
+        with patch("routers.whatsapp.emit_message_created") as mock_emit:
+            response = client.post(
+                "/api/whatsapp/webhook",
+                data={
+                    "From": f"whatsapp:{test_customer.phone_number}",
+                    "Body": "I need more help with my crops",
+                    "MessageSid": "SM_EXISTING_TICKET",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+
+        # Verify message was created with correct body
+        message = (
+            db_session.query(Message)
+            .filter(Message.message_sid == "SM_EXISTING_TICKET")
+            .first()
+        )
+        assert message is not None
+        assert message.body == "I need more help with my crops"
+        assert message.customer_id == test_customer.id
+
+        # Verify emit_message_created was called for mobile notifications
+        # (This happens in WHISPER mode with existing ticket)
+        mock_emit.assert_called_once()
+        call_kwargs = mock_emit.call_args[1]
+        assert call_kwargs["ticket_id"] == test_ticket.id
+        assert call_kwargs["customer_id"] == test_customer.id
+        assert call_kwargs["body"] == "I need more help with my crops"
+
+    def test_customer_without_ticket_stores_message(
+        self,
+        client: TestClient,
+        db_session: Session,
+    ):
+        """
+        Test that a customer without an existing ticket
+        has message stored correctly (REPLY mode path)
+        """
+        with patch("routers.whatsapp.emit_message_created") as mock_emit:
+            response = client.post(
+                "/api/whatsapp/webhook",
+                data={
+                    "From": "whatsapp:+255999888777",
+                    "Body": "Hello, I need farming advice",
+                    "MessageSid": "SM_NO_TICKET",
+                },
+            )
+
+        assert response.status_code == 200
+
+        # Verify message was created
+        message = (
+            db_session.query(Message)
+            .filter(Message.message_sid == "SM_NO_TICKET")
+            .first()
+        )
+        assert message is not None
+        assert message.body == "Hello, I need farming advice"
+
+        # Verify customer was created
+        customer = (
+            db_session.query(Customer)
+            .filter(Customer.phone_number == "+255999888777")
+            .first()
+        )
+        assert customer is not None
+        assert message.customer_id == customer.id
+
+        # Verify emit_message_created was NOT called
+        # (REPLY mode without ticket - no EO notification needed)
+        mock_emit.assert_not_called()
+
+    def test_customer_with_resolved_ticket_stores_message(
+        self,
+        client: TestClient,
+        db_session: Session,
+        test_customer,
+        test_ticket,
+    ):
+        """
+        Test that a customer with only resolved tickets
+        has message stored correctly (REPLY mode path)
+        """
+        # Resolve the existing ticket
+        from datetime import datetime
+
+        test_ticket.resolved_at = datetime.utcnow()
+        db_session.commit()
+
+        with patch("routers.whatsapp.emit_message_created") as mock_emit:
+            response = client.post(
+                "/api/whatsapp/webhook",
+                data={
+                    "From": f"whatsapp:{test_customer.phone_number}",
+                    "Body": "I have a new question",
+                    "MessageSid": "SM_RESOLVED_TICKET",
+                },
+            )
+
+        assert response.status_code == 200
+
+        # Verify message was created
+        message = (
+            db_session.query(Message)
+            .filter(Message.message_sid == "SM_RESOLVED_TICKET")
+            .first()
+        )
+        assert message is not None
+        assert message.body == "I have a new question"
+
+        # Verify emit_message_created was NOT called
+        # (no unresolved ticket, so REPLY mode - no EO notification)
+        mock_emit.assert_not_called()
+
+    def test_escalate_button_creates_ticket_and_stores_message(
+        self,
+        client: TestClient,
+        db_session: Session,
+        test_customer,
+    ):
+        """
+        Test that clicking escalate button creates ticket
+        and stores message with original question
+        """
+        # Create initial message from customer
+        initial_message = Message(
+            message_sid="SM_INITIAL",
+            customer_id=test_customer.id,
+            body="I have a difficult problem",
+            from_source=1,
+        )
+        db_session.add(initial_message)
+
+        # Create AI reply message (so offset(1) in escalate flow works)
+        ai_reply = Message(
+            message_sid="SM_AI_REPLY",
+            customer_id=test_customer.id,
+            body="AI reply with escalate button",
+            from_source=3,  # LLM
+            message_type=MessageType.REPLY,
+        )
+        db_session.add(ai_reply)
+        db_session.commit()
+
+        # Seed administrative data for ticket creation
+        from seeder.administrative import seed_administrative_data
+
+        rows = [
+            {
+                "code": "WARD1",
+                "name": "Ward 1",
+                "level": "Ward",
+                "parent_code": "",
+            }
+        ]
+        seed_administrative_data(db_session, rows)
+
+        with patch("routers.whatsapp.emit_message_created"), patch(
+            "routers.whatsapp.emit_ticket_created"
+        ) as mock_emit_ticket:
+            response = client.post(
+                "/api/whatsapp/webhook",
+                data={
+                    "From": f"whatsapp:{test_customer.phone_number}",
+                    "Body": "Yes",  # Button response
+                    "MessageSid": "SM_ESCALATE",
+                    "ButtonPayload": "escalate",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.json()["message"] == "Escalation processed"
+
+        # Verify ticket was created
+        ticket = (
+            db_session.query(Ticket)
+            .filter(Ticket.customer_id == test_customer.id)
+            .first()
+        )
+        assert ticket is not None
+        assert ticket.resolved_at is None
+
+        # Verify escalation message was stored
+        # Note: The body will be from the previous message (offset 1),
+        # which should be customer's question or AI's reply depending on order
+        escalation_message = (
+            db_session.query(Message)
+            .filter(Message.message_sid == "SM_ESCALATE")
+            .first()
+        )
+        assert escalation_message is not None
+        # Verify it's not the button click body "Yes"
+        assert escalation_message.body != "Yes"
+        # Verify it's one of the previous messages
+        assert escalation_message.body in [
+            "I have a difficult problem",
+            "AI reply with escalate button",
+        ]
+
+        # Verify ticket created event was emitted
+        mock_emit_ticket.assert_called_once()
+
+    def test_multiple_messages_with_unresolved_ticket_all_emit(
+        self,
+        client: TestClient,
+        db_session: Session,
+        test_customer,
+        test_ticket,
+    ):
+        """
+        Test that multiple messages from same customer
+        with unresolved ticket all emit notifications (WHISPER mode path)
+        """
+        message_sids = ["SM_MSG1", "SM_MSG2", "SM_MSG3"]
+
+        with patch("routers.whatsapp.emit_message_created") as mock_emit:
+            for i, sid in enumerate(message_sids):
+                response = client.post(
+                    "/api/whatsapp/webhook",
+                    data={
+                        "From": f"whatsapp:{test_customer.phone_number}",
+                        "Body": f"Follow-up question {i + 1}",
+                        "MessageSid": sid,
+                    },
+                )
+                assert response.status_code == 200
+
+        # Verify all messages were created
+        messages = (
+            db_session.query(Message)
+            .filter(Message.message_sid.in_(message_sids))
+            .all()
+        )
+        assert len(messages) == 3
+
+        # Verify all messages have correct bodies
+        for i, msg in enumerate(
+            sorted(messages, key=lambda m: m.message_sid)
+        ):
+            assert msg.body == f"Follow-up question {i + 1}"
+            assert msg.customer_id == test_customer.id
+
+        # Verify emit_message_created was called for each message
+        # (WHISPER mode with existing ticket emits for EO notifications)
+        assert mock_emit.call_count == 3
+        for call in mock_emit.call_args_list:
+            call_kwargs = call[1]
+            assert call_kwargs["ticket_id"] == test_ticket.id
+            assert call_kwargs["customer_id"] == test_customer.id
