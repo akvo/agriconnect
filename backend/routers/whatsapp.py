@@ -15,6 +15,7 @@ from models.message import (
     MessageType,
 )
 from models.ticket import Ticket
+from models.administrative import Administrative
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
 from services.akvo_rag_service import get_akvo_rag_service
@@ -177,6 +178,13 @@ async def whatsapp_webhook(
 
                 # Emit message created event
                 ward_id = None
+                national_adm = (
+                    db.query(Administrative)
+                    .filter(Administrative.parent_id.is_(None))
+                    .first()
+                )
+                if national_adm:
+                    ward_id = national_adm.id
                 if (
                     hasattr(customer, "customer_administrative")
                     and len(customer.customer_administrative) > 0
@@ -297,6 +305,13 @@ async def whatsapp_webhook(
 
             # Emit message created event for real-time notifications
             ward_id = None
+            national_adm = (
+                db.query(Administrative)
+                .filter(Administrative.parent_id.is_(None))
+                .first()
+            )
+            if national_adm:
+                ward_id = national_adm.id
             if (
                 hasattr(customer, "customer_administrative")
                 and len(customer.customer_administrative) > 0
