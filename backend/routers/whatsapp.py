@@ -204,8 +204,21 @@ async def whatsapp_webhook(
             return {"status": "success", "message": "Escalation processed"}
 
         # ========================================
-        # FLOW 1: Regular message → AI auto-response (REPLY mode)
+        # FLOW 1: Regular message
+        # Check if customer has existing unresolved ticket to determine:
+        # - Existing ticket → WHISPER (no auto-reply)
+        # - No ticket → REPLY (auto-reply to farmer)
         # ========================================
+
+        # Check if customer has an existing unresolved ticket
+        existing_ticket = (
+            db.query(Ticket)
+            .filter(
+                Ticket.customer_id == customer.id,
+                Ticket.resolved_at.is_(None),
+            )
+            .first()
+        )
 
         # Create farmer message
         message = Message(
@@ -219,41 +232,139 @@ async def whatsapp_webhook(
         db.commit()
         db.refresh(message)
 
-        # Get recent chat history for context (use smaller limit for REPLY)
-        reply_history_limit = settings.escalation_reply_history_limit
-        chat_history = (
-            db.query(Message)
-            .filter(Message.customer_id == customer.id)
-            .filter(Message.created_at <= message.created_at)
-            .order_by(Message.created_at.desc())
-            .limit(reply_history_limit)
-            .all()
-        )
+        if existing_ticket:
+            # Customer has unresolved ticket → WHISPER mode (no auto-reply)
+            logger.info(
+                f"Customer {phone_number} has existing ticket "
+                f"{existing_ticket.ticket_number}, using WHISPER mode"
+            )
 
-        # Format chat history
-        chats = []
-        for msg in reversed(chat_history):
-            if msg.from_source == MessageFrom.CUSTOMER:
-                role = "user"
-            elif msg.from_source in (MessageFrom.USER, MessageFrom.LLM):
-                role = "assistant"
-            else:
-                continue  # Skip unknown sources
+            # Get chat history with larger limit for WHISPER
+            chat_history_limit = settings.escalation_chat_history_limit
+            chat_history = (
+                db.query(Message)
+                .filter(Message.customer_id == customer.id)
+                .filter(Message.created_at <= message.created_at)
+                .order_by(Message.created_at.desc())
+                .limit(chat_history_limit)
+                .all()
+            )
 
-            chats.append({"role": role, "content": msg.body})
+            # Format chat history
+            chats = []
+            for msg in reversed(chat_history):
+                if msg.from_source == MessageFrom.CUSTOMER:
+                    role = "user"
+                elif msg.from_source in (MessageFrom.USER, MessageFrom.LLM):
+                    role = "assistant"
+                else:
+                    continue  # Skip unknown sources
 
-        # Create REPLY job (AI answers farmer directly) if not testing
-        if not os.getenv("TESTING"):
-            rag_service = get_akvo_rag_service()
+                chats.append({"role": role, "content": msg.body})
+
+            # Add context instruction for whisper
+            chats.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Based on this conversation, "
+                        "please give an answer with "
+                        "the context we have provided"
+                    ),
+                }
+            )
+
+            # Create WHISPER job (AI suggests to EO) if not testing
+            if not os.getenv("TESTING"):
+                rag_service = get_akvo_rag_service()
+                trace_id = (
+                    f"whisper_t{existing_ticket.id}_m{message.id}"
+                )
+                asyncio.create_task(
+                    rag_service.create_chat_job(
+                        message_id=message.id,
+                        message_type=MessageType.WHISPER.value,
+                        customer_id=customer.id,
+                        ticket_id=existing_ticket.id,
+                        administrative_id=existing_ticket.administrative_id,
+                        chats=chats,
+                        trace_id=trace_id,
+                    )
+                )
+
+            # Emit message created event for real-time notifications
+            ward_id = None
+            if (
+                hasattr(customer, "customer_administrative")
+                and len(customer.customer_administrative) > 0
+            ):
+                ward_id = customer.customer_administrative[
+                    0
+                ].administrative_id
+
             asyncio.create_task(
-                rag_service.create_chat_job(
+                emit_message_created(
+                    ticket_id=existing_ticket.id,
                     message_id=message.id,
-                    message_type=MessageType.REPLY.value,
+                    message_sid=MessageSid,
                     customer_id=customer.id,
-                    chats=chats,
-                    trace_id=f"reply_c{customer.id}_m{message.id}",
+                    body=Body,
+                    from_source=MessageFrom.CUSTOMER,
+                    ts=message.created_at.isoformat(),
+                    administrative_id=ward_id,
+                    ticket_number=existing_ticket.ticket_number,
+                    customer_name=customer.full_name,
+                    sender_user_id=None,
                 )
             )
+
+        else:
+            # No existing ticket → REPLY mode (auto-reply to farmer)
+            logger.info(
+                f"Customer {phone_number} has no unresolved ticket, "
+                f"using REPLY mode"
+            )
+
+            # Get chat history with smaller limit for REPLY
+            reply_history_limit = settings.escalation_reply_history_limit
+            chat_history = (
+                db.query(Message)
+                .filter(Message.customer_id == customer.id)
+                .filter(Message.created_at <= message.created_at)
+                .order_by(Message.created_at.desc())
+                .limit(reply_history_limit)
+                .all()
+            )
+
+            # Format chat history
+            chats = []
+            for msg in reversed(chat_history):
+                if msg.from_source == MessageFrom.CUSTOMER:
+                    role = "user"
+                elif msg.from_source in (MessageFrom.USER, MessageFrom.LLM):
+                    role = "assistant"
+                else:
+                    continue  # Skip unknown sources
+
+                chats.append({"role": role, "content": msg.body})
+
+            # Create REPLY job (AI answers farmer directly) if not testing
+            if not os.getenv("TESTING"):
+                rag_service = get_akvo_rag_service()
+                asyncio.create_task(
+                    rag_service.create_chat_job(
+                        message_id=message.id,
+                        message_type=MessageType.REPLY.value,
+                        customer_id=customer.id,
+                        chats=chats,
+                        trace_id=f"reply_c{customer.id}_m{message.id}",
+                    )
+                )
+
+            # Emit message created event for real-time notifications
+            # Note: For REPLY mode without ticket, we don't emit to avoid
+            # notifying EOs about auto-handled conversations
+            # The message will still be stored and accessible via API
 
         # Send welcome message for new customers
         if is_new_customer:
