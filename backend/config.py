@@ -72,6 +72,10 @@ class Settings(BaseSettings):
         "AKVO_RAG_APP_ACCESS_TOKEN",
         _config.get("akvo_rag", {}).get("access_token"),
     )
+    print(
+        "Loaded AKVO_RAG_APP_ACCESS_TOKEN:",
+        _config.get("akvo_rag", {}).get("access_token")
+    )
     akvo_rag_knowledge_base_id: Optional[int] = (
         int(os.getenv("AKVO_RAG_APP_KNOWLEDGE_BASE_ID"))
         if os.getenv("AKVO_RAG_APP_KNOWLEDGE_BASE_ID")
