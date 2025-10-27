@@ -50,7 +50,6 @@ const convertToUIMessage = (
   // Determine the sender name for user messages
   // If msg has user_name (from database), use it
   // If user_id matches current user, show "You"
-  // Otherwise show "Unknown User"
   const userName = isCustomerMessage
     ? msg.customer_name
     : isLLMMessage

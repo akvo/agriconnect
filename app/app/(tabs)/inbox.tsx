@@ -105,11 +105,15 @@ const Inbox: React.FC = () => {
       );
     }
     // Navigate to the chat screen, passing ticketNumber as query param
+    const chatName =
+      ticket.customer?.name?.trim().length === 0
+        ? ticket.customer?.phoneNumber
+        : ticket.customer?.name || "Chat";
     router.push({
       pathname: "/chat",
       params: {
         ticketNumber: ticket.ticketNumber,
-        name: ticket.customer?.name || "Chat",
+        name: chatName,
         messageId: ticket.message?.id || undefined,
       },
     });

@@ -9,9 +9,10 @@ type Props = {
 };
 
 const HeaderTitle = ({ name }: Props) => {
+  const initName = name?.includes("+") ? "U" : name?.trim();
   return (
     <View style={styles.container}>
-      <Avatar initials={initialsFromName(name)} size={36} />
+      <Avatar initials={initialsFromName(initName)} size={36} />
       <View style={styles.textContainer}>
         <Text style={[typography.body2, styles.customerName]} numberOfLines={1}>
           {name}

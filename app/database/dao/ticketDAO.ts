@@ -120,7 +120,11 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
   private mapRowToTicket(row: any): Ticket {
     return {
       id: row.id,
-      customer: { id: row.customerId, name: row.customer_name },
+      customer: {
+        id: row.customerId,
+        name: row.customer_name,
+        phoneNumber: row.customer_phone,
+      },
       message: row.messageId
         ? {
             id: row.messageId,
@@ -145,6 +149,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     const stmt = db.prepareSync(
       `SELECT t.*, 
         cu.fullName as customer_name,
+        cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name
       FROM tickets t
@@ -171,6 +176,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     const stmt = db.prepareSync(
       `SELECT t.*, 
         cu.fullName as customer_name,
+        cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name
       FROM tickets t
@@ -267,6 +273,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     const stmt = db.prepareSync(
       `SELECT t.*, 
         cu.fullName as customer_name,
+        cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name
       FROM tickets t
@@ -305,6 +312,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     const stmt = db.prepareSync(
       `SELECT t.*, 
         cu.fullName as customer_name,
+        cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name
       FROM tickets t
@@ -374,7 +382,9 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
 
       for (const ticketData of tickets) {
         const result = this.upsert(db, ticketData);
-        if (result) count++;
+        if (result) {
+          count++;
+        }
       }
 
       db.execSync("COMMIT");

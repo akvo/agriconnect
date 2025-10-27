@@ -1,4 +1,4 @@
-type Customer = { id: number; name: string };
+type Customer = { id: number; name?: string; phoneNumber: string } | null;
 type User = { id: number; name: string } | null;
 type Message = { id: number; body: string; timestamp: string } | null;
 

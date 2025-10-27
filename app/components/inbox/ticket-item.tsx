@@ -55,7 +55,9 @@ const TicketItem: React.FC<{
                 { color: themeColors.textPrimary },
               ]}
             >
-              {ticket.customer.name}
+              {ticket.customer.name?.trim().length === 0
+                ? ticket.customer.phoneNumber
+                : ticket.customer.name}
             </Text>
             <Text
               style={[

@@ -232,7 +232,7 @@ class TicketSyncService {
         const created = dao.customerUser.create(db, {
           id: customerData.id, // Use backend customer ID directly
           phoneNumber: customerData.phone_number || `unknown_${Date.now()}`,
-          fullName: customerData.name || customerData.full_name || "Unknown",
+          fullName: customerData.name || customerData.full_name || "",
           language: customerData.language || "en",
         });
         return created.id;
