@@ -6,6 +6,7 @@ import {
   UpdateMessageData,
   MessageWithUsers,
 } from "./types/message";
+import { MessageFrom } from "@/constants/messageSource";
 
 export class MessageDAO extends BaseDAOImpl<Message> {
   constructor() {
@@ -19,7 +20,12 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     const hasId = data.id !== undefined;
 
     console.log(
-      `[MessageDAO.create] Attempting to create message - id=${data.id}, from_source=${data.from_source}, body="${data.body.substring(0, 50)}..."`,
+      `[MessageDAO.create] Attempting to create message - id=${
+        data.id
+      }, from_source=${data.from_source}, body="${data.body.substring(
+        0,
+        50,
+      )}..."`,
     );
 
     // Check if message with this ID already exists (for backend messages)
@@ -76,7 +82,9 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       const messageId = hasId ? data.id! : result.lastInsertRowId;
 
       console.log(
-        `[MessageDAO.create] Successfully created message - id=${messageId}, from_source=${data.from_source}, body="${data.body.substring(0, 50)}..."`,
+        `[MessageDAO.create] Successfully created message - id=${messageId}, from_source=${
+          data.from_source
+        }, body="${data.body.substring(0, 50)}..."`,
       );
 
       const message = this.findById(db, messageId as number);
@@ -86,7 +94,12 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       return message;
     } catch (error) {
       console.error(
-        `[MessageDAO.create] Error creating message - id=${data.id}, from_source=${data.from_source}, body="${data.body.substring(0, 50)}...":`,
+        `[MessageDAO.create] Error creating message - id=${
+          data.id
+        }, from_source=${data.from_source}, body="${data.body.substring(
+          0,
+          50,
+        )}...":`,
         error,
       );
       throw error;
@@ -233,7 +246,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
       LEFT JOIN users u ON m.user_id = u.id
-      WHERE m.customer_id = ?
+      WHERE m.customer_id = ? AND m.message_type IS NOT 'WHISPER'
       ORDER BY m.createdAt DESC
       LIMIT ?`,
     );
@@ -250,108 +263,29 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     }
   }
 
-  // Get messages by ticket ID with pagination (for scroll-to-top loading older messages)
-  // Returns messages in ASC order (oldest to newest)
-  // limit: number of messages to return
-  // offset: number of messages to skip from the oldest
-  getMessagesByTicketId(
+  // Get last AI suggestion message by customer ID and message type (WHISPER)
+  getLastAISuggestionByCustomerId(
     db: SQLiteDatabase,
-    ticketId: number,
-    limit: number = 20,
-    offset: number = 0,
-  ): MessageWithUsers[] {
-    // First, get the customer_id from the ticket
-    const ticketStmt = db.prepareSync(
-      "SELECT customerId FROM tickets WHERE id = ?",
-    );
-    let customerId: number | null = null;
-
-    try {
-      const ticketResult = ticketStmt.executeSync<{ customerId: number }>([
-        ticketId,
-      ]);
-      const ticket = ticketResult.getFirstSync();
-      customerId = ticket?.customerId || null;
-    } catch (error) {
-      console.error("Error getting ticket customer_id:", error);
-      return [];
-    } finally {
-      ticketStmt.finalizeSync();
-    }
-
-    if (!customerId) {
-      console.error(`Ticket ${ticketId} not found or has no customer`);
-      return [];
-    }
-
-    // Get messages with pagination, ordered by createdAt ASC (oldest to newest)
+    customerId: number,
+  ): Message | null {
+    // Get the last AI suggestion message for that customer and message type
     const stmt = db.prepareSync(
-      `SELECT
-        m.*,
-        f.fullName as customer_name,
-        f.phoneNumber as customer_phone,
-        u.fullName as user_name,
-        u.email as user_email
-      FROM messages m
-      JOIN customer_users f ON m.customer_id = f.id
-      LEFT JOIN users u ON m.user_id = u.id
-      WHERE m.customer_id = ?
-      ORDER BY m.createdAt ASC
-      LIMIT ? OFFSET ?`,
+      `SELECT *
+      FROM messages
+      WHERE customer_id = ? AND from_source = ? AND message_type = ?
+      ORDER BY createdAt DESC
+      LIMIT 1`,
     );
     try {
-      const result = stmt.executeSync<MessageWithUsers>([
+      const result = stmt.executeSync<Message>([
         customerId,
-        limit,
-        offset,
+        MessageFrom.LLM,
+        "WHISPER",
       ]);
-      return result.getAllSync();
+      return result.getFirstSync() || null;
     } catch (error) {
-      console.error(
-        "Error getting messages by ticket ID with pagination:",
-        error,
-      );
-      return [];
-    } finally {
-      stmt.finalizeSync();
-    }
-  }
-
-  // Get total message count for a ticket (for pagination)
-  getMessageCountByTicketId(db: SQLiteDatabase, ticketId: number): number {
-    // First, get the customer_id from the ticket
-    const ticketStmt = db.prepareSync(
-      "SELECT customerId FROM tickets WHERE id = ?",
-    );
-    let customerId: number | null = null;
-
-    try {
-      const ticketResult = ticketStmt.executeSync<{ customerId: number }>([
-        ticketId,
-      ]);
-      const ticket = ticketResult.getFirstSync();
-      customerId = ticket?.customerId || null;
-    } catch (error) {
-      console.error("Error getting ticket customer_id:", error);
-      return 0;
-    } finally {
-      ticketStmt.finalizeSync();
-    }
-
-    if (!customerId) {
-      return 0;
-    }
-
-    const stmt = db.prepareSync(
-      "SELECT COUNT(*) as count FROM messages WHERE customer_id = ?",
-    );
-    try {
-      const result = stmt.executeSync<{ count: number }>([customerId]);
-      const row = result.getFirstSync();
-      return row?.count || 0;
-    } catch (error) {
-      console.error("Error getting message count:", error);
-      return 0;
+      console.error("Error getting last AI suggestion message:", error);
+      return null;
     } finally {
       stmt.finalizeSync();
     }

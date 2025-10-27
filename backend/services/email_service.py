@@ -39,11 +39,20 @@ class EmailService:
         template_dir = Path(__file__).parent.parent / "templates"
         self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
 
-        # If running in test mode, disable actual sending to avoid
-        # failures when SMTP credentials are not available. We detect
-        # only the `TEST` environment variable. Accept '1' or 'true'.
+        # CRITICAL: Prevent real email sending during tests
+        # Check both TEST and TESTING environment variables for compatibility
+        # This aligns with WhatsAppService testing strategy
         test_val = os.getenv("TEST", "").lower()
-        self.disable_sending = test_val in ("1", "true")
+        testing_val = os.getenv("TESTING", "").lower()
+        self.disable_sending = (
+            test_val in ("1", "true") or testing_val in ("1", "true", "yes")
+        )
+
+        if self.disable_sending:
+            logger.info(
+                "EmailService initialized in TESTING mode - "
+                "emails will NOT be sent"
+            )
 
     async def send_invitation_email(
         self,

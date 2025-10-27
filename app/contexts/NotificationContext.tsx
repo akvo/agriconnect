@@ -53,7 +53,6 @@ Notifications.setNotificationHandler({
         `[Notifications] Suppressing notification for active ticket ${ticketId}`,
       );
       return {
-        shouldShowAlert: false,
         shouldPlaySound: false,
         shouldSetBadge: false,
         shouldShowBanner: false,
@@ -61,8 +60,9 @@ Notifications.setNotificationHandler({
       };
     }
 
+    // Show notification banner, list, play sound, and update badge
+    // Note: shouldShowAlert is deprecated, use shouldShowBanner and shouldShowList
     return {
-      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
       shouldShowBanner: true,
@@ -77,8 +77,12 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] =
     useState<Notifications.Notification | null>(null);
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<
+    Notifications.EventSubscription | undefined
+  >(undefined);
+  const responseListener = useRef<Notifications.EventSubscription | undefined>(
+    undefined,
+  );
   const router = useRouter();
   const { user } = useAuth();
 
@@ -140,7 +144,20 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
       });
 
       token = pushTokenData.data;
-      console.log("Push token generated:", token);
+
+      // Validate token format
+      if (!token || !token.startsWith("ExponentPushToken[")) {
+        console.error(
+          "❌ Invalid push token format received:",
+          token ? token.substring(0, 30) + "..." : "null",
+        );
+        console.error(
+          "Expected format: ExponentPushToken[...], but got different format",
+        );
+        return undefined;
+      }
+
+      console.log("✅ Push token generated:", token.substring(0, 30) + "...");
 
       return token;
     } catch (error) {
@@ -157,16 +174,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     // Check if user has administrative location
-    if (!user.administrativeLocation?.id) {
-      console.warn(
-        "[Device Registration] Cannot register device: user has no administrative location",
-      );
-      console.warn(
-        "[Device Registration] User object:",
-        JSON.stringify(user, null, 2),
-      );
-      return;
-    }
+    // Admin users may not have one, use a fallback
+    const administrativeId = user.administrativeLocation?.id;
 
     try {
       const appVersion = Constants.expoConfig?.version || "1.0.0";
@@ -178,13 +187,13 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
       );
       console.log(
         "[Device Registration] Administrative ID:",
-        user.administrativeLocation.id,
+        administrativeId || "N/A (admin user)",
       );
       console.log("[Device Registration] App version:", appVersion);
 
       await api.registerDevice(user.accessToken, {
         push_token: expoPushToken,
-        administrative_id: user.administrativeLocation.id,
+        administrative_id: administrativeId,
         app_version: appVersion,
       });
 
@@ -218,10 +227,16 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Error getting push token:", error);
       });
 
-    // Listen for push token updates
+    // Listen for push token updates (rare, but important for backend sync)
     const tokenListener = Notifications.addPushTokenListener((event) => {
-      console.log("Push token updated:", event.data);
-      setExpoPushToken(event.data);
+      console.log("🔄 Push token updated:", event.data);
+      const newToken = event.data;
+
+      // Validate token format before saving
+      if (newToken && newToken.startsWith("ExponentPushToken[")) {
+        console.log("✅ Token validated, updating state");
+        setExpoPushToken(newToken);
+      }
     });
 
     // Listen for notifications received while app is foregrounded

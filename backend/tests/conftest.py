@@ -1,3 +1,49 @@
+"""
+Test Configuration and Fixtures
+
+CRITICAL SECURITY: This file implements defense-in-depth mocking to prevent
+real API calls (WhatsApp/Twilio, Email, Push Notifications) during testing.
+
+## Mocking Strategy
+
+### 1. Environment-Based Mocking (Primary Defense)
+   - Sets TESTING=true environment variable
+   - WhatsAppService checks this in __init__ and creates mock client
+   - Prevents accidental real API calls even if patching fails
+
+### 2. Patch-Based Mocking (Secondary Defense)
+   - Patches WhatsAppService in ALL routers (callbacks, messages, whatsapp)
+   - Provides MockWhatsAppService with all required methods
+   - Ensures consistent mock behavior across all tests
+
+### 3. Service-Level Mocking (Tertiary Defense)
+   - Mocks PushNotificationService to prevent push notifications
+   - Mocks EmailService to prevent email sending
+   - Mocks WebSocket emitters to prevent real-time events
+
+## Why Defense-in-Depth?
+   - Tests must NEVER trigger real API calls
+   - Real API calls can:
+     * Cost money (Twilio charges per message)
+     * Send messages to real phone numbers
+     * Leak test data to production systems
+   - Multiple layers ensure safety even if one layer fails
+
+## Adding New External Services
+   When adding new external services:
+   1. Add TESTING environment check in service __init__
+   2. Create mock class in this file
+   3. Patch service in ALL locations where it's imported
+   4. Add tests to verify mocking works
+
+## Testing the Mocking
+   Run: pytest tests/test_whatsapp_service.py -v
+   Run: pytest tests/test_customer_endpoints.py -v
+   Run: pytest tests/test_callbacks.py -v
+
+   All should pass with NO real API calls.
+"""
+
 import os
 
 import pytest
@@ -10,8 +56,11 @@ from database import Base, get_db
 from main import app
 from models.customer import AgeGroup
 
-# Set testing environment
-os.environ["TESTING"] = "true"
+# CRITICAL: Set testing environment to prevent real API calls
+# This is the PRIMARY defense against real Twilio/WhatsApp/Email API calls
+# Set both TESTING and TEST for backward compatibility with different services
+os.environ["TESTING"] = "true"  # Used by WhatsAppService
+os.environ["TEST"] = "true"      # Used by EmailService
 
 # Test database URL
 TEST_DATABASE_URL = "postgresql://akvo:password@db:5432/agriconnect_test"
@@ -165,10 +214,60 @@ def auth_headers_factory(db_session):
 
 @pytest.fixture(autouse=True)
 def mock_websocket_emitters(monkeypatch):
-    """Mock WebSocket emitters for all tests to avoid async issues."""
+    """Mock WebSocket emitters and push notifications for all tests."""
 
     async def mock_emit(*args, **kwargs):
         pass
+
+    # Mock a push notification service that does nothing
+    class MockPushNotificationService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def notify_new_ticket(self, *args, **kwargs):
+            pass
+
+        def notify_ticket_resolved(self, *args, **kwargs):
+            pass
+
+        def notify_message_status(self, *args, **kwargs):
+            pass
+
+    # Mock WhatsAppService to prevent actual API calls
+    # CRITICAL: This mock prevents ANY real WhatsApp/Twilio API calls
+    # during testing, regardless of environment configuration
+    class MockWhatsAppService:
+        def __init__(self, *args, **kwargs):
+            self.testing_mode = True  # Always in test mode
+            import uuid
+            self._uuid = uuid  # Store for use in methods
+
+        def _generate_unique_sid(self):
+            """Generate unique SID to prevent DB constraint violations"""
+            return f"MOCK_SID_{self._uuid.uuid4().hex[:12].upper()}"
+
+        def send_confirmation_template(self, *args, **kwargs):
+            return {"sid": self._generate_unique_sid(), "status": "sent"}
+
+        def send_message(self, *args, **kwargs):
+            return {"sid": self._generate_unique_sid(), "status": "sent"}
+
+        def send_template_message(self, *args, **kwargs):
+            return {"sid": self._generate_unique_sid(), "status": "sent"}
+
+        def send_welcome_message(self, *args, **kwargs):
+            return {"sid": self._generate_unique_sid(), "status": "sent"}
+
+    # Mock EmailService to prevent actual email sending
+    class MockEmailService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def send_invitation_email(self, *args, **kwargs):
+            return True
+
+        async def send_password_reset_email(self, *args, **kwargs):
+            return True
 
     monkeypatch.setattr("routers.messages.emit_message_created", mock_emit)
     monkeypatch.setattr(
@@ -176,3 +275,44 @@ def mock_websocket_emitters(monkeypatch):
     )
     monkeypatch.setattr("routers.messages.emit_ticket_resolved", mock_emit)
     monkeypatch.setattr("routers.tickets.emit_ticket_created", mock_emit)
+    monkeypatch.setattr("routers.callbacks.emit_whisper_created", mock_emit)
+    monkeypatch.setattr(
+        "routers.ws.PushNotificationService",
+        MockPushNotificationService
+    )
+
+    # CRITICAL: Patch WhatsAppService in ALL routers to prevent real API calls
+    # This is defense-in-depth: even if TESTING env var isn't set,
+    # these mocks ensure no real messages are sent during tests
+    monkeypatch.setattr(
+        "routers.callbacks.WhatsAppService",
+        MockWhatsAppService
+    )
+    monkeypatch.setattr(
+        "routers.messages.WhatsAppService",
+        MockWhatsAppService
+    )
+    monkeypatch.setattr(
+        "routers.whatsapp.WhatsAppService",
+        MockWhatsAppService
+    )
+
+    # Mock the email_service instance (not EmailService class)
+    monkeypatch.setattr(
+        "services.user_service.email_service",
+        MockEmailService()
+    )
+
+
+@pytest.fixture
+def mock_akvo_rag_client(monkeypatch):
+    """Mock httpx client for akvo-rag service tests"""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_client = AsyncMock()
+    mock_response = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    return mock_client, mock_response

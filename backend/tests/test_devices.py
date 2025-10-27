@@ -101,10 +101,7 @@ def auth_headers(auth_user):
 def auth_headers2(auth_user2):
     """Create authentication headers for second test user."""
     token = create_access_token(
-        data={
-            "sub": auth_user2.email,
-            "user_type": auth_user2.user_type.value
-        }
+        data={"sub": auth_user2.email, "user_type": auth_user2.user_type.value}
     )
     return {"Authorization": f"Bearer {token}"}
 
@@ -169,6 +166,7 @@ class TestDeviceRegistration:
         """Test that re-registering same token updates device."""
         # First registration
         device = Device(
+            user_id=auth_user.id,
             administrative_id=administrative_area.id,
             push_token="ExponentPushToken[existing]",
             app_version="1.0.0",
@@ -193,6 +191,7 @@ class TestDeviceRegistration:
 
         # Should be same device ID (upsert behavior)
         assert data["id"] == device_id
+        assert data["user_id"] == auth_user.id
         assert data["app_version"] == "1.1.0"
         assert data["is_active"] is True
 
@@ -201,8 +200,12 @@ class TestDeviceRegistration:
         assert device_count == 1
 
     def test_register_device_without_access_to_area(
-        self, client, db_session, auth_user2, auth_headers2,
-        administrative_level
+        self,
+        client,
+        db_session,
+        auth_user2,
+        auth_headers2,
+        administrative_level,
     ):
         """Test that user cannot register device for area without access."""
         # Create an administrative area
@@ -268,6 +271,93 @@ class TestDeviceRegistration:
 
         assert response.status_code == 422, "Expected 422 Validation Error"
 
+    def test_register_device_invalid_token_format_no_prefix(
+        self, client, administrative_area, auth_headers
+    ):
+        """
+        Test validation error for invalid
+        token without ExponentPushToken prefix.
+        """
+        payload = {
+            "push_token": "dXV1LjrWT0Wr_rkvwQK_ci:APA91bH...",
+            "administrative_id": administrative_area.id,
+        }
+
+        response = client.post(
+            "/api/devices", json=payload, headers=auth_headers
+        )
+
+        assert response.status_code == 422
+        error_detail = response.json()["detail"][0]
+        assert "Invalid push token format" in error_detail["msg"]
+        assert "ExponentPushToken" in error_detail["msg"]
+
+    def test_register_device_invalid_token_format_no_brackets(
+        self, client, administrative_area, auth_headers
+    ):
+        """Test validation error for token without proper bracket format."""
+        payload = {
+            "push_token": "ExponentPushToken-invalid-format",
+            "administrative_id": administrative_area.id,
+        }
+
+        response = client.post(
+            "/api/devices", json=payload, headers=auth_headers
+        )
+
+        assert response.status_code == 422
+        error_detail = response.json()["detail"][0]
+        assert "Invalid push token format" in error_detail["msg"]
+
+    def test_register_device_invalid_token_format_no_closing_bracket(
+        self, client, administrative_area, auth_headers
+    ):
+        """Test validation error for token without closing bracket."""
+        payload = {
+            "push_token": "ExponentPushToken[xxxxxxxxxxxxx",
+            "administrative_id": administrative_area.id,
+        }
+
+        response = client.post(
+            "/api/devices", json=payload, headers=auth_headers
+        )
+
+        assert response.status_code == 422
+        error_detail = response.json()["detail"][0]
+        assert "must end with ']'" in error_detail["msg"]
+
+    def test_register_device_invalid_token_too_short(
+        self, client, administrative_area, auth_headers
+    ):
+        """Test validation error for token that's too short."""
+        payload = {
+            "push_token": "ExponentPushToken[]",  # 20 chars exactly, need > 20
+            "administrative_id": administrative_area.id,
+        }
+
+        response = client.post(
+            "/api/devices", json=payload, headers=auth_headers
+        )
+
+        assert response.status_code == 422
+        error_detail = response.json()["detail"][0]
+        assert "too short" in error_detail["msg"]
+
+    def test_register_device_empty_token(
+        self, client, administrative_area, auth_headers
+    ):
+        """Test validation error for empty token."""
+        payload = {
+            "push_token": "",
+            "administrative_id": administrative_area.id,
+        }
+
+        response = client.post(
+            "/api/devices", json=payload, headers=auth_headers
+        )
+
+        assert response.status_code == 422
+
 
 class TestListDevices:
     """Tests for GET /api/devices endpoint."""
@@ -322,8 +412,13 @@ class TestListDevices:
         assert len(data) == 2
 
     def test_list_devices_only_own_areas(
-        self, client, db_session, auth_user, administrative_area,
-        administrative_level, auth_headers
+        self,
+        client,
+        db_session,
+        auth_user,
+        administrative_area,
+        administrative_level,
+        auth_headers,
     ):
         """Test that users only see devices in their assigned areas."""
         # Create device in user's area
@@ -453,8 +548,7 @@ class TestUpdateDevice:
         assert response.status_code == 404
 
     def test_update_device_forbidden_other_area(
-        self, client, db_session, auth_user, auth_headers,
-        administrative_level
+        self, client, db_session, auth_user, auth_headers, administrative_level
     ):
         """Test that users cannot update devices in other areas."""
         # Create device in different area
@@ -537,8 +631,7 @@ class TestDeleteDevice:
         assert response.status_code == 404
 
     def test_delete_device_forbidden_other_area(
-        self, client, db_session, auth_user, auth_headers,
-        administrative_level
+        self, client, db_session, auth_user, auth_headers, administrative_level
     ):
         """Test that users cannot delete devices in other areas."""
         # Create device in different area
@@ -585,3 +678,188 @@ class TestDeleteDevice:
         response = client.delete(f"/api/devices/{device.id}")
 
         assert response.status_code == 403
+
+
+class TestLogoutDevices:
+    """Tests for POST /api/devices/logout endpoint."""
+
+    def test_logout_deactivates_all_user_devices(
+        self, client, db_session, auth_user, administrative_area, auth_headers
+    ):
+        """Test that logout deactivates all devices for the user."""
+        # Create multiple devices for the user
+        device1 = Device(
+            user_id=auth_user.id,
+            administrative_id=administrative_area.id,
+            push_token="ExponentPushToken[logout1]",
+            is_active=True,
+        )
+        device2 = Device(
+            user_id=auth_user.id,
+            administrative_id=administrative_area.id,
+            push_token="ExponentPushToken[logout2]",
+            is_active=True,
+        )
+        db_session.add_all([device1, device2])
+        db_session.commit()
+
+        # Logout
+        response = client.post("/api/devices/logout", headers=auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["deactivated_count"] == 2
+        assert "2 device(s)" in data["message"]
+
+        # Verify devices are deactivated in database
+        db_session.refresh(device1)
+        db_session.refresh(device2)
+        assert device1.is_active is False
+        assert device2.is_active is False
+
+    def test_logout_only_deactivates_user_devices(
+        self,
+        client,
+        db_session,
+        auth_user,
+        auth_user2,
+        administrative_area,
+        auth_headers,
+    ):
+        """Test that logout only deactivates current user's devices."""
+        # Create devices for both users
+        user1_device = Device(
+            user_id=auth_user.id,
+            administrative_id=administrative_area.id,
+            push_token="ExponentPushToken[user1logout]",
+            is_active=True,
+        )
+        user2_device = Device(
+            user_id=auth_user2.id,
+            administrative_id=administrative_area.id,
+            push_token="ExponentPushToken[user2logout]",
+            is_active=True,
+        )
+        db_session.add_all([user1_device, user2_device])
+        db_session.commit()
+
+        # Logout as user 1
+        response = client.post("/api/devices/logout", headers=auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["deactivated_count"] == 1
+
+        # Verify only user1's device is deactivated
+        db_session.refresh(user1_device)
+        db_session.refresh(user2_device)
+        assert user1_device.is_active is False
+        assert user2_device.is_active is True
+
+    def test_logout_with_no_devices(self, client, auth_headers):
+        """Test logout when user has no devices."""
+        response = client.post("/api/devices/logout", headers=auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["deactivated_count"] == 0
+
+    def test_logout_with_already_inactive_devices(
+        self, client, db_session, auth_user, administrative_area, auth_headers
+    ):
+        """Test logout when devices are already inactive."""
+        device = Device(
+            user_id=auth_user.id,
+            administrative_id=administrative_area.id,
+            push_token="ExponentPushToken[alreadyinactive]",
+            is_active=False,
+        )
+        db_session.add(device)
+        db_session.commit()
+
+        response = client.post("/api/devices/logout", headers=auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["deactivated_count"] == 0
+
+    def test_logout_requires_auth(self, client):
+        """Test that logout requires authentication."""
+        response = client.post("/api/devices/logout")
+
+        assert response.status_code == 403
+
+
+class TestUserDeviceTracking:
+    """Tests for user_id tracking in device registration."""
+
+    def test_device_switches_user_on_reregistration(
+        self,
+        client,
+        db_session,
+        auth_user,
+        auth_user2,
+        administrative_area,
+        auth_headers,
+        auth_headers2,
+    ):
+        """Test that device user_id updates when different user logs in."""
+        # User 1 registers device
+        payload = {
+            "push_token": "ExponentPushToken[switchuser]",
+            "administrative_id": administrative_area.id,
+        }
+
+        response1 = client.post(
+            "/api/devices", json=payload, headers=auth_headers
+        )
+        assert response1.status_code == 201
+        device_id = response1.json()["id"]
+        assert response1.json()["user_id"] == auth_user.id
+
+        # Assign user2 to same administrative area
+        user_admin2 = UserAdministrative(
+            user_id=auth_user2.id,
+            administrative_id=administrative_area.id,
+        )
+        db_session.add(user_admin2)
+        db_session.commit()
+
+        # User 2 registers same device (simulates logout/login)
+        response2 = client.post(
+            "/api/devices", json=payload, headers=auth_headers2
+        )
+        assert response2.status_code == 201
+        assert response2.json()["id"] == device_id  # Same device
+        assert response2.json()["user_id"] == auth_user2.id  # Updated user
+
+        # Verify only one device exists
+        device_count = db_session.query(Device).count()
+        assert device_count == 1
+
+        # Verify user_id was updated
+        device = db_session.query(Device).filter_by(id=device_id).first()
+        assert device.user_id == auth_user2.id
+
+    def test_device_has_user_id_on_creation(
+        self, client, db_session, auth_user, administrative_area, auth_headers
+    ):
+        """Test that newly created devices have user_id set."""
+        payload = {
+            "push_token": "ExponentPushToken[newdevice]",
+            "administrative_id": administrative_area.id,
+        }
+
+        response = client.post(
+            "/api/devices", json=payload, headers=auth_headers
+        )
+
+        assert response.status_code == 201
+        device_id = response.json()["id"]
+
+        # Check database
+        device = db_session.query(Device).filter_by(id=device_id).first()
+        assert device.user_id == auth_user.id
+        assert device.user_id is not None

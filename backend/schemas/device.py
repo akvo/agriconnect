@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class DeviceRegisterRequest(BaseModel):
@@ -22,11 +22,47 @@ class DeviceRegisterRequest(BaseModel):
         max_length=50,
     )
 
+    @field_validator("push_token")
+    @classmethod
+    def validate_push_token(cls, v: str) -> str:
+        """
+        Validate that push token has correct Expo format.
+
+        Valid Expo push token format: ExponentPushToken[XXXXXX...]
+        Invalid formats will be rejected
+        to prevent silent notification failures.
+        """
+        if not v:
+            raise ValueError("Push token cannot be empty")
+
+        if not v.startswith("ExponentPushToken["):
+            raise ValueError(
+                "Invalid push token format. Expected format: "
+                "ExponentPushToken[...]. "
+                f"Received: {v[:50]}..."
+            )
+
+        if not v.endswith("]"):
+            raise ValueError(
+                "Invalid push token format. Token must end with ']'. "
+                f"Received: {v[:50]}..."
+            )
+
+        # Check minimum length (ExponentPushToken[X] = 21 chars minimum)
+        if len(v) < 21:
+            raise ValueError(
+                f"Push token too short. Expected at least 21 characters, "
+                f"got {len(v)}"
+            )
+
+        return v
+
 
 class DeviceResponse(BaseModel):
     """Response schema for device operations."""
 
     id: int
+    user_id: Optional[int]
     administrative_id: int
     push_token: str
     app_version: Optional[str]

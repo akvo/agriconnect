@@ -27,7 +27,10 @@ const BroadcastLayout = () => {
     : "index";
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: themeColors.background }}
+      edges={["left", "right", "bottom"]}
+    >
       {/* Custom Tabs at Top */}
       <View style={styles.tabsContainer}>
         <View style={styles.tabList}>

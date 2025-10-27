@@ -2,12 +2,12 @@ module.exports = {
   expo: {
     name: "agriconnect",
     slug: "agriconnect",
-    version: "1.0.4",
+    version: "1.0.5",
     owner: "akvo",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "agriconnect",
-    userInterfaceStyle: "automatic",
+    userInterfaceStyle: "light",
     newArchEnabled: true,
     android: {
       package: "com.akvo.agriconnect",
@@ -41,10 +41,7 @@ module.exports = {
           image: "./assets/images/splash-icon.png",
           imageWidth: 200,
           resizeMode: "contain",
-          backgroundColor: "#ffffff",
-          dark: {
-            backgroundColor: "#000000",
-          },
+          backgroundColor: "#027E5D",
         },
       ],
       [
@@ -64,7 +61,9 @@ module.exports = {
       ],
     ],
     androidNavigationBar: {
-      visible: "immersive",
+      visible: "sticky-immersive",
+      barStyle: "light-content",
+      backgroundColor: "#000000",
     },
     experiments: {
       typedRoutes: true,

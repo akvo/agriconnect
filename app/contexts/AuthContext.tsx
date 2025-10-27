@@ -204,6 +204,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     try {
       console.log("🔄 Starting logout process...");
 
+      // Deactivate devices on backend BEFORE clearing local state
+      if (user?.accessToken) {
+        try {
+          console.log("📱 Deactivating devices on backend...");
+          await api.logoutDevices(user.accessToken);
+          console.log("✅ Devices deactivated successfully");
+        } catch (error) {
+          console.error("⚠️ Failed to deactivate devices:", error);
+          // Don't block logout if device deactivation fails
+        }
+      }
+
       // Set user state to null immediately for UI feedback
       setUser(null);
       setIsValid(false);
