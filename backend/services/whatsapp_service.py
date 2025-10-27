@@ -149,6 +149,10 @@ class WhatsAppService:
         if not text:
             return "Response is being processed."
 
+        # Ensure text length does not exceed WhatsApp limits
+        max_length = 1500
+        if len(text) > max_length:
+            text = text[:max_length - 3].rstrip() + "..."
         return text
 
     def send_template_message(
