@@ -65,11 +65,11 @@ async def ai_callback(
                             payload.callback_params.message_type
                             == MessageType.REPLY
                         ):
-                            # REPLY mode: Send AI answer to farmer with confirmation template
+                            # REPLY mode: Send AI answer to farmer, then send confirmation template
                             try:
                                 whatsapp_service = WhatsAppService()
 
-                                # Send AI answer with confirmation template
+                                # Send AI answer as separate message, then confirmation template
                                 # Template includes buttons: "Yes" (escalate) and "No" (none)
                                 response = whatsapp_service.send_confirmation_template(
                                     to_number=ai_message.customer.phone_number,
@@ -77,7 +77,7 @@ async def ai_callback(
                                 )
 
                                 print(
-                                    "WhatsApp AI reply sent with confirmation template: "
+                                    "WhatsApp AI reply and confirmation template sent: "
                                     f"{response.get('sid')}"
                                 )
                             except Exception as e:

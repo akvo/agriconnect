@@ -405,7 +405,7 @@ class TestWhatsAppService:
                 )
 
     def test_send_confirmation_template_success(self):
-        """Test sending confirmation template with AI answer"""
+        """Test sending confirmation template sends AI answer then template"""
         # Set TESTING=false
         # to test the real code path (with mocked Twilio client)
         env_vars = {
@@ -424,14 +424,26 @@ class TestWhatsAppService:
                         "HX123abc456"
                     )
 
-                    mock_message = Mock()
-                    mock_message.sid = "SM999"
-                    mock_message.status = "sent"
+                    # Mock two messages: AI answer and template
+                    mock_answer_msg = Mock()
+                    mock_answer_msg.sid = "SM888"
+                    mock_answer_msg.status = "sent"
+                    mock_answer_msg.to = "whatsapp:+255123456789"
+                    mock_answer_msg.body = (
+                        "Your crops need watering this week."
+                    )
+
+                    mock_template_msg = Mock()
+                    mock_template_msg.sid = "SM999"
+                    mock_template_msg.status = "sent"
 
                     mock_client_instance = Mock()
-                    mock_client_instance.messages.create.return_value = (
-                        mock_message
-                    )
+                    # First call: send_message (AI answer)
+                    # Second call: send template
+                    mock_client_instance.messages.create.side_effect = [
+                        mock_answer_msg,
+                        mock_template_msg,
+                    ]
                     mock_client.return_value = mock_client_instance
 
                     service = WhatsAppService()
@@ -440,22 +452,28 @@ class TestWhatsAppService:
                         "Your crops need watering this week.",
                     )
 
+                    # Should return the template message SID
                     assert result == {"sid": "SM999", "status": "sent"}
 
-                    # Verify content_variables is JSON string
-                    call_args = mock_client_instance.messages.create.call_args
-                    import json
+                    # Verify two messages were sent
+                    assert mock_client_instance.messages.create.call_count == 2
 
-                    content_vars = json.loads(
-                        call_args.kwargs["content_variables"]
+                    # First call: AI answer as regular message
+                    first_call = mock_client_instance\
+                        .messages.create.call_args_list[0]
+                    assert first_call.kwargs["body"] == (
+                        "Your crops need watering this week."
                     )
-                    assert (
-                        content_vars["ai_answer"]
-                        == "Your crops need watering this week."
-                    )
+                    assert first_call.kwargs["to"] == "whatsapp:+255123456789"
+
+                    # Second call: Template without variables
+                    second_call = mock_client_instance\
+                        .messages.create.call_args_list[1]
+                    assert second_call.kwargs["content_sid"] == "HX123abc456"
+                    assert "content_variables" not in second_call.kwargs
 
     def test_send_confirmation_template_no_template_sid(self):
-        """Test fallback to plain message when no template SID configured"""
+        """Test sends AI answer only when no template SID configured"""
         # Set TESTING=false to test real code path (with mocked Twilio client)
         env_vars = {
             "TWILIO_ACCOUNT_SID": "test_sid",
@@ -487,8 +505,9 @@ class TestWhatsAppService:
                         "+255123456789", "AI answer text"
                     )
 
-                    # Should fallback to send_message
+                    # Should only send AI answer, no template
                     assert result["sid"] == "SM888"
+                    # Only one message sent (AI answer)
                     mock_client_instance.messages.create.assert_called_once()
 
     def test_send_confirmation_template_testing_mode(self):
@@ -510,7 +529,9 @@ class TestWhatsAppService:
                 assert result == {"sid": "TESTING_MODE", "status": "sent"}
 
     def test_send_confirmation_template_twilio_error(self):
-        """Test confirmation template fallback on Twilio error"""
+        """
+        Test confirmation template returns answer response when template fails
+        """
         # Set TESTING=false to test real code path (with mocked Twilio client)
         env_vars = {
             "TWILIO_ACCOUNT_SID": "test_sid",
@@ -528,16 +549,17 @@ class TestWhatsAppService:
                     )
 
                     mock_client_instance = Mock()
-                    # Template fails, then fallback succeeds
-                    mock_message = Mock()
-                    mock_message.sid = "SM777"
-                    mock_message.status = "sent"
-                    mock_message.to = "whatsapp:+255123456789"
-                    mock_message.body = "Fallback message"
+                    # First call: AI answer succeeds
+                    # Second call: Template fails
+                    mock_answer_msg = Mock()
+                    mock_answer_msg.sid = "SM777"
+                    mock_answer_msg.status = "sent"
+                    mock_answer_msg.to = "whatsapp:+255123456789"
+                    mock_answer_msg.body = "AI answer"
 
                     mock_client_instance.messages.create.side_effect = [
+                        mock_answer_msg,
                         Exception("Template error"),
-                        mock_message,
                     ]
                     mock_client.return_value = mock_client_instance
 
@@ -546,7 +568,7 @@ class TestWhatsAppService:
                         "+255123456789", "AI answer"
                     )
 
-                    # Should fallback to send_message
+                    # Should return answer response when template fails
                     assert result["sid"] == "SM777"
                     assert mock_client_instance.messages.create.call_count == 2
 
@@ -747,14 +769,21 @@ class TestWhatsAppService:
                         "HX123abc456"
                     )
 
-                    mock_message = Mock()
-                    mock_message.sid = "SM999"
-                    mock_message.status = "sent"
+                    mock_answer_msg = Mock()
+                    mock_answer_msg.sid = "SM888"
+                    mock_answer_msg.status = "sent"
+                    mock_answer_msg.to = "whatsapp:+255123456789"
+                    mock_answer_msg.body = "Line 1\nLine 2 spaces tabs"
+
+                    mock_template_msg = Mock()
+                    mock_template_msg.sid = "SM999"
+                    mock_template_msg.status = "sent"
 
                     mock_client_instance = Mock()
-                    mock_client_instance.messages.create.return_value = (
-                        mock_message
-                    )
+                    mock_client_instance.messages.create.side_effect = [
+                        mock_answer_msg,
+                        mock_template_msg,
+                    ]
                     mock_client.return_value = mock_client_instance
 
                     service = WhatsAppService()
@@ -768,14 +797,11 @@ class TestWhatsAppService:
 
                     assert result == {"sid": "SM999", "status": "sent"}
 
-                    # Verify sanitized content was sent
-                    call_args = mock_client_instance.messages.create.call_args
-                    import json
-
-                    content_vars = json.loads(
-                        call_args.kwargs["content_variables"]
-                    )
-                    sanitized = content_vars["ai_answer"]
+                    # Verify sanitized content
+                    # was sent in first message (AI answer)
+                    first_call = mock_client_instance\
+                        .messages.create.call_args_list[0]
+                    sanitized = first_call.kwargs["body"]
 
                     # Verify violations are removed
                     assert "\n\n" not in sanitized

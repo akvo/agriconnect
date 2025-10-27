@@ -229,7 +229,7 @@ class WhatsAppService:
         self, to_number: str, ai_answer: str
     ) -> Dict[str, Any]:
         """
-        Send AI answer with confirmation template
+        Send AI answer as a separate message, then send confirmation template
         asking if farmer needs human help.
 
         Template buttons:
@@ -238,39 +238,50 @@ class WhatsAppService:
 
         Args:
             to_number: Farmer's phone number
-            ai_answer: The AI-generated answer to include in template
+            ai_answer: The AI-generated answer to send as separate message
 
         Returns:
-            Response from Twilio with message SID
+            Response from Twilio with template message SID
         """
         # Sanitize AI answer to prevent Twilio error 63013
         sanitized_answer = self.sanitize_whatsapp_content(ai_answer)
 
         if self.testing_mode:
-            # Skip sending templates in testing mode - NO REAL API CALLS
+            # Skip sending messages in testing mode - NO REAL API CALLS
             logger.info(
-                f"[TESTING MODE] Mocking confirmation template to {to_number}"
+                f"[TESTING MODE] Mocking AI answer and confirmation template "
+                f"to {to_number}"
             )
             return {"sid": "TESTING_MODE", "status": "sent"}
+
+        # Step 1: Send AI answer as a regular message
+        try:
+            answer_response = self.send_message(to_number, sanitized_answer)
+            logger.info(
+                f"✓ Sent AI answer to {to_number}: {answer_response['sid']}"
+            )
+        except Exception as e:
+            logger.error(f"✗ Error sending AI answer: {e}")
+            # If we can't send the answer, still try to send the template
+            pass
+
+        # Step 2: Send confirmation template
         template_sid = settings.whatsapp_confirmation_template_sid
 
         if not template_sid:
-            # Fallback: send plain message without template
+            # If no template configured, we already sent the answer
             logger.warning(
-                "No confirmation template SID configured -"
-                " sending plain message"
+                "No confirmation template SID configured - "
+                "only AI answer was sent"
             )
-            return self.send_message(to_number, sanitized_answer)
+            return answer_response
 
         try:
-            # Send template message with sanitized AI answer
+            # Send template message without variables
             message = self.client.messages.create(
                 from_=self.whatsapp_number,
                 to=f"whatsapp:{to_number}",
                 content_sid=template_sid,
-                content_variables=json.dumps(
-                    {"ai_answer": sanitized_answer}
-                ),
             )
 
             logger.info(
@@ -280,5 +291,5 @@ class WhatsAppService:
 
         except Exception as e:
             logger.error(f"✗ Error sending confirmation template: {e}")
-            # Fallback: send plain message
-            return self.send_message(to_number, ai_answer)
+            # If template fails but answer was sent, return answer response
+            return answer_response
