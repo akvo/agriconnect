@@ -52,6 +52,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     borderWidth: 1,
     borderColor: themeColors.mutedBorder,
+    color: themeColors.textPrimary,
   },
 });
 

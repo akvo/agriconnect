@@ -80,6 +80,7 @@ export default function LoginScreen() {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          placeholderTextColor="#999"
         />
         <View style={styles.passwordRow}>
           <TextInput
@@ -88,6 +89,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
+            placeholderTextColor="#999"
           />
           <TouchableOpacity
             style={styles.eyeButton}
@@ -152,6 +154,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: "white",
     fontSize: 16,
+    color: "#222222",
   },
   passwordRow: {
     flexDirection: "row",
