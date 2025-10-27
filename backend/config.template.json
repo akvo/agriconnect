@@ -6,7 +6,7 @@
 		"domain": "https://agriconnect2.akvotest.org/",
 		"chat_callback": "https://agriconnect2.akvotest.org/api/callback/ai",
 		"upload_callback": "https://agriconnect2.akvotest.org/api/callback/kb",
-		"callback_token": "",
+		"callback_token": "secret",
 		"default_chat_prompt": "You are an agricultural expert assistant. Provide practical, actionable farming advice based on the knowledge base. Format: Keep the full reply under 1600 characters to support WhatsApp. Prioritize actionable items and immediate next steps. Provided Context:\n{context}\n",
 		"access_token": null,
 		"knowledge_base_id": null

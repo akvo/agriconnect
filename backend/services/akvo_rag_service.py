@@ -165,12 +165,6 @@ class AkvoRagService:
         Returns:
             Job response with job_id and status
         """
-        logger.debug(
-            "[DEBUG] Akvo-RAG access_token:",
-            self.access_token,
-            settings.akvo_rag_access_token,
-            os.getenv("AKVO_RAG_APP_ACCESS_TOKEN")
-        )
         if not self.access_token:
             logger.error("No access token - app not registered with akvo-rag")
             return None

@@ -14,6 +14,12 @@ def load_config() -> Dict[str, Any]:
     if not config_path.exists():
         # Create new from template if missing
         template_path = Path(__file__).parent / "config.template.json"
+        # Verify template exists
+        if not template_path.exists():
+            print("Template config not found:", template_path)
+            raise FileNotFoundError(
+                f"Template config not found: {template_path}"
+            )
         with open(template_path, "r") as f:
             template_config = json.load(f)
         with open(config_path, "w") as f:
@@ -71,10 +77,6 @@ class Settings(BaseSettings):
     akvo_rag_access_token: Optional[str] = os.getenv(
         "AKVO_RAG_APP_ACCESS_TOKEN",
         _config.get("akvo_rag", {}).get("access_token"),
-    )
-    print(
-        "Loaded AKVO_RAG_APP_ACCESS_TOKEN:",
-        _config.get("akvo_rag", {}).get("access_token")
     )
     akvo_rag_knowledge_base_id: Optional[int] = (
         int(os.getenv("AKVO_RAG_APP_KNOWLEDGE_BASE_ID"))
