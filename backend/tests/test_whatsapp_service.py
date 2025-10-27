@@ -634,6 +634,63 @@ class TestWhatsAppService:
         assert result.startswith("Line 1")  # Trimmed leading whitespace
         assert result.endswith("tabs")  # Trimmed trailing whitespace
 
+    def test_sanitize_whatsapp_content_wrapping_double_quotes(self):
+        """Test sanitization removes wrapping double quotes"""
+        text = '"This is a quoted response"'
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should remove wrapping quotes
+        assert result == "This is a quoted response"
+        assert not result.startswith('"')
+        assert not result.endswith('"')
+
+    def test_sanitize_whatsapp_content_wrapping_single_quotes(self):
+        """Test sanitization removes wrapping single quotes"""
+        text = "'This is a quoted response'"
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should remove wrapping quotes
+        assert result == "This is a quoted response"
+        assert not result.startswith("'")
+        assert not result.endswith("'")
+
+    def test_sanitize_whatsapp_content_real_example(self):
+        """Test with real example from user that caused error 63013"""
+        # Real AI response that was causing error 63013
+        # It has wrapping quotes and could have formatting issues
+        text = (
+            '"You\'re correct. Stem borers can cause significant damage '
+            'to crops. Here are some additional steps to manage them:\n'
+            '1. Field Sanitation: Regularly remove and destroy crop '
+            'residues after harvest. This eliminates potential breeding '
+            'sites for stem borers.\n'
+            '2. Biological Control: Use natural enemies of stem borers, '
+            'such as parasitic wasps and birds. Introduce these '
+            'beneficial organisms into your field to naturally control '
+            'the stem borer population.\n'
+            '3. Pheromone Traps: These traps attract male stem borers, '
+            'reducing their population and disrupting their mating.\n'
+            '4. Resistant Varieties: Plant varieties that are resistant '
+            'to stem borers. Consult with local agricultural extension '
+            'services or seed suppliers for suitable varieties.\n'
+            '5. Regular Monitoring: Regularly inspect your crops for '
+            'signs of stem borer infestation. Look for "dead hearts" '
+            '(dying young leaves) and "white heads" (empty, white '
+            'panicles).\n'
+            '6. Chemical Control: If infestation levels are high, use '
+            'approved insecticides. Always follow the manufacturer\'s '
+            'instructions to ensure effective and safe use.\n'
+            'Remember, an integrated pest management approach combining '
+            'these methods will give the best results."'
+        )
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should remove wrapping quotes
+        assert not result.startswith('"')
+        assert not result.endswith('"')
+        # Should still contain the actual content
+        assert "You're correct" in result
+        assert "stem borers" in result
+        # Should not have consecutive newlines
+        assert "\n\n" not in result
+
     def test_send_confirmation_template_sanitizes_ai_answer(self):
         """Test that send_confirmation_template sanitizes AI answer"""
         env_vars = {

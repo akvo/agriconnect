@@ -104,6 +104,7 @@ class WhatsAppService:
         Prevents:
         - More than 4 consecutive whitespaces
         - Consecutive newlines (multiple blank lines)
+        - Wrapping quotation marks
         - Empty or null strings
 
         Args:
@@ -115,6 +116,15 @@ class WhatsAppService:
         if not text or not text.strip():
             return "Response is being processed."
 
+        # Remove leading/trailing whitespace first
+        text = text.strip()
+
+        # Remove wrapping quotation marks (single or double quotes)
+        # that wrap the entire response
+        if (text.startswith('"') and text.endswith('"')) or \
+           (text.startswith("'") and text.endswith("'")):
+            text = text[1:-1].strip()
+
         # Replace more than 4 consecutive spaces with 3 spaces
         text = re.sub(r' {4,}', '   ', text)
 
@@ -124,7 +134,7 @@ class WhatsAppService:
         # Replace tabs with single space
         text = text.replace('\t', ' ')
 
-        # Remove leading/trailing whitespace
+        # Remove any remaining leading/trailing whitespace
         text = text.strip()
 
         # Ensure we still have content after sanitization

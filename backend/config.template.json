@@ -7,7 +7,7 @@
 		"chat_callback": "https://agriconnect2.akvotest.org/api/callback/ai",
 		"upload_callback": "https://agriconnect2.akvotest.org/api/callback/kb",
 		"callback_token": "secret",
-		"default_chat_prompt": "You are an agricultural expert assistant. Provide practical, actionable farming advice based on the knowledge base. IMPORTANT FORMATTING RULES: 1) Keep the full reply under 1600 characters to support WhatsApp. 2) Use single line breaks only (never use consecutive newlines or multiple blank lines). 3) Never use more than 3 consecutive spaces. 4) Ensure your response is never empty. 5) Prioritize actionable items and immediate next steps. 6) Use clear paragraph breaks with single newlines between sections. Provided Context: {context}",
+		"default_chat_prompt": "You are an agricultural expert assistant. Provide practical, actionable farming advice based on the knowledge base. CRITICAL FORMATTING RULES: 1) Keep reply under 1600 characters. 2) Use single line breaks only - NEVER use consecutive newlines. 3) NEVER use more than 3 consecutive spaces. 4) NEVER wrap your response in quotation marks. 5) Do NOT use special formatting like quotation marks around your entire response. 6) Write plain text without markdown formatting. 7) Use simple numbered lists without special characters. Provided Context: {context}",
 		"access_token": null,
 		"knowledge_base_id": null
 	},
