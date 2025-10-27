@@ -292,6 +292,9 @@ async def create_message(
         if message_data.from_source == MessageFrom.USER
         else None
     )
+    customer_name = ticket.customer.phone_number
+    if ticket.customer.full_name:
+        customer_name = ticket.customer.full_name
     await emit_message_created(
         ticket_id=ticket.id,
         message_id=new_message.id,
@@ -302,7 +305,7 @@ async def create_message(
         ts=new_message.created_at.isoformat(),
         administrative_id=ticket.administrative_id,
         ticket_number=ticket.ticket_number,
-        customer_name=ticket.customer.full_name,
+        customer_name=customer_name,
         sender_user_id=sender_id,
     )
 
