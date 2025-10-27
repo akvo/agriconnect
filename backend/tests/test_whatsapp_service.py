@@ -577,3 +577,112 @@ class TestWhatsAppService:
             ):
                 result = load_message_templates()
                 assert result == {}
+
+    def test_sanitize_whatsapp_content_consecutive_spaces(self):
+        """Test sanitization of more than 4 consecutive spaces"""
+        text = "This has     5 spaces and      7 spaces here"
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should replace 4+ spaces with 3 spaces
+        assert "     " not in result  # No 5+ consecutive spaces
+        assert "    " not in result  # No 4+ consecutive spaces
+
+    def test_sanitize_whatsapp_content_consecutive_newlines(self):
+        """Test sanitization of consecutive newlines"""
+        text = "Line 1\n\n\nLine 2\n\nLine 3"
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should replace 2+ newlines with single newline
+        assert "\n\n" not in result
+        assert result == "Line 1\nLine 2\nLine 3"
+
+    def test_sanitize_whatsapp_content_tabs(self):
+        """Test sanitization of tab characters"""
+        text = "This\thas\ttabs"
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should replace tabs with single space
+        assert "\t" not in result
+        assert result == "This has tabs"
+
+    def test_sanitize_whatsapp_content_empty_string(self):
+        """Test sanitization of empty string"""
+        text = ""
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should return fallback message
+        assert result == "Response is being processed."
+
+    def test_sanitize_whatsapp_content_whitespace_only(self):
+        """Test sanitization of whitespace-only string"""
+        text = "   \n\n  \t  "
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should return fallback message
+        assert result == "Response is being processed."
+
+    def test_sanitize_whatsapp_content_leading_trailing_whitespace(self):
+        """Test sanitization removes leading/trailing whitespace"""
+        text = "  \n  Valid content  \n  "
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should strip leading/trailing whitespace
+        assert result == "Valid content"
+
+    def test_sanitize_whatsapp_content_mixed_violations(self):
+        """Test sanitization with multiple violation types"""
+        text = "  Line 1\n\n\nLine 2     with spaces\t\tand tabs  "
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should handle all violations
+        assert "\n\n" not in result  # No consecutive newlines
+        assert "    " not in result  # No 4+ consecutive spaces
+        assert "\t" not in result  # No tabs
+        assert result.startswith("Line 1")  # Trimmed leading whitespace
+        assert result.endswith("tabs")  # Trimmed trailing whitespace
+
+    def test_send_confirmation_template_sanitizes_ai_answer(self):
+        """Test that send_confirmation_template sanitizes AI answer"""
+        env_vars = {
+            "TWILIO_ACCOUNT_SID": "test_sid",
+            "TWILIO_AUTH_TOKEN": "test_token",
+            "WHATSAPP_CONFIRMATION_TEMPLATE_SID": "HX123abc456",
+            "TESTING": "false",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=False):
+            with patch("services.whatsapp_service.Client") as mock_client:
+                with patch(
+                    "services.whatsapp_service.settings"
+                ) as mock_settings:
+                    mock_settings.whatsapp_confirmation_template_sid = (
+                        "HX123abc456"
+                    )
+
+                    mock_message = Mock()
+                    mock_message.sid = "SM999"
+                    mock_message.status = "sent"
+
+                    mock_client_instance = Mock()
+                    mock_client_instance.messages.create.return_value = (
+                        mock_message
+                    )
+                    mock_client.return_value = mock_client_instance
+
+                    service = WhatsAppService()
+
+                    # AI answer with violations
+                    dirty_answer = "Line 1\n\n\nLine 2     spaces\t\ttabs"
+                    result = service.send_confirmation_template(
+                        "+255123456789",
+                        dirty_answer,
+                    )
+
+                    assert result == {"sid": "SM999", "status": "sent"}
+
+                    # Verify sanitized content was sent
+                    call_args = mock_client_instance.messages.create.call_args
+                    import json
+
+                    content_vars = json.loads(
+                        call_args.kwargs["content_variables"]
+                    )
+                    sanitized = content_vars["ai_answer"]
+
+                    # Verify violations are removed
+                    assert "\n\n" not in sanitized
+                    assert "    " not in sanitized
+                    assert "\t" not in sanitized

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from typing import Any, Dict
 from twilio.rest import Client
 
@@ -95,6 +96,43 @@ class WhatsAppService:
             )
             self.client = Client(self.account_sid, self.auth_token)
 
+    @staticmethod
+    def sanitize_whatsapp_content(text: str) -> str:
+        """
+        Sanitize text to prevent Twilio error 63013 (Channel policy violation).
+
+        Prevents:
+        - More than 4 consecutive whitespaces
+        - Consecutive newlines (multiple blank lines)
+        - Empty or null strings
+
+        Args:
+            text: The text to sanitize
+
+        Returns:
+            Sanitized text safe for WhatsApp template variables
+        """
+        if not text or not text.strip():
+            return "Response is being processed."
+
+        # Replace more than 4 consecutive spaces with 3 spaces
+        text = re.sub(r' {4,}', '   ', text)
+
+        # Replace consecutive newlines (2+ newlines) with single newline
+        text = re.sub(r'\n{2,}', '\n', text)
+
+        # Replace tabs with single space
+        text = text.replace('\t', ' ')
+
+        # Remove leading/trailing whitespace
+        text = text.strip()
+
+        # Ensure we still have content after sanitization
+        if not text:
+            return "Response is being processed."
+
+        return text
+
     def send_template_message(
         self, to: str, content_sid: str, content_variables: Dict[str, str]
     ) -> Dict[str, Any]:
@@ -183,6 +221,9 @@ class WhatsAppService:
         Returns:
             Response from Twilio with message SID
         """
+        # Sanitize AI answer to prevent Twilio error 63013
+        sanitized_answer = self.sanitize_whatsapp_content(ai_answer)
+
         if self.testing_mode:
             # Skip sending templates in testing mode - NO REAL API CALLS
             logger.info(
@@ -197,16 +238,16 @@ class WhatsAppService:
                 "No confirmation template SID configured -"
                 " sending plain message"
             )
-            return self.send_message(to_number, ai_answer)
+            return self.send_message(to_number, sanitized_answer)
 
         try:
-            # Send template message with AI answer as variable
+            # Send template message with sanitized AI answer
             message = self.client.messages.create(
                 from_=self.whatsapp_number,
                 to=f"whatsapp:{to_number}",
                 content_sid=template_sid,
                 content_variables=json.dumps(
-                    {"ai_answer": ai_answer}  # Template variable for AI answer
+                    {"ai_answer": sanitized_answer}
                 ),
             )
 
