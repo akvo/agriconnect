@@ -85,11 +85,12 @@ class Settings(BaseSettings):
     )
 
     # WhatsApp settings
-    whatsapp_confirmation_template_sid: str = (
+    whatsapp_confirmation_template_sid: str = os.getenv(
+        "WHATSAPP_CONFIRMATION_TEMPLATE_SID",
         _config.get("whatsapp", {})
         .get("templates", {})
         .get("confirmation", {})
-        .get("sid")
+        .get("sid"),
     )
     whatsapp_escalate_button_payload: str = (
         _config.get("whatsapp", {}).get("button_payloads", {}).get("escalate")
