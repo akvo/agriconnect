@@ -45,7 +45,7 @@ else
     echo "✅ ANDROID_HOME: $ANDROID_HOME"
 fi
 
-# Check adb
+# Check adb and detect devices
 if ! command -v adb &> /dev/null; then
     echo "⚠️  WARNING: adb not found in PATH"
     echo "Make sure Android SDK platform-tools is in your PATH"
@@ -55,6 +55,19 @@ else
     echo "Connected devices:"
     adb devices
     echo ""
+
+    # Prioritize physical devices over emulators
+    PHYSICAL_DEVICE=$(adb devices | grep -v "List of devices" | grep -v "emulator" | grep "device$" | awk '{print $1}' | head -1)
+
+    if [ -n "$PHYSICAL_DEVICE" ]; then
+        echo "✅ Physical device found: $PHYSICAL_DEVICE"
+        echo "Will use this device for installation"
+        export ANDROID_SERIAL=$PHYSICAL_DEVICE
+        echo ""
+    else
+        echo "⚠️  No physical device found. Will try to use emulator if available."
+        echo ""
+    fi
 fi
 
 # Check .env file
@@ -103,8 +116,28 @@ echo ""
 echo "Make sure your device is connected or emulator is running!"
 echo ""
 
-# Build the app
-npx expo run:android
+# Generate native Android project
+echo "Step 1: Generating native Android project..."
+npx expo prebuild --platform android
+
+if [ $? -ne 0 ]; then
+    echo "❌ Prebuild failed!"
+    exit 1
+fi
+
+echo ""
+echo "Step 2: Building and installing APK..."
+cd android
+
+# Build and install using Gradle (more reliable than expo run:android)
+./gradlew installDebug
+
+if [ $? -ne 0 ]; then
+    echo "❌ Build/Install failed!"
+    exit 1
+fi
+
+cd ..
 
 echo ""
 echo "================================"
@@ -112,6 +145,17 @@ echo "✅ Build complete!"
 echo "================================"
 echo ""
 echo "The development build is now installed on your device."
+echo ""
+echo "Starting Metro bundler..."
+echo ""
+
+# Start Metro bundler in dev-client mode
+npx expo start --dev-client
+
+echo ""
+echo "================================"
+echo "Development Tips"
+echo "================================"
 echo ""
 echo "To start development:"
 echo "  1. App should auto-connect to Metro bundler"
