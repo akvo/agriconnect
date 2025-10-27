@@ -111,8 +111,24 @@ const ChatScreen = () => {
 
   // handle accept AI suggestion
   const handleAcceptSuggestion = (suggestion: string) => {
+    // If suggestion is empty, user is dismissing the chip
+    // If suggestion has content, user is accepting it
     setText(suggestion);
     setAISuggestion(null);
+
+    // Mark WHISPER message as used in database so it doesn't appear again
+    // This applies both when accepting or dismissing the suggestion
+    if (ticket?.customer?.id) {
+      const marked = daoManager.message.markWhisperAsUsed(
+        db,
+        ticket.customer.id,
+      );
+      if (marked) {
+        console.log(
+          `[Chat] Marked WHISPER message as used for customer ${ticket.customer.id}`,
+        );
+      }
+    }
   };
 
   // Group messages by date for section headers

@@ -1,6 +1,8 @@
 // Message types and interfaces
 // Note: from_source uses MessageFrom constants (1=CUSTOMER, 2=USER, 3=LLM)
 // Note: status uses MessageStatus constants (1=PENDING, 2=REPLIED, 3=RESOLVED)
+// Note: message_type (1=REPLY, 2=WHISPER)
+// Note: is_used (0=not used, 1=used) - tracks if WHISPER message has been accepted
 // Import from @/constants/messageSource and @/constants/messageStatus when needed
 export interface Message {
   id: number;
@@ -11,6 +13,7 @@ export interface Message {
   body: string;
   message_type: number;
   status: number; // 1=PENDING, 2=REPLIED, 3=RESOLVED
+  is_used: number; // 0=not used, 1=used (for WHISPER messages)
   createdAt: string;
   updatedAt: string;
 }
@@ -24,6 +27,7 @@ export interface CreateMessageData {
   createdAt: string;
   message_type?: number;
   status?: number; // Use MessageStatus constants (default: PENDING=1)
+  is_used?: number; // 0=not used, 1=used (default: 0)
 }
 
 export interface UpdateMessageData {
@@ -34,6 +38,7 @@ export interface UpdateMessageData {
   body?: string;
   message_type?: number;
   status?: number; // Use MessageStatus constants
+  is_used?: number; // 0=not used, 1=used
 }
 
 // Extended message interface with user details (for inbox/conversation views)

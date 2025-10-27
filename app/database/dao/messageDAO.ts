@@ -44,14 +44,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       ? db.prepareSync(
           `INSERT INTO messages (
             id, from_source, message_sid, customer_id, user_id, body,
-            message_type, status, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            message_type, status, is_used, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
       : db.prepareSync(
           `INSERT INTO messages (
             from_source, message_sid, customer_id, user_id, body,
-            message_type, status, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            message_type, status, is_used, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         );
 
     try {
@@ -65,6 +65,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.body,
             data.message_type || null,
             data.status || 1, // Default to PENDING (1)
+            data.is_used || 0, // Default to not used (0)
             data.createdAt,
           ]
         : [
@@ -75,6 +76,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.body,
             data.message_type || null,
             data.status || 1, // Default to PENDING (1)
+            data.is_used || 0, // Default to not used (0)
             data.createdAt,
           ];
 
@@ -140,6 +142,10 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       if (data.status !== undefined) {
         updates.push("status = ?");
         values.push(data.status);
+      }
+      if (data.is_used !== undefined) {
+        updates.push("is_used = ?");
+        values.push(data.is_used);
       }
 
       if (updates.length === 0) {
@@ -264,15 +270,17 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   }
 
   // Get last AI suggestion message by customer ID and message type (WHISPER)
+  // Only returns WHISPER messages that have not been used yet (is_used = 0)
   getLastAISuggestionByCustomerId(
     db: SQLiteDatabase,
     customerId: number,
   ): Message | null {
     // Get the last AI suggestion message for that customer and message type
+    // message_type = 2 (WHISPER), is_used = 0 (not used)
     const stmt = db.prepareSync(
       `SELECT *
       FROM messages
-      WHERE customer_id = ? AND from_source = ? AND message_type = ?
+      WHERE customer_id = ? AND from_source = ? AND message_type = ? AND is_used = 0
       ORDER BY createdAt DESC
       LIMIT 1`,
     );
@@ -280,7 +288,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       const result = stmt.executeSync<Message>([
         customerId,
         MessageFrom.LLM,
-        "WHISPER",
+        2, // WHISPER = 2 (INTEGER, not string)
       ]);
       return result.getFirstSync() || null;
     } catch (error) {
@@ -288,6 +296,39 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       return null;
     } finally {
       stmt.finalizeSync();
+    }
+  }
+
+  // Mark WHISPER message as used by customer ID
+  // This marks the most recent unused WHISPER message for a customer as used
+  markWhisperAsUsed(db: SQLiteDatabase, customerId: number): boolean {
+    try {
+      // First, get the last unused WHISPER message
+      const lastWhisper = this.getLastAISuggestionByCustomerId(db, customerId);
+
+      if (!lastWhisper) {
+        console.log(
+          `[MessageDAO] No unused WHISPER message found for customer ${customerId}`,
+        );
+        return false;
+      }
+
+      // Mark it as used
+      const updated = this.update(db, lastWhisper.id, { is_used: 1 });
+
+      if (updated) {
+        console.log(
+          `[MessageDAO] Marked WHISPER message ${lastWhisper.id} as used for customer ${customerId}`,
+        );
+      }
+
+      return updated;
+    } catch (error) {
+      console.error(
+        `[MessageDAO] Error marking WHISPER as used for customer ${customerId}:`,
+        error,
+      );
+      return false;
     }
   }
 

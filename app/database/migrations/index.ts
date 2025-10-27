@@ -4,6 +4,7 @@ import { messagesMigration } from "./003_create_messages_table";
 import { profileMigration } from "./004_create_profile_table";
 import { ticketMigration } from "./005_create_tickets_table";
 import { alterMessagesAddStatusMigration } from "./006_alter_messages_add_status";
+import { alterMessagesAddIsUsedMigration } from "./007_alter_messages_add_is_used";
 
 // Type definition for migration objects
 export interface Migration {
@@ -25,9 +26,14 @@ export const allMigrations: Migration[] = [
     name: "alter_messages_add_status",
     migration: alterMessagesAddStatusMigration,
   },
+  {
+    version: 4,
+    name: "alter_messages_add_is_used",
+    migration: alterMessagesAddIsUsedMigration,
+  },
 
   // Future migrations can be added here
-  // { version: 4, name: 'some_new_feature', migration: someNewFeatureMigration },
+  // { version: 5, name: 'some_new_feature', migration: someNewFeatureMigration },
 ];
 
 // Helper function to get migrations by version

@@ -9,7 +9,7 @@ type Props = {
 };
 
 const HeaderTitle = ({ name }: Props) => {
-  const initName = name?.includes("+") ? "U" : name?.trim();
+  const initName = name?.includes("+") ? "" : name?.trim();
   return (
     <View style={styles.container}>
       <Avatar initials={initialsFromName(initName)} size={36} />
