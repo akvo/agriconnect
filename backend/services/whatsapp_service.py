@@ -105,6 +105,7 @@ class WhatsAppService:
         - More than 4 consecutive whitespaces
         - Consecutive newlines (multiple blank lines)
         - Wrapping quotation marks
+        - Trailing punctuation followed by multiple spaces
         - Empty or null strings
 
         Args:
@@ -133,6 +134,13 @@ class WhatsAppService:
 
         # Replace tabs with single space
         text = text.replace('\t', ' ')
+
+        # Fix consecutive punctuation (e.g., "results.." becomes "results.")
+        text = re.sub(r'([.!?]){2,}', r'\1', text)
+
+        # Fix punctuation followed by multiple spaces
+        # (e.g., "results. " becomes "results. ")
+        text = re.sub(r'([.!?,;:])\s{2,}', r'\1 ', text)
 
         # Remove any remaining leading/trailing whitespace
         text = text.strip()

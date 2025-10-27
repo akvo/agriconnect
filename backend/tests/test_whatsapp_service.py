@@ -691,6 +691,44 @@ class TestWhatsAppService:
         # Should not have consecutive newlines
         assert "\n\n" not in result
 
+    def test_sanitize_whatsapp_content_consecutive_punctuation(self):
+        """Test sanitization removes consecutive punctuation"""
+        text = "This is great... Really good!!"
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should remove consecutive punctuation
+        assert "..." not in result
+        assert "!!" not in result
+        assert result == "This is great. Really good!"
+
+    def test_sanitize_whatsapp_content_punctuation_multiple_spaces(self):
+        """Test sanitization fixes punctuation followed by multiple spaces"""
+        text = "First sentence.  Second sentence"
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should reduce to single space after punctuation
+        assert ".  " not in result
+        assert result == "First sentence. Second sentence"
+
+    def test_sanitize_whatsapp_content_rice_example(self):
+        """Test with actual failing rice example with double periods"""
+        # Real response that was failing with error 63013
+        # Has double periods (..) and potential spacing issues
+        text = (
+            'Transitioning from cassava to rice cultivation involves '
+            'several steps:\n'
+            '1. Land Preparation: Clear the land of cassava plants.\n'
+            '2. Water Management: Rice cultivation requires water.\n'
+            '3. Seed Selection: Choose a rice variety.\n'
+            'Remember to seek advice from agricultural experts.. '
+            '\n\nDo you want to ask further to our representative officer?'
+        )
+        result = WhatsAppService.sanitize_whatsapp_content(text)
+        # Should fix all violations
+        import re
+        assert not re.search(r'    ', result)  # No 4+ spaces
+        assert not re.search(r'\n\n', result)  # No double newlines
+        assert not re.search(r'\.\.', result)  # No double periods
+        assert not re.search(r'[.!?,;:]\s{2,}', result)  # No punct + 2+ spaces
+
     def test_send_confirmation_template_sanitizes_ai_answer(self):
         """Test that send_confirmation_template sanitizes AI answer"""
         env_vars = {
