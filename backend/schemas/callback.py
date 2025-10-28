@@ -158,3 +158,62 @@ class KBWebhookCallback(BaseModel):
     def stage(self) -> CallbackStage:
         """Alias for status to maintain backward compatibility"""
         return self.status
+
+
+class TwilioMessageStatus(str, Enum):
+    """Twilio message status values"""
+    QUEUED = "queued"
+    SENDING = "sending"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    READ = "read"
+    FAILED = "failed"
+    UNDELIVERED = "undelivered"
+
+
+class TwilioStatusCallback(BaseModel):
+    """
+    Twilio status callback payload for WhatsApp message delivery tracking.
+
+    Twilio sends these callbacks when message status changes.
+    Configure callback URL in Twilio console or when sending messages.
+    """
+
+    MessageSid: str = Field(
+        ..., description="Unique Twilio message identifier"
+    )
+    MessageStatus: TwilioMessageStatus = Field(
+        ..., description="Current message status"
+    )
+    ErrorCode: Optional[str] = Field(
+        None, description="Error code if failed"
+    )
+    ErrorMessage: Optional[str] = Field(
+        None, description="Error message if failed"
+    )
+    To: str = Field(
+        ..., description="Recipient phone number (whatsapp:+123456789)"
+    )
+    From: str = Field(
+        ..., description="Sender phone number (whatsapp:+123456789)"
+    )
+
+    # Optional fields that may be included
+    AccountSid: Optional[str] = Field(
+        None, description="Twilio account SID"
+    )
+    MessagingServiceSid: Optional[str] = Field(
+        None, description="Messaging service SID"
+    )
+    SmsStatus: Optional[str] = Field(
+        None, description="SMS status (for non-WhatsApp)"
+    )
+    SmsSid: Optional[str] = Field(
+        None, description="SMS SID (for non-WhatsApp)"
+    )
+    EventType: Optional[str] = Field(
+        None, description="Event type (for read receipts)"
+    )
+    ChannelToAddress: Optional[str] = Field(
+        None, description="Channel destination address"
+    )

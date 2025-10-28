@@ -1,15 +1,27 @@
 import asyncio
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from twilio.base.exceptions import TwilioRestException
 
 from database import get_db
 from models.ticket import Ticket
-from schemas.callback import AIWebhookCallback, KBWebhookCallback, MessageType, CallbackStage
+from models.message import DeliveryStatus, MessageFrom
+from schemas.callback import (
+    AIWebhookCallback,
+    KBWebhookCallback,
+    TwilioStatusCallback,
+    MessageType,
+    CallbackStage,
+)
 from services.message_service import MessageService
 from services.whatsapp_service import WhatsAppService
+from services.reconnection_service import ReconnectionService
+from services.twilio_status_service import TwilioStatusService
 from routers.ws import emit_whisper_created
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -51,79 +63,152 @@ async def ai_callback(
             # Store AI response in database if message_id is provided
             if payload.callback_params and payload.callback_params.message_id:
                 message_service = MessageService(db)
-                ai_message = message_service.create_ai_response(
-                    original_message_id=payload.callback_params.message_id,
-                    ai_response=payload.output.answer,
-                    message_sid=f"ai_{payload.job_id}",
-                    message_type=payload.callback_params.message_type,
+
+                # CRITICAL FIX: Create message WITHOUT committing
+                # Use appropriate SID format: WHISPER uses final SID, REPLY uses pending SID (replaced later)
+                message_sid = (
+                    f"ai_{payload.job_id}"
+                    if payload.callback_params.message_type == MessageType.WHISPER
+                    else f"pending_ai_{payload.job_id}"
                 )
-                if ai_message:
 
-                    # Handle message_type for AI callbacks
-                    if payload.callback_params.message_type:
-                        if (
-                            payload.callback_params.message_type
-                            == MessageType.REPLY
-                        ):
-                            # REPLY mode: Send AI answer to farmer, then send confirmation template
-                            try:
-                                whatsapp_service = WhatsAppService()
-
-                                # Send AI answer as separate message, then confirmation template
-                                # Template includes buttons: "Yes" (escalate) and "No" (none)
-                                response = whatsapp_service.send_confirmation_template(
-                                    to_number=ai_message.customer.phone_number,
-                                    ai_answer=payload.output.answer,
-                                )
-
-                                print(
-                                    "WhatsApp AI reply and confirmation template sent: "
-                                    f"{response.get('sid')}"
-                                )
-                            except Exception as e:
-                                print(f"Failed to send WhatsApp reply: {e}")
-
-                        elif (
-                            payload.callback_params.message_type
-                            == MessageType.WHISPER
-                        ):
-                            # Whisper is stored but not sent to customer
-                            # EO will receive this as suggestion for the answer
-                            print("Whisper suggestion stored for EO review")
-                            # Note: In a real implementation, you might:
-                            # 1. Send notification to EO via WebSocket/SSE
-                            # 2. Add to EO dashboard for suggestions
-                            # 3. Send email/SMS notification to EO
-                            ticket_id = payload.callback_params.ticket_id
-                            if not ticket_id:
-                                # Find open ticket for customer
-                                ticket = (
-                                    db.query(Ticket)
-                                    .filter(
-                                        Ticket.customer_id == ai_message.customer_id,
-                                        Ticket.resolved_at.is_(None)
-                                    )
-                                    .order_by(Ticket.created_at.desc())
-                                    .first()
-                                )
-                                if ticket:
-                                    ticket_id = ticket.id
-                            print("Emitting whisper_created for ticket_id:", ticket_id)
-                            if ticket_id:
-                                # Emit WebSocket event for EO suggestion
-                                asyncio.create_task(
-                                    emit_whisper_created(
-                                        ticket_id=ticket_id,
-                                        message_id=ai_message.id,
-                                        suggestion=ai_message.body,
-                                    )
-                                )
-                else:
-                    print(
-                        "Failed to store AI response for message: {}".format(
-                            payload.callback_params.message_id
-                        )
+                try:
+                    ai_message = message_service.create_ai_response_pending(
+                        original_message_id=payload.callback_params.message_id,
+                        ai_response=payload.output.answer,
+                        message_sid=message_sid,
+                        message_type=payload.callback_params.message_type,
                     )
+                except Exception as e:
+                    # Original message not found - log warning but acknowledge callback
+                    logger.warning(
+                        f"Cannot store AI response: original message "
+                        f"{payload.callback_params.message_id} not found: {e}"
+                    )
+                    # Still acknowledge the callback even if we can't store
+                    return {"status": "received", "job_id": payload.job_id}
+
+                if not ai_message:
+                    logger.warning(
+                        f"Failed to create pending AI message for "
+                        f"original_message_id={payload.callback_params.message_id}"
+                    )
+                    # Still acknowledge the callback even if we can't store
+                    return {"status": "received", "job_id": payload.job_id}
+
+                # Handle message_type for AI callbacks
+                if payload.callback_params.message_type:
+                    if (
+                        payload.callback_params.message_type
+                        == MessageType.REPLY
+                    ):
+                        # REPLY mode: Send AI answer to farmer, then send confirmation template
+                        try:
+                            whatsapp_service = WhatsAppService()
+
+                            # CRITICAL: Send to WhatsApp BEFORE committing to database
+                            # Step 1: Send AI answer as separate message
+                            logger.info(
+                                f"Sending AI answer to {ai_message.customer.phone_number}"
+                            )
+
+                            answer_response = whatsapp_service.send_message_with_tracking(
+                                to_number=ai_message.customer.phone_number,
+                                message_body=WhatsAppService.sanitize_whatsapp_content(
+                                    payload.output.answer
+                                ),
+                                message_id=ai_message.id,
+                                db=db,
+                            )
+
+                            # Update message with real Twilio SID
+                            ai_message.message_sid = answer_response['sid']
+                            ai_message.delivery_status = DeliveryStatus.SENT
+
+                            logger.info(
+                                f"✓ AI answer sent successfully: {answer_response['sid']}"
+                            )
+
+                            # Step 2: Send confirmation template (non-critical)
+                            from config import settings
+                            template_sid = settings.whatsapp_confirmation_template_sid
+                            if template_sid:
+                                try:
+                                    template_response = whatsapp_service.send_template_message(
+                                        to=ai_message.customer.phone_number,
+                                        content_sid=template_sid,
+                                        content_variables={},
+                                    )
+                                    logger.info(
+                                        f"✓ Confirmation template sent: {template_response['sid']}"
+                                    )
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Failed to send confirmation template (non-critical): {e}"
+                                    )
+                                    # Template failure is non-fatal
+
+                            # CRITICAL: Only commit if WhatsApp send succeeded
+                            message_service.commit_message(ai_message)
+
+                            # Update customer last_message tracking (for 24h reconnection)
+                            reconnection_service = ReconnectionService(db)
+                            reconnection_service.update_customer_last_message(
+                                customer_id=ai_message.customer_id,
+                                from_source=MessageFrom.LLM
+                            )
+
+                            logger.info(
+                                f"✓ AI message {ai_message.id} delivered and committed"
+                            )
+
+                        except (TwilioRestException, ValueError) as e:
+                            # CRITICAL: Rollback on Twilio/validation failure
+                            logger.error(f"✗ WhatsApp delivery failed: {e}")
+                            message_service.rollback_message(ai_message)
+
+                            return {
+                                "status": "error",
+                                "job_id": payload.job_id,
+                                "error": f"WhatsApp delivery failed: {str(e)}",
+                            }
+
+                    elif (
+                        payload.callback_params.message_type
+                        == MessageType.WHISPER
+                    ):
+                        # WHISPER mode: Store suggestion for EO (does NOT go to WhatsApp)
+                        # Whisper messages don't go to WhatsApp, safe to commit immediately
+                        message_service.commit_message(ai_message)
+
+                        logger.info("✓ Whisper suggestion stored for EO review")
+
+                        # Find ticket and emit WebSocket event
+                        ticket_id = payload.callback_params.ticket_id
+                        if not ticket_id:
+                            # Find open ticket for customer
+                            ticket = (
+                                db.query(Ticket)
+                                .filter(
+                                    Ticket.customer_id == ai_message.customer_id,
+                                    Ticket.resolved_at.is_(None)
+                                )
+                                .order_by(Ticket.created_at.desc())
+                                .first()
+                            )
+                            if ticket:
+                                ticket_id = ticket.id
+
+                        if ticket_id:
+                            logger.info(f"Emitting whisper_created for ticket_id: {ticket_id}")
+                            # Emit WebSocket event for EO suggestion
+                            asyncio.create_task(
+                                emit_whisper_created(
+                                    ticket_id=ticket_id,
+                                    message_id=ai_message.id,
+                                    suggestion=ai_message.body,
+                                )
+                            )
         elif payload.status in [CallbackStage.FAILED, CallbackStage.TIMEOUT]:
             # Handle error cases
             print(f"AI processing failed: {payload.status}")
@@ -214,6 +299,66 @@ async def kb_callback(
         return {"status": "received", "job_id": payload.job_id}
 
     except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing callback: {str(e)}",
+        )
+
+
+@router.post(
+    "/twilio/status",
+    summary="Twilio Message Status Callbacks",
+    description="Receives real-time delivery status updates from Twilio. "
+    "Updates message delivery status, timestamps, and error information. "
+    "Configure this URL in Twilio console as the status callback URL.",
+    responses={
+        200: {
+            "description": "Status callback processed successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message_id": 123,
+                        "old_status": "SENT",
+                        "new_status": "DELIVERED",
+                        "sid": "SM123456789",
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error during callback processing"
+        },
+    },
+)
+async def twilio_status_callback(
+    payload: TwilioStatusCallback,
+    db: Session = Depends(get_db),
+):
+    """
+    Handle Twilio status callbacks for message delivery tracking.
+
+    This endpoint receives webhooks from Twilio when message status changes:
+    - queued: Message accepted by Twilio
+    - sending: Message being sent
+    - sent: Message sent to carrier
+    - delivered: Message delivered to recipient
+    - read: Message read by recipient (if read receipts enabled)
+    - failed: Message failed to send
+    - undelivered: Message could not be delivered
+    """
+    try:
+        logger.info(
+            f"Twilio status callback: {payload.MessageSid} → {payload.MessageStatus.value}"
+        )
+
+        status_service = TwilioStatusService(db)
+        result = status_service.process_status_callback(payload)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error processing Twilio status callback: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing callback: {str(e)}",
