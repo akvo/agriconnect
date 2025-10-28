@@ -1,3 +1,5 @@
+import enum
+
 from sqlalchemy import (
     Column,
     DateTime,
@@ -21,10 +23,23 @@ class MessageFrom:
 
 
 class MessageStatus:
+    """Business logic status (kept for backward compatibility)"""
     PENDING = 1
     REPLIED = 2
     RESOLVED = 3
     ESCALATED = 4  # Farmer requested human help after AI response
+
+
+class DeliveryStatus(enum.Enum):
+    """Twilio delivery status tracking"""
+    PENDING = "PENDING"          # Initial state, not sent yet
+    QUEUED = "QUEUED"            # Twilio accepted, queuing
+    SENDING = "SENDING"          # Twilio sending to WhatsApp
+    SENT = "SENT"                # Sent to WhatsApp servers
+    DELIVERED = "DELIVERED"      # Delivered to device
+    READ = "READ"                # Customer read (if callbacks enabled)
+    FAILED = "FAILED"            # Permanent failure
+    UNDELIVERED = "UNDELIVERED"  # Temporary failure/expired
 
 
 class Message(Base):
@@ -37,13 +52,44 @@ class Message(Base):
     body = Column(Text, nullable=False)
     from_source = Column(Integer, nullable=False)
     message_type = Column(Enum(MessageType), nullable=True)
+
+    # Business logic status (kept for backward compatibility)
     status = Column(
         Integer,
         nullable=False,
         server_default=str(MessageStatus.PENDING),
         index=True,
     )
+
+    # Delivery tracking fields
+    delivery_status = Column(
+        Enum(DeliveryStatus),
+        nullable=False,
+        server_default=DeliveryStatus.PENDING.value,
+        index=True,
+    )
+    twilio_error_code = Column(String(10), nullable=True)
+    twilio_error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, nullable=False, server_default="0")
+    last_retry_at = Column(DateTime(timezone=True), nullable=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     customer = relationship("Customer", back_populates="messages")
     user = relationship("User")
+
+    def is_delivery_failed(self) -> bool:
+        """Check if message delivery permanently failed"""
+        return self.delivery_status in (
+            DeliveryStatus.FAILED, DeliveryStatus.UNDELIVERED
+        )
+
+    def can_retry(self, max_retries: int = 3) -> bool:
+        """Check if message can be retried"""
+        return (
+            self.delivery_status in (
+                DeliveryStatus.PENDING, DeliveryStatus.FAILED
+            )
+            and self.retry_count < max_retries
+        )
