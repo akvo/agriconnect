@@ -1,10 +1,7 @@
 import json
 import httpx
 import logging
-import asyncio
-import os
 from typing import Optional, Dict, Any, List
-from pathlib import Path
 
 from config import settings
 from models.message import MessageType
@@ -13,131 +10,55 @@ logger = logging.getLogger(__name__)
 
 
 class AkvoRagService:
-    """Service for interacting with akvo-rag API"""
+    """
+    Service for interacting with Akvo RAG API.
 
-    # Class-level lock to prevent concurrent registrations across instances
-    _registration_lock = asyncio.Lock()
-    _is_registered = False
+    Uses environment variables for configuration:
+    - AKVO_RAG_BASE_URL: Base URL of the Akvo RAG service
+    - AKVO_RAG_APP_ACCESS_TOKEN: Access token for authentication
+    - AKVO_RAG_APP_KNOWLEDGE_BASE_ID: Knowledge base ID to use
+
+    No automatic registration -
+    tokens must be pre-configured via environment variables.
+    """
 
     def __init__(self):
         self.base_url = settings.akvo_rag_base_url
-        config_path = Path(__file__).parent.parent / "config.json"
-        if os.getenv("TESTING"):
-            config_path = Path(__file__).parent.parent / "config.test.json"
-        if not config_path.exists():
-            # Copy from template if missing
-            template_path = (
-                Path(__file__).parent.parent / "config.template.json"
-            )
-            with (
-                open(template_path, "r") as src,
-                open(config_path, "w") as dst
-            ):
-                dst.write(src.read())
-                dst.close()
-        self.config_path = config_path
-
-        # Load from settings (which reads from config.json)
         self.access_token = settings.akvo_rag_access_token
         self.knowledge_base_id = settings.akvo_rag_knowledge_base_id
 
-    def _save_access_token_to_config(self, access_token: str, kb_id: int):
-        """Save access_token and kb_id to config.json"""
-        try:
-            # Read current config
-            with open(self.config_path, "r") as f:
-                config = json.load(f)
+        # Log configuration status (mask sensitive data)
+        if self.access_token:
+            masked_token = f"{self.access_token[:8]}..."\
+                if len(self.access_token) > 8 else "***"
+            logger.debug(
+                f"[AkvoRagService] Initialized with token: {masked_token}, "
+                f"KB ID: {self.knowledge_base_id}"
+            )
+        else:
+            logger.debug("[AkvoRagService] Initialized without access token")
 
-            # Update akvo_rag section with access_token and kb_id
-            if "akvo_rag" not in config:
-                config["akvo_rag"] = {}
-
-            config["akvo_rag"]["access_token"] = access_token
-            config["akvo_rag"]["knowledge_base_id"] = kb_id
-
-            # Write back to file
-            with open(self.config_path, "w") as f:
-                json.dump(config, f, indent=2)
-
-            # Update instance variables
-            self.access_token = access_token
-            self.knowledge_base_id = kb_id
-
-            logger.info("✓ Saved access_token and kb_id to config.json")
-        except Exception as e:
-            logger.error(f"✗ Failed to save access_token to config: {e}")
-
-    async def register_app(self) -> bool:
+    def is_configured(self) -> bool:
         """
-        Register app with akvo-rag on startup.
-        Stores access_token and knowledge_base_id in config.json for
-        persistence. Skips registration if already registered.
-        Uses a lock to prevent concurrent registrations from multiple
-        workers.
+        Check if the service is fully configured.
+
+        Returns:
+            True if access_token and knowledge_base_id are set, False otherwise
         """
-        # if testing mode, set as registered without actual registration
-        if os.getenv("TESTING"):
-            AkvoRagService._is_registered = True
-            logger.info("✓ Testing mode - skipping akvo-rag registration")
-            return True
-        # Use class-level lock to prevent concurrent registrations
-        async with self._registration_lock:
-            # Check class-level flag first (prevents redundant checks)
-            if AkvoRagService._is_registered:
-                logger.debug("✓ Already registered (by another worker)")
-                return True
+        is_valid = bool(self.access_token and self.knowledge_base_id)
 
-            # Skip registration if we already have an access_token
-            if self.access_token:
-                logger.info(
-                    "✓ Already registered with akvo-rag "
-                    "(access_token found in config.json). "
-                    f"Using KB ID: {self.knowledge_base_id}"
-                )
-                AkvoRagService._is_registered = True
-                return True
+        if not is_valid:
+            missing = []
+            if not self.access_token:
+                missing.append("AKVO_RAG_APP_ACCESS_TOKEN")
+            if not self.knowledge_base_id:
+                missing.append("AKVO_RAG_APP_KNOWLEDGE_BASE_ID")
 
-            if not self.base_url:
-                logger.warning("✗ akvo-rag base_url not configured")
-                return False
+            logger.warning(
+                f"[AkvoRagService] Missing configuration: {', '.join(missing)}"
+            )
 
-            logger.info("→ Registering with akvo-rag...")
-            url = f"{self.base_url}/api/apps/register"
-            payload = {
-                "app_name": settings.akvo_rag_app_name,
-                "domain": settings.akvo_rag_domain,
-                "default_chat_prompt": settings.akvo_rag_default_chat_prompt,
-                "chat_callback": settings.akvo_rag_chat_callback,
-                "upload_callback": settings.akvo_rag_upload_callback,
-                "callback_token": settings.akvo_rag_callback_token,
-            }
-
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        url, json=payload, timeout=30.0
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-
-                    access_token = data.get("access_token")
-                    kb_id = data.get("knowledge_base_id")
-
-                    # Persist access_token to config.json
-                    self._save_access_token_to_config(access_token, kb_id)
-
-                    logger.info(
-                        f"✓ Successfully registered with akvo-rag\n"
-                        f"  KB ID: {kb_id}\n"
-                        f"  Access token saved to config.json"
-                    )
-
-                    # Mark as registered
-                    AkvoRagService._is_registered = True
-                    return True
-            except Exception as e:
-                logger.error(f"✗ Failed to register with akvo-rag: {e}")
-                return False
+        return is_valid
 
     async def create_chat_job(
         self,
@@ -150,10 +71,9 @@ class AkvoRagService:
         trace_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Create a chat job with akvo-rag.
+        Create a chat job with Akvo RAG.
 
         Args:
-            prompt: The question/message
             message_id: ID of the message being processed
             message_type: 1 (REPLY to farmer) or 2 (WHISPER to EO)
             customer_id: Customer ID
@@ -163,10 +83,17 @@ class AkvoRagService:
             trace_id: Trace ID for debugging
 
         Returns:
-            Job response with job_id and status
+            Job response with job_id and status,
+            or None if service not configured
         """
-        if not self.access_token:
-            logger.error("No access token - app not registered with akvo-rag")
+        # Check configuration
+        if not self.is_configured():
+            logger.error(
+                "[AkvoRagService] Cannot create chat job - "
+                "service not configured. "
+                "Set AKVO_RAG_APP_ACCESS_TOKEN and "
+                "AKVO_RAG_APP_KNOWLEDGE_BASE_ID."
+            )
             return None
 
         url = f"{self.base_url}/api/apps/jobs"
@@ -179,7 +106,7 @@ class AkvoRagService:
         }
 
         # WHISPER mode requires ticket and administrative info
-        if message_type == 2:
+        if message_type == MessageType.WHISPER.value:
             if ticket_id:
                 callback_params["ticket_id"] = ticket_id
             if administrative_id:
@@ -220,13 +147,20 @@ class AkvoRagService:
                     if message_type == MessageType.REPLY.value \
                     else "WHISPER"
                 logger.info(
-                    f"✓ Created akvo-rag {msg_type_str} "
+                    f"✓ Created Akvo RAG {msg_type_str} "
                     f"job {data.get('job_id')} "
                     f"for message {message_id}"
                 )
                 return data
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"✗ Failed to create Akvo RAG job: "
+                f"HTTP {e.response.status_code} - "
+                f"{e.response.text}"
+            )
+            return None
         except Exception as e:
-            logger.error(f"✗ Failed to create akvo-rag job: {e}")
+            logger.error(f"✗ Failed to create Akvo RAG job: {e}")
             return None
 
 
@@ -235,7 +169,7 @@ _akvo_rag_service = None
 
 
 def get_akvo_rag_service() -> AkvoRagService:
-    """Get the global akvo-rag service instance"""
+    """Get the global Akvo RAG service instance"""
     global _akvo_rag_service
     if _akvo_rag_service is None:
         _akvo_rag_service = AkvoRagService()

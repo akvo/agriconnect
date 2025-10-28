@@ -21,6 +21,7 @@ from routers import (
 )
 from fastapi.staticfiles import StaticFiles
 from services.akvo_rag_service import get_akvo_rag_service
+from tasks.retry_scheduler import start_retry_scheduler, stop_retry_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +32,30 @@ async def lifespan(app: FastAPI):
     Lifespan context manager for startup and shutdown events.
     Replaces deprecated on_event decorator.
     """
-    # Startup: register with akvo-rag
-    logger.info("✓ Application startup - registering with akvo-rag")
+    # Startup: Validate Akvo RAG configuration
+    logger.info("✓ Application startup - validating Akvo RAG configuration")
     rag_service = get_akvo_rag_service()
-    await rag_service.register_app()
+    if not rag_service.is_configured():
+        logger.warning(
+            "⚠ Akvo RAG not fully configured. "
+            "Set AKVO_RAG_APP_ACCESS_TOKEN and "
+            "AKVO_RAG_APP_KNOWLEDGE_BASE_ID environment variables."
+        )
+    else:
+        logger.info(
+            f"✓ Akvo RAG configured with KB ID: "
+            f"{rag_service.knowledge_base_id}"
+        )
+
+    # Startup: start retry scheduler for failed messages
+    logger.info("✓ Starting retry scheduler for failed messages")
+    start_retry_scheduler()
 
     yield
+
+    # Shutdown: stop retry scheduler
+    logger.info("✓ Stopping retry scheduler")
+    stop_retry_scheduler()
 
     # Shutdown: cleanup if needed
     logger.info("✓ Application shutdown")

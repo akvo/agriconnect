@@ -459,16 +459,18 @@ class TestWhatsAppService:
                     assert mock_client_instance.messages.create.call_count == 2
 
                     # First call: AI answer as regular message
-                    first_call = mock_client_instance\
-                        .messages.create.call_args_list[0]
+                    first_call = (
+                        mock_client_instance.messages.create.call_args_list[0]
+                    )
                     assert first_call.kwargs["body"] == (
                         "Your crops need watering this week."
                     )
                     assert first_call.kwargs["to"] == "whatsapp:+255123456789"
 
                     # Second call: Template without variables
-                    second_call = mock_client_instance\
-                        .messages.create.call_args_list[1]
+                    second_call = (
+                        mock_client_instance.messages.create.call_args_list[1]
+                    )
                     assert second_call.kwargs["content_sid"] == "HX123abc456"
                     assert "content_variables" not in second_call.kwargs
 
@@ -679,28 +681,28 @@ class TestWhatsAppService:
         # Real AI response that was causing error 63013
         # It has wrapping quotes and could have formatting issues
         text = (
-            '"You\'re correct. Stem borers can cause significant damage '
-            'to crops. Here are some additional steps to manage them:\n'
-            '1. Field Sanitation: Regularly remove and destroy crop '
-            'residues after harvest. This eliminates potential breeding '
-            'sites for stem borers.\n'
-            '2. Biological Control: Use natural enemies of stem borers, '
-            'such as parasitic wasps and birds. Introduce these '
-            'beneficial organisms into your field to naturally control '
-            'the stem borer population.\n'
-            '3. Pheromone Traps: These traps attract male stem borers, '
-            'reducing their population and disrupting their mating.\n'
-            '4. Resistant Varieties: Plant varieties that are resistant '
-            'to stem borers. Consult with local agricultural extension '
-            'services or seed suppliers for suitable varieties.\n'
-            '5. Regular Monitoring: Regularly inspect your crops for '
+            "\"You're correct. Stem borers can cause significant damage "
+            "to crops. Here are some additional steps to manage them:\n"
+            "1. Field Sanitation: Regularly remove and destroy crop "
+            "residues after harvest. This eliminates potential breeding "
+            "sites for stem borers.\n"
+            "2. Biological Control: Use natural enemies of stem borers, "
+            "such as parasitic wasps and birds. Introduce these "
+            "beneficial organisms into your field to naturally control "
+            "the stem borer population.\n"
+            "3. Pheromone Traps: These traps attract male stem borers, "
+            "reducing their population and disrupting their mating.\n"
+            "4. Resistant Varieties: Plant varieties that are resistant "
+            "to stem borers. Consult with local agricultural extension "
+            "services or seed suppliers for suitable varieties.\n"
+            "5. Regular Monitoring: Regularly inspect your crops for "
             'signs of stem borer infestation. Look for "dead hearts" '
             '(dying young leaves) and "white heads" (empty, white '
-            'panicles).\n'
-            '6. Chemical Control: If infestation levels are high, use '
-            'approved insecticides. Always follow the manufacturer\'s '
-            'instructions to ensure effective and safe use.\n'
-            'Remember, an integrated pest management approach combining '
+            "panicles).\n"
+            "6. Chemical Control: If infestation levels are high, use "
+            "approved insecticides. Always follow the manufacturer's "
+            "instructions to ensure effective and safe use.\n"
+            "Remember, an integrated pest management approach combining "
             'these methods will give the best results."'
         )
         result = WhatsAppService.sanitize_whatsapp_content(text)
@@ -735,21 +737,22 @@ class TestWhatsAppService:
         # Real response that was failing with error 63013
         # Has double periods (..) and potential spacing issues
         text = (
-            'Transitioning from cassava to rice cultivation involves '
-            'several steps:\n'
-            '1. Land Preparation: Clear the land of cassava plants.\n'
-            '2. Water Management: Rice cultivation requires water.\n'
-            '3. Seed Selection: Choose a rice variety.\n'
-            'Remember to seek advice from agricultural experts.. '
-            '\n\nDo you want to ask further to our representative officer?'
+            "Transitioning from cassava to rice cultivation involves "
+            "several steps:\n"
+            "1. Land Preparation: Clear the land of cassava plants.\n"
+            "2. Water Management: Rice cultivation requires water.\n"
+            "3. Seed Selection: Choose a rice variety.\n"
+            "Remember to seek advice from agricultural experts.. "
+            "\n\nDo you want to ask further to our representative officer?"
         )
         result = WhatsAppService.sanitize_whatsapp_content(text)
         # Should fix all violations
         import re
-        assert not re.search(r'    ', result)  # No 4+ spaces
-        assert not re.search(r'\n\n', result)  # No double newlines
-        assert not re.search(r'\.\.', result)  # No double periods
-        assert not re.search(r'[.!?,;:]\s{2,}', result)  # No punct + 2+ spaces
+
+        assert not re.search(r"    ", result)  # No 4+ spaces
+        assert not re.search(r"\n\n", result)  # No double newlines
+        assert not re.search(r"\.\.", result)  # No double periods
+        assert not re.search(r"[.!?,;:]\s{2,}", result)  # No punct + 2+ spaces
 
     def test_send_confirmation_template_sanitizes_ai_answer(self):
         """Test that send_confirmation_template sanitizes AI answer"""
@@ -799,8 +802,9 @@ class TestWhatsAppService:
 
                     # Verify sanitized content
                     # was sent in first message (AI answer)
-                    first_call = mock_client_instance\
-                        .messages.create.call_args_list[0]
+                    first_call = (
+                        mock_client_instance.messages.create.call_args_list[0]
+                    )
                     sanitized = first_call.kwargs["body"]
 
                     # Verify violations are removed

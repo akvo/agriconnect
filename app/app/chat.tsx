@@ -30,8 +30,10 @@ import { Message } from "@/utils/chat";
 import { formatDateLabel } from "@/utils/time";
 import TicketRespondedStatus from "@/components/inbox/ticket-responded-status";
 import AISuggestionChip from "@/components/chat/ai-suggestion-chip";
+import { ConnectionStatusBanner } from "@/components/chat/connection-status-banner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { useNetwork } from "@/contexts/NetworkContext";
 import MessageSyncService from "@/services/messageSync";
 import { MessageFrom } from "@/constants/messageSource";
 import { api } from "@/services/api";
@@ -92,7 +94,9 @@ const ChatScreen = () => {
   const daoManager = React.useMemo(() => new DAOManager(db), [db]);
   const { user } = useAuth();
   const { setActiveTicket } = useNotifications();
+  const { isOnline } = useNetwork();
   const {
+    connectionState,
     joinTicket,
     leaveTicket,
     onMessageCreated,
@@ -340,17 +344,29 @@ const ChatScreen = () => {
     }
     /**
      * Load last AI suggestion from database for this customer
+     * Only load if we don't already have a suggestion (e.g., from WebSocket)
      */
-    const aiSuggestion =
+    if (aiSuggestion) {
+      console.log(
+        "[Chat] Skipping AI suggestion load from database - already have one from WebSocket",
+      );
+      return;
+    }
+
+    const dbAiSuggestion =
       await daoManager.message.getLastAISuggestionByCustomerId(
         db,
         ticket.customer.id,
       );
 
-    if (aiSuggestion?.body) {
-      setAISuggestion(aiSuggestion.body);
+    if (dbAiSuggestion?.body) {
+      console.log(
+        "[Chat] Loaded AI suggestion from database:",
+        dbAiSuggestion.body.substring(0, 50) + "...",
+      );
+      setAISuggestion(dbAiSuggestion.body);
     }
-  }, [db, daoManager, postload, loading, ticket?.customer?.id]);
+  }, [db, daoManager, postload, loading, ticket?.customer?.id, aiSuggestion]);
 
   useEffect(() => {
     loadDataOnPostload();
@@ -616,14 +632,15 @@ const ChatScreen = () => {
       console.log("[Chat] AI suggestion created:", event);
       // Update local state with new AI suggestion
       setAISuggestion(event.suggestion);
-      // Refresh messages to include the new whisper message
-      loadTicketAndMessages(true).catch((error) => {
-        console.error("[Chat] Error reloading messages after whisper:", error);
-      });
+
+      // NOTE: We don't reload messages here to avoid race condition with loadDataOnPostload
+      // The whisper message will be synced in background automatically
+      // Reloading here would trigger loadDataOnPostload which might overwrite the suggestion
+      // before the new whisper is saved to database
     });
 
     return unsubscribe;
-  }, [onWhisperCreated, loadTicketAndMessages, ticket?.id]);
+  }, [onWhisperCreated, ticket?.id]);
 
   const renderItem = ({ item }: { item: any }) => {
     if (item.type === "header") {
@@ -661,6 +678,12 @@ const ChatScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
+      {/* Connection Status Banner */}
+      <ConnectionStatusBanner
+        connectionState={connectionState}
+        isOnline={isOnline}
+      />
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior="height"

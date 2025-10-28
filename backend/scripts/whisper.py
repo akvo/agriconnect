@@ -132,11 +132,11 @@ def send_callback(
             "answer": suggestion_text,
             "citations": [
                 {
-                    "title": f"{suggestion_key.capitalize()} Guide",
-                    "url": (
-                        f"https://example.com/"
-                        f"{suggestion_key.lower()}-guide"
-                    )
+                    "document": "Knowledge Base Article 123",
+                    "chunk": (
+                        "This is a sample citation from the knowledge base."
+                    ),
+                    "page": "1",
                 }
             ]
         }

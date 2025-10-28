@@ -36,9 +36,7 @@ def test_message(db_session: Session, test_customer):
     return message
 
 
-def test_ai_callback_success(
-    client: TestClient, db_session: Session
-):
+def test_ai_callback_success(client: TestClient, db_session: Session):
     """Test successful AI callback"""
     payload = {
         "job_id": "job_123",
@@ -51,7 +49,7 @@ def test_ai_callback_success(
                     "chunk": (
                         "Free chlorine should be maintained at 2-4 mg/L"
                     ),
-                    "page": "5"
+                    "page": "5",
                 }
             ],
         },
@@ -84,7 +82,7 @@ def test_ai_callback_success_with_message_storage(
                 {
                     "document": "WHO Water Quality",
                     "chunk": "Free chlorine should be maintained at 2-4 mg/L",
-                    "page": "5"
+                    "page": "5",
                 }
             ],
         },
@@ -118,6 +116,7 @@ def test_ai_callback_success_with_message_storage(
     assert ai_message.from_source == MessageFrom.LLM
     # Import MessageType to check the value
     from schemas.callback import MessageType
+
     assert ai_message.message_type == MessageType.WHISPER
 
 
@@ -136,7 +135,7 @@ def test_ai_callback_success_invalid_message_id(
                     "chunk": (
                         "Free chlorine should be maintained at 2-4 mg/L"
                     ),
-                    "page": "5"
+                    "page": "5",
                 }
             ],
         },
@@ -165,9 +164,7 @@ def test_ai_callback_success_invalid_message_id(
     assert len(ai_messages) == 0
 
 
-def test_ai_callback_failed_job(
-    client: TestClient, db_session: Session
-):
+def test_ai_callback_failed_job(client: TestClient, db_session: Session):
     """Test AI callback for failed job"""
     payload = {
         "job_id": "job_456",
@@ -187,9 +184,7 @@ def test_ai_callback_failed_job(
     assert response.json() == {"status": "received", "job_id": "job_456"}
 
 
-def test_kb_callback_success(
-    client: TestClient, db_session: Session
-):
+def test_kb_callback_success(client: TestClient, db_session: Session):
     """Test successful KB callback"""
     payload = {
         "job_id": "kb_job_789",
@@ -205,9 +200,7 @@ def test_kb_callback_success(
     assert response.json() == {"status": "received", "job_id": "kb_job_789"}
 
 
-def test_kb_callback_timeout(
-    client: TestClient, db_session: Session
-):
+def test_kb_callback_timeout(client: TestClient, db_session: Session):
     """Test KB callback for timeout"""
     payload = {
         "job_id": "kb_job_timeout",
@@ -226,9 +219,7 @@ def test_kb_callback_timeout(
     }
 
 
-def test_callback_invalid_stage_enum(
-    client: TestClient
-):
+def test_callback_invalid_stage_enum(client: TestClient):
     """Test callback with invalid stage enum"""
     payload = {
         "job_id": "job_123",
@@ -246,9 +237,7 @@ def test_callback_invalid_stage_enum(
     assert response.status_code == 422  # Validation error
 
 
-def test_callback_invalid_job_enum(
-    client: TestClient
-):
+def test_callback_invalid_job_enum(client: TestClient):
     """Test callback with invalid job enum"""
     payload = {
         "job_id": "job_123",
@@ -266,9 +255,7 @@ def test_callback_invalid_job_enum(
     assert response.status_code == 422  # Validation error
 
 
-def test_callback_missing_required_fields(
-    client: TestClient
-):
+def test_callback_missing_required_fields(client: TestClient):
     """Test callback with missing required fields"""
     payload = {
         "job_id": "job_123",
@@ -280,9 +267,7 @@ def test_callback_missing_required_fields(
     assert response.status_code == 422  # Validation error
 
 
-def test_callback_with_all_optional_fields(
-    client: TestClient
-):
+def test_callback_with_all_optional_fields(client: TestClient):
     """Test callback with all optional fields included"""
     payload = {
         "job_id": "job_complete",
@@ -293,12 +278,12 @@ def test_callback_with_all_optional_fields(
                 {
                     "document": "Source 1",
                     "chunk": "Content from source 1",
-                    "page": "10"
+                    "page": "10",
                 },
                 {
                     "document": "Source 2",
                     "chunk": "Content from source 2",
-                    "page": "20"
+                    "page": "20",
                 },
             ],
         },
@@ -422,7 +407,7 @@ def test_ai_callback_whisper_type_with_ticket_id(
                 {
                     "document": "Rice Growing Guide",
                     "chunk": "Rice requires well-drained soil",
-                    "page": "12"
+                    "page": "12",
                 }
             ],
         },
@@ -435,14 +420,12 @@ def test_ai_callback_whisper_type_with_ticket_id(
         "job": "chat",
     }
 
-    response = client.post(
-        "/api/callback/ai", json=payload
-    )
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {
         "status": "received",
-        "job_id": "whisper_job_001"
+        "job_id": "whisper_job_001",
     }
 
     # Verify whisper message was created
@@ -461,6 +444,7 @@ def test_ai_callback_whisper_type_with_ticket_id(
     assert whisper_msg.from_source == MessageFrom.LLM
     # Import MessageType to check the value
     from schemas.callback import MessageType
+
     assert whisper_msg.message_type == MessageType.WHISPER
 
 
@@ -481,7 +465,7 @@ def test_ai_callback_whisper_type_without_ticket_id(
                 {
                     "document": "Rice Fertilizer Guide",
                     "chunk": "Nitrogen-rich fertilizers improve rice yield",
-                    "page": "8"
+                    "page": "8",
                 }
             ],
         },
@@ -494,9 +478,7 @@ def test_ai_callback_whisper_type_without_ticket_id(
         "job": "chat",
     }
 
-    response = client.post(
-        "/api/callback/ai", json=payload
-    )
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 200
 
@@ -544,9 +526,7 @@ def test_ai_callback_whisper_type_no_open_ticket(
         "job": "chat",
     }
 
-    response = client.post(
-        "/api/callback/ai", json=payload
-    )
+    response = client.post("/api/callback/ai", json=payload)
 
     assert response.status_code == 200
 

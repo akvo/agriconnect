@@ -31,6 +31,10 @@ class Customer(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    # 24-hour reconnection tracking
+    last_message_at = Column(DateTime(timezone=True), nullable=True)
+    last_message_from = Column(Integer, nullable=True)  # MessageFrom value
+
     messages = relationship(
         "Message", back_populates="customer", cascade="all, delete-orphan"
     )
@@ -41,6 +45,33 @@ class Customer(Base):
     crop_type = relationship(
         "CropType", back_populates="customers"
     )
+
+    def needs_reconnection_template(self, threshold_hours: int = 24) -> bool:
+        """
+        Check if customer needs reconnection template.
+
+        Returns True if:
+        - Last message was from LLM/USER (outgoing from us)
+        - More than threshold_hours have passed since last message
+
+        Args:
+            threshold_hours:
+            Number of hours of inactivity before reconnection needed
+        Returns:
+            bool: True if reconnection template should be sent
+        """
+        if not self.last_message_at or not self.last_message_from:
+            return False
+
+        from datetime import datetime, timezone, timedelta
+        from models.message import MessageFrom
+
+        # Only need reconnection if last message was FROM us
+        if self.last_message_from not in (MessageFrom.USER, MessageFrom.LLM):
+            return False
+
+        time_since_last = datetime.now(timezone.utc) - self.last_message_at
+        return time_since_last > timedelta(hours=threshold_hours)
 
 
 class CropType(Base):

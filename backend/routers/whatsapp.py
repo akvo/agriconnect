@@ -19,7 +19,10 @@ from models.administrative import Administrative
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
 from services.akvo_rag_service import get_akvo_rag_service
+from services.reconnection_service import ReconnectionService
+from services.twilio_status_service import TwilioStatusService
 from routers.ws import emit_message_created, emit_ticket_created
+from schemas.callback import TwilioStatusCallback, TwilioMessageStatus
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 logger = logging.getLogger(__name__)
@@ -62,6 +65,18 @@ async def whatsapp_webhook(
             .count()
             == 0
         )
+
+        # Check if reconnection template needed (24+ hours inactive)
+        if not is_new_customer:
+            reconnection_service = ReconnectionService(db)
+            if reconnection_service.check_and_send_reconnection(
+                customer, Body
+            ):
+                logger.info(
+                    f"Sent reconnection template to {phone_number} "
+                    f"(24+ hours inactive)"
+                )
+                # Continue processing message normally after reconnection
 
         escalate_payload = settings.whatsapp_escalate_button_payload
 
@@ -398,6 +413,15 @@ async def whatsapp_webhook(
             except Exception as e:
                 logger.error(f"Failed to send welcome message: {e}")
 
+        # Update last_message tracking for customer
+        # This is used for 24-hour reconnection logic
+        if not is_new_customer:
+            reconnection_service = ReconnectionService(db)
+            reconnection_service.update_customer_last_message(
+                customer_id=customer.id,
+                from_source=MessageFrom.CUSTOMER
+            )
+
         return {"status": "success", "message": "Message processed"}
 
     except Exception as e:
@@ -406,7 +430,70 @@ async def whatsapp_webhook(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.post("/status")
+async def whatsapp_status_callback(
+    MessageSid: Annotated[str, Form()],
+    MessageStatus: Annotated[str, Form()],
+    To: Annotated[str, Form()],
+    From: Annotated[str, Form()],
+    ErrorCode: Annotated[Optional[str], Form()] = None,
+    ErrorMessage: Annotated[Optional[str], Form()] = None,
+    AccountSid: Annotated[Optional[str], Form()] = None,
+    MessagingServiceSid: Annotated[Optional[str], Form()] = None,
+    SmsStatus: Annotated[Optional[str], Form()] = None,
+    SmsSid: Annotated[Optional[str], Form()] = None,
+    EventType: Annotated[Optional[str], Form()] = None,
+    ChannelToAddress: Annotated[Optional[str], Form()] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Handle Twilio status callbacks for message delivery tracking.
+
+    Twilio POSTs to this endpoint when message status changes:
+    - queued: Message accepted by Twilio
+    - sending: Message being sent
+    - sent: Message sent to carrier
+    - delivered: Message delivered to recipient
+    - read: Message read by recipient (if read receipts enabled)
+    - failed: Message failed to send
+    - undelivered: Message could not be delivered
+    """
+    try:
+        # Map string status to enum
+        try:
+            status_enum = TwilioMessageStatus(MessageStatus.lower())
+        except ValueError:
+            logger.warning(f"Unknown Twilio status: {MessageStatus}")
+            return {"status": "ignored", "message": "Unknown status"}
+
+        # Create callback object
+        callback = TwilioStatusCallback(
+            MessageSid=MessageSid,
+            MessageStatus=status_enum,
+            To=To,
+            From=From,
+            ErrorCode=ErrorCode,
+            ErrorMessage=ErrorMessage,
+            AccountSid=AccountSid,
+            MessagingServiceSid=MessagingServiceSid,
+            SmsStatus=SmsStatus,
+            SmsSid=SmsSid,
+            EventType=EventType,
+            ChannelToAddress=ChannelToAddress,
+        )
+
+        # Process callback
+        status_service = TwilioStatusService(db)
+        result = status_service.process_status_callback(callback)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error processing Twilio status callback: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 @router.get("/status")
-async def whatsapp_status():
+async def whatsapp_health_check():
     """Health check endpoint for WhatsApp service."""
     return {"status": "WhatsApp service is running"}

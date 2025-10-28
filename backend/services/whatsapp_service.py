@@ -2,8 +2,16 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict
+import uuid
+import phonenumbers
+from typing import Any, Dict, Optional
+from models.message import Message, DeliveryStatus
 from twilio.rest import Client
+from twilio.base.exceptions import TwilioRestException
+from sqlalchemy.sql import func
+from phonenumbers import NumberParseException
+from sqlalchemy.orm import Session
+from unittest.mock import Mock
 
 from config import settings
 
@@ -66,8 +74,6 @@ class WhatsAppService:
                 "WhatsAppService initialized in TESTING mode - "
                 "using mock client"
             )
-            from unittest.mock import Mock
-            import uuid
 
             self.client = Mock()
 
@@ -149,10 +155,6 @@ class WhatsAppService:
         if not text:
             return "Response is being processed."
 
-        # Ensure text length does not exceed WhatsApp limits
-        max_length = 1500
-        if len(text) > max_length:
-            text = text[:max_length - 3].rstrip() + "..."
         return text
 
     def send_template_message(
@@ -293,3 +295,229 @@ class WhatsAppService:
             logger.error(f"✗ Error sending confirmation template: {e}")
             # If template fails but answer was sent, return answer response
             return answer_response
+
+    @staticmethod
+    def validate_and_format_phone_number(phone: str) -> str:
+        """
+        Validate and format phone number to E.164 format.
+
+        Args:
+            phone: Phone number in any format
+
+        Returns:
+            E.164 formatted number (e.g., +255712345678)
+
+        Raises:
+            ValueError: If phone number is invalid
+        """
+        try:
+            # Remove whatsapp: prefix if present
+            phone = phone.replace("whatsapp:", "").strip()
+
+            # If number doesn't start with +, try adding it
+            if not phone.startswith("+"):
+                phone = "+" + phone
+
+            # Parse phone number (None = detect country from number)
+            parsed = phonenumbers.parse(phone, None)
+
+            # Validate
+            if not phonenumbers.is_valid_number(parsed):
+                raise ValueError(f"Invalid phone number: {phone}")
+
+            # Format to E.164
+            formatted = phonenumbers.format_number(
+                parsed,
+                phonenumbers.PhoneNumberFormat.E164
+            )
+
+            logger.info(f"Validated phone: {phone} → {formatted}")
+            return formatted
+
+        except NumberParseException as e:
+            raise ValueError(f"Cannot parse phone number '{phone}': {e}")
+
+    def send_message_with_tracking(
+        self,
+        to_number: str,
+        message_body: str,
+        message_id: Optional[int] = None,
+        db: Optional[Session] = None,
+    ) -> Dict[str, Any]:
+        """
+        Send WhatsApp message with delivery tracking and error handling.
+
+        Args:
+            to_number: Recipient phone number
+            message_body: Message content
+            message_id: Database message ID (for status updates)
+            db: Database session (for status updates)
+
+        Returns:
+            Dict with sid, status, error info
+
+        Raises:
+            ValueError: Invalid phone number
+            TwilioRestException: Twilio API error
+        """
+        # Validate phone number first
+        try:
+            validated_number = self.validate_and_format_phone_number(to_number)
+        except ValueError as e:
+            logger.error(f"Phone validation failed: {e}")
+            if message_id and db:
+                self._update_message_status(
+                    db, message_id,
+                    delivery_status="FAILED",
+                    error_code="INVALID",  # Shortened to fit 10-char limit
+                    error_message=str(e)
+                )
+            raise
+
+        # Testing mode bypass
+        if self.testing_mode:
+            logger.info(
+                f"[TESTING MODE] Mocking message to {validated_number}"
+            )
+            mock_sid = f"MOCK_SID_{uuid.uuid4().hex[:12].upper()}"
+
+            # Update database status even in testing mode
+            if message_id and db:
+                self._update_message_status(
+                    db, message_id,
+                    delivery_status="SENT",
+                    message_sid=mock_sid
+                )
+
+            return {
+                "sid": mock_sid,
+                "status": "sent",
+                "to": f"whatsapp:{validated_number}",
+                "body": message_body,
+                "error_code": None,
+            }
+
+        try:
+            # Send via Twilio
+            message = self.client.messages.create(
+                from_=self.whatsapp_number,
+                body=message_body,
+                to=f"whatsapp:{validated_number}",
+            )
+
+            # Check for errors
+            if message.error_code:
+                logger.error(
+                    f"Twilio error {message.error_code}: "
+                    f"{message.error_message}"
+                )
+                if message_id and db:
+                    self._update_message_status(
+                        db, message_id,
+                        delivery_status="FAILED",
+                        error_code=str(message.error_code),
+                        error_message=message.error_message
+                    )
+                raise TwilioRestException(
+                    status=400,
+                    uri=f"/Messages/{message.sid}",
+                    msg=message.error_message,
+                    code=message.error_code,
+                )
+
+            # Update status to QUEUED/SENT
+            if message_id and db:
+                # Map Twilio status to our enum
+                delivery_status = self._map_twilio_status(message.status)
+                self._update_message_status(
+                    db, message_id,
+                    delivery_status=delivery_status,
+                    message_sid=message.sid
+                )
+
+            logger.info(
+                f"✓ Message sent: {message.sid} (status: {message.status})"
+            )
+
+            return {
+                "sid": message.sid,
+                "status": message.status,
+                "to": message.to,
+                "body": message.body,
+                "error_code": None,
+            }
+
+        except TwilioRestException as e:
+            logger.error(f"Twilio API error {e.code}: {e.msg}")
+
+            # Update message status
+            if message_id and db:
+                # Determine if error is retryable
+                # Rate limit, server errors
+                retryable_codes = [20429, 20500, 20503]
+                status = (
+                    "PENDING" if e.code in retryable_codes
+                    else "FAILED"
+                )
+
+                self._update_message_status(
+                    db, message_id,
+                    delivery_status=status,
+                    error_code=str(e.code),
+                    error_message=e.msg
+                )
+
+            raise
+
+    def _map_twilio_status(self, twilio_status: str) -> str:
+        """Map Twilio status to our DeliveryStatus enum value"""
+        status_map = {
+            "queued": "QUEUED",
+            "sending": "SENDING",
+            "sent": "SENT",
+            "delivered": "DELIVERED",
+            "read": "READ",
+            "failed": "FAILED",
+            "undelivered": "UNDELIVERED",
+        }
+        return status_map.get(twilio_status.lower(), "PENDING")
+
+    def _update_message_status(
+        self,
+        db: Session,
+        message_id: int,
+        delivery_status: str,
+        error_code: Optional[str] = None,
+        error_message: Optional[str] = None,
+        message_sid: Optional[str] = None,
+    ):
+        """Update message delivery status in database"""
+        message = db.query(Message).filter(Message.id == message_id).first()
+        if not message:
+            logger.warning(f"Message {message_id} not found for status update")
+            return
+
+        # Convert string to enum if it's a string
+        if isinstance(delivery_status, str):
+            try:
+                delivery_status = DeliveryStatus[delivery_status]
+            except KeyError:
+                logger.error(f"Invalid delivery status: {delivery_status}")
+                return
+
+        message.delivery_status = delivery_status
+
+        if error_code:
+            message.twilio_error_code = error_code
+        if error_message:
+            message.twilio_error_message = error_message
+        if message_sid:
+            message.message_sid = message_sid
+
+        if delivery_status == DeliveryStatus.DELIVERED:
+            message.delivered_at = func.now()
+
+        db.commit()
+        logger.info(
+            f"Updated message {message_id} status to {delivery_status.value}"
+        )

@@ -55,12 +55,13 @@ from sqlalchemy.orm import sessionmaker
 from database import Base, get_db
 from main import app
 from models.customer import AgeGroup
+from models.message import DeliveryStatus
 
 # CRITICAL: Set testing environment to prevent real API calls
 # This is the PRIMARY defense against real Twilio/WhatsApp/Email API calls
 # Set both TESTING and TEST for backward compatibility with different services
 os.environ["TESTING"] = "true"  # Used by WhatsAppService
-os.environ["TEST"] = "true"      # Used by EmailService
+os.environ["TEST"] = "true"  # Used by EmailService
 
 # Test database URL
 TEST_DATABASE_URL = "postgresql://akvo:password@db:5432/agriconnect_test"
@@ -76,8 +77,10 @@ TestingSessionLocal = sessionmaker(
 def test_db():
     # Create enum types before creating tables
     age_group_enum = sa.Enum(AgeGroup, name="agegroup")
+    delivery_status_enum = sa.Enum(DeliveryStatus, name="deliverystatus")
 
     age_group_enum.create(engine, checkfirst=True)
+    delivery_status_enum.create(engine, checkfirst=True)
 
     # Create tables
     Base.metadata.create_all(bind=engine)
@@ -86,6 +89,7 @@ def test_db():
     Base.metadata.drop_all(bind=engine)
 
     # Drop enum types
+    delivery_status_enum.drop(engine, checkfirst=True)
     age_group_enum.drop(engine, checkfirst=True)
 
 
@@ -240,6 +244,7 @@ def mock_websocket_emitters(monkeypatch):
         def __init__(self, *args, **kwargs):
             self.testing_mode = True  # Always in test mode
             import uuid
+
             self._uuid = uuid  # Store for use in methods
 
         def _generate_unique_sid(self):
@@ -277,30 +282,25 @@ def mock_websocket_emitters(monkeypatch):
     monkeypatch.setattr("routers.tickets.emit_ticket_created", mock_emit)
     monkeypatch.setattr("routers.callbacks.emit_whisper_created", mock_emit)
     monkeypatch.setattr(
-        "routers.ws.PushNotificationService",
-        MockPushNotificationService
+        "routers.ws.PushNotificationService", MockPushNotificationService
     )
 
     # CRITICAL: Patch WhatsAppService in ALL routers to prevent real API calls
     # This is defense-in-depth: even if TESTING env var isn't set,
     # these mocks ensure no real messages are sent during tests
     monkeypatch.setattr(
-        "routers.callbacks.WhatsAppService",
-        MockWhatsAppService
+        "routers.callbacks.WhatsAppService", MockWhatsAppService
     )
     monkeypatch.setattr(
-        "routers.messages.WhatsAppService",
-        MockWhatsAppService
+        "routers.messages.WhatsAppService", MockWhatsAppService
     )
     monkeypatch.setattr(
-        "routers.whatsapp.WhatsAppService",
-        MockWhatsAppService
+        "routers.whatsapp.WhatsAppService", MockWhatsAppService
     )
 
     # Mock the email_service instance (not EmailService class)
     monkeypatch.setattr(
-        "services.user_service.email_service",
-        MockEmailService()
+        "services.user_service.email_service", MockEmailService()
     )
 
 
