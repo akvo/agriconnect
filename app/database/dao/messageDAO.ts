@@ -276,7 +276,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     customerId: number,
   ): Message | null {
     // Get the last AI suggestion message for that customer and message type
-    // message_type = 2 (WHISPER), is_used = 0 (not used)
+    // message_type = 'WHISPER', is_used = 0 (not used)
     const stmt = db.prepareSync(
       `SELECT *
       FROM messages
@@ -288,7 +288,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       const result = stmt.executeSync<Message>([
         customerId,
         MessageFrom.LLM,
-        2, // WHISPER = 2 (INTEGER, not string)
+        'WHISPER',
       ]);
       return result.getFirstSync() || null;
     } catch (error) {
