@@ -179,7 +179,7 @@ class AkvoRagService:
         }
 
         # WHISPER mode requires ticket and administrative info
-        if message_type == 2:
+        if message_type == MessageType.WHISPER.value:
             if ticket_id:
                 callback_params["ticket_id"] = ticket_id
             if administrative_id:
