@@ -21,7 +21,7 @@ from routers import (
 )
 from fastapi.staticfiles import StaticFiles
 from services.akvo_rag_service import get_akvo_rag_service
-from tasks.retry_scheduler import start_retry_scheduler, stop_retry_scheduler
+# from tasks.retry_scheduler import start_retry_scheduler, stop_retry_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -48,14 +48,14 @@ async def lifespan(app: FastAPI):
         )
 
     # Startup: start retry scheduler for failed messages
-    logger.info("✓ Starting retry scheduler for failed messages")
-    start_retry_scheduler()
+    # logger.info("✓ Starting retry scheduler for failed messages")
+    # start_retry_scheduler()
 
     yield
 
     # Shutdown: stop retry scheduler
-    logger.info("✓ Stopping retry scheduler")
-    stop_retry_scheduler()
+    # logger.info("✓ Stopping retry scheduler")
+    # stop_retry_scheduler()
 
     # Shutdown: cleanup if needed
     logger.info("✓ Application shutdown")

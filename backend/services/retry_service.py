@@ -47,7 +47,7 @@ class RetryService:
     def get_messages_needing_retry(self) -> List[Message]:
         """
         Get messages that need retry based on:
-        1. Status is FAILED or PENDING
+        1. Status is FAILED or UNDELIVERED
         2. retry_count < max_attempts
         3. Enough time has passed based on exponential backoff
         4. Not a permanent error
@@ -63,7 +63,7 @@ class RetryService:
             self.db.query(Message)
             .filter(
                 Message.delivery_status.in_(
-                    [DeliveryStatus.FAILED, DeliveryStatus.PENDING]
+                    [DeliveryStatus.FAILED, DeliveryStatus.UNDELIVERED]
                 ),
                 Message.retry_count < self.max_attempts,
                 Message.from_source.in_([MessageFrom.LLM, MessageFrom.USER]),
