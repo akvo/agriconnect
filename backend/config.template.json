@@ -19,6 +19,10 @@
 				"variables": {
 					"ai_answer": "ai_answer"
 				}
+			},
+			"reconnection": {
+				"sid": "HX96e24070ecb0aff53a013c10be6d7523",
+				"description": "Template sent to reconnect with farmer after escalation"
 			}
 		},
 		"button_payloads": {

@@ -107,6 +107,33 @@ class Settings(BaseSettings):
         "reply_history_limit"
     )
 
+    # Reconnection settings (24-hour inactive conversation)
+    whatsapp_reconnection_template_sid: str = os.getenv(
+        "WHATSAPP_RECONNECTION_TEMPLATE_SID",
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("reconnection", {})
+        .get("sid", ""),
+    )
+    whatsapp_reconnection_threshold_hours: int = (
+        _config.get("whatsapp", {})
+        .get("reconnection", {})
+        .get("threshold_hours", 24)
+    )
+
+    # Retry settings for failed message delivery
+    retry_enabled: bool = (
+        _config.get("whatsapp", {}).get("retry", {}).get("enabled", True)
+    )
+    retry_max_attempts: int = (
+        _config.get("whatsapp", {}).get("retry", {}).get("max_attempts", 3)
+    )
+    retry_backoff_minutes: list = (
+        _config.get("whatsapp", {})
+        .get("retry", {})
+        .get("backoff_minutes", [5, 15, 60])
+    )
+
 
 # Global settings instance
 settings = Settings()
