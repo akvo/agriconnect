@@ -104,6 +104,16 @@ def mock_whatsapp_service():
     service.send_confirmation_template = MagicMock(
         return_value={"sid": "MM123456789"}
     )
+    service.send_message_with_tracking = MagicMock(
+        return_value={
+            "sid": "SM_MOCK_123",
+            "status": "sent",
+            "error_code": None,
+        }
+    )
+    service.send_template_message = MagicMock(
+        return_value={"sid": "MM_TEMPLATE_123"}
+    )
     return service
 
 
@@ -170,8 +180,7 @@ class TestAkvoRagCallbackToWhatsApp:
             "status": "completed",
             "output": {
                 "answer": (
-                    "For maize, "
-                    "use NPK fertilizer at a ratio of 20-10-10."
+                    "For maize, " "use NPK fertilizer at a ratio of 20-10-10."
                 ),
                 "citations": [
                     {
@@ -202,17 +211,23 @@ class TestAkvoRagCallbackToWhatsApp:
         assert response.json()["job_id"] == "job_abc123"
 
         # Verify AI message was stored in database
+        # For REPLY type,
+        # message_sid is the Twilio SID from WhatsApp send (mocked)
         ai_message = (
             db_session.query(Message)
-            .filter(Message.message_sid == f"ai_{callback_payload['job_id']}")
+            .filter(
+                Message.message_sid == "SM_MOCK_123"
+            )  # From mock WhatsApp service
             .first()
         )
         assert ai_message is not None
         assert ai_message.body == callback_payload["output"]["answer"]
         assert ai_message.message_type == MessageType.REPLY
 
-        # Verify WhatsApp message was sent
-        mock_whatsapp_service.send_confirmation_template.assert_called_once()
+        # Verify WhatsApp messages were sent
+        # (AI answer + confirmation template)
+        mock_whatsapp_service.send_message_with_tracking.assert_called_once()
+        mock_whatsapp_service.send_template_message.assert_called_once()
 
     def test_failed_callback_logs_error(
         self,
@@ -229,7 +244,8 @@ class TestAkvoRagCallbackToWhatsApp:
             "error": "Prompt must accept context as an input variable",
             "callback_params": (
                 f'{{"message_id": {test_message.id}, '
-                f'"message_type": 1, "customer_id": {test_customer.id}}}'),
+                f'"message_type": 1, "customer_id": {test_customer.id}}}'
+            ),
         }
 
         response = client.post("/api/callback/ai", json=callback_payload)
@@ -630,9 +646,10 @@ class TestTicketBasedMessageTypeRouting:
         ]
         seed_administrative_data(db_session, rows)
 
-        with patch("routers.whatsapp.emit_message_created"), patch(
-            "routers.whatsapp.emit_ticket_created"
-        ) as mock_emit_ticket:
+        with (
+            patch("routers.whatsapp.emit_message_created"),
+            patch("routers.whatsapp.emit_ticket_created") as mock_emit_ticket,
+        ):
             response = client.post(
                 "/api/whatsapp/webhook",
                 data={
@@ -709,9 +726,7 @@ class TestTicketBasedMessageTypeRouting:
         assert len(messages) == 3
 
         # Verify all messages have correct bodies
-        for i, msg in enumerate(
-            sorted(messages, key=lambda m: m.message_sid)
-        ):
+        for i, msg in enumerate(sorted(messages, key=lambda m: m.message_sid)):
             assert msg.body == f"Follow-up question {i + 1}"
             assert msg.customer_id == test_customer.id
 

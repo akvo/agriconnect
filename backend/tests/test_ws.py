@@ -364,8 +364,9 @@ class TestEventEmissions:
 
         with patch("routers.ws.sio", mock_sio):
             await emit_ticket_resolved(
-                ticket_id=1, resolved_at="2024-01-01T12:00:00",
-                administrative_id=10
+                ticket_id=1,
+                resolved_at="2024-01-01T12:00:00",
+                administrative_id=10,
             )
 
             # Should emit to ticket room, ward room, and admin room
@@ -387,19 +388,13 @@ class TestHelperFunctions:
         db_session.add(ward_assignment)
         db_session.commit()
 
-        administrative_ids = get_user_adm_ids(
-            sample_eo_user, db_session
-        )
+        administrative_ids = get_user_adm_ids(sample_eo_user, db_session)
 
         assert sample_administrative.id in administrative_ids
 
-    def test_get_user_adm_ids_for_admin(
-        self, sample_admin_user, db_session
-    ):
+    def test_get_user_adm_ids_for_admin(self, sample_admin_user, db_session):
         """Test admin returns empty list (marker for all access)"""
-        administrative_ids = get_user_adm_ids(
-            sample_admin_user, db_session
-        )
+        administrative_ids = get_user_adm_ids(sample_admin_user, db_session)
 
         assert administrative_ids == []
 
