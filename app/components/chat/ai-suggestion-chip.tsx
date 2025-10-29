@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
+  ScrollView,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import typography from "@/styles/typography";
@@ -33,13 +34,9 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
   containerStyle,
   loading = false,
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const [text, setText] = useState<string | null>(suggestion);
   const fadeAnim = useRef(new Animated.Value(1)).current;
-
-  // Don't render if no suggestion and not loading
-  if (!suggestion && !loading) {
-    return null;
-  }
 
   // Handle accept suggestion
   const handleAccept = () => {
@@ -57,6 +54,18 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
   // Calculate dynamic height based on expanded state
   const screenHeight = Dimensions.get("window").height;
   const maxHeight = expanded ? screenHeight * 0.66 : 48;
+
+  useEffect(() => {
+    if (suggestion !== text && !expanded) {
+      setText(suggestion);
+      setExpanded(true);
+    }
+  }, [expanded, suggestion, text]);
+
+  // Don't render if no suggestion and not loading
+  if (!suggestion && !loading) {
+    return null;
+  }
 
   return (
     <Animated.View
@@ -97,18 +106,41 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
         {loading ? (
           <LoadingDots />
         ) : (
-          <TouchableOpacity onPress={handleAccept}>
-            <Text
-              style={[
-                typography.body3,
-                styles.suggestionText,
-                expanded && styles.suggestionTextExpanded,
-              ]}
-              numberOfLines={expanded ? undefined : 3}
+          <View>
+            <ScrollView style={{ maxHeight: screenHeight * 0.16 }}>
+              <Text
+                style={[
+                  typography.body3,
+                  styles.suggestionText,
+                  expanded && styles.suggestionTextExpanded,
+                ]}
+                numberOfLines={expanded ? undefined : 3}
+              >
+                {text}
+              </Text>
+            </ScrollView>
+            <TouchableOpacity
+              onPress={handleAccept}
+              disabled={!text}
+              style={styles.actionButtonContainer}
             >
-              {suggestion}
-            </Text>
-          </TouchableOpacity>
+              <View style={styles.actionButtons}>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={20}
+                  color={themeColors["green-500"]}
+                />
+                <Text
+                  style={[
+                    typography.label2,
+                    { color: themeColors["green-500"] },
+                  ]}
+                >
+                  Accept Suggestion
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </Animated.View>
@@ -180,6 +212,7 @@ const styles = StyleSheet.create({
   whisperContent: {
     paddingHorizontal: 16,
     paddingVertical: 12,
+    overflowY: "auto",
   },
   suggestionText: {
     color: themeColors.textPrimary,
@@ -189,9 +222,18 @@ const styles = StyleSheet.create({
   suggestionTextExpanded: {
     marginBottom: 16,
   },
+  actionButtonContainer: {
+    alignSelf: "flex-end",
+    backgroundColor: themeColors["green-50"],
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 32,
+    marginTop: 8,
+  },
   actionButtons: {
     flexDirection: "row",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
   },
   loadingContainer: {
     paddingVertical: 20,
