@@ -61,8 +61,6 @@ const styles = StyleSheet.create({
   },
   flexRow: {
     width: "100%",
-    flex: 1,
-    flexShrink: 1,
     gap: 4,
     flexDirection: "row",
   },

@@ -182,6 +182,25 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     }
   }
 
+  // Find message by ID
+  findById(db: SQLiteDatabase, id: number): MessageWithUsers | null {
+    const stmt = db.prepareSync(`
+      SELECT m.*, f.fullName as customer_name, u.fullName as user_name
+      FROM messages m
+      LEFT JOIN customer_users f ON m.customer_id = f.id
+      LEFT JOIN users u ON m.user_id = u.id
+      WHERE m.id = ?`);
+    try {
+      const result = stmt.executeSync<MessageWithUsers>([id]);
+      return result.getFirstSync() || null;
+    } catch (error) {
+      console.error("Error finding message by ID:", error);
+      return null;
+    } finally {
+      stmt.finalizeSync();
+    }
+  }
+
   // Find message with user details by ID
   findByIdWithUsers(db: SQLiteDatabase, id: number): MessageWithUsers | null {
     const stmt = db.prepareSync(

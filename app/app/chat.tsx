@@ -242,20 +242,6 @@ const ChatScreen = () => {
           setMessages(uiMessages);
           setOldestTimestamp(result.oldestTimestamp);
 
-          // Show sticky bubble if messageId matches a customer message
-          if (messageId) {
-            const targetMessage = uiMessages.find(
-              (msg) =>
-                msg.id === parseInt(messageId, 10) && msg.sender === "customer",
-            );
-            if (targetMessage) {
-              setStickyMessage(targetMessage);
-              console.log(
-                `[Chat] Setting sticky bubble for customer message id=${messageId}`,
-              );
-            }
-          }
-
           // Scroll to bottom after loading cached messages
           if (!forceRefresh) {
             setTimeout(() => scrollToBottom(false), 300);
@@ -321,7 +307,7 @@ const ChatScreen = () => {
         }
       }
     },
-    [ticketNumber, db, daoManager, user, scrollToBottom, messageId],
+    [ticketNumber, db, daoManager, user, scrollToBottom],
   );
 
   useEffect(() => {
@@ -370,6 +356,24 @@ const ChatScreen = () => {
       // Force refresh messages to get latest data
       await loadTicketAndMessages(true);
     }
+
+    // Get sticky message if messageId param is provided
+    if (messageId) {
+      const dbMessage = daoManager.message.findById(
+        db,
+        parseInt(messageId, 10),
+      );
+      if (dbMessage?.body) {
+        setStickyMessage({
+          id: dbMessage.id,
+          message_sid: dbMessage.message_sid,
+          name: dbMessage.customer_name,
+          text: dbMessage.body,
+          sender: "customer",
+          timestamp: dbMessage.createdAt,
+        });
+      }
+    }
   }, [
     db,
     daoManager,
@@ -379,6 +383,7 @@ const ChatScreen = () => {
     aiSuggestion,
     aiSuggestionUsed,
     refresh,
+    messageId,
     loadTicketAndMessages,
   ]);
 
@@ -699,6 +704,7 @@ const ChatScreen = () => {
       </SafeAreaView>
     );
   }
+  console.log("stickyMessage", stickyMessage);
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
