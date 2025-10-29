@@ -273,6 +273,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
               ticketNumber,
               name,
               messageId,
+              refresh: "true",
             },
           });
         }

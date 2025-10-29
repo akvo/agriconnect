@@ -1,135 +1,205 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
+  Animated,
+  Dimensions,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Feathericons from "@expo/vector-icons/Feather";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 
 interface AISuggestionChipProps {
-  suggestion: string;
+  suggestion: string | null;
   onAccept: (suggestion: string) => void;
   containerStyle?: object;
+  loading?: boolean;
 }
 
 /**
- * AISuggestionChip - Displays AI-generated message suggestions
+ * Whisper - Displays AI-generated message suggestions
  *
- * Shows a horizontally scrollable chip with suggested text that can be
- * tapped to accept and use in the message input.
+ * Similar to rag-doll's Whisper component with:
+ * - Expand/collapse functionality
+ * - Loading state with animated dots
+ * - Copy feedback when accepting
+ * - Improved UX
  */
 const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
   suggestion,
   onAccept,
   containerStyle,
+  loading = false,
 }) => {
-  if (!suggestion?.trim()) {
+  const [expanded, setExpanded] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Don't render if no suggestion and not loading
+  if (!suggestion && !loading) {
     return null;
   }
 
+  // Handle accept suggestion
+  const handleAccept = () => {
+    if (!suggestion) {
+      return;
+    }
+    onAccept(suggestion);
+  };
+
+  // Toggle expanded state
+  const toggleExpanded = () => {
+    setExpanded(!expanded);
+  };
+
+  // Calculate dynamic height based on expanded state
+  const screenHeight = Dimensions.get("window").height;
+  const maxHeight = expanded ? screenHeight * 0.66 : 48;
+
   return (
-    <View style={[styles.suggestionContainer, containerStyle]}>
-      <View style={styles.suggestionHeader}>
-        <View style={styles.suggestionIconTextContainer}>
+    <Animated.View
+      style={[
+        styles.whisperContainer,
+        { opacity: fadeAnim, maxHeight },
+        containerStyle,
+      ]}
+    >
+      {/* Header */}
+      <View style={styles.whisperHeader}>
+        <View style={styles.headerLeft}>
           <Ionicons
             name="sparkles-outline"
-            size={16}
-            color={themeColors.textSecondary}
+            size={18}
+            color={themeColors["green-500"]}
           />
-          <Text style={styles.suggestionText}>AI suggestion</Text>
+          <Text style={styles.whisperTitle}>AI Suggestion</Text>
         </View>
-        <View>
-          {/* Close button for dismiss */}
-          <TouchableOpacity onPress={() => onAccept("")}>
+        <View style={styles.headerRight}>
+          {/* Expand/Collapse button */}
+          <TouchableOpacity
+            onPress={toggleExpanded}
+            style={styles.iconButton}
+            disabled={loading}
+          >
             <Ionicons
-              name="close-sharp"
-              size={24}
+              name={expanded ? "chevron-down" : "chevron-up"}
+              size={20}
               color={themeColors.textSecondary}
             />
           </TouchableOpacity>
         </View>
       </View>
-      <ScrollView
-        showsHorizontalScrollIndicator={false}
-        style={styles.scrollViewCard}
-      >
-        <View style={styles.editContainer}>
-          <View style={styles.editCircle}>
-            <Feathericons
-              name="edit"
-              size={16}
-              color={themeColors["green-500"]}
-            />
-          </View>
-        </View>
-        <TouchableOpacity
-          onPress={() => onAccept(suggestion)}
-          style={styles.suggestionChip}
-        >
-          <Text numberOfLines={2} style={typography.body3}>
-            {suggestion}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+
+      {/* Content */}
+      <View style={styles.whisperContent}>
+        {loading ? (
+          <LoadingDots />
+        ) : (
+          <TouchableOpacity onPress={handleAccept}>
+            <Text
+              style={[
+                typography.body3,
+                styles.suggestionText,
+                expanded && styles.suggestionTextExpanded,
+              ]}
+              numberOfLines={expanded ? undefined : 3}
+            >
+              {suggestion}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </Animated.View>
+  );
+};
+
+/**
+ * LoadingDots - Animated loading indicator
+ */
+const LoadingDots = () => {
+  const [dots, setDots] = useState(".");
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => {
+        if (prev === "...") {
+          return ".";
+        }
+        return prev + ".";
+      });
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <View style={styles.loadingContainer}>
+      <Text style={[typography.body3, styles.loadingText]}>
+        AI is thinking{dots}
+      </Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  suggestionContainer: {
+  whisperContainer: {
     borderTopWidth: 1,
     borderColor: themeColors.mutedBorder,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: themeColors.background,
+    backgroundColor: themeColors.white,
+    overflow: "hidden",
   },
-  suggestionChip: {
-    width: "100%",
-    backgroundColor: themeColors["green-50"],
-    padding: 8,
-    borderRadius: 8,
-    maxWidth: 300,
-  },
-  suggestionHeader: {
+  whisperHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: themeColors.mutedBorder,
   },
-  suggestionIconTextContainer: {
+  headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 8,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  whisperTitle: {
+    ...typography.label2,
+    color: themeColors.textPrimary,
+    fontWeight: "600",
+  },
+  iconButton: {
+    padding: 4,
+  },
+  whisperContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   suggestionText: {
-    ...typography.label3,
-    color: themeColors.textSecondary,
-    fontWeight: 700,
-  },
-  scrollViewCard: {
-    borderWidth: 1,
-    borderColor: themeColors.mutedBorder,
-    borderRadius: 16,
-    padding: 12,
-  },
-  editContainer: {
-    justifyContent: "flex-start",
-    alignItems: "flex-start",
+    color: themeColors.textPrimary,
     marginBottom: 12,
+    lineHeight: 20,
   },
-  editCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 48,
-    backgroundColor: themeColors["green-50"],
-    justifyContent: "center",
+  suggestionTextExpanded: {
+    marginBottom: 16,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+  },
+  loadingContainer: {
+    paddingVertical: 20,
     alignItems: "center",
-    marginBottom: 4,
+  },
+  loadingText: {
+    color: themeColors.textSecondary,
+    fontStyle: "italic",
   },
 });
 

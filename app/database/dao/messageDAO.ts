@@ -276,20 +276,22 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     customerId: number,
   ): Message | null {
     // Get the last AI suggestion message for that customer and message type
-    // message_type = 'WHISPER', is_used = 0 (not used)
     const stmt = db.prepareSync(
-      `SELECT *
-      FROM messages
-      WHERE customer_id = ? AND from_source = ? AND message_type = ? AND is_used = 0
-      ORDER BY createdAt DESC
-      LIMIT 1`,
+      `SELECT * FROM messages m1
+      WHERE m1.customer_id = ?
+      AND m1.from_source = ?
+      AND m1.message_type = 'WHISPER'
+      AND m1.is_used = 0
+      AND m1.createdAt = (
+        SELECT MAX(m2.createdAt)
+        FROM messages m2
+        WHERE m2.customer_id = m1.customer_id
+          AND m2.from_source = m1.from_source
+          AND m2.message_type = 'WHISPER'
+      )`,
     );
     try {
-      const result = stmt.executeSync<Message>([
-        customerId,
-        MessageFrom.LLM,
-        'WHISPER',
-      ]);
+      const result = stmt.executeSync<Message>([customerId, MessageFrom.LLM]);
       return result.getFirstSync() || null;
     } catch (error) {
       console.error("Error getting last AI suggestion message:", error);

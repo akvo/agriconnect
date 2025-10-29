@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Text,
   KeyboardAvoidingView,
@@ -80,6 +86,7 @@ const ChatScreen = () => {
   const params = useLocalSearchParams();
   const ticketNumber = params.ticketNumber as string | undefined;
   const messageId = params.messageId as string | undefined;
+  const refresh = params.refresh as string | undefined;
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
@@ -88,6 +95,9 @@ const ChatScreen = () => {
   const [text, setText] = useState<string>("");
   const [stickyMessage, setStickyMessage] = useState<Message | null>(null);
   const [aiSuggestion, setAISuggestion] = useState<string | null>(null);
+  const [aiSuggestionLoading, setAISuggestionLoading] =
+    useState<boolean>(false);
+  const [aiSuggestionUsed, setAISuggestionUsed] = useState<boolean>(false);
   const [postload, setPostload] = useState<boolean>(true);
   const flatListRef = useRef<any | null>(null);
   const db = useDatabase();
@@ -119,20 +129,8 @@ const ChatScreen = () => {
     // If suggestion has content, user is accepting it
     setText(suggestion);
     setAISuggestion(null);
-
-    // Mark WHISPER message as used in database so it doesn't appear again
-    // This applies both when accepting or dismissing the suggestion
-    if (ticket?.customer?.id) {
-      const marked = daoManager.message.markWhisperAsUsed(
-        db,
-        ticket.customer.id,
-      );
-      if (marked) {
-        console.log(
-          `[Chat] Marked WHISPER message as used for customer ${ticket.customer.id}`,
-        );
-      }
-    }
+    setAISuggestionLoading(false); // Clear loading state
+    setAISuggestionUsed(true); // Mark suggestion as used
   };
 
   // Group messages by date for section headers
@@ -158,7 +156,7 @@ const ChatScreen = () => {
 
   // Flatten sections for FlatList
   // Messages are ordered oldest to newest (chronological order)
-  const flattenedData = React.useMemo(() => {
+  const flattenedData = useMemo(() => {
     const sections = groupMessagesByDate(messages);
     const result: { type: "header" | "message"; data: any }[] = [];
 
@@ -344,11 +342,11 @@ const ChatScreen = () => {
     }
     /**
      * Load last AI suggestion from database for this customer
-     * Only load if we don't already have a suggestion (e.g., from WebSocket)
+     * Only load if we don't already have a suggestion (e.g., from WebSocket) or used
      */
-    if (aiSuggestion) {
+    if (aiSuggestion || aiSuggestionUsed) {
       console.log(
-        "[Chat] Skipping AI suggestion load from database - already have one from WebSocket",
+        "[Chat] AI suggestion already present or used, skipping load",
       );
       return;
     }
@@ -365,8 +363,24 @@ const ChatScreen = () => {
         dbAiSuggestion.body.substring(0, 50) + "...",
       );
       setAISuggestion(dbAiSuggestion.body);
+      setAISuggestionLoading(false); // Ensure loading state is cleared
     }
-  }, [db, daoManager, postload, loading, ticket?.customer?.id, aiSuggestion]);
+
+    if (refresh === "true") {
+      // Force refresh messages to get latest data
+      await loadTicketAndMessages(true);
+    }
+  }, [
+    db,
+    daoManager,
+    postload,
+    loading,
+    ticket?.customer?.id,
+    aiSuggestion,
+    aiSuggestionUsed,
+    refresh,
+    loadTicketAndMessages,
+  ]);
 
   useEffect(() => {
     loadDataOnPostload();
@@ -448,6 +462,14 @@ const ChatScreen = () => {
       console.log("[Chat] Received new message:", event);
 
       try {
+        // If this is a customer message, show loading state for AI suggestion
+        if (event.from_source === MessageFrom.CUSTOMER) {
+          console.log(
+            "[Chat] Customer message received, waiting for AI suggestion...",
+          );
+          setAISuggestionLoading(true);
+        }
+
         // Save message to SQLite database (idempotent upsert)
         // Use the message_id from backend as the SQLite ID
         const savedMessage = daoManager.message.upsert(db, {
@@ -632,6 +654,8 @@ const ChatScreen = () => {
       console.log("[Chat] AI suggestion created:", event);
       // Update local state with new AI suggestion
       setAISuggestion(event.suggestion);
+      // Clear loading state
+      setAISuggestionLoading(false);
 
       // NOTE: We don't reload messages here to avoid race condition with loadDataOnPostload
       // The whisper message will be synced in background automatically
@@ -719,7 +743,6 @@ const ChatScreen = () => {
               padding: 12,
               paddingBottom: 20,
             }}
-            style={{ marginTop: stickyMessage ? 40 : 0 }}
             onScroll={(event) => {
               const { contentOffset } = event.nativeEvent;
               // Trigger load older messages when scrolled near top
@@ -744,9 +767,10 @@ const ChatScreen = () => {
         </View>
 
         {/* AI Suggestion Chip */}
-        {aiSuggestion && (
+        {(aiSuggestion || aiSuggestionLoading) && (
           <AISuggestionChip
             suggestion={aiSuggestion}
+            loading={aiSuggestionLoading}
             onAccept={handleAcceptSuggestion}
           />
         )}
@@ -862,6 +886,19 @@ const ChatScreen = () => {
                         : msg,
                     );
                   });
+
+                  if (aiSuggestionUsed) {
+                    // Mark the AI suggestion as used in the database
+                    const marked = daoManager.message.markWhisperAsUsed(
+                      db,
+                      ticket.customer.id,
+                    );
+                    if (marked) {
+                      console.log(
+                        `[Chat] Marked WHISPER message as used for customer ${ticket.customer.id}`,
+                      );
+                    }
+                  }
                 } catch (apiError) {
                   console.error(
                     "❌ [Chat] Failed to send message to backend:",
@@ -1015,7 +1052,7 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.white,
   },
   stickyBubbleContainer: {
-    position: "absolute",
+    position: "relative",
     top: 0,
     left: 0,
     right: 0,
