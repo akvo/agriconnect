@@ -71,9 +71,9 @@ class Settings(BaseSettings):
     akvo_rag_callback_token: str = _config.get("akvo_rag", {}).get(
         "callback_token"
     )
-    akvo_rag_default_chat_prompt: str = _config.get("akvo_rag", {}).get(
-        "default_chat_prompt"
-    )
+    akvo_rag_default_chat_prompt: Optional[str] = _config.get(
+        "akvo_rag", {}
+    ).get("default_chat_prompt")
     akvo_rag_access_token: Optional[str] = os.getenv(
         "AKVO_RAG_APP_ACCESS_TOKEN",
         _config.get("akvo_rag", {}).get("access_token"),
