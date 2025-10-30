@@ -230,6 +230,32 @@ class ApiClient {
     };
   }
 
+  async getTicketById(token: string, ticketId: number): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/tickets/${ticketId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      // Note: 401 errors are now handled by fetchWithRetry
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch ticket" }));
+      throw new Error(error.detail || "Failed to fetch ticket");
+    }
+
+    const { ticket } = await response.json();
+    return {
+      ...ticket,
+      ticketNumber: ticket.ticket_number,
+      unreadCount: ticket.resolved_at ? 0 : 1,
+    };
+  }
+
   async closeTicket(token: string, ticketID: number): Promise<any> {
     const response = await this.fetchWithRetry(
       `${this.baseUrl}/tickets/${ticketID}`,

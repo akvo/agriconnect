@@ -444,6 +444,7 @@ class PushNotificationService:
             data={
                 "type": "message_created",
                 "ticketNumber": ticket_number,
+                "ticketId": str(ticket_id),
                 "name": customer_name,
                 "messageId": str(message_id),
             },

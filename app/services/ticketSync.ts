@@ -335,6 +335,45 @@ class TicketSyncService {
       throw error;
     }
   }
+
+  /**
+   * Fetch a single ticket by ID from API and sync to SQLite
+   * Used when opening a chat from notification and ticket doesn't exist locally
+   */
+  static async syncTicketById(
+    db: SQLiteDatabase,
+    accessToken: string,
+    ticketId: number,
+    userId?: number,
+  ): Promise<boolean> {
+    try {
+      console.log(`[TicketSync] Fetching ticket ${ticketId} from API...`);
+
+      // Fetch ticket details from API
+      const apiTicket = await api.getTicketById(accessToken, ticketId);
+
+      if (!apiTicket) {
+        console.warn(`[TicketSync] Ticket ${ticketId} not found in API`);
+        return false;
+      }
+
+      console.log(
+        `[TicketSync] Successfully fetched ticket ${ticketId} from API:`,
+        apiTicket,
+      );
+
+      // Sync the ticket to local database
+      await this.syncTicketsToLocal(db, [apiTicket], userId);
+
+      console.log(
+        `[TicketSync] Successfully synced ticket ${ticketId} to SQLite`,
+      );
+      return true;
+    } catch (error) {
+      console.error(`[TicketSync] Error syncing ticket ${ticketId}:`, error);
+      throw error;
+    }
+  }
 }
 
 export default TicketSyncService;

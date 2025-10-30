@@ -41,6 +41,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useNetwork } from "@/contexts/NetworkContext";
 import MessageSyncService from "@/services/messageSync";
+import TicketSyncService from "@/services/ticketSync";
 import { MessageFrom } from "@/constants/messageSource";
 import { api } from "@/services/api";
 
@@ -85,6 +86,7 @@ interface DateSection {
 const ChatScreen = () => {
   const params = useLocalSearchParams();
   const ticketNumber = params.ticketNumber as string | undefined;
+  const ticketId = params.ticketId as string | undefined;
   const messageId = params.messageId as string | undefined;
   const refresh = params.refresh as string | undefined;
   const [messages, setMessages] = useState<Message[]>([]);
@@ -289,7 +291,115 @@ const ChatScreen = () => {
               // Don't throw - background sync failure is non-fatal
             });
         } else {
-          console.warn(`[Chat] Ticket not found: ${ticketNumber}`);
+          console.warn(`[Chat] Ticket not found in SQLite: ${ticketNumber}`);
+
+          // If we have ticketId from notification, try to fetch from API
+          if (ticketId && !isNaN(Number(ticketId))) {
+            console.log(
+              `[Chat] Attempting to fetch ticket ${ticketId} from API...`,
+            );
+            try {
+              const synced = await TicketSyncService.syncTicketById(
+                db,
+                user.accessToken,
+                Number(ticketId),
+                user?.id,
+              );
+
+              if (synced) {
+                console.log(
+                  `[Chat] Successfully synced ticket ${ticketId}, retrying load...`,
+                );
+
+                // Retry loading the ticket from SQLite
+                const retryTicketData = daoManager.ticket.findByTicketNumber(
+                  db,
+                  ticketNumber,
+                );
+
+                if (retryTicketData) {
+                  console.log(
+                    `[Chat] Found ticket after API sync: id=${retryTicketData.id}`,
+                  );
+                  setTicket({
+                    id: retryTicketData.id,
+                    ticketNumber: retryTicketData.ticketNumber,
+                    customer: retryTicketData.customer,
+                    resolver: retryTicketData.resolver,
+                    resolvedAt: retryTicketData.resolvedAt,
+                    createdAt: retryTicketData.createdAt,
+                  });
+
+                  // Load messages for the ticket
+                  const result = await MessageSyncService.loadInitialMessages(
+                    db,
+                    user.accessToken,
+                    retryTicketData.id,
+                    retryTicketData.customer?.id || 0,
+                    retryTicketData.createdAt || new Date().toISOString(),
+                    user?.id,
+                    20,
+                    forceRefresh,
+                  );
+
+                  const uiMessages = result.messages.map((msg) =>
+                    convertToUIMessage(msg, user?.id),
+                  );
+                  setMessages(uiMessages);
+                  setOldestTimestamp(result.oldestTimestamp);
+
+                  // Scroll to bottom after loading
+                  if (!forceRefresh) {
+                    setTimeout(() => scrollToBottom(false), 300);
+                  }
+
+                  // Sync newer messages in background
+                  MessageSyncService.syncNewerMessages(
+                    db,
+                    user.accessToken,
+                    retryTicketData.id,
+                    retryTicketData.customer?.id || 0,
+                    user?.id,
+                  )
+                    .then((newCount) => {
+                      if (newCount > 0) {
+                        console.log(
+                          `[Chat] Background sync found ${newCount} new messages, reloading`,
+                        );
+                        const updatedMessages =
+                          daoManager.message.getAllMessagesByTicketId(
+                            db,
+                            retryTicketData.id,
+                          );
+                        const updatedUIMessages = updatedMessages.map((msg) =>
+                          convertToUIMessage(msg, user?.id),
+                        );
+                        setMessages(updatedUIMessages);
+                        if (updatedMessages.length > 0) {
+                          setOldestTimestamp(updatedMessages[0].createdAt);
+                        }
+                        setTimeout(() => scrollToBottom(true), 100);
+                      }
+                    })
+                    .catch((error) => {
+                      console.error("[Chat] Background sync failed:", error);
+                    });
+                } else {
+                  console.error(
+                    `[Chat] Ticket ${ticketNumber} still not found after API sync`,
+                  );
+                }
+              } else {
+                console.error(
+                  `[Chat] Failed to sync ticket ${ticketId} from API`,
+                );
+              }
+            } catch (syncError) {
+              console.error(`[Chat] Error syncing ticket from API:`, syncError);
+            }
+          } else {
+            console.warn(`[Chat] No ticketId provided, cannot fetch from API`);
+          }
         }
       } catch (error: any) {
         // Check if this is a 401 Unauthorized error
@@ -307,7 +417,7 @@ const ChatScreen = () => {
         }
       }
     },
-    [ticketNumber, db, daoManager, user, scrollToBottom],
+    [ticketNumber, ticketId, db, daoManager, user, scrollToBottom],
   );
 
   useEffect(() => {

@@ -253,11 +253,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         const data = response.notification.request.content.data;
 
         // Type guard for notification data
-        const ticketNumber =
-          typeof data?.ticketNumber === "string" ||
-          typeof data?.ticketNumber === "number"
-            ? String(data.ticketNumber)
-            : null;
+        const ticketNumber = data?.ticketNumber ? `${data.ticketNumber}` : null;
+        const ticketId = data?.ticketId ? `${data.ticketId}` : null;
         const name = typeof data?.name === "string" ? data.name : "Chat";
         const messageId =
           typeof data?.messageId === "string" ||
@@ -271,6 +268,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
             pathname: "/chat",
             params: {
               ticketNumber,
+              ticketId,
               name,
               messageId,
               refresh: "true",
@@ -284,7 +282,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
-  }, []);
+  }, [router]);
 
   return (
     <NotificationContext.Provider
