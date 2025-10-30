@@ -1,7 +1,3 @@
-"""
-Seed crop types from CSV file
-"""
-
 import csv
 import os
 import sys

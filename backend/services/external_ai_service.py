@@ -45,7 +45,12 @@ class ExternalAIService:
                     f"[ExternalAIService] Cached active token: "
                     f"{cls._cached_token.service_name}"
                 )
-        return cls._cached_token
+
+        # Merge cached token into current session
+        # to avoid DetachedInstanceError
+        if cls._cached_token:
+            return db.merge(cls._cached_token, load=False)
+        return None
 
     @classmethod
     def invalidate_cache(cls):
@@ -86,6 +91,7 @@ class ExternalAIService:
         chats: Optional[List[Dict[str, str]]] = None,
         trace_id: Optional[str] = None,
         prompt: Optional[str] = None,
+        additional_callback_params: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Create a chat job with external AI service.
@@ -99,6 +105,8 @@ class ExternalAIService:
             chats: Chat history for context
             trace_id: Trace ID for debugging
             prompt: Optional custom prompt (from config if not provided)
+            additional_callback_params: Optional dict of additional
+                params for callback
 
         Returns:
             Job response with job_id and status, or None if not configured
@@ -123,6 +131,10 @@ class ExternalAIService:
                 callback_params["ticket_id"] = ticket_id
             if administrative_id:
                 callback_params["administrative_id"] = administrative_id
+
+        # Merge additional callback params (for playground, etc.)
+        if additional_callback_params:
+            callback_params.update(additional_callback_params)
 
         # Get default prompt from service token if not provided
         if not prompt:

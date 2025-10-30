@@ -77,6 +77,28 @@ class AICallbackParams(BaseModel):
         example=456,
     )
 
+    # Playground-specific fields
+    source: Optional[str] = Field(
+        None,
+        description=(
+            "Source of the message: 'playground' for testing, "
+            "None for production"
+        ),
+        example="playground",
+    )
+    session_id: Optional[str] = Field(
+        None,
+        description=(
+            "UUID of the playground session (only for playground source)"
+        ),
+        example="550e8400-e29b-41d4-a716-446655440000",
+    )
+    admin_user_id: Optional[int] = Field(
+        None,
+        description="ID of the admin user (only for playground source)",
+        example=789,
+    )
+
 
 class KBCallbackParams(BaseModel):
     """Parameters specific to Knowledge Base processing callbacks"""

@@ -12,6 +12,7 @@ import {
   ChevronRightIcon,
   SparklesIcon,
   DocumentIcon,
+  BeakerIcon,
 } from "@heroicons/react/24/outline";
 
 export default function Dashboard() {
@@ -132,30 +133,57 @@ export default function Dashboard() {
             </a>
 
             {user?.user_type === "admin" && (
-              <a
-                href="/users"
-                className="group bg-gradient-to-br from-purple-50 to-purple-100 p-6 text-left hover:from-purple-100 hover:to-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
-                style={{ borderRadius: "5px" }}
-              >
-                <div className="flex items-center mb-4">
-                  <div
-                    className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 mr-3"
-                    style={{ borderRadius: "5px" }}
-                  >
-                    <UsersIcon className="w-5 h-5 text-white" />
+              <>
+                <a
+                  href="/users"
+                  className="group bg-gradient-to-br from-purple-50 to-purple-100 p-6 text-left hover:from-purple-100 hover:to-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
+                  style={{ borderRadius: "5px" }}
+                >
+                  <div className="flex items-center mb-4">
+                    <div
+                      className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 mr-3"
+                      style={{ borderRadius: "5px" }}
+                    >
+                      <UsersIcon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="text-purple-700 font-bold text-lg">
+                      User Management
+                    </div>
                   </div>
-                  <div className="text-purple-700 font-bold text-lg">
-                    User Management
+                  <div className="text-secondary-600 text-sm leading-relaxed">
+                    Create, edit, and manage system users and their permissions
                   </div>
-                </div>
-                <div className="text-secondary-600 text-sm leading-relaxed">
-                  Create, edit, and manage system users and their permissions
-                </div>
-                <div className="mt-4 flex items-center text-purple-600 text-sm font-semibold group-hover:text-purple-700">
-                  <span>Manage Users</span>
-                  <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
-                </div>
-              </a>
+                  <div className="mt-4 flex items-center text-purple-600 text-sm font-semibold group-hover:text-purple-700">
+                    <span>Manage Users</span>
+                    <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
+                  </div>
+                </a>
+
+                <a
+                  href="/playground"
+                  className="group bg-gradient-to-br from-indigo-50 to-indigo-100 p-6 text-left hover:from-indigo-100 hover:to-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
+                  style={{ borderRadius: "5px" }}
+                >
+                  <div className="flex items-center mb-4">
+                    <div
+                      className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 mr-3"
+                      style={{ borderRadius: "5px" }}
+                    >
+                      <BeakerIcon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="text-indigo-700 font-bold text-lg">
+                      Chat Playground
+                    </div>
+                  </div>
+                  <div className="text-secondary-600 text-sm leading-relaxed">
+                    Test and fine-tune AI prompts with custom configurations
+                  </div>
+                  <div className="mt-4 flex items-center text-indigo-600 text-sm font-semibold group-hover:text-indigo-700">
+                    <span>Open Playground</span>
+                    <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
+                  </div>
+                </a>
+              </>
             )}
 
             <button

@@ -117,11 +117,15 @@ def db_session(test_db):
         # Import Ticket model
         from models.ticket import Ticket
 
+        # Import PlaygroundMessage model
+        from models.playground_message import PlaygroundMessage
+
         # Delete in correct order to respect foreign key constraints
         db.query(UserAdministrative).delete()
         db.query(CustomerAdministrative).delete()
         db.query(Ticket).delete()
         db.query(Message).delete()
+        db.query(PlaygroundMessage).delete()  # Playground messages
         db.query(Customer).delete()
         db.query(KnowledgeBase).delete()
         # Device must be deleted before Administrative (foreign key)

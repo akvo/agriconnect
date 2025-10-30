@@ -317,6 +317,52 @@ async def leave_ticket(sid: str, data: dict):
         return {"success": False, "error": "Internal error"}
 
 
+@sio.event
+async def join_playground(sid: str, data: dict):
+    """
+    Handle client joining a playground session room.
+    Emitted when admin opens playground with a session.
+    """
+    if sid not in connections:
+        logger.warning(f"Unknown client attempting to join playground: {sid}")
+        return {"success": False, "error": "Not authenticated"}
+
+    # Rate limiting
+    if not check_rate_limit(sid, "join"):
+        logger.warning(f"Rate limit exceeded for join_playground: {sid}")
+        return {"success": False, "error": "Rate limit exceeded"}
+
+    session_id = data.get("session_id")
+    if not session_id:
+        return {"success": False, "error": "session_id is required"}
+
+    try:
+        # Verify user is admin
+        user_info = connections[sid]
+        if user_info.get("user_type") != UserType.ADMIN.value:
+            logger.warning(
+                f"Non-admin user {user_info['user_id']} "
+                f"attempted to join playground"
+            )
+            return {"success": False, "error": "Admin access required"}
+
+        # Join playground session room
+        room_name = f"playground:{session_id}"
+        await sio.enter_room(sid, room_name)
+
+        connections[sid]["last_action"] = datetime.utcnow()
+        logger.info(
+            f"Admin user {user_info['user_id']} joined playground room "
+            f"{room_name} (sid: {sid})"
+        )
+
+        return {"success": True, "session_id": session_id}
+
+    except Exception as e:
+        logger.error(f"Error joining playground room: {e}", exc_info=True)
+        return {"success": False, "error": "Internal error"}
+
+
 # Helper functions for emitting events (called from REST endpoints)
 
 
@@ -582,6 +628,33 @@ async def emit_whisper_created(
         f"in ticket {ticket_id}"
     )
 
+
+async def emit_playground_response(
+    session_id: str, message_id: int, content: str, response_time_ms: int
+):
+    """
+    Emit playground_response event to playground session room.
+    Called when AI callback completes for playground message.
+    """
+    event_data = {
+        "session_id": session_id,
+        "message_id": message_id,
+        "content": content,
+        "response_time_ms": response_time_ms,
+        "role": "assistant",
+        "status": "completed",
+    }
+
+    # Emit to playground session room
+    room_name = f"playground:{session_id}"
+    await sio.emit("playground_response", event_data, room=room_name)
+
+    logger.info(
+        f"Emitted playground_response event for session {session_id}, "
+        f"message {message_id} (response_time: {response_time_ms}ms)"
+    )
+
+
 # Export for use in other routers
 __all__ = [
     "sio",
@@ -591,4 +664,5 @@ __all__ = [
     "emit_ticket_resolved",
     "emit_ticket_created",
     "emit_whisper_created",
+    "emit_playground_response",
 ]
