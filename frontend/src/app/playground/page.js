@@ -192,7 +192,9 @@ export default function PlaygroundPage() {
       <div className="min-h-screen bg-gradient-brand flex items-center justify-center">
         <div className="text-center animate-fade-in">
           <ArrowPathIcon className="animate-spin h-16 w-16 text-primary-600 mx-auto mb-4" />
-          <p className="text-secondary-700 font-medium">Loading playground...</p>
+          <p className="text-secondary-700 font-medium">
+            Loading playground...
+          </p>
         </div>
       </div>
     );
@@ -247,7 +249,9 @@ export default function PlaygroundPage() {
                       <span className="text-sm text-gray-600">WebSocket:</span>
                       <div className="flex items-center mt-1">
                         <div className="h-2 w-2 bg-green-500 rounded-full mr-2"></div>
-                        <span className="text-green-600 text-sm">Connected</span>
+                        <span className="text-green-600 text-sm">
+                          Connected
+                        </span>
                       </div>
                     </div>
                   )}
@@ -333,44 +337,46 @@ export default function PlaygroundPage() {
                   messages.map((msg) => {
                     const isUser = msg.role === "user" || msg.role === "USER";
                     return (
-                    <div
-                      key={msg.id}
-                      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                    >
                       <div
-                        className={`max-w-[70%] p-4 ${
-                          isUser
-                            ? "text-white"
-                            : msg.status === "pending"
-                              ? "bg-gray-100 text-gray-600"
-                              : "bg-gray-100 text-gray-800"
-                        }`}
-                        style={{
-                          borderRadius: "12px",
-                          backgroundColor: isUser ? "#2563EB" : undefined
-                        }}
+                        key={msg.id}
+                        className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                       >
-                        {msg.status === "pending" ? (
-                          <div className="flex items-center">
-                            <ArrowPathIcon className="animate-spin h-4 w-4 mr-2" />
-                            <span className="text-sm">Thinking...</span>
-                          </div>
-                        ) : (
-                          <div className="whitespace-pre-wrap">{msg.content}</div>
-                        )}
-                        <div className="flex items-center justify-between mt-2 text-xs opacity-75">
-                          <span>
-                            {new Date(msg.created_at).toLocaleTimeString()}
-                          </span>
-                          {msg.response_time_ms && (
-                            <span className="flex items-center ml-4">
-                              <ClockIcon className="h-3 w-3 mr-1" />
-                              {(msg.response_time_ms / 1000).toFixed(2)}s
-                            </span>
+                        <div
+                          className={`max-w-[70%] p-4 ${
+                            isUser
+                              ? "text-white"
+                              : msg.status === "pending"
+                                ? "bg-gray-100 text-gray-600"
+                                : "bg-gray-100 text-gray-800"
+                          }`}
+                          style={{
+                            borderRadius: "12px",
+                            backgroundColor: isUser ? "#2563EB" : undefined,
+                          }}
+                        >
+                          {msg.status === "pending" ? (
+                            <div className="flex items-center">
+                              <ArrowPathIcon className="animate-spin h-4 w-4 mr-2" />
+                              <span className="text-sm">Thinking...</span>
+                            </div>
+                          ) : (
+                            <div className="whitespace-pre-wrap">
+                              {msg.content}
+                            </div>
                           )}
+                          <div className="flex items-center justify-between mt-2 text-xs opacity-75">
+                            <span>
+                              {new Date(msg.created_at).toLocaleTimeString()}
+                            </span>
+                            {msg.response_time_ms && (
+                              <span className="flex items-center ml-4">
+                                <ClockIcon className="h-3 w-3 mr-1" />
+                                {(msg.response_time_ms / 1000).toFixed(2)}s
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
                     );
                   })
                 )}
@@ -392,11 +398,16 @@ export default function PlaygroundPage() {
                   />
                   <button
                     onClick={handleSendMessage}
-                    disabled={isSending || !inputMessage.trim() || !activeService}
+                    disabled={
+                      isSending || !inputMessage.trim() || !activeService
+                    }
                     className="px-6 text-white disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
                     style={{
                       borderRadius: "5px",
-                      backgroundColor: (isSending || !inputMessage.trim() || !activeService) ? '#9CA3AF' : '#2563EB'
+                      backgroundColor:
+                        isSending || !inputMessage.trim() || !activeService
+                          ? "#9CA3AF"
+                          : "#2563EB",
                     }}
                   >
                     {isSending ? (
