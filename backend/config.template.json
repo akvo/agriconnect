@@ -1,38 +1,38 @@
 {
-	"message_limit": 10,
-	"akvo_rag": {
-		"base_url": "https://agriconnect-rag.akvotest.org",
-		"app_name": "agriconnect",
-		"domain": "https://agriconnect2.akvotest.org/",
-		"chat_callback": "https://agriconnect2.akvotest.org/api/callback/ai",
-		"upload_callback": "https://agriconnect2.akvotest.org/api/callback/kb",
-		"callback_token": "secret",
-		"default_chat_prompt": "You are an agricultural expert assistant. Provide practical, actionable farming advice based on the knowledge base. CRITICAL FORMATTING RULES: 1) Keep reply under 1500 characters. 2) Use single line breaks only - NEVER use consecutive newlines. 3) NEVER use more than 3 consecutive spaces. 4) NEVER wrap your response in quotation marks. 5) Do NOT use special formatting like quotation marks around your entire response. 6) Write plain text without markdown formatting. 7) Use simple numbered lists without special characters. Provided Context: {context}",
-		"access_token": null,
-		"knowledge_base_id": null
-	},
-	"whatsapp": {
-		"templates": {
-			"confirmation": {
-				"sid": "HX5101667dea7c8b3ec75bb6720eab8992",
-				"description": "Template sent after AI response asking if farmer needs human help",
-				"variables": {
-					"ai_answer": "ai_answer"
-				}
-			},
-			"reconnection": {
-				"sid": "HX96e24070ecb0aff53a013c10be6d7523",
-				"description": "Template sent to reconnect with farmer after escalation"
-			}
-		},
-		"button_payloads": {
-			"escalate": "escalate",
-			"none": "none"
-		}
-	},
-	"escalation": {
-		"chat_history_limit": 20,
-		"reply_history_limit": 10,
-		"description": "Number of recent messages to include in chat history for AI context"
-	}
+  "message_limit": 10,
+  "akvo_rag": {
+    "base_url": "https://agriconnect-rag.akvotest.org",
+    "app_name": "agriconnect",
+    "domain": "https://agriconnect2.akvotest.org/",
+    "chat_callback": "https://agriconnect2.akvotest.org/api/callback/ai",
+    "upload_callback": "https://agriconnect2.akvotest.org/api/callback/kb",
+    "callback_token": "secret",
+    "default_chat_prompt": null,
+    "access_token": null,
+    "knowledge_base_id": null
+  },
+  "whatsapp": {
+    "templates": {
+      "confirmation": {
+        "sid": "HX5101667dea7c8b3ec75bb6720eab8992",
+        "description": "Template sent after AI response asking if farmer needs human help",
+        "variables": {
+          "ai_answer": "ai_answer"
+        }
+      },
+      "reconnection": {
+        "sid": "HX96e24070ecb0aff53a013c10be6d7523",
+        "description": "Template sent to reconnect with farmer after escalation"
+      }
+    },
+    "button_payloads": {
+      "escalate": "escalate",
+      "none": "none"
+    }
+  },
+  "escalation": {
+    "chat_history_limit": 20,
+    "reply_history_limit": 10,
+    "description": "Number of recent messages to include in chat history for AI context"
+  }
 }
