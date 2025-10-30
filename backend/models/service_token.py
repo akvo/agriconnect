@@ -17,6 +17,9 @@ class ServiceToken(Base):
     upload_url = Column(
         String, nullable=True
     )  # URL for KB upload job requests
+    default_prompt = Column(
+        String, nullable=True
+    )  # Default system prompt for AI service
     active = Column(
         Integer, nullable=False, default=0, index=True
     )  # 0=inactive, 1=active, only one can be active

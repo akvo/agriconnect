@@ -20,7 +20,8 @@ from routers import (
     crop_types,
 )
 from fastapi.staticfiles import StaticFiles
-from services.akvo_rag_service import get_akvo_rag_service
+from services.external_ai_service import ExternalAIService
+from database import SessionLocal
 # from tasks.retry_scheduler import start_retry_scheduler, stop_retry_scheduler
 
 logger = logging.getLogger(__name__)
@@ -32,20 +33,24 @@ async def lifespan(app: FastAPI):
     Lifespan context manager for startup and shutdown events.
     Replaces deprecated on_event decorator.
     """
-    # Startup: Validate Akvo RAG configuration
-    logger.info("✓ Application startup - validating Akvo RAG configuration")
-    rag_service = get_akvo_rag_service()
-    if not rag_service.is_configured():
-        logger.warning(
-            "⚠ Akvo RAG not fully configured. "
-            "Set AKVO_RAG_APP_ACCESS_TOKEN and "
-            "AKVO_RAG_APP_KNOWLEDGE_BASE_ID environment variables."
-        )
-    else:
-        logger.info(
-            f"✓ Akvo RAG configured with KB ID: "
-            f"{rag_service.knowledge_base_id}"
-        )
+    # Startup: Validate external AI service configuration
+    logger.info("✓ Application startup - validating AI service configuration")
+    db = SessionLocal()
+    try:
+        ai_service = ExternalAIService(db)
+        if not ai_service.is_configured():
+            logger.warning(
+                "⚠ External AI service not configured. "
+                "Create an active service token via /api/admin/service-tokens"
+            )
+        else:
+            logger.info(
+                f"✓ External AI service configured: "
+                f"{ai_service.token.service_name} "
+                f"(chat: {ai_service.token.chat_url})"
+            )
+    finally:
+        db.close()
 
     # Startup: start retry scheduler for failed messages
     # logger.info("✓ Starting retry scheduler for failed messages")

@@ -174,17 +174,60 @@ function MyComponent() {
 - **JWT-based authentication**
 - **Twilio WhatsApp integration** for messaging
 - **Email notification system**
-- **Service token management** for outbound API access (e.g., calling Akvo RAG)
+- **External AI service integration** - service-agnostic, database-driven configuration
+- **Service token management** for external AI services (stored in `service_tokens` table)
 - **Webhook callbacks** for real-time updates (AI/KB callbacks do not require authentication)
 - **WebSocket (Socket.IO)** for real-time chat communication
 - **Push notifications** via Expo Push Notification service
 - **Device registration** associated with administrative areas (wards)
 
-### Authentication Flow with Akvo RAG
-- **AgriConnect → Akvo RAG**: Uses service tokens (stored in `service_tokens` table with `access_token`, `chat_url`, `upload_url` fields)
-- **Akvo RAG → AgriConnect**: No authentication required for callback endpoints (`/api/callback/ai`, `/api/callback/kb`)
-- Service tokens manage **outbound authentication only** - no incoming authentication tokens are stored
-- This simplifies token management by eliminating bidirectional authentication
+### External AI Service Integration
+
+AgriConnect uses a **service-agnostic AI integration** managed via the `service_tokens` database table.
+
+**Configuration:**
+- Admin users configure AI services via `/api/admin/service-tokens` API
+- Multiple services can be configured, only one active at a time
+- Supports any AI service (Akvo RAG, OpenAI, Claude API, etc.)
+- Service configuration stored in database, not environment variables
+- TTL cache (5 minutes) for optimal performance
+
+**API Endpoints:**
+- `POST /api/admin/service-tokens` - Create new service token
+- `GET /api/admin/service-tokens` - List all service tokens
+- `PUT /api/admin/service-tokens/{id}` - Update service token
+- `DELETE /api/admin/service-tokens/{id}` - Delete service token
+
+**Environment Variables:**
+- No external AI environment variables required
+- All configuration managed via database (`service_tokens` table)
+
+**Token Management:**
+- Access tokens and service URLs stored in `service_tokens` table
+- Managed via admin API (no environment variables for tokens)
+- Cache invalidation on token updates ensures immediate effect
+- Multiple services supported, switch via `active` flag
+
+**Database Schema:**
+```sql
+CREATE TABLE service_tokens (
+    id SERIAL PRIMARY KEY,
+    service_name VARCHAR NOT NULL UNIQUE,
+    access_token VARCHAR,           -- Token to authenticate with external service
+    chat_url VARCHAR,                -- URL for chat job requests
+    upload_url VARCHAR,              -- URL for KB upload job requests
+    active INTEGER DEFAULT 0,        -- 0=inactive, 1=active (only one can be active)
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### Authentication Flow with External AI Services
+
+- **AgriConnect → External AI**: Uses service tokens (from `service_tokens` table)
+- **External AI → AgriConnect**: No authentication required for callback endpoints (`/api/callback/ai`, `/api/callback/kb`)
+- Service tokens manage **outbound authentication only**
+- Simplified token management by eliminating bidirectional authentication
 
 ## Development Workflow
 

@@ -47,43 +47,6 @@ class Settings(BaseSettings):
     # Message limit
     message_limit: int = _config.get("message_limit")
 
-    # Akvo-RAG settings
-    akvo_rag_base_url: str = os.getenv(
-        "AKVO_RAG_BASE_URL",
-        _config.get("akvo_rag", {}).get("base_url"),
-    )
-    akvo_rag_app_name: str = os.getenv(
-        "AKVO_RAG_APP_NAME",
-        _config.get("akvo_rag", {}).get("app_name"),
-    )
-    akvo_rag_domain: str = os.getenv(
-        "AKVO_RAG_APP_DOMAIN",
-        _config.get("akvo_rag", {}).get("domain"),
-    )
-    akvo_rag_chat_callback: str = os.getenv(
-        "AKVO_RAG_APP_CHAT_CALLBACK",
-        _config.get("akvo_rag", {}).get("chat_callback"),
-    )
-    akvo_rag_upload_callback: str = os.getenv(
-        "AKVO_RAG_APP_UPLOAD_CALLBACK",
-        _config.get("akvo_rag", {}).get("upload_callback"),
-    )
-    akvo_rag_callback_token: str = _config.get("akvo_rag", {}).get(
-        "callback_token"
-    )
-    akvo_rag_default_chat_prompt: str = _config.get("akvo_rag", {}).get(
-        "default_chat_prompt"
-    )
-    akvo_rag_access_token: Optional[str] = os.getenv(
-        "AKVO_RAG_APP_ACCESS_TOKEN",
-        _config.get("akvo_rag", {}).get("access_token"),
-    )
-    akvo_rag_knowledge_base_id: Optional[int] = (
-        int(os.getenv("AKVO_RAG_APP_KNOWLEDGE_BASE_ID"))
-        if os.getenv("AKVO_RAG_APP_KNOWLEDGE_BASE_ID")
-        else _config.get("akvo_rag", {}).get("knowledge_base_id")
-    )
-
     # WhatsApp settings
     whatsapp_confirmation_template_sid: str = os.getenv(
         "WHATSAPP_CONFIRMATION_TEMPLATE_SID",

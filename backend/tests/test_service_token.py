@@ -13,6 +13,7 @@ def test_service_token_creation(db_session: Session):
         access_token="akvo_token_123",
         chat_url="https://akvo-rag.example.com/chat",
         upload_url="https://akvo-rag.example.com/upload",
+        default_prompt="Test prompt",
     )
 
     db_session.add(service_token)
@@ -24,6 +25,7 @@ def test_service_token_creation(db_session: Session):
     assert service_token.access_token == "akvo_token_123"
     assert service_token.chat_url == "https://akvo-rag.example.com/chat"
     assert service_token.upload_url == "https://akvo-rag.example.com/upload"
+    assert service_token.default_prompt == "Test prompt"
     assert service_token.created_at is not None
     assert service_token.updated_at is not None
     assert isinstance(service_token.created_at, datetime)
@@ -71,9 +73,10 @@ def test_service_token_service_create_token(db_session: Session):
     access_token = "akvo_access_token_123"
     chat_url = "https://akvo-rag.example.com/chat"
     upload_url = "https://akvo-rag.example.com/upload"
+    default_prompt = "Test AI prompt"
 
     service_token = ServiceTokenService.create_token(
-        db_session, service_name, access_token, chat_url, upload_url
+        db_session, service_name, access_token, chat_url, upload_url, default_prompt
     )
 
     # Check that service token was created
@@ -82,6 +85,7 @@ def test_service_token_service_create_token(db_session: Session):
     assert service_token.access_token == access_token
     assert service_token.chat_url == chat_url
     assert service_token.upload_url == upload_url
+    assert service_token.default_prompt == default_prompt
 
     # Verify token can be found by service name
     found_token = ServiceTokenService.get_token_by_service_name(
@@ -151,4 +155,5 @@ def test_service_token_minimal_fields(db_session: Session):
     assert service_token.access_token is None
     assert service_token.chat_url is None
     assert service_token.upload_url is None
+    assert service_token.default_prompt is None
     assert service_token.service_name == service_name

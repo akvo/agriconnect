@@ -302,17 +302,3 @@ def mock_websocket_emitters(monkeypatch):
     monkeypatch.setattr(
         "services.user_service.email_service", MockEmailService()
     )
-
-
-@pytest.fixture
-def mock_akvo_rag_client(monkeypatch):
-    """Mock httpx client for akvo-rag service tests"""
-    from unittest.mock import AsyncMock, MagicMock
-
-    mock_client = AsyncMock()
-    mock_response = MagicMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=None)
-
-    return mock_client, mock_response

@@ -13,6 +13,7 @@ class ServiceTokenService:
         access_token: Optional[str] = None,
         chat_url: Optional[str] = None,
         upload_url: Optional[str] = None,
+        default_prompt: Optional[str] = None,
         active: Optional[int] = None,
     ) -> ServiceToken:
         """Create a new service token configuration for external service."""
@@ -32,6 +33,7 @@ class ServiceTokenService:
             access_token=access_token,
             chat_url=chat_url,
             upload_url=upload_url,
+            default_prompt=default_prompt,
             active=active,
         )
 
@@ -59,6 +61,7 @@ class ServiceTokenService:
         access_token: Optional[str] = None,
         chat_url: Optional[str] = None,
         upload_url: Optional[str] = None,
+        default_prompt: Optional[str] = None,
         active: Optional[int] = None,
     ) -> Optional[ServiceToken]:
         """Update service token configuration with external service details."""
@@ -79,6 +82,8 @@ class ServiceTokenService:
             token.chat_url = chat_url
         if upload_url is not None:
             token.upload_url = upload_url
+        if default_prompt is not None:
+            token.default_prompt = default_prompt
         if active is not None:
             token.active = active
 
