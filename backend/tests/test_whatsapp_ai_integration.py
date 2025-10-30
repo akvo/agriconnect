@@ -118,7 +118,7 @@ def mock_whatsapp_service():
 
 
 class TestWhatsAppToExternalAIFlow:
-    """Test the complete flow from WhatsApp message to external AI job creation"""
+    """Test the complete flow from WhatsApp message to external AI"""
 
     @pytest.mark.asyncio
     async def test_incoming_whatsapp_message_creates_ai_job(

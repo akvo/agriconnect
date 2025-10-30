@@ -76,7 +76,12 @@ def test_service_token_service_create_token(db_session: Session):
     default_prompt = "Test AI prompt"
 
     service_token = ServiceTokenService.create_token(
-        db_session, service_name, access_token, chat_url, upload_url, default_prompt
+        db_session,
+        service_name,
+        access_token,
+        chat_url,
+        upload_url,
+        default_prompt,
     )
 
     # Check that service token was created

@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 class ExternalAIService:
     """
+    Service-agnostic
     Generic service for integrating with external AI platforms.
 
-    Service-agnostic - works with any AI service (Akvo RAG, OpenAI, Claude, etc.)
     Configuration managed via ServiceToken database model.
 
     Caching Strategy: TTL cache (5 minutes) for active service token
@@ -34,8 +34,10 @@ class ExternalAIService:
     def _get_cached_token(cls, db: Session) -> Optional[ServiceToken]:
         """Get token from cache or refresh if expired"""
         now = time.time()
-        if (cls._cached_token is None or
-                now - cls._cache_timestamp > cls._cache_ttl):
+        if (
+            cls._cached_token is None
+            or now - cls._cache_timestamp > cls._cache_ttl
+        ):
             cls._cached_token = ServiceTokenService.get_active_token(db)
             cls._cache_timestamp = now
             if cls._cached_token:
@@ -55,9 +57,7 @@ class ExternalAIService:
     def is_configured(self) -> bool:
         """Check if service is fully configured"""
         is_valid = bool(
-            self.token and
-            self.token.chat_url and
-            self.token.access_token
+            self.token and self.token.chat_url and self.token.access_token
         )
 
         if not is_valid:
@@ -85,7 +85,7 @@ class ExternalAIService:
         administrative_id: Optional[int] = None,
         chats: Optional[List[Dict[str, str]]] = None,
         trace_id: Optional[str] = None,
-        prompt: Optional[str] = None
+        prompt: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Create a chat job with external AI service.
@@ -139,35 +139,30 @@ class ExternalAIService:
             "job": "chat",
             "prompt": prompt,
             "chats": chats or [],
-            "callback_params": callback_params
+            "callback_params": callback_params,
         }
 
         if trace_id:
             job_payload["trace_id"] = trace_id
 
         # Prepare form data
-        form_data = {
-            "payload": json.dumps(job_payload)
-        }
+        form_data = {"payload": json.dumps(job_payload)}
 
-        headers = {
-            "Authorization": f"Bearer {self.token.access_token}"
-        }
+        headers = {"Authorization": f"Bearer {self.token.access_token}"}
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    url,
-                    data=form_data,
-                    headers=headers,
-                    timeout=30.0
+                    url, data=form_data, headers=headers, timeout=30.0
                 )
                 response.raise_for_status()
                 data = response.json()
 
-                msg_type_str = "REPLY" \
-                    if message_type == MessageType.REPLY.value \
+                msg_type_str = (
+                    "REPLY"
+                    if message_type == MessageType.REPLY.value
                     else "WHISPER"
+                )
                 logger.info(
                     f"✓ Created {msg_type_str} job {data.get('job_id')} "
                     f"for message {message_id} "
@@ -188,7 +183,7 @@ class ExternalAIService:
         self,
         file_path: str,
         kb_id: int,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Create an upload job with external AI service.
@@ -207,13 +202,6 @@ class ExternalAIService:
                 "not configured or upload_url missing"
             )
             return None
-
-        url = self.token.upload_url
-
-        # Prepare callback params
-        callback_params = {
-            "kb_id": kb_id
-        }
 
         # TODO: Implement file upload logic
         # This depends on how external service expects files
