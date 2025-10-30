@@ -2,6 +2,17 @@
 
 set -euo pipefail
 
+echo "Waiting for database to be ready..."
+# Wait for PostgreSQL to be ready
+for i in {1..30}; do
+  if psql "${DATABASE_URL}" -c '\q' 2>/dev/null; then
+    echo "Database is ready!"
+    break
+  fi
+  echo "Waiting for database... ($i/30)"
+  sleep 2
+done
+
 echo "Running database migrations"
 alembic upgrade head
 
