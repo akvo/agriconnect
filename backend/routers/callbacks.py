@@ -24,6 +24,93 @@ router = APIRouter(prefix="/callback", tags=["callbacks"])
 logger = logging.getLogger(__name__)
 
 
+async def handle_playground_callback(payload: AIWebhookCallback, db: Session):
+    """Handle AI callbacks for playground messages"""
+    try:
+        if payload.status != CallbackStage.COMPLETED or not payload.output:
+            # Handle error case - update playground message status to 'failed'
+            from models.playground_message import (
+                PlaygroundMessage,
+                PlaygroundMessageStatus,
+                PlaygroundMessageRole,
+            )
+
+            pg_message = (
+                db.query(PlaygroundMessage)
+                .filter(
+                    PlaygroundMessage.job_id == payload.job_id,
+                    PlaygroundMessage.role == PlaygroundMessageRole.ASSISTANT,
+                )
+                .first()
+            )
+
+            if pg_message:
+                pg_message.status = PlaygroundMessageStatus.FAILED
+                pg_message.updated_at = func.now()
+                db.commit()
+                logger.error(
+                    f"Playground job {payload.job_id} failed: {payload.error}"
+                )
+
+            return {"status": "error", "job_id": payload.job_id}
+
+        # Get playground message by job_id
+        from models.playground_message import (
+            PlaygroundMessage,
+            PlaygroundMessageStatus,
+        )
+        from datetime import datetime
+
+        pg_message = (
+            db.query(PlaygroundMessage)
+            .filter(PlaygroundMessage.job_id == payload.job_id)
+            .first()
+        )
+
+        if not pg_message:
+            logger.warning(
+                f"Playground message not found for job {payload.job_id}"
+            )
+            return {"status": "received", "job_id": payload.job_id}
+
+        # Calculate response time
+        import time
+
+        response_time_ms = int(
+            (time.time() - pg_message.created_at.timestamp()) * 1000
+        )
+
+        # Update message with AI response
+        pg_message.content = payload.output.answer
+        pg_message.status = PlaygroundMessageStatus.COMPLETED
+        pg_message.response_time_ms = response_time_ms
+        pg_message.updated_at = datetime.utcnow()
+        db.commit()
+
+        logger.info(
+            f"✓ Playground message {pg_message.id} completed "
+            f"(session: {pg_message.session_id}, response_time: {response_time_ms}ms)"
+        )
+
+        # Emit WebSocket event to playground room
+        from routers.ws import emit_playground_response
+
+        session_id = payload.callback_params.session_id
+        if session_id:
+            await emit_playground_response(
+                session_id=session_id,
+                message_id=pg_message.id,
+                content=pg_message.content,
+                response_time_ms=response_time_ms,
+            )
+
+        return {"status": "received", "job_id": payload.job_id}
+
+    except Exception as e:
+        logger.error(f"Error handling playground callback: {e}", exc_info=True)
+        return {"status": "error", "job_id": payload.job_id, "error": str(e)}
+
+
 @router.post(
     "/ai",
     summary="AI Processing Callbacks",
@@ -52,12 +139,20 @@ async def ai_callback(
 ):
     """Handle AI processing callbacks from external platforms"""
     try:
-        # Log the callback for debugging (you might want to store this in DB)        
+        # Log the callback for debugging
         print(f"Job ID: {payload.job_id}")
         print(f"Stage: {payload.stage}")
         print(f"Job Type: {payload.job}")
 
-        # Process the callback based on stage
+        # Check if this is a playground callback
+        if (
+            payload.callback_params
+            and payload.callback_params.source == "playground"
+        ):
+            logger.info(f"Routing to playground handler: {payload.job_id}")
+            return await handle_playground_callback(payload, db)
+
+        # Process the callback based on stage (production flow)
         if payload.status == CallbackStage.COMPLETED and payload.output:
 
             # Store AI response in database if message_id is provided
@@ -68,7 +163,8 @@ async def ai_callback(
                 # Use appropriate SID format: WHISPER uses final SID, REPLY uses pending SID (replaced later)
                 message_sid = (
                     f"ai_{payload.job_id}"
-                    if payload.callback_params.message_type == MessageType.WHISPER
+                    if payload.callback_params.message_type
+                    == MessageType.WHISPER
                     else f"pending_ai_{payload.job_id}"
                 )
 
@@ -122,7 +218,7 @@ async def ai_callback(
                             )
 
                             # Update message with real Twilio SID
-                            ai_message.message_sid = answer_response['sid']
+                            ai_message.message_sid = answer_response["sid"]
                             ai_message.delivery_status = DeliveryStatus.SENT
 
                             logger.info(
@@ -131,7 +227,10 @@ async def ai_callback(
 
                             # Step 2: Send confirmation template (non-critical)
                             from config import settings
-                            template_sid = settings.whatsapp_confirmation_template_sid
+
+                            template_sid = (
+                                settings.whatsapp_confirmation_template_sid
+                            )
                             if template_sid:
                                 try:
                                     template_response = whatsapp_service.send_template_message(
@@ -155,7 +254,7 @@ async def ai_callback(
                             reconnection_service = ReconnectionService(db)
                             reconnection_service.update_customer_last_message(
                                 customer_id=ai_message.customer_id,
-                                from_source=MessageFrom.LLM
+                                from_source=MessageFrom.LLM,
                             )
 
                             logger.info(
@@ -181,7 +280,9 @@ async def ai_callback(
                         # Whisper messages don't go to WhatsApp, safe to commit immediately
                         message_service.commit_message(ai_message)
 
-                        logger.info("✓ Whisper suggestion stored for EO review")
+                        logger.info(
+                            "✓ Whisper suggestion stored for EO review"
+                        )
 
                         # Find ticket and emit WebSocket event
                         ticket_id = payload.callback_params.ticket_id
@@ -190,8 +291,9 @@ async def ai_callback(
                             ticket = (
                                 db.query(Ticket)
                                 .filter(
-                                    Ticket.customer_id == ai_message.customer_id,
-                                    Ticket.resolved_at.is_(None)
+                                    Ticket.customer_id
+                                    == ai_message.customer_id,
+                                    Ticket.resolved_at.is_(None),
                                 )
                                 .order_by(Ticket.created_at.desc())
                                 .first()
@@ -200,7 +302,9 @@ async def ai_callback(
                                 ticket_id = ticket.id
 
                         if ticket_id:
-                            logger.info(f"Emitting whisper_created for ticket_id: {ticket_id}")
+                            logger.info(
+                                f"Emitting whisper_created for ticket_id: {ticket_id}"
+                            )
                             # Emit WebSocket event for EO suggestion
                             asyncio.create_task(
                                 emit_whisper_created(
@@ -262,16 +366,22 @@ async def kb_callback(
 
             # Update KB status in database if kb_id is provided
             if payload.callback_params and payload.callback_params.kb_id:
-                from services.knowledge_base_service import KnowledgeBaseService
+                from services.knowledge_base_service import (
+                    KnowledgeBaseService,
+                )
+
                 kb_service = KnowledgeBaseService(db)
                 updated_kb = kb_service.update_status(
-                    payload.callback_params.kb_id,
-                    payload.stage
+                    payload.callback_params.kb_id, payload.stage
                 )
                 if updated_kb:
-                    print(f"KB status updated to DONE for KB ID: {updated_kb.id}")
+                    print(
+                        f"KB status updated to DONE for KB ID: {updated_kb.id}"
+                    )
                 else:
-                    print(f"Failed to update KB status for KB ID: {payload.callback_params.kb_id}")
+                    print(
+                        f"Failed to update KB status for KB ID: {payload.callback_params.kb_id}"
+                    )
 
             # Here you would typically also:
             # 1. Notify users that KB is ready
@@ -283,16 +393,22 @@ async def kb_callback(
 
             # Update KB status in database if kb_id is provided
             if payload.callback_params and payload.callback_params.kb_id:
-                from services.knowledge_base_service import KnowledgeBaseService
+                from services.knowledge_base_service import (
+                    KnowledgeBaseService,
+                )
+
                 kb_service = KnowledgeBaseService(db)
                 updated_kb = kb_service.update_status(
-                    payload.callback_params.kb_id,
-                    payload.stage
+                    payload.callback_params.kb_id, payload.stage
                 )
                 if updated_kb:
-                    print(f"KB status updated to {payload.stage.value.upper()} for KB ID: {updated_kb.id}")
+                    print(
+                        f"KB status updated to {payload.stage.value.upper()} for KB ID: {updated_kb.id}"
+                    )
                 else:
-                    print(f"Failed to update KB status for KB ID: {payload.callback_params.kb_id}")
+                    print(
+                        f"Failed to update KB status for KB ID: {payload.callback_params.kb_id}"
+                    )
 
             # Notify users of failure
 
