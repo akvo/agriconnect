@@ -72,7 +72,14 @@ export default function PlaygroundPage() {
     if (!currentSessionId || !user) return;
 
     const token = api.token;
-    const newSocket = io("http://localhost:8000", {
+
+    // Determine WebSocket URL based on environment
+    // Local dev (no nginx): Backend runs on port 8000
+    // Production (with nginx): Backend is proxied through same origin
+    const isLocalDev = window.location.port === "3000";
+    const wsUrl = isLocalDev ? "http://localhost:8000" : window.location.origin;
+
+    const newSocket = io(wsUrl, {
       auth: { token },
       transports: ["websocket"],
       path: "/ws/socket.io/",
