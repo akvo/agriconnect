@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+echo "Running database migrations"
+alembic upgrade head
+
 echo "Running tests"
 export TEST=true
 COVERAGE_PROCESS_START=./.coveragerc \
