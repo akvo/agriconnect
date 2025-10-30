@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 def load_config() -> Dict[str, Any]:
     """Load configuration from config.json file"""
     config_path = Path(__file__).parent / "config.json"
-    if os.getenv("TESTING"):
+    if os.getenv("TEST") or os.getenv("TESTING"):
         config_path = Path(__file__).parent / "config.test.json"
     if not config_path.exists():
         # Create new from template if missing
