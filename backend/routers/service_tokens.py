@@ -9,6 +9,7 @@ from database import get_db
 from models.service_token import ServiceToken
 from models.user import User
 from services.service_token_service import ServiceTokenService
+from services.external_ai_service import ExternalAIService
 from utils.auth_dependencies import admin_required
 
 router = APIRouter(prefix="/admin/service-tokens", tags=["service-tokens"])
@@ -19,6 +20,7 @@ class ServiceTokenCreate(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    default_prompt: Optional[str] = None
     active: Optional[int] = None
 
 
@@ -26,6 +28,7 @@ class ServiceTokenUpdate(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    default_prompt: Optional[str] = None
     active: Optional[int] = None
 
 
@@ -35,6 +38,7 @@ class ServiceTokenResponse(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    default_prompt: Optional[str] = None
     active: int
     created_at: datetime
     updated_at: datetime
@@ -69,8 +73,12 @@ def create_service_token(
         token_data.access_token,
         token_data.chat_url,
         token_data.upload_url,
+        token_data.default_prompt,
         token_data.active,
     )
+
+    # Invalidate cache when new token is created
+    ExternalAIService.invalidate_cache()
 
     return ServiceTokenResponse.model_validate(service_token)
 
@@ -99,6 +107,7 @@ def update_service_token(
         token_data.access_token,
         token_data.chat_url,
         token_data.upload_url,
+        token_data.default_prompt,
         token_data.active,
     )
 
@@ -107,6 +116,9 @@ def update_service_token(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Service token not found",
         )
+
+    # Invalidate cache when token is updated
+    ExternalAIService.invalidate_cache()
 
     return ServiceTokenResponse.model_validate(updated_token)
 

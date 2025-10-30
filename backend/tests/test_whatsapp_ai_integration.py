@@ -1,11 +1,11 @@
 """
-Integration tests for WhatsApp + Akvo-RAG workflow
+Integration tests for WhatsApp + External AI Service workflow
 
 Tests the complete flow:
 1. Customer sends WhatsApp message
 2. Message stored in database
-3. Chat job created with akvo-rag
-4. Callback received from akvo-rag
+3. Chat job created with external AI service
+4. Callback received from external AI service
 5. Response sent back to customer via WhatsApp
 """
 
@@ -88,8 +88,8 @@ def test_ticket(db_session: Session, test_customer, test_message):
 
 
 @pytest.fixture
-def mock_akvo_rag_service():
-    """Mock akvo-rag service"""
+def mock_external_ai_service():
+    """Mock external AI service"""
     service = MagicMock()
     service.create_chat_job = AsyncMock(
         return_value={"job_id": "test_job_123", "status": "queued"}
@@ -117,19 +117,19 @@ def mock_whatsapp_service():
     return service
 
 
-class TestWhatsAppToAkvoRagFlow:
-    """Test the complete flow from WhatsApp message to akvo-rag job creation"""
+class TestWhatsAppToExternalAIFlow:
+    """Test the complete flow from WhatsApp message to external AI"""
 
     @pytest.mark.asyncio
-    async def test_incoming_whatsapp_message_creates_rag_job(
+    async def test_incoming_whatsapp_message_creates_ai_job(
         self,
         client: TestClient,
         db_session: Session,
         test_customer,
-        mock_akvo_rag_service,
+        mock_external_ai_service,
     ):
         """
-        Test that incoming WhatsApp message triggers akvo-rag job creation
+        Test that incoming WhatsApp message triggers external AI job creation
         """
         # This would be triggered by the WhatsApp webhook endpoint
         # For now, we test the service layer directly
@@ -146,12 +146,12 @@ class TestWhatsAppToAkvoRagFlow:
         db_session.commit()
         db_session.refresh(message)
 
-        # Call the akvo-rag service to create a job
+        # Call the external AI service to create a job
         with patch(
-            "services.akvo_rag_service.get_akvo_rag_service",
-            return_value=mock_akvo_rag_service,
+            "services.external_ai_service.get_external_ai_service",
+            return_value=mock_external_ai_service,
         ):
-            result = await mock_akvo_rag_service.create_chat_job(
+            result = await mock_external_ai_service.create_chat_job(
                 message_id=message.id,
                 message_type=MessageType.REPLY.value,
                 customer_id=test_customer.id,
@@ -159,11 +159,11 @@ class TestWhatsAppToAkvoRagFlow:
 
         assert result is not None
         assert result["job_id"] == "test_job_123"
-        mock_akvo_rag_service.create_chat_job.assert_called_once()
+        mock_external_ai_service.create_chat_job.assert_called_once()
 
 
-class TestAkvoRagCallbackToWhatsApp:
-    """Test akvo-rag callback handling and WhatsApp response"""
+class TestExternalAICallbackToWhatsApp:
+    """Test external AI callback handling and WhatsApp response"""
 
     def test_successful_callback_sends_whatsapp_reply(
         self,
@@ -173,8 +173,8 @@ class TestAkvoRagCallbackToWhatsApp:
         test_message,
         mock_whatsapp_service,
     ):
-        """Test successful akvo-rag callback sends WhatsApp response"""
-        # Prepare callback payload from akvo-rag
+        """Test successful external AI callback sends WhatsApp response"""
+        # Prepare callback payload from external AI service
         callback_payload = {
             "job_id": "job_abc123",
             "status": "completed",
@@ -236,7 +236,7 @@ class TestAkvoRagCallbackToWhatsApp:
         test_customer,
         test_message,
     ):
-        """Test failed akvo-rag callback is handled gracefully"""
+        """Test failed external AI callback is handled gracefully"""
         callback_payload = {
             "job_id": "job_failed_123",
             "status": "failed",
@@ -423,11 +423,11 @@ class TestCallbackPayloadValidation:
 
 
 class TestChatHistoryIntegration:
-    """Test chat history is passed to akvo-rag"""
+    """Test chat history is passed to external AI service"""
 
     @pytest.mark.asyncio
     async def test_chat_history_included_in_job(
-        self, db_session: Session, test_customer, mock_akvo_rag_service
+        self, db_session: Session, test_customer, mock_external_ai_service
     ):
         """Test that recent chat history is included when creating job"""
         # Create multiple messages to build history
@@ -458,10 +458,10 @@ class TestChatHistoryIntegration:
 
         # Create job with chat history
         with patch(
-            "services.akvo_rag_service.get_akvo_rag_service",
-            return_value=mock_akvo_rag_service,
+            "services.external_ai_service.get_external_ai_service",
+            return_value=mock_external_ai_service,
         ):
-            await mock_akvo_rag_service.create_chat_job(
+            await mock_external_ai_service.create_chat_job(
                 message_id=messages[-1].id,
                 message_type=MessageType.REPLY.value,
                 customer_id=test_customer.id,
@@ -469,7 +469,7 @@ class TestChatHistoryIntegration:
             )
 
         # Verify chat history was passed
-        call_args = mock_akvo_rag_service.create_chat_job.call_args
+        call_args = mock_external_ai_service.create_chat_job.call_args
         assert call_args[1]["chats"] == chat_history
 
 

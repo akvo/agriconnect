@@ -33,14 +33,14 @@ router = APIRouter(prefix="/kb", tags=["knowledge_base"])
     response_model=KnowledgeBaseResponse,
     summary="Upload Knowledge Base File",
     # flake8: noqa: E501
-    description="Upload a file and create a knowledge base entry. The file will be processed by Akvo RAG service.",
+    description="Upload a file and create a knowledge base entry. The file will be processed by the configured external AI service.",
 )
 @router.post(
     "",
     response_model=KnowledgeBaseResponse,
     summary="Upload Knowledge Base File (without trailing slash)",
     # flake8: noqa: E501
-    description="Upload a file and create a knowledge base entry. The file will be processed by Akvo RAG service.",
+    description="Upload a file and create a knowledge base entry. The file will be processed by the configured external AI service.",
 )
 async def create_knowledge_base(
     file: UploadFile = File(..., description="File to upload"),
@@ -81,9 +81,17 @@ async def create_knowledge_base(
             extra_data=extra_data,
         )
 
-        # TODO: Send file to Akvo RAG service for processing
-        # This would typically involve uploading to external service
-        # and getting a job_id back
+        # Send file to external AI service for processing
+        from services.external_ai_service import ExternalAIService
+        ai_service = ExternalAIService(db)
+        if ai_service.is_configured() and ai_service.token.upload_url:
+            # TODO: Implement file upload when ready
+            # job_response = await ai_service.create_upload_job(
+            #     file_path=...,
+            #     kb_id=kb.id,
+            #     metadata=extra_data
+            # )
+            pass
 
         return kb
 

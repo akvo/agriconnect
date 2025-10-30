@@ -18,7 +18,7 @@ from models.ticket import Ticket
 from models.administrative import Administrative
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
-from services.akvo_rag_service import get_akvo_rag_service
+from services.external_ai_service import get_external_ai_service
 from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
 from routers.ws import emit_message_created, emit_ticket_created
@@ -178,9 +178,9 @@ async def whatsapp_webhook(
 
                 if not os.getenv("TESTING"):
                     # Create WHISPER job (AI suggests to EO) if not testing
-                    rag_service = get_akvo_rag_service()
+                    ai_service = get_external_ai_service(db)
                     asyncio.create_task(
-                        rag_service.create_chat_job(
+                        ai_service.create_chat_job(
                             message_id=message.id,
                             message_type=MessageType.WHISPER.value,
                             customer_id=customer.id,
@@ -302,12 +302,12 @@ async def whatsapp_webhook(
 
             # Create WHISPER job (AI suggests to EO) if not testing
             if not os.getenv("TESTING"):
-                rag_service = get_akvo_rag_service()
+                ai_service = get_external_ai_service(db)
                 trace_id = (
                     f"whisper_t{existing_ticket.id}_m{message.id}"
                 )
                 asyncio.create_task(
-                    rag_service.create_chat_job(
+                    ai_service.create_chat_job(
                         message_id=message.id,
                         message_type=MessageType.WHISPER.value,
                         customer_id=customer.id,
@@ -386,9 +386,9 @@ async def whatsapp_webhook(
 
             # Create REPLY job (AI answers farmer directly) if not testing
             if not os.getenv("TESTING"):
-                rag_service = get_akvo_rag_service()
+                ai_service = get_external_ai_service(db)
                 asyncio.create_task(
-                    rag_service.create_chat_job(
+                    ai_service.create_chat_job(
                         message_id=message.id,
                         message_type=MessageType.REPLY.value,
                         customer_id=customer.id,
