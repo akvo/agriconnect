@@ -7,6 +7,7 @@ import {
   MessageWithUsers,
 } from "./types/message";
 import { MessageFrom } from "@/constants/messageSource";
+import { DeliveryStatus } from "@/constants/deliveryStatus";
 
 export class MessageDAO extends BaseDAOImpl<Message> {
   constructor() {
@@ -44,14 +45,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       ? db.prepareSync(
           `INSERT INTO messages (
             id, from_source, message_sid, customer_id, user_id, body,
-            message_type, status, is_used, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            message_type, status, is_used, delivery_status, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
       : db.prepareSync(
           `INSERT INTO messages (
             from_source, message_sid, customer_id, user_id, body,
-            message_type, status, is_used, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            message_type, status, is_used, delivery_status, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         );
 
     try {
@@ -66,6 +67,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.message_type || null,
             data.status || 1, // Default to PENDING (1)
             data.is_used || 0, // Default to not used (0)
+            data.delivery_status || DeliveryStatus.PENDING,
             data.createdAt,
           ]
         : [
@@ -77,6 +79,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.message_type || null,
             data.status || 1, // Default to PENDING (1)
             data.is_used || 0, // Default to not used (0)
+            data.delivery_status || DeliveryStatus.PENDING,
             data.createdAt,
           ];
 
@@ -146,6 +149,10 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       if (data.is_used !== undefined) {
         updates.push("is_used = ?");
         values.push(data.is_used);
+      }
+      if (data.delivery_status !== undefined) {
+        updates.push("delivery_status = ?");
+        values.push(data.delivery_status);
       }
 
       if (updates.length === 0) {
@@ -230,6 +237,10 @@ export class MessageDAO extends BaseDAOImpl<Message> {
   // Gets the customer_id from the ticket first, then fetches ALL messages for that customer
   // Returns messages in ASC order (oldest to newest)
   // Default limit: 10 messages for better scroll-to-bottom performance
+  // Excludes WHISPER messages and messages with certain statuses
+  // NOTE: Mobile app currently doesn't store delivery_status (FAILED/UNDELIVERED)
+  //       which is tracked on backend only. If needed, add delivery_status column
+  //       via migration and sync from backend API response.
   getAllMessagesByTicketId(
     db: SQLiteDatabase,
     ticketId: number,
@@ -261,6 +272,9 @@ export class MessageDAO extends BaseDAOImpl<Message> {
 
     // Get the most recent N messages for that customer
     // First order DESC to get newest, then reverse to ASC for UI display
+    // Excludes:
+    // - WHISPER messages (message_type = 2) - AI suggestions for EOs only
+    // - FAILED and UNDELIVERED messages - Failed delivery status from Twilio
     const stmt = db.prepareSync(
       `SELECT
         m.*,
@@ -271,12 +285,19 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
       LEFT JOIN users u ON m.user_id = u.id
-      WHERE m.customer_id = ? AND m.message_type IS NOT 'WHISPER'
+      WHERE m.customer_id = ?
+        AND m.message_type IS NOT 'WHISPER'
+        AND m.delivery_status NOT IN (?, ?)
       ORDER BY m.createdAt DESC
       LIMIT ?`,
     );
     try {
-      const result = stmt.executeSync<MessageWithUsers>([customerId, limit]);
+      const result = stmt.executeSync<MessageWithUsers>([
+        customerId,
+        DeliveryStatus.FAILED,
+        DeliveryStatus.UNDELIVERED,
+        limit,
+      ]);
       const messages = result.getAllSync();
       // Reverse to return in ASC order (oldest to newest) for UI display
       return messages.reverse();

@@ -3,6 +3,7 @@
 // Note: status uses MessageStatus constants (1=PENDING, 2=REPLIED, 3=RESOLVED)
 // Note: message_type (1=REPLY, 2=WHISPER)
 // Note: is_used (0=not used, 1=used) - tracks if WHISPER message has been accepted
+// Note: delivery_status - Twilio delivery tracking: PENDING, QUEUED, SENDING, SENT, DELIVERED, READ, FAILED, UNDELIVERED
 // Import from @/constants/messageSource and @/constants/messageStatus when needed
 export interface Message {
   id: number;
@@ -14,6 +15,7 @@ export interface Message {
   message_type: number;
   status: number; // 1=PENDING, 2=REPLIED, 3=RESOLVED
   is_used: number; // 0=not used, 1=used (for WHISPER messages)
+  delivery_status: string; // Twilio delivery status: PENDING, QUEUED, SENDING, SENT, DELIVERED, READ, FAILED, UNDELIVERED
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +30,7 @@ export interface CreateMessageData {
   message_type?: number;
   status?: number; // Use MessageStatus constants (default: PENDING=1)
   is_used?: number; // 0=not used, 1=used (default: 0)
+  delivery_status?: string; // Twilio delivery status (default: PENDING)
 }
 
 export interface UpdateMessageData {
@@ -39,6 +42,7 @@ export interface UpdateMessageData {
   message_type?: number;
   status?: number; // Use MessageStatus constants
   is_used?: number; // 0=not used, 1=used
+  delivery_status?: string; // Twilio delivery status
 }
 
 // Extended message interface with user details (for inbox/conversation views)

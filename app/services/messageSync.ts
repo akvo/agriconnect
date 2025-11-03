@@ -2,6 +2,7 @@ import { SQLiteDatabase } from "expo-sqlite";
 import { api } from "./api";
 import { DAOManager } from "@/database/dao";
 import { stringToMessageFrom } from "@/constants/messageSource";
+import { DeliveryStatus } from "@/constants/deliveryStatus";
 
 interface MessageUser {
   id: number;
@@ -18,6 +19,7 @@ interface MessageResponse {
   from_source: string; // "whatsapp", "system", or "llm" from API
   message_type: number; // 1=REPLY, 2=WHISPER
   status: number; // 1=PENDING, 2=REPLIED, 3=RESOLVED (matches backend MessageStatus)
+  delivery_status: string; // PENDING, QUEUED, SENDING, SENT, DELIVERED, READ, FAILED, UNDELIVERED
   user_id: number | null; // User ID for messages from users
   user: MessageUser | null; // User details for messages from users (from_source = USER)
   created_at: string;
@@ -125,6 +127,7 @@ class MessageSyncService {
         body: apiMessage.body,
         message_type: apiMessage.message_type,
         status: apiMessage.status || 1, // Default to PENDING if not provided
+        delivery_status: apiMessage.delivery_status || DeliveryStatus.PENDING,
         createdAt: apiMessage.created_at,
       });
     } catch (error) {
