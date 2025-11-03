@@ -22,28 +22,34 @@ const TicketRespondedStatus = ({
         {`Ticket: #${ticketNumber}`}
       </Text>
       <View style={[styles.flexRow]}>
-        <Text style={[typography.body4, { color: themeColors.textPrimary }]}>
-          Responded by:
-        </Text>
-        {respondedBy ? (
-          <View style={[styles.flexRow, { justifyContent: "space-between" }]}>
-            <Text
-              style={[typography.body4, { color: themeColors["green-500"] }]}
-            >
-              {respondedBy.name}
-            </Text>
-            <Text style={[typography.caption2, { color: themeColors.dark4 }]}>
-              {formatResolved(resolvedAt)}
-            </Text>
-          </View>
-        ) : (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 4,
+          }}
+        >
+          <Text style={[typography.body4, { color: themeColors.textPrimary }]}>
+            Responded by:
+          </Text>
+
           <Text
             style={[
               typography.body4,
-              { color: themeColors.error, fontWeight: 500 },
+              {
+                color: respondedBy
+                  ? themeColors["green-500"]
+                  : themeColors.error,
+              },
             ]}
           >
-            No response yet
+            {respondedBy ? respondedBy.name : "No response yet"}
+          </Text>
+        </View>
+
+        {resolvedAt && (
+          <Text style={[typography.caption2, { color: themeColors.dark4 }]}>
+            {formatResolved(resolvedAt)}
           </Text>
         )}
       </View>
@@ -63,6 +69,7 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: 4,
     flexDirection: "row",
+    justifyContent: "space-between",
   },
 });
 

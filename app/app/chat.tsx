@@ -41,6 +41,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useNetwork } from "@/contexts/NetworkContext";
 import MessageSyncService from "@/services/messageSync";
+import TicketSyncService from "@/services/ticketSync";
 import { MessageFrom } from "@/constants/messageSource";
 import { api } from "@/services/api";
 
@@ -85,6 +86,7 @@ interface DateSection {
 const ChatScreen = () => {
   const params = useLocalSearchParams();
   const ticketNumber = params.ticketNumber as string | undefined;
+  const ticketId = params.ticketId as string | undefined;
   const messageId = params.messageId as string | undefined;
   const refresh = params.refresh as string | undefined;
   const [messages, setMessages] = useState<Message[]>([]);
@@ -280,6 +282,32 @@ const ChatScreen = () => {
                 }
                 // Scroll to bottom to show new messages
                 setTimeout(() => scrollToBottom(true), 100);
+
+                // Check for AI suggestion after sync completes
+                // This handles the case where a whisper was synced from the API
+                if (
+                  ticketData.customer?.id &&
+                  !aiSuggestion &&
+                  !aiSuggestionUsed
+                ) {
+                  console.log(
+                    "[Chat] Checking for AI suggestion after background sync",
+                  );
+                  const dbAiSuggestion =
+                    daoManager.message.getLastAISuggestionByCustomerId(
+                      db,
+                      ticketData.customer.id,
+                    );
+                  if (dbAiSuggestion?.body) {
+                    console.log(
+                      "[Chat] Found AI suggestion after sync:",
+                      dbAiSuggestion.body.substring(0, 50) + "...",
+                    );
+                    console.log("[Chat] dbAiSuggestion", dbAiSuggestion);
+                    setAISuggestion(dbAiSuggestion.body);
+                    setAISuggestionLoading(false);
+                  }
+                }
               } else {
                 console.log(`[Chat] Background sync complete, no new messages`);
               }
@@ -289,7 +317,140 @@ const ChatScreen = () => {
               // Don't throw - background sync failure is non-fatal
             });
         } else {
-          console.warn(`[Chat] Ticket not found: ${ticketNumber}`);
+          console.warn(`[Chat] Ticket not found in SQLite: ${ticketNumber}`);
+
+          // If we have ticketId from notification, try to fetch from API
+          if (ticketId && !isNaN(Number(ticketId))) {
+            console.log(
+              `[Chat] Attempting to fetch ticket ${ticketId} from API...`,
+            );
+            try {
+              const synced = await TicketSyncService.syncTicketById(
+                db,
+                user.accessToken,
+                Number(ticketId),
+                user?.id,
+              );
+
+              if (synced) {
+                console.log(
+                  `[Chat] Successfully synced ticket ${ticketId}, retrying load...`,
+                );
+
+                // Retry loading the ticket from SQLite
+                const retryTicketData = daoManager.ticket.findByTicketNumber(
+                  db,
+                  ticketNumber,
+                );
+
+                if (retryTicketData) {
+                  console.log(
+                    `[Chat] Found ticket after API sync: id=${retryTicketData.id}`,
+                  );
+                  setTicket({
+                    id: retryTicketData.id,
+                    ticketNumber: retryTicketData.ticketNumber,
+                    customer: retryTicketData.customer,
+                    resolver: retryTicketData.resolver,
+                    resolvedAt: retryTicketData.resolvedAt,
+                    createdAt: retryTicketData.createdAt,
+                  });
+
+                  // Load messages for the ticket
+                  const result = await MessageSyncService.loadInitialMessages(
+                    db,
+                    user.accessToken,
+                    retryTicketData.id,
+                    retryTicketData.customer?.id || 0,
+                    retryTicketData.createdAt || new Date().toISOString(),
+                    user?.id,
+                    20,
+                    forceRefresh,
+                  );
+
+                  const uiMessages = result.messages.map((msg) =>
+                    convertToUIMessage(msg, user?.id),
+                  );
+                  setMessages(uiMessages);
+                  setOldestTimestamp(result.oldestTimestamp);
+
+                  // Scroll to bottom after loading
+                  if (!forceRefresh) {
+                    setTimeout(() => scrollToBottom(false), 300);
+                  }
+
+                  // Sync newer messages in background
+                  MessageSyncService.syncNewerMessages(
+                    db,
+                    user.accessToken,
+                    retryTicketData.id,
+                    retryTicketData.customer?.id || 0,
+                    user?.id,
+                  )
+                    .then((newCount) => {
+                      if (newCount > 0) {
+                        console.log(
+                          `[Chat] Background sync found ${newCount} new messages, reloading`,
+                        );
+                        const updatedMessages =
+                          daoManager.message.getAllMessagesByTicketId(
+                            db,
+                            retryTicketData.id,
+                          );
+                        const updatedUIMessages = updatedMessages.map((msg) =>
+                          convertToUIMessage(msg, user?.id),
+                        );
+                        setMessages(updatedUIMessages);
+                        if (updatedMessages.length > 0) {
+                          setOldestTimestamp(updatedMessages[0].createdAt);
+                        }
+                        setTimeout(() => scrollToBottom(true), 100);
+
+                        // Check for AI suggestion after sync completes
+                        // This handles the case where a whisper was synced from the API
+                        if (
+                          retryTicketData.customer?.id &&
+                          !aiSuggestion &&
+                          !aiSuggestionUsed
+                        ) {
+                          console.log(
+                            "[Chat] Checking for AI suggestion after background sync (retry path)",
+                          );
+                          const dbAiSuggestion =
+                            daoManager.message.getLastAISuggestionByCustomerId(
+                              db,
+                              retryTicketData.customer.id,
+                            );
+                          if (dbAiSuggestion?.body) {
+                            console.log(
+                              "[Chat] Found AI suggestion after sync (retry path):",
+                              dbAiSuggestion.body.substring(0, 50) + "...",
+                            );
+                            setAISuggestion(dbAiSuggestion.body);
+                            setAISuggestionLoading(false);
+                          }
+                        }
+                      }
+                    })
+                    .catch((error) => {
+                      console.error("[Chat] Background sync failed:", error);
+                    });
+                } else {
+                  console.error(
+                    `[Chat] Ticket ${ticketNumber} still not found after API sync`,
+                  );
+                }
+              } else {
+                console.error(
+                  `[Chat] Failed to sync ticket ${ticketId} from API`,
+                );
+              }
+            } catch (syncError) {
+              console.error(`[Chat] Error syncing ticket from API:`, syncError);
+            }
+          } else {
+            console.warn(`[Chat] No ticketId provided, cannot fetch from API`);
+          }
         }
       } catch (error: any) {
         // Check if this is a 401 Unauthorized error
@@ -307,7 +468,18 @@ const ChatScreen = () => {
         }
       }
     },
-    [ticketNumber, db, daoManager, user, scrollToBottom],
+    [
+      ticketNumber,
+      user.accessToken,
+      user?.id,
+      daoManager.ticket,
+      daoManager.message,
+      db,
+      aiSuggestion,
+      aiSuggestionUsed,
+      ticketId,
+      scrollToBottom,
+    ],
   );
 
   useEffect(() => {
@@ -334,22 +506,26 @@ const ChatScreen = () => {
       console.log(
         "[Chat] AI suggestion already present or used, skipping load",
       );
-      return;
-    }
+    } else {
+      const dbAiSuggestion =
+        await daoManager.message.getLastAISuggestionByCustomerId(
+          db,
+          ticket.customer.id,
+        );
 
-    const dbAiSuggestion =
-      await daoManager.message.getLastAISuggestionByCustomerId(
-        db,
-        ticket.customer.id,
-      );
-
-    if (dbAiSuggestion?.body) {
-      console.log(
-        "[Chat] Loaded AI suggestion from database:",
-        dbAiSuggestion.body.substring(0, 50) + "...",
-      );
-      setAISuggestion(dbAiSuggestion.body);
-      setAISuggestionLoading(false); // Ensure loading state is cleared
+      if (dbAiSuggestion?.body) {
+        console.log(
+          "[Chat] Loaded AI suggestion from database:",
+          dbAiSuggestion.body.substring(0, 50) + "...",
+        );
+        setAISuggestion(dbAiSuggestion.body);
+        setAISuggestionLoading(false); // Ensure loading state is cleared
+      } else {
+        console.log(
+          "[Chat] No AI suggestion found in database for customer:",
+          ticket.customer.id,
+        );
+      }
     }
 
     if (refresh === "true") {
@@ -473,6 +649,10 @@ const ChatScreen = () => {
             "[Chat] Customer message received, waiting for AI suggestion...",
           );
           setAISuggestionLoading(true);
+          // Reset the "used" flag so the new suggestion will be shown
+          setAISuggestionUsed(false);
+          // Clear any old suggestion
+          setAISuggestion(null);
         }
 
         // Save message to SQLite database (idempotent upsert)
@@ -661,6 +841,8 @@ const ChatScreen = () => {
       setAISuggestion(event.suggestion);
       // Clear loading state
       setAISuggestionLoading(false);
+      // Reset the "used" flag so the suggestion is available for use
+      setAISuggestionUsed(false);
 
       // NOTE: We don't reload messages here to avoid race condition with loadDataOnPostload
       // The whisper message will be synced in background automatically
@@ -704,7 +886,6 @@ const ChatScreen = () => {
       </SafeAreaView>
     );
   }
-  console.log("stickyMessage", stickyMessage);
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
@@ -773,7 +954,10 @@ const ChatScreen = () => {
         </View>
 
         {/* AI Suggestion Chip */}
-        {(aiSuggestion || aiSuggestionLoading) && (
+        {/**
+         * Hide when ticket is resolved
+         */}
+        {(aiSuggestion || aiSuggestionLoading) && !ticket?.resolvedAt && (
           <AISuggestionChip
             suggestion={aiSuggestion}
             loading={aiSuggestionLoading}
@@ -782,7 +966,12 @@ const ChatScreen = () => {
         )}
 
         {/* Message Input Row */}
-        <View style={styles.inputRow}>
+        <View
+          style={[
+            styles.inputRow,
+            { display: ticket?.resolvedAt ? "none" : "flex" },
+          ]}
+        >
           <TextInput
             value={text}
             onChangeText={setText}
@@ -985,9 +1174,11 @@ const StickyCustomerBubble = ({
           {message.text}
         </Text>
       </View>
-      <TouchableOpacity onPress={onClose} style={styles.stickyBubbleClose}>
-        <Feathericons name="x" size={16} color={themeColors.dark3} />
-      </TouchableOpacity>
+      {!ticket?.resolvedAt && (
+        <TouchableOpacity onPress={onClose} style={styles.stickyBubbleClose}>
+          <Feathericons name="x" size={16} color={themeColors.dark3} />
+        </TouchableOpacity>
+      )}
     </View>
   </View>
 );

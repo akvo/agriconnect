@@ -381,6 +381,11 @@ async def get_ticket_conversation(
                 else None
             ),
             "status": getattr(m, "status", None),
+            "delivery_status": (
+                m.delivery_status.value
+                if hasattr(m, "delivery_status") and m.delivery_status
+                else "PENDING"
+            ),
             "user_id": m.user_id,
             "user": (
                 {

@@ -93,6 +93,19 @@ export const migrateDbIfNeeded = (db: SQLiteDatabase): void => {
     console.log("✅ Database upgraded to version 4");
   }
 
+  if (currentDbVersion === 4) {
+    console.log("🔄 Upgrading database to version 5...");
+    const version5Migrations = getMigrationsByVersion(5);
+
+    for (const migration of version5Migrations) {
+      console.log(`Executing migration: ${migration.name}`);
+      executeMigration(db, migration);
+    }
+
+    currentDbVersion = 5;
+    console.log("✅ Database upgraded to version 5");
+  }
+
   db.execSync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 };
 
