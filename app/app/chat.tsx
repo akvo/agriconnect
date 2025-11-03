@@ -282,6 +282,32 @@ const ChatScreen = () => {
                 }
                 // Scroll to bottom to show new messages
                 setTimeout(() => scrollToBottom(true), 100);
+
+                // Check for AI suggestion after sync completes
+                // This handles the case where a whisper was synced from the API
+                if (
+                  ticketData.customer?.id &&
+                  !aiSuggestion &&
+                  !aiSuggestionUsed
+                ) {
+                  console.log(
+                    "[Chat] Checking for AI suggestion after background sync",
+                  );
+                  const dbAiSuggestion =
+                    daoManager.message.getLastAISuggestionByCustomerId(
+                      db,
+                      ticketData.customer.id,
+                    );
+                  if (dbAiSuggestion?.body) {
+                    console.log(
+                      "[Chat] Found AI suggestion after sync:",
+                      dbAiSuggestion.body.substring(0, 50) + "...",
+                    );
+                    console.log("[Chat] dbAiSuggestion", dbAiSuggestion);
+                    setAISuggestion(dbAiSuggestion.body);
+                    setAISuggestionLoading(false);
+                  }
+                }
               } else {
                 console.log(`[Chat] Background sync complete, no new messages`);
               }
@@ -379,6 +405,31 @@ const ChatScreen = () => {
                           setOldestTimestamp(updatedMessages[0].createdAt);
                         }
                         setTimeout(() => scrollToBottom(true), 100);
+
+                        // Check for AI suggestion after sync completes
+                        // This handles the case where a whisper was synced from the API
+                        if (
+                          retryTicketData.customer?.id &&
+                          !aiSuggestion &&
+                          !aiSuggestionUsed
+                        ) {
+                          console.log(
+                            "[Chat] Checking for AI suggestion after background sync (retry path)",
+                          );
+                          const dbAiSuggestion =
+                            daoManager.message.getLastAISuggestionByCustomerId(
+                              db,
+                              retryTicketData.customer.id,
+                            );
+                          if (dbAiSuggestion?.body) {
+                            console.log(
+                              "[Chat] Found AI suggestion after sync (retry path):",
+                              dbAiSuggestion.body.substring(0, 50) + "...",
+                            );
+                            setAISuggestion(dbAiSuggestion.body);
+                            setAISuggestionLoading(false);
+                          }
+                        }
                       }
                     })
                     .catch((error) => {
@@ -417,7 +468,18 @@ const ChatScreen = () => {
         }
       }
     },
-    [ticketNumber, ticketId, db, daoManager, user, scrollToBottom],
+    [
+      ticketNumber,
+      user.accessToken,
+      user?.id,
+      daoManager.ticket,
+      daoManager.message,
+      db,
+      aiSuggestion,
+      aiSuggestionUsed,
+      ticketId,
+      scrollToBottom,
+    ],
   );
 
   useEffect(() => {
@@ -444,22 +506,26 @@ const ChatScreen = () => {
       console.log(
         "[Chat] AI suggestion already present or used, skipping load",
       );
-      return;
-    }
+    } else {
+      const dbAiSuggestion =
+        await daoManager.message.getLastAISuggestionByCustomerId(
+          db,
+          ticket.customer.id,
+        );
 
-    const dbAiSuggestion =
-      await daoManager.message.getLastAISuggestionByCustomerId(
-        db,
-        ticket.customer.id,
-      );
-
-    if (dbAiSuggestion?.body) {
-      console.log(
-        "[Chat] Loaded AI suggestion from database:",
-        dbAiSuggestion.body.substring(0, 50) + "...",
-      );
-      setAISuggestion(dbAiSuggestion.body);
-      setAISuggestionLoading(false); // Ensure loading state is cleared
+      if (dbAiSuggestion?.body) {
+        console.log(
+          "[Chat] Loaded AI suggestion from database:",
+          dbAiSuggestion.body.substring(0, 50) + "...",
+        );
+        setAISuggestion(dbAiSuggestion.body);
+        setAISuggestionLoading(false); // Ensure loading state is cleared
+      } else {
+        console.log(
+          "[Chat] No AI suggestion found in database for customer:",
+          ticket.customer.id,
+        );
+      }
     }
 
     if (refresh === "true") {
@@ -583,6 +649,10 @@ const ChatScreen = () => {
             "[Chat] Customer message received, waiting for AI suggestion...",
           );
           setAISuggestionLoading(true);
+          // Reset the "used" flag so the new suggestion will be shown
+          setAISuggestionUsed(false);
+          // Clear any old suggestion
+          setAISuggestion(null);
         }
 
         // Save message to SQLite database (idempotent upsert)
@@ -771,6 +841,8 @@ const ChatScreen = () => {
       setAISuggestion(event.suggestion);
       // Clear loading state
       setAISuggestionLoading(false);
+      // Reset the "used" flag so the suggestion is available for use
+      setAISuggestionUsed(false);
 
       // NOTE: We don't reload messages here to avoid race condition with loadDataOnPostload
       // The whisper message will be synced in background automatically

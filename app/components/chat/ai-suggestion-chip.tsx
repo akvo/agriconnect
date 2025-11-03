@@ -56,7 +56,7 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
   const maxHeight = expanded ? screenHeight * 0.66 : 48;
 
   useEffect(() => {
-    if (suggestion !== text && !expanded) {
+    if (suggestion !== text) {
       setText(suggestion);
       setExpanded(true);
     }
