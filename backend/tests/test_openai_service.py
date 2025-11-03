@@ -2,15 +2,12 @@
 Unit tests for OpenAI service.
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
+from unittest.mock import AsyncMock, MagicMock, patch
 from services.openai_service import OpenAIService, get_openai_service
 from schemas.openai_schemas import (
     ChatCompletionResponse,
-    ChatCompletionUsage,
     TranscriptionResponse,
     ModerationResponse,
-    ModerationCategory,
-    ModerationCategoryScores,
     EmbeddingResponse,
     StructuredOutputResponse,
 )

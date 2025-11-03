@@ -20,7 +20,6 @@ from openai.types.chat import ChatCompletion
 
 from config import settings
 from schemas.openai_schemas import (
-    ChatMessage,
     ChatCompletionResponse,
     ChatCompletionUsage,
     TranscriptionResponse,
@@ -29,7 +28,6 @@ from schemas.openai_schemas import (
     ModerationCategoryScores,
     EmbeddingResponse,
     StructuredOutputResponse,
-    OpenAIErrorResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -355,10 +353,12 @@ class OpenAIService:
                 response_format=response_format,
             )
 
-            logger.info(
-                f"✓ Audio transcribed "
-                f"({len(transcript.text) if hasattr(transcript, 'text') else 0} chars)"
+            text_len = (
+                len(transcript.text)
+                if hasattr(transcript, 'text')
+                else 0
             )
+            logger.info(f"✓ Audio transcribed ({text_len} chars)")
 
             # Handle different response formats
             if response_format in ["json", "verbose_json"]:
@@ -416,9 +416,13 @@ class OpenAIService:
             result = response.results[0]
 
             if result.flagged:
+                flagged_cats = [
+                    k for k, v in result.categories.model_dump().items()
+                    if v
+                ]
                 logger.warning(
                     f"⚠ Content flagged by moderation: "
-                    f"{', '.join([k for k, v in result.categories.model_dump().items() if v])}"
+                    f"{', '.join(flagged_cats)}"
                 )
 
             return ModerationResponse(

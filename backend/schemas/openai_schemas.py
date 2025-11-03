@@ -2,7 +2,7 @@
 OpenAI service schemas for request/response validation.
 """
 from typing import List, Dict, Any, Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 # Chat Completion Schemas
