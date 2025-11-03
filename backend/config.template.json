@@ -23,5 +23,49 @@
 		"chat_history_limit": 20,
 		"reply_history_limit": 10,
 		"description": "Number of recent messages to include in chat history for AI context"
+	},
+	"openai": {
+		"enabled": true,
+		"default_model": "gpt-4o-mini",
+		"temperature": 0.7,
+		"max_tokens": 1000,
+		"timeout": 30,
+		"max_retries": 3,
+		"models": {
+			"chat": "gpt-4o-mini",
+			"chat_advanced": "gpt-4o",
+			"transcription": "whisper-1",
+			"embedding": "text-embedding-3-small",
+			"moderation": "text-moderation-latest"
+		},
+		"features": {
+			"speech_to_text": {
+				"enabled": true,
+				"language": "en",
+				"response_format": "json",
+				"temperature": 0,
+				"description": "Convert voice/audio to text (NOT related to WHISPER message type)"
+			},
+			"onboarding": {
+				"enabled": true,
+				"model": "gpt-4o-mini",
+				"temperature": 0.8,
+				"max_tokens": 500,
+				"system_prompt": "You are a helpful agricultural assistant helping farmers get started with AgriConnect. Be friendly, concise, and practical."
+			},
+			"content_moderation": {
+				"enabled": true,
+				"auto_flag": true
+			},
+			"structured_extraction": {
+				"enabled": true,
+				"model": "gpt-4o-mini",
+				"temperature": 0
+			}
+		},
+		"cost_tracking": {
+			"enabled": true,
+			"log_usage": true
+		}
 	}
 }

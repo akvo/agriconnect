@@ -229,6 +229,62 @@ CREATE TABLE service_tokens (
 - Service tokens manage **outbound authentication only**
 - Simplified token management by eliminating bidirectional authentication
 
+### OpenAI Service Integration
+
+AgriConnect includes a **direct OpenAI API integration** for features that require synchronous responses and don't involve external RAG/knowledge base services.
+
+**Use Cases:**
+- **Speech-to-text transcription** - Convert voice messages to text
+- **Onboarding workflows** - Personalized farmer onboarding
+- **Content moderation** - Check messages for policy violations
+- **Structured data extraction** - Extract information from queries
+- **Text embeddings** - Semantic search and similarity
+
+**Configuration:**
+- API key stored in `.env` file (`OPENAI_API_KEY`)
+- Settings managed via `config.json` (models, parameters, feature flags)
+- Feature-specific configurations (transcription, onboarding, moderation)
+
+**Service Methods:**
+- `chat_completion()` - Generate chat responses
+- `chat_completion_stream()` - Streaming chat responses
+- `transcribe_audio()` - Convert voice/audio to text (speech-to-text)
+- `moderate_content()` - Check content for policy violations
+- `create_embedding()` - Generate text embeddings
+- `structured_output()` - Get JSON-structured responses
+
+**Example Usage:**
+```python
+from services.openai_service import get_openai_service
+
+# Convert voice message to text (speech-to-text)
+service = get_openai_service()
+transcription = await service.transcribe_audio(
+    audio_url="https://example.com/voice.mp3"
+)
+# transcription.text contains the text version of the audio
+
+# Generate onboarding message
+response = await service.chat_completion(
+    messages=[
+        {"role": "system", "content": "You are a helpful agricultural assistant..."},
+        {"role": "user", "content": "How do I get started?"}
+    ]
+)
+
+# Moderate content
+moderation = await service.moderate_content("User message text")
+if moderation.flagged:
+    # Handle inappropriate content
+    pass
+```
+
+**Key Differences from External AI Service:**
+- **Synchronous**: Immediate response (not job-based with callbacks)
+- **Direct API**: OpenAI API calls (not external RAG service)
+- **Configuration**: Environment variable + config.json (not database)
+- **Use Cases**: Speech-to-text, moderation, general AI tasks (not KB-based chat or WHISPER suggestions)
+
 ## Development Workflow
 
 1. Always use `./dc.sh exec backend <command>` for backend operations
