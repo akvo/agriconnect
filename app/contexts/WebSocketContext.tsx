@@ -1,16 +1,16 @@
 /**
- * WebSocket Context for Real-time Updates - OFFLINE-FIRST
+ * WebSocket Context for Real-time Updates - REFACTORED (Phase 2)
  *
- * Provides Socket.IO connection management for the mobile app.
+ * Now uses module-level socket instance from services/socket.ts
+ * Following official Socket.io Expo example pattern.
+ *
  * Features:
- * - Automatic connection/reconnection with exponential backoff
+ * - Simplified connection management (no socket creation in context)
  * - Room management (ward rooms and ticket rooms)
  * - Real-time event handling (message_created, ticket_resolved, etc.)
  * - Offline/online detection and graceful degradation
- * - Operation queue for offline actions (join/leave rooms)
  * - Automatic ticket room rejoin after reconnection
  * - Connection state monitoring with visual feedback
- * - No error spam when offline
  */
 
 import React, {
@@ -23,20 +23,17 @@ import React, {
   useCallback,
 } from "react";
 import { AppState, AppStateStatus } from "react-native";
-import io, { Socket } from "socket.io-client";
+import { socket } from "@/services/socket"; // Module-level socket
 import { useAuth } from "./AuthContext";
 import { useNetwork } from "./NetworkContext";
 
-// Connection states
-export enum ConnectionState {
-  DISCONNECTED = "DISCONNECTED",
-  CONNECTING = "CONNECTING",
-  CONNECTED = "CONNECTED",
-  RECONNECTING = "RECONNECTING",
-  ERROR = "ERROR",
+// Simplified connection state (just what we need)
+export interface ConnectionStatus {
+  isConnected: boolean;
+  transport: string;
 }
 
-// WebSocket event types
+// WebSocket event types (unchanged)
 export interface MessageCreatedEvent {
   ticket_id: number;
   message_id: number;
@@ -73,15 +70,9 @@ export interface WhisperCreatedEvent {
   suggestion: string;
 }
 
-// Operation types for queue
-type QueuedOperation =
-  | { type: "join_ticket"; ticketId: number }
-  | { type: "leave_ticket"; ticketId: number };
-
 interface WebSocketContextType {
-  connectionState: ConnectionState;
   isConnected: boolean;
-  socket: Socket | null;
+  transport: string;
   joinTicket: (ticketId: number) => void;
   leaveTicket: (ticketId: number) => void;
   onMessageCreated: (
@@ -118,19 +109,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 }) => {
   const { user } = useAuth();
   const { isOnline } = useNetwork();
-  const socketRef = useRef<Socket | null>(null);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(
-    ConnectionState.DISCONNECTED,
+
+  // Simple connection state tracking
+  const [isConnected, setIsConnected] = useState(socket.connected);
+  const [transport, setTransport] = useState(
+    socket.connected ? socket.io.engine.transport.name : "N/A",
   );
-  const isConnecting = useRef(false);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 10;
 
   // Track joined ticket rooms for auto-rejoin after reconnection
   const joinedTicketsRef = useRef<Set<number>>(new Set());
-
-  // Operation queue for offline actions
-  const operationQueueRef = useRef<QueuedOperation[]>([]);
 
   // Event handlers registry
   const eventHandlersRef = useRef<{
@@ -147,53 +134,116 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     whisper_created: new Set(),
   });
 
-  // Process queued operations after reconnection
-  const processOperationQueue = useCallback(() => {
-    if (
-      !socketRef.current?.connected ||
-      operationQueueRef.current.length === 0
-    ) {
-      return;
+  // Setup connection state tracking
+  useEffect(() => {
+    function onConnect() {
+      console.log("[WebSocket] Connected");
+      setIsConnected(true);
+      setTransport(socket.io.engine.transport.name);
+
+      // Track transport upgrades
+      socket.io.engine.on("upgrade", (newTransport) => {
+        console.log("[WebSocket] Transport upgraded to:", newTransport.name);
+        setTransport(newTransport.name);
+      });
     }
 
-    console.log(
-      `[WebSocket] Processing ${operationQueueRef.current.length} queued operations`,
-    );
+    function onDisconnect(reason: string) {
+      console.log("[WebSocket] Disconnected:", reason);
+      setIsConnected(false);
+      setTransport("N/A");
+    }
 
-    const queue = [...operationQueueRef.current];
-    operationQueueRef.current = [];
-
-    queue.forEach((operation) => {
-      if (operation.type === "join_ticket") {
-        console.log(
-          `[WebSocket] Processing queued join for ticket ${operation.ticketId}`,
-        );
-        joinTicketInternal(operation.ticketId);
-      } else if (operation.type === "leave_ticket") {
-        console.log(
-          `[WebSocket] Processing queued leave for ticket ${operation.ticketId}`,
-        );
-        leaveTicketInternal(operation.ticketId);
+    function onConnectError(error: Error) {
+      // Only log if online (suppress errors when offline)
+      if (isOnline) {
+        console.error("[WebSocket] Connection error:", error.message);
       }
-    });
-  }, []);
+    }
 
-  // Auto-rejoin all previously joined ticket rooms
-  const rejoinTicketRooms = useCallback(() => {
-    if (!socketRef.current?.connected || joinedTicketsRef.current.size === 0) {
+    // Attach listeners
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
+
+    // Set initial state
+    if (socket.connected) {
+      onConnect();
+    }
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
+    };
+  }, [isOnline]);
+
+  // Manage connection based on auth and network
+  useEffect(() => {
+    if (!user?.accessToken) {
+      console.log("[WebSocket] No auth token, disconnecting");
+      socket.disconnect();
       return;
     }
 
-    console.log(
-      `[WebSocket] Rejoining ${joinedTicketsRef.current.size} ticket rooms after reconnection`,
+    if (!isOnline) {
+      console.log("[WebSocket] Device offline, disconnecting");
+      socket.disconnect();
+      return;
+    }
+
+    // Set auth token and connect
+    console.log("[WebSocket] Auth token available, connecting");
+    socket.auth = { token: user.accessToken };
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    // Don't disconnect on cleanup - let connection persist
+    return () => {
+      console.log("[WebSocket] Effect cleanup (not disconnecting)");
+    };
+  }, [user?.accessToken, isOnline]);
+
+  // Handle app state changes (foreground/background)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === "active") {
+        console.log("[WebSocket] App became active");
+        if (user?.accessToken && isOnline && !socket.connected) {
+          console.log("[WebSocket] Reconnecting after app became active");
+          socket.auth = { token: user.accessToken };
+          socket.connect();
+        }
+      } else if (nextAppState === "background") {
+        console.log("[WebSocket] App went to background");
+        // Keep connection alive for notifications
+      }
+    };
+
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange,
     );
 
-    joinedTicketsRef.current.forEach((ticketId) => {
-      console.log(`[WebSocket] Rejoining ticket room: ${ticketId}`);
-      socketRef.current!.emit(
-        "join_ticket",
-        { ticket_id: ticketId },
-        (response: any) => {
+    return () => {
+      subscription.remove();
+    };
+  }, [user?.accessToken, isOnline]);
+
+  // Auto-rejoin ticket rooms after reconnection
+  useEffect(() => {
+    function onReconnect() {
+      if (joinedTicketsRef.current.size === 0) return;
+
+      console.log(
+        `[WebSocket] Rejoining ${joinedTicketsRef.current.size} ticket rooms after reconnection`,
+      );
+
+      joinedTicketsRef.current.forEach((ticketId) => {
+        console.log(`[WebSocket] Rejoining ticket room: ${ticketId}`);
+        socket.emit("join_ticket", { ticket_id: ticketId }, (response: any) => {
           if (response?.success) {
             console.log(
               `[WebSocket] Successfully rejoined ticket room: ${ticketId}`,
@@ -204,23 +254,28 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
               response?.error,
             );
           }
-        },
-      );
-    });
+        });
+      });
+    }
+
+    socket.on("connect", onReconnect);
+
+    return () => {
+      socket.off("connect", onReconnect);
+    };
   }, []);
 
-  // Setup event listeners on socket (only once per socket instance)
-  const setupEventListeners = useCallback((socket: Socket) => {
-    console.log("[WebSocket] Setting up event listeners");
+  // Setup business event listeners (message_created, ticket_resolved, etc.)
+  useEffect(() => {
+    console.log("[WebSocket] Setting up business event listeners");
 
     // Remove any existing listeners to prevent duplicates
-    socket.removeAllListeners("message_created");
-    socket.removeAllListeners("message_status_updated");
-    socket.removeAllListeners("ticket_resolved");
-    socket.removeAllListeners("ticket_created");
-    socket.removeAllListeners("whisper_created");
+    socket.off("message_created");
+    socket.off("message_status_updated");
+    socket.off("ticket_resolved");
+    socket.off("ticket_created");
+    socket.off("whisper_created");
 
-    // Setup event handlers
     socket.on("message_created", (data: MessageCreatedEvent) => {
       console.log("[WebSocket] message_created:", data);
       eventHandlersRef.current.message_created.forEach((handler) =>
@@ -255,261 +310,68 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         handler(data),
       );
     });
+
+    return () => {
+      console.log("[WebSocket] Removing business event listeners");
+      socket.off("message_created");
+      socket.off("message_status_updated");
+      socket.off("ticket_resolved");
+      socket.off("ticket_created");
+      socket.off("whisper_created");
+    };
   }, []);
 
-  // Internal join ticket function (actual socket emit)
-  const joinTicketInternal = useCallback((ticketId: number) => {
-    if (!socketRef.current?.connected) {
+  // Join ticket room
+  const joinTicket = useCallback((ticketId: number) => {
+    if (!socket.connected) {
       console.warn(
         `[WebSocket] Cannot join ticket ${ticketId}: socket not connected`,
       );
+      // Still track it for auto-rejoin
+      joinedTicketsRef.current.add(ticketId);
       return;
     }
 
     console.log(`[WebSocket] Joining ticket room: ${ticketId}`);
-    socketRef.current.emit(
-      "join_ticket",
-      { ticket_id: ticketId },
-      (response: any) => {
-        if (response?.success) {
-          console.log(
-            `[WebSocket] Successfully joined ticket room: ${ticketId}`,
-          );
-          joinedTicketsRef.current.add(ticketId);
-        } else {
-          console.error(
-            `[WebSocket] Failed to join ticket room ${ticketId}:`,
-            response?.error,
-          );
-        }
-      },
-    );
+    socket.emit("join_ticket", { ticket_id: ticketId }, (response: any) => {
+      if (response?.success) {
+        console.log(`[WebSocket] Successfully joined ticket room: ${ticketId}`);
+        joinedTicketsRef.current.add(ticketId);
+      } else {
+        console.error(
+          `[WebSocket] Failed to join ticket room ${ticketId}:`,
+          response?.error,
+        );
+      }
+    });
   }, []);
 
-  // Internal leave ticket function (actual socket emit)
-  const leaveTicketInternal = useCallback((ticketId: number) => {
-    if (!socketRef.current?.connected) {
+  // Leave ticket room
+  const leaveTicket = useCallback((ticketId: number) => {
+    if (!socket.connected) {
       console.warn(
         `[WebSocket] Cannot leave ticket ${ticketId}: socket not connected`,
       );
+      // Remove from tracking immediately
+      joinedTicketsRef.current.delete(ticketId);
       return;
     }
 
     console.log(`[WebSocket] Leaving ticket room: ${ticketId}`);
-    socketRef.current.emit(
-      "leave_ticket",
-      { ticket_id: ticketId },
-      (response: any) => {
-        if (response?.success) {
-          console.log(`[WebSocket] Successfully left ticket room: ${ticketId}`);
-          joinedTicketsRef.current.delete(ticketId);
-        } else {
-          console.error(
-            `[WebSocket] Failed to leave ticket room ${ticketId}:`,
-            response?.error,
-          );
-        }
-      },
-    );
-  }, []);
-
-  // Public join ticket function (with offline queue support)
-  const joinTicket = useCallback(
-    (ticketId: number) => {
-      if (!socketRef.current?.connected) {
-        console.log(
-          `[WebSocket] Queueing join ticket ${ticketId} (socket not connected)`,
-        );
-        operationQueueRef.current.push({ type: "join_ticket", ticketId });
-        // Still track it for rejoin after reconnection
-        joinedTicketsRef.current.add(ticketId);
-        return;
-      }
-
-      joinTicketInternal(ticketId);
-    },
-    [joinTicketInternal],
-  );
-
-  // Public leave ticket function (with offline queue support)
-  const leaveTicket = useCallback(
-    (ticketId: number) => {
-      if (!socketRef.current?.connected) {
-        console.log(
-          `[WebSocket] Queueing leave ticket ${ticketId} (socket not connected)`,
-        );
-        operationQueueRef.current.push({ type: "leave_ticket", ticketId });
-        // Remove from tracked tickets immediately
+    socket.emit("leave_ticket", { ticket_id: ticketId }, (response: any) => {
+      if (response?.success) {
+        console.log(`[WebSocket] Successfully left ticket room: ${ticketId}`);
         joinedTicketsRef.current.delete(ticketId);
-        return;
-      }
-
-      leaveTicketInternal(ticketId);
-    },
-    [leaveTicketInternal],
-  );
-
-  // Connect to WebSocket
-  const connect = useCallback(() => {
-    // Guard: Check if we should connect
-    if (!user?.accessToken) {
-      console.log("[WebSocket] No access token, cannot connect");
-      return;
-    }
-
-    if (!isOnline) {
-      console.log("[WebSocket] Device offline, skipping connection");
-      setConnectionState(ConnectionState.DISCONNECTED);
-      return;
-    }
-
-    if (isConnecting.current) {
-      console.log("[WebSocket] Already connecting, skipping duplicate connect");
-      return;
-    }
-
-    if (socketRef.current?.connected) {
-      console.log("[WebSocket] Already connected");
-      setConnectionState(ConnectionState.CONNECTED);
-      return;
-    }
-
-    // Cleanup any existing socket first
-    if (socketRef.current) {
-      console.log("[WebSocket] Cleaning up existing socket before reconnect");
-      socketRef.current.removeAllListeners();
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-
-    console.log("[WebSocket] Initiating connection...");
-    isConnecting.current = true;
-    setConnectionState(ConnectionState.CONNECTING);
-
-    const apiUrl = process.env.AGRICONNECT_SERVER_URL || "";
-    const baseUrl = apiUrl.replace(/\/api\/?$/, "");
-
-    console.log("[WebSocket] Base URL:", baseUrl);
-
-    const socket = io(baseUrl, {
-      path: "/ws/socket.io",
-      auth: {
-        token: user.accessToken,
-      },
-      transports: ["websocket", "polling"], // Prefer WebSocket, fallback to polling
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 30000,
-      reconnectionAttempts: maxReconnectAttempts,
-      timeout: 20000,
-    });
-
-    socketRef.current = socket;
-
-    // Connection events
-    socket.on("connect", () => {
-      console.log("[WebSocket] Connected successfully, socket ID:", socket.id);
-      isConnecting.current = false;
-      setConnectionState(ConnectionState.CONNECTED);
-      reconnectAttempts.current = 0;
-
-      // Setup event listeners
-      setupEventListeners(socket);
-
-      // Rejoin previously joined rooms
-      rejoinTicketRooms();
-
-      // Process any queued operations
-      processOperationQueue();
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log("[WebSocket] Disconnected, reason:", reason);
-      isConnecting.current = false;
-      setConnectionState(ConnectionState.DISCONNECTED);
-
-      // Don't log errors if intentional disconnect
-      if (
-        reason === "io client disconnect" ||
-        reason === "io server disconnect"
-      ) {
-        console.log("[WebSocket] Intentional disconnect, not an error");
-      }
-    });
-
-    socket.on("connect_error", (error) => {
-      isConnecting.current = false;
-
-      // Only log errors if device is online (suppress errors when offline)
-      if (isOnline) {
-        console.error("[WebSocket] Connection error:", error.message);
-        setConnectionState(ConnectionState.ERROR);
       } else {
-        console.log("[WebSocket] Connection error (device offline, expected)");
-        setConnectionState(ConnectionState.DISCONNECTED);
-      }
-
-      reconnectAttempts.current++;
-
-      if (reconnectAttempts.current >= maxReconnectAttempts) {
-        if (isOnline) {
-          console.error(
-            "[WebSocket] Max reconnection attempts reached, giving up",
-          );
-          setConnectionState(ConnectionState.ERROR);
-        }
-        socket.disconnect();
+        console.error(
+          `[WebSocket] Failed to leave ticket room ${ticketId}:`,
+          response?.error,
+        );
       }
     });
-
-    // Reconnection events
-    socket.io.on("reconnect", (attempt) => {
-      console.log("[WebSocket] Reconnected after", attempt, "attempts");
-      isConnecting.current = false;
-      setConnectionState(ConnectionState.CONNECTED);
-      reconnectAttempts.current = 0;
-
-      // Setup event listeners again
-      setupEventListeners(socket);
-
-      // Rejoin previously joined rooms
-      rejoinTicketRooms();
-
-      // Process any queued operations
-      processOperationQueue();
-    });
-
-    socket.io.on("reconnect_attempt", (attempt) => {
-      console.log("[WebSocket] Reconnection attempt:", attempt);
-      setConnectionState(ConnectionState.RECONNECTING);
-    });
-
-    socket.io.on("reconnect_failed", () => {
-      console.error("[WebSocket] All reconnection attempts failed");
-      isConnecting.current = false;
-      setConnectionState(ConnectionState.ERROR);
-    });
-  }, [
-    user?.accessToken,
-    isOnline,
-    setupEventListeners,
-    rejoinTicketRooms,
-    processOperationQueue,
-  ]);
-
-  // Disconnect from WebSocket
-  const disconnect = useCallback(() => {
-    if (socketRef.current) {
-      console.log("[WebSocket] Disconnecting gracefully...");
-      isConnecting.current = false;
-      socketRef.current.removeAllListeners();
-      socketRef.current.disconnect();
-      socketRef.current = null;
-      setConnectionState(ConnectionState.DISCONNECTED);
-    }
   }, []);
 
-  // Register event handler for message_created
+  // Event handler registration functions
   const onMessageCreated = useCallback(
     (callback: (data: MessageCreatedEvent) => void) => {
       eventHandlersRef.current.message_created.add(callback);
@@ -520,7 +382,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     [],
   );
 
-  // Register event handler for message_status_updated
   const onMessageStatusUpdated = useCallback(
     (callback: (data: MessageStatusUpdatedEvent) => void) => {
       eventHandlersRef.current.message_status_updated.add(callback);
@@ -531,7 +392,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     [],
   );
 
-  // Register event handler for ticket_resolved
   const onTicketResolved = useCallback(
     (callback: (data: TicketResolvedEvent) => void) => {
       eventHandlersRef.current.ticket_resolved.add(callback);
@@ -542,7 +402,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     [],
   );
 
-  // Register event handler for ticket_created
   const onTicketCreated = useCallback(
     (callback: (data: TicketCreatedEvent) => void) => {
       eventHandlersRef.current.ticket_created.add(callback);
@@ -553,7 +412,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     [],
   );
 
-  // Register event handler for whisper_created
   const onWhisperCreated = useCallback(
     (callback: (data: WhisperCreatedEvent) => void) => {
       eventHandlersRef.current.whisper_created.add(callback);
@@ -564,66 +422,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     [],
   );
 
-  // Effect: Connect when user logs in or network comes back online
-  // NOTE: connect and disconnect are NOT in dependencies to avoid infinite loops
-  useEffect(() => {
-    if (!user?.accessToken) {
-      // User logged out, disconnect
-      disconnect();
-      return;
-    }
-
-    if (!isOnline) {
-      // Device went offline, disconnect gracefully
-      console.log("[WebSocket] Network offline, disconnecting...");
-      disconnect();
-      return;
-    }
-
-    // User is logged in and online, connect
-    console.log("[WebSocket] Conditions met for connection, attempting...");
-    connect();
-
-    // Cleanup on unmount
-    return () => {
-      disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.accessToken, isOnline]);
-
-  // Effect: Handle app state changes (foreground/background)
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (nextAppState === "active") {
-        // App came to foreground
-        console.log("[WebSocket] App became active");
-        if (user?.accessToken && isOnline && !socketRef.current?.connected) {
-          console.log("[WebSocket] Reconnecting after app became active");
-          connect();
-        }
-      } else if (nextAppState === "background") {
-        // App went to background
-        console.log("[WebSocket] App went to background");
-        // Keep connection alive in background for notifications
-        // Only disconnect if needed to save battery (optional)
-      }
-    };
-
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
-
-    return () => {
-      subscription.remove();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.accessToken, isOnline]);
-
   const value: WebSocketContextType = {
-    connectionState,
-    isConnected: connectionState === ConnectionState.CONNECTED,
-    socket: socketRef.current,
+    isConnected,
+    transport,
     joinTicket,
     leaveTicket,
     onMessageCreated,
