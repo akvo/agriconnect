@@ -108,7 +108,8 @@ const ChatScreen = () => {
   const { setActiveTicket } = useNotifications();
   const { isOnline } = useNetwork();
   const {
-    connectionState,
+    isConnected,
+    transport,
     joinTicket,
     leaveTicket,
     onMessageCreated,
@@ -193,7 +194,7 @@ const ChatScreen = () => {
       }
 
       try {
-        if (!forceRefresh) {
+        if (forceRefresh) {
           setLoading(true);
         }
 
@@ -224,13 +225,8 @@ const ChatScreen = () => {
           );
           const result = await MessageSyncService.loadInitialMessages(
             db,
-            user.accessToken,
             ticketData.id,
-            ticketData.customer?.id || 0,
             ticketData.createdAt || new Date().toISOString(),
-            user?.id,
-            20,
-            forceRefresh,
           );
 
           console.log(
@@ -244,11 +240,6 @@ const ChatScreen = () => {
           setMessages(uiMessages);
           setOldestTimestamp(result.oldestTimestamp);
 
-          // Scroll to bottom after loading cached messages
-          if (!forceRefresh) {
-            setTimeout(() => scrollToBottom(false), 300);
-          }
-
           // STEP 2: Sync newer messages from API in background
           // This catches up with any new messages that arrived while offline
           console.log(
@@ -261,7 +252,7 @@ const ChatScreen = () => {
             ticketData.customer?.id || 0,
             user?.id,
           )
-            .then((newCount) => {
+            .then(async (newCount) => {
               if (newCount > 0) {
                 console.log(
                   `[Chat] Background sync found ${newCount} new messages, reloading`,
@@ -280,37 +271,20 @@ const ChatScreen = () => {
                 if (updatedMessages.length > 0) {
                   setOldestTimestamp(updatedMessages[0].createdAt);
                 }
-                // Scroll to bottom to show new messages
-                setTimeout(() => scrollToBottom(true), 100);
-
-                // Check for AI suggestion after sync completes
-                // This handles the case where a whisper was synced from the API
-                if (
-                  ticketData.customer?.id &&
-                  !aiSuggestion &&
-                  !aiSuggestionUsed
-                ) {
-                  console.log(
-                    "[Chat] Checking for AI suggestion after background sync",
-                  );
-                  const dbAiSuggestion =
-                    daoManager.message.getLastAISuggestionByCustomerId(
-                      db,
-                      ticketData.customer.id,
-                    );
-                  if (dbAiSuggestion?.body) {
-                    console.log(
-                      "[Chat] Found AI suggestion after sync:",
-                      dbAiSuggestion.body.substring(0, 50) + "...",
-                    );
-                    console.log("[Chat] dbAiSuggestion", dbAiSuggestion);
-                    setAISuggestion(dbAiSuggestion.body);
-                    setAISuggestionLoading(false);
-                  }
-                }
-              } else {
-                console.log(`[Chat] Background sync complete, no new messages`);
               }
+
+              const dbAiSuggestion =
+                await daoManager.message.getLastAISuggestionByCustomerId(
+                  db,
+                  ticketData.customer?.id || 0,
+                );
+
+              if (dbAiSuggestion?.body) {
+                setAISuggestion(dbAiSuggestion.body);
+              }
+
+              // Scroll to bottom to show new messages
+              setTimeout(() => scrollToBottom(true), 300);
             })
             .catch((error) => {
               console.error("[Chat] Background sync failed:", error);
@@ -319,7 +293,7 @@ const ChatScreen = () => {
         } else {
           console.warn(`[Chat] Ticket not found in SQLite: ${ticketNumber}`);
 
-          // If we have ticketId from notification, try to fetch from API
+          // If ticket not found in SQLite, try fetching from API (only if ticketId is provided)
           if (ticketId && !isNaN(Number(ticketId))) {
             console.log(
               `[Chat] Attempting to fetch ticket ${ticketId} from API...`,
@@ -359,13 +333,8 @@ const ChatScreen = () => {
                   // Load messages for the ticket
                   const result = await MessageSyncService.loadInitialMessages(
                     db,
-                    user.accessToken,
                     retryTicketData.id,
-                    retryTicketData.customer?.id || 0,
                     retryTicketData.createdAt || new Date().toISOString(),
-                    user?.id,
-                    20,
-                    forceRefresh,
                   );
 
                   const uiMessages = result.messages.map((msg) =>
@@ -375,66 +344,7 @@ const ChatScreen = () => {
                   setOldestTimestamp(result.oldestTimestamp);
 
                   // Scroll to bottom after loading
-                  if (!forceRefresh) {
-                    setTimeout(() => scrollToBottom(false), 300);
-                  }
-
-                  // Sync newer messages in background
-                  MessageSyncService.syncNewerMessages(
-                    db,
-                    user.accessToken,
-                    retryTicketData.id,
-                    retryTicketData.customer?.id || 0,
-                    user?.id,
-                  )
-                    .then((newCount) => {
-                      if (newCount > 0) {
-                        console.log(
-                          `[Chat] Background sync found ${newCount} new messages, reloading`,
-                        );
-                        const updatedMessages =
-                          daoManager.message.getAllMessagesByTicketId(
-                            db,
-                            retryTicketData.id,
-                          );
-                        const updatedUIMessages = updatedMessages.map((msg) =>
-                          convertToUIMessage(msg, user?.id),
-                        );
-                        setMessages(updatedUIMessages);
-                        if (updatedMessages.length > 0) {
-                          setOldestTimestamp(updatedMessages[0].createdAt);
-                        }
-                        setTimeout(() => scrollToBottom(true), 100);
-
-                        // Check for AI suggestion after sync completes
-                        // This handles the case where a whisper was synced from the API
-                        if (
-                          retryTicketData.customer?.id &&
-                          !aiSuggestion &&
-                          !aiSuggestionUsed
-                        ) {
-                          console.log(
-                            "[Chat] Checking for AI suggestion after background sync (retry path)",
-                          );
-                          const dbAiSuggestion =
-                            daoManager.message.getLastAISuggestionByCustomerId(
-                              db,
-                              retryTicketData.customer.id,
-                            );
-                          if (dbAiSuggestion?.body) {
-                            console.log(
-                              "[Chat] Found AI suggestion after sync (retry path):",
-                              dbAiSuggestion.body.substring(0, 50) + "...",
-                            );
-                            setAISuggestion(dbAiSuggestion.body);
-                            setAISuggestionLoading(false);
-                          }
-                        }
-                      }
-                    })
-                    .catch((error) => {
-                      console.error("[Chat] Background sync failed:", error);
-                    });
+                  setTimeout(() => scrollToBottom(false), 300);
                 } else {
                   console.error(
                     `[Chat] Ticket ${ticketNumber} still not found after API sync`,
@@ -448,8 +358,6 @@ const ChatScreen = () => {
             } catch (syncError) {
               console.error(`[Chat] Error syncing ticket from API:`, syncError);
             }
-          } else {
-            console.warn(`[Chat] No ticketId provided, cannot fetch from API`);
           }
         }
       } catch (error: any) {
@@ -463,20 +371,16 @@ const ChatScreen = () => {
         }
         console.error("[Chat] Error loading ticket and messages:", error);
       } finally {
-        if (!forceRefresh) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     },
     [
       ticketNumber,
-      user.accessToken,
+      user?.accessToken,
       user?.id,
       daoManager.ticket,
       daoManager.message,
       db,
-      aiSuggestion,
-      aiSuggestionUsed,
       ticketId,
       scrollToBottom,
     ],
@@ -497,35 +401,6 @@ const ChatScreen = () => {
     if (postload) {
       setPostload(false);
       return;
-    }
-    /**
-     * Load last AI suggestion from database for this customer
-     * Only load if we don't already have a suggestion (e.g., from WebSocket) or used
-     */
-    if (aiSuggestion || aiSuggestionUsed) {
-      console.log(
-        "[Chat] AI suggestion already present or used, skipping load",
-      );
-    } else {
-      const dbAiSuggestion =
-        await daoManager.message.getLastAISuggestionByCustomerId(
-          db,
-          ticket.customer.id,
-        );
-
-      if (dbAiSuggestion?.body) {
-        console.log(
-          "[Chat] Loaded AI suggestion from database:",
-          dbAiSuggestion.body.substring(0, 50) + "...",
-        );
-        setAISuggestion(dbAiSuggestion.body);
-        setAISuggestionLoading(false); // Ensure loading state is cleared
-      } else {
-        console.log(
-          "[Chat] No AI suggestion found in database for customer:",
-          ticket.customer.id,
-        );
-      }
     }
 
     if (refresh === "true") {
@@ -556,8 +431,6 @@ const ChatScreen = () => {
     postload,
     loading,
     ticket?.customer?.id,
-    aiSuggestion,
-    aiSuggestionUsed,
     refresh,
     messageId,
     loadTicketAndMessages,
@@ -891,8 +764,9 @@ const ChatScreen = () => {
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       {/* Connection Status Banner */}
       <ConnectionStatusBanner
-        connectionState={connectionState}
+        isConnected={isConnected}
         isOnline={isOnline}
+        transport={transport}
       />
 
       <KeyboardAvoidingView
@@ -929,14 +803,6 @@ const ChatScreen = () => {
             contentContainerStyle={{
               padding: 12,
               paddingBottom: 20,
-            }}
-            onScroll={(event) => {
-              const { contentOffset } = event.nativeEvent;
-              // Trigger load older messages when scrolled near top
-              // Check if scrolled to top (with small threshold)
-              if (contentOffset.y <= 100 && !loadingMore && oldestTimestamp) {
-                loadOlderMessages();
-              }
             }}
             scrollEventThrottle={400}
             ListHeaderComponent={renderFooter}

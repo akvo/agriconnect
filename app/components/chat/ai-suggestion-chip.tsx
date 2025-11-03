@@ -60,7 +60,7 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
       setText(suggestion);
       setExpanded(true);
     }
-  }, [expanded, suggestion, text]);
+  }, [suggestion, text]);
 
   // Don't render if no suggestion and not loading
   if (!suggestion && !loading) {

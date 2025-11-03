@@ -147,13 +147,8 @@ class MessageSyncService {
    */
   static async loadInitialMessages(
     db: SQLiteDatabase,
-    accessToken: string,
     ticketId: number,
-    customerId: number,
     ticketCreatedAt: string,
-    userId?: number,
-    limit: number = 20,
-    forceRefresh: boolean = false,
   ): Promise<SyncResult> {
     const dao = new DAOManager(db);
 
