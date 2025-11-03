@@ -886,7 +886,6 @@ const ChatScreen = () => {
       </SafeAreaView>
     );
   }
-  console.log("stickyMessage", stickyMessage);
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
@@ -955,7 +954,10 @@ const ChatScreen = () => {
         </View>
 
         {/* AI Suggestion Chip */}
-        {(aiSuggestion || aiSuggestionLoading) && (
+        {/**
+         * Hide when ticket is resolved
+         */}
+        {(aiSuggestion || aiSuggestionLoading) && !ticket?.resolvedAt && (
           <AISuggestionChip
             suggestion={aiSuggestion}
             loading={aiSuggestionLoading}
@@ -964,7 +966,12 @@ const ChatScreen = () => {
         )}
 
         {/* Message Input Row */}
-        <View style={styles.inputRow}>
+        <View
+          style={[
+            styles.inputRow,
+            { display: ticket?.resolvedAt ? "none" : "flex" },
+          ]}
+        >
           <TextInput
             value={text}
             onChangeText={setText}
@@ -1167,9 +1174,11 @@ const StickyCustomerBubble = ({
           {message.text}
         </Text>
       </View>
-      <TouchableOpacity onPress={onClose} style={styles.stickyBubbleClose}>
-        <Feathericons name="x" size={16} color={themeColors.dark3} />
-      </TouchableOpacity>
+      {!ticket?.resolvedAt && (
+        <TouchableOpacity onPress={onClose} style={styles.stickyBubbleClose}>
+          <Feathericons name="x" size={16} color={themeColors.dark3} />
+        </TouchableOpacity>
+      )}
     </View>
   </View>
 );
