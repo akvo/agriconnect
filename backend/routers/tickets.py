@@ -187,31 +187,13 @@ async def list_tickets(
 
     Admin users can see all tickets.
     EO users can only see tickets in their assigned administrative areas.
-    Ensure tickets are grouped by customer and
-    sorted by last message date descending.
-    If customer have multiple tickets:
-    - For open status: show the earliest unresolved ticket
-    - For resolved status: show the latest resolved ticket
+
+    Business rules:
+    - For OPEN status: show only the earliest unresolved ticket per customer
+    - For RESOLVED status: show ALL resolved tickets (no grouping)
     """
-    # Subquery to get the appropriate ticket ID for each customer
-    # based on the status filter and administrative area
-    # For OPEN: get MIN(id) to show earliest unresolved ticket
-    # For RESOLVED: get MAX(id) to show latest resolved ticket
-    # For RESOLVED: also exclude customers who have any open tickets
-    if status == TicketStatus.OPEN:
-        # For open tickets, prioritize the earliest (first) unresolved ticket
-        subquery = db.query(
-            Ticket.customer_id,
-            func.min(Ticket.id).label('selected_ticket_id')
-        )
-    else:
-        # For resolved tickets, show the latest (most recent) resolved ticket
-        # But exclude customers who have any open tickets
-        subquery = db.query(
-            Ticket.customer_id,
-            func.max(Ticket.id).label('selected_ticket_id')
-        )
-    # Filter by administrative area for EO users
+    # Get administrative IDs for EO users
+    admin_ids = None
     if current_user.user_type == UserType.EXTENSION_OFFICER:
         admin_ids = _get_user_administrative_ids(current_user, db)
         if not admin_ids:
@@ -222,40 +204,43 @@ async def list_tickets(
                 "page": page,
                 "size": page_size,
             }
-        subquery = subquery.filter(Ticket.administrative_id.in_(admin_ids))
-    # Filter by status
+
+    # For RESOLVED: show ALL resolved tickets (no grouping by customer)
+    query = db.query(Ticket).filter(Ticket.resolved_at.isnot(None))
+
+    # Filter by administrative area for EO users
+    if admin_ids:
+        query = query.filter(Ticket.administrative_id.in_(admin_ids))
+
+    query = query.order_by(desc(Ticket.resolved_at))
+    # Build query based on status
     if status == TicketStatus.OPEN:
-        subquery = subquery.filter(Ticket.resolved_at.is_(None))
-    elif status == TicketStatus.RESOLVED:
-        subquery = subquery.filter(Ticket.resolved_at.isnot(None))
-        # Exclude customers who have any open tickets
-        # Get customer IDs that have open tickets
-        customers_with_open_tickets = (
-            db.query(Ticket.customer_id)
+        # For OPEN: show only earliest unresolved ticket per customer
+        # Subquery to get MIN(id) per customer for open tickets
+        subquery = (
+            db.query(
+                Ticket.customer_id,
+                func.min(Ticket.id).label('selected_ticket_id')
+            )
             .filter(Ticket.resolved_at.is_(None))
         )
-        if current_user.user_type == UserType.EXTENSION_OFFICER:
-            customers_with_open_tickets = customers_with_open_tickets.filter(
-                Ticket.administrative_id.in_(admin_ids)
-            )
-        customers_with_open_tickets = customers_with_open_tickets.distinct()
-        # Exclude those customers from resolved list
-        subquery = subquery.filter(
-            ~Ticket.customer_id.in_(customers_with_open_tickets)
-        )
-    # Group by customer to get the selected ticket per customer
-    subquery = subquery.group_by(Ticket.customer_id).subquery()
-    # Main query to fetch tickets
-    query = db.query(Ticket).join(
-        subquery,
-        Ticket.id == subquery.c.selected_ticket_id
-    )
-    # Get total count of unique customers with tickets
+
+        # Filter by administrative area for EO users
+        if admin_ids is not None:
+            subquery = subquery.filter(Ticket.administrative_id.in_(admin_ids))
+
+        subquery = subquery.group_by(Ticket.customer_id).subquery()
+
+        # Main query joins with subquery to get only the selected tickets
+        query = (
+            db.query(Ticket)
+            .join(subquery, Ticket.id == subquery.c.selected_ticket_id)
+        ).order_by(desc(Ticket.updated_at))
+
+    # Get total count
     total = query.count()
-    # Order by updated_at descending (most recently updated first)
-    # Then apply pagination
     tickets = (
-        query.order_by(desc(Ticket.updated_at))
+        query
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -335,7 +320,25 @@ async def get_ticket_conversation(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
-
+    # Get next and previous tickets for the same customer
+    next_ticket = (
+        db.query(Ticket)
+        .filter(
+            Ticket.customer_id == ticket.customer_id,
+            Ticket.id > ticket.id,
+        )
+        .order_by(Ticket.id.asc())
+        .first()
+    )
+    previous_ticket = (
+        db.query(Ticket)
+        .filter(
+            Ticket.customer_id == ticket.customer_id,
+            Ticket.id < ticket.id,
+        )
+        .order_by(Ticket.id.desc())
+        .first()
+    )
     # Check access for EO users
     _check_ticket_access(ticket, current_user, db)
 
@@ -353,19 +356,36 @@ async def get_ticket_conversation(
     )
 
     if before_ts:
-        # Pagination: get older messages before the given timestamp
+        # Pagination: get older messages before the given timestamp and
+        # Make sure we don't go before previous ticket's escalation message
         try:
             before_dt = datetime.fromisoformat(before_ts)
             msgs_query = msgs_query.filter(Message.created_at < before_dt)
+            # Use previous ticket's message creation time as lower boundary
+            if previous_ticket:
+                previous_message = previous_ticket.message
+                if previous_message and previous_message.created_at:
+                    msgs_query = msgs_query.filter(
+                        Message.created_at >= previous_message.created_at,
+                    )
         except Exception:
             # ignore invalid before_ts, return from ticket start
             pass
     else:
         # Default: start from ticket's escalation message onwards
+        # and before next ticket's escalation message
         if ticket_message and ticket_message.created_at:
             msgs_query = msgs_query.filter(
-                Message.created_at >= ticket_message.created_at
+                Message.created_at >= ticket_message.created_at,
             )
+        # Use next ticket's message creation time as upper boundary
+        # This ensures we stop BEFORE the next ticket's escalation message
+        if next_ticket:
+            next_message = next_ticket.message
+            if next_message and next_message.created_at:
+                msgs_query = msgs_query.filter(
+                    Message.created_at < next_message.created_at,
+                )
 
     msgs = msgs_query.order_by(Message.created_at.desc()).limit(limit).all()
 

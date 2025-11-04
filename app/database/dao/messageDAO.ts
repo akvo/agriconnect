@@ -233,33 +233,42 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     }
   }
 
-  // Get ALL messages by ticket ID (for offline-first display)
-  // Gets the customer_id from the ticket first, then fetches ALL messages for that customer
+  // Get messages by ticket ID with ticket boundaries (aligned with backend logic)
+  // Fetches messages within the ticket's conversation boundaries:
+  // - From ticket's message creation time onwards
+  // - Before next ticket's creation time (if exists)
   // Returns messages in ASC order (oldest to newest)
   // Default limit: 10 messages for better scroll-to-bottom performance
-  // Excludes WHISPER messages and messages with certain statuses
-  // NOTE: Mobile app currently doesn't store delivery_status (FAILED/UNDELIVERED)
-  //       which is tracked on backend only. If needed, add delivery_status column
-  //       via migration and sync from backend API response.
+  // Excludes WHISPER messages and FAILED/UNDELIVERED messages
   getAllMessagesByTicketId(
     db: SQLiteDatabase,
     ticketId: number,
     limit: number = 10,
+    beforeTimestamp?: string, // For pagination: load older messages
   ): MessageWithUsers[] {
-    // First, get the customer_id from the ticket
+    // Get the ticket with its message timestamp (ticket escalation point)
     const ticketStmt = db.prepareSync(
-      "SELECT customerId FROM tickets WHERE id = ?",
+      `SELECT t.customerId, t.createdAt as ticket_createdAt, m.createdAt as message_createdAt
+       FROM tickets t
+       LEFT JOIN messages m ON t.messageId = m.id
+       WHERE t.id = ?`,
     );
     let customerId: number | null = null;
+    let ticketMessageCreatedAt: string | null = null;
 
     try {
-      const ticketResult = ticketStmt.executeSync<{ customerId: number }>([
-        ticketId,
-      ]);
+      const ticketResult = ticketStmt.executeSync<{
+        customerId: number;
+        ticket_createdAt: string;
+        message_createdAt: string;
+      }>([ticketId]);
       const ticket = ticketResult.getFirstSync();
       customerId = ticket?.customerId || null;
+      // Use message creation time as the starting point (escalation point)
+      ticketMessageCreatedAt =
+        ticket?.message_createdAt || ticket?.ticket_createdAt || null;
     } catch (error) {
-      console.error("Error getting ticket customer_id:", error);
+      console.error("Error getting ticket info:", error);
       return [];
     } finally {
       ticketStmt.finalizeSync();
@@ -270,11 +279,94 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       return [];
     }
 
-    // Get the most recent N messages for that customer
-    // First order DESC to get newest, then reverse to ASC for UI display
-    // Excludes:
-    // - WHISPER messages (message_type = 2) - AI suggestions for EOs only
-    // - FAILED and UNDELIVERED messages - Failed delivery status from Twilio
+    // Get next ticket's message creation time for upper boundary
+    // This ensures we stop BEFORE the next ticket's escalation message
+    const nextTicketStmt = db.prepareSync(
+      `SELECT m.createdAt as message_createdAt
+       FROM tickets t
+       LEFT JOIN messages m ON t.messageId = m.id
+       WHERE t.customerId = ? AND t.id > ?
+       ORDER BY t.id ASC
+       LIMIT 1`,
+    );
+    let nextTicketMessageCreatedAt: string | null = null;
+
+    try {
+      const nextResult = nextTicketStmt.executeSync<{
+        message_createdAt: string;
+      }>([customerId, ticketId]);
+      const nextTicket = nextResult.getFirstSync();
+      nextTicketMessageCreatedAt = nextTicket?.message_createdAt || null;
+    } catch (error) {
+      console.error("Error getting next ticket:", error);
+    } finally {
+      nextTicketStmt.finalizeSync();
+    }
+
+    // Get previous ticket's message creation time for lower boundary (when paginating)
+    // This ensures we only show messages after the previous ticket's escalation message
+    let previousTicketMessageCreatedAt: string | null = null;
+    if (beforeTimestamp) {
+      const prevTicketStmt = db.prepareSync(
+        `SELECT m.createdAt as message_createdAt
+         FROM tickets t
+         LEFT JOIN messages m ON t.messageId = m.id
+         WHERE t.customerId = ? AND t.id < ?
+         ORDER BY t.id DESC
+         LIMIT 1`,
+      );
+
+      try {
+        const prevResult = prevTicketStmt.executeSync<{
+          message_createdAt: string;
+        }>([customerId, ticketId]);
+        const prevTicket = prevResult.getFirstSync();
+        previousTicketMessageCreatedAt = prevTicket?.message_createdAt || null;
+      } catch (error) {
+        console.error("Error getting previous ticket:", error);
+      } finally {
+        prevTicketStmt.finalizeSync();
+      }
+    }
+
+    // Build query with boundaries
+    let whereConditions = [
+      "m.customer_id = ?",
+      "m.message_type IS NOT 'WHISPER'",
+      "m.delivery_status NOT IN (?, ?)",
+    ];
+    let queryParams: any[] = [
+      customerId,
+      DeliveryStatus.FAILED,
+      DeliveryStatus.UNDELIVERED,
+    ];
+
+    if (beforeTimestamp) {
+      // Pagination: get messages before the given timestamp
+      whereConditions.push("m.createdAt < ?");
+      queryParams.push(beforeTimestamp);
+
+      // And after previous ticket's escalation message (if exists)
+      if (previousTicketMessageCreatedAt) {
+        whereConditions.push("m.createdAt >= ?");
+        queryParams.push(previousTicketMessageCreatedAt);
+      }
+    } else {
+      // Initial load: get messages from ticket's message onwards
+      if (ticketMessageCreatedAt) {
+        whereConditions.push("m.createdAt >= ?");
+        queryParams.push(ticketMessageCreatedAt);
+      }
+
+      // And before next ticket's escalation message (if exists)
+      if (nextTicketMessageCreatedAt) {
+        whereConditions.push("m.createdAt < ?");
+        queryParams.push(nextTicketMessageCreatedAt);
+      }
+    }
+
+    queryParams.push(limit);
+
     const stmt = db.prepareSync(
       `SELECT
         m.*,
@@ -285,24 +377,17 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       FROM messages m
       JOIN customer_users f ON m.customer_id = f.id
       LEFT JOIN users u ON m.user_id = u.id
-      WHERE m.customer_id = ?
-        AND m.message_type IS NOT 'WHISPER'
-        AND m.delivery_status NOT IN (?, ?)
+      WHERE ${whereConditions.join(" AND ")}
       ORDER BY m.createdAt DESC
       LIMIT ?`,
     );
     try {
-      const result = stmt.executeSync<MessageWithUsers>([
-        customerId,
-        DeliveryStatus.FAILED,
-        DeliveryStatus.UNDELIVERED,
-        limit,
-      ]);
+      const result = stmt.executeSync<MessageWithUsers>(queryParams);
       const messages = result.getAllSync();
       // Reverse to return in ASC order (oldest to newest) for UI display
       return messages.reverse();
     } catch (error) {
-      console.error("Error getting all messages by ticket ID:", error);
+      console.error("Error getting messages by ticket ID:", error);
       return [];
     } finally {
       stmt.finalizeSync();

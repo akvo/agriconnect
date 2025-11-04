@@ -142,25 +142,29 @@ class MessageSyncService {
   /**
    * Load initial messages for a ticket - TRUE OFFLINE-FIRST
    *
-   * Step 1: Load ALL messages from SQLite immediately (instant display)
-   * Returns all cached messages for instant display
+   * Loads messages from SQLite with ticket boundaries:
+   * - From ticket's message creation time onwards
+   * - Before next ticket's creation time (if exists)
+   * Returns cached messages for instant display
    */
   static async loadInitialMessages(
     db: SQLiteDatabase,
-    accessToken: string,
     ticketId: number,
-    customerId: number,
     ticketCreatedAt: string,
-    userId?: number,
     limit: number = 20,
-    forceRefresh: boolean = false,
   ): Promise<SyncResult> {
     const dao = new DAOManager(db);
 
-    // Load ALL messages from SQLite for instant display
-    const cachedMessages = dao.message.getAllMessagesByTicketId(db, ticketId);
+    // Load messages from SQLite with ticket boundaries
+    // The getAllMessagesByTicketId method now respects ticket boundaries
+    const cachedMessages = dao.message.getAllMessagesByTicketId(
+      db,
+      ticketId,
+      limit,
+      undefined, // no beforeTimestamp = initial load
+    );
     console.log(
-      `[MessageSync] Loaded ${cachedMessages.length} cached messages for ticket ${ticketId}`,
+      `[MessageSync] Loaded ${cachedMessages.length} cached messages for ticket ${ticketId} (within boundaries)`,
     );
 
     // Get oldest timestamp for pagination (to fetch older messages from API)
@@ -225,8 +229,9 @@ class MessageSyncService {
    * Load older messages - HYBRID APPROACH
    *
    * Step 1: Fetch from API using before_ts (oldest cached message timestamp)
+   *         Backend handles filtering with previous ticket boundary
    * Step 2: Store fetched messages in SQLite
-   * Step 3: Return the newly fetched messages
+   * Step 3: Query SQLite with ticket boundaries to return messages
    *
    * This is called iteratively as user scrolls to top
    */
@@ -244,7 +249,7 @@ class MessageSyncService {
         `[MessageSync] Fetching older messages from API: ticket=${ticketId}, before_ts=${beforeTimestamp}`,
       );
 
-      // Fetch older messages from API
+      // Fetch older messages from API (backend filters by previous ticket boundary)
       const apiData = await this.fetchMessagesFromAPI(
         accessToken,
         ticketId,
@@ -257,28 +262,26 @@ class MessageSyncService {
       );
 
       // Sync each message to SQLite
-      const dao = new DAOManager(db);
       for (const apiMessage of apiData.messages) {
         await this.syncMessageToLocal(db, apiMessage, customerId);
       }
 
-      // Get the synced messages from SQLite with user details
-      const messages = apiData.messages
-        .map((msg) => dao.message.findByIdWithUsers(db, msg.id))
-        .filter((msg) => msg !== null)
-        .sort(
-          (a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-        );
+      // Query SQLite with ticket boundaries to get the older messages
+      // This ensures we respect ticket boundaries even when loading from cache
+      const dao = new DAOManager(db);
+      const messages = dao.message.getAllMessagesByTicketId(
+        db,
+        ticketId,
+        limit,
+        beforeTimestamp, // Pass beforeTimestamp for pagination with boundaries
+      );
 
       // Get the new oldest timestamp for next pagination
       const newOldestTimestamp =
-        apiData.messages.length > 0
-          ? apiData.messages[apiData.messages.length - 1].created_at
-          : null;
+        messages.length > 0 ? messages[0].createdAt : null;
 
       console.log(
-        `[MessageSync] Synced ${messages.length} older messages, new oldest timestamp: ${newOldestTimestamp}`,
+        `[MessageSync] Loaded ${messages.length} older messages with boundaries, new oldest timestamp: ${newOldestTimestamp}`,
       );
 
       return {

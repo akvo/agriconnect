@@ -51,7 +51,7 @@ const HeaderOptions = ({ ticketID }: Props) => {
         resolvedBy: user.id,
         unreadCount: 0,
       });
-      // Redirect to inbox after closing with active tab as 'responded'
+      // Redirect to inbox after closing with active tab as 'resolved'
       router.replace("/inbox?initTab=resolved");
     } catch (error) {
       console.error("Error closing ticket:", error);

@@ -1,32 +1,31 @@
 /**
- * Connection Status Banner Component
+ * Connection Status Banner Component - REFACTORED (Phase 2)
  *
  * Displays a banner at the top of the chat screen showing WebSocket connection status.
- * Only visible when connection is not in CONNECTED state (offline, reconnecting, error).
+ * Simplified to show only when not connected (offline or disconnected).
  *
  * States:
- * - DISCONNECTED: Gray banner - "You're offline"
- * - CONNECTING: Blue banner - "Connecting..."
- * - RECONNECTING: Blue banner - "Reconnecting..."
- * - ERROR: Red banner - "Connection error. Trying to reconnect..."
- * - CONNECTED: Hidden (no banner shown)
+ * - Connected: Hidden (no banner shown)
+ * - Disconnected + Offline: Gray banner - "You're offline"
+ * - Disconnected + Online: Amber banner - "Connecting..."
  */
 
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { ConnectionState } from "@/contexts/WebSocketContext";
 
 interface ConnectionStatusBannerProps {
-  connectionState: ConnectionState;
+  isConnected: boolean;
   isOnline: boolean;
+  transport?: string; // Optional: for debugging
 }
 
 export const ConnectionStatusBanner: React.FC<ConnectionStatusBannerProps> = ({
-  connectionState,
+  isConnected,
   isOnline,
+  transport,
 }) => {
-  // Don't show banner if connected
-  if (connectionState === ConnectionState.CONNECTED) {
+  // Don't show banner if connected and online
+  if (isConnected && isOnline) {
     return null;
   }
 
@@ -35,44 +34,25 @@ export const ConnectionStatusBanner: React.FC<ConnectionStatusBannerProps> = ({
   let backgroundColor = "";
   let showDot = false;
 
-  switch (connectionState) {
-    case ConnectionState.DISCONNECTED:
-      if (!isOnline) {
-        message = "You're offline. Messages will sync when online.";
-        backgroundColor = "#6B7280"; // Gray
-      } else {
-        message = "Disconnected. Attempting to reconnect...";
-        backgroundColor = "#F59E0B"; // Amber
-        showDot = true;
-      }
-      break;
-
-    case ConnectionState.CONNECTING:
-      message = "Connecting...";
-      backgroundColor = "#3B82F6"; // Blue
-      showDot = true;
-      break;
-
-    case ConnectionState.RECONNECTING:
-      message = "Reconnecting...";
-      backgroundColor = "#3B82F6"; // Blue
-      showDot = true;
-      break;
-
-    case ConnectionState.ERROR:
-      message = "Connection error. Retrying...";
-      backgroundColor = "#EF4444"; // Red
-      showDot = true;
-      break;
-
-    default:
-      return null;
+  if (!isOnline) {
+    // Device is offline
+    message = "You're offline. Messages will sync when online.";
+    backgroundColor = "#6B7280"; // Gray
+    showDot = false;
+  } else if (!isConnected) {
+    // Device is online but WebSocket disconnected
+    message = "Connecting...";
+    backgroundColor = "#F59E0B"; // Amber
+    showDot = true;
   }
 
   return (
     <View style={[styles.banner, { backgroundColor }]}>
       {showDot && <View style={styles.pulsingDot} />}
       <Text style={styles.text}>{message}</Text>
+      {__DEV__ && transport && transport !== "N/A" && (
+        <Text style={styles.transportText}> ({transport})</Text>
+      )}
     </View>
   );
 };
@@ -90,6 +70,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     textAlign: "center",
+  },
+  transportText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "400",
+    opacity: 0.8,
   },
   pulsingDot: {
     width: 8,
