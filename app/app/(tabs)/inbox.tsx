@@ -40,7 +40,7 @@ const Inbox: React.FC = () => {
   );
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +49,6 @@ const Inbox: React.FC = () => {
   const isFetchingRef = React.useRef(false); // prevent duplicate fetches
   const isInitialMount = React.useRef(true); // track initial mount
   const db = useDatabase();
-  // const { updateTicket } = useTicket();
   const { isConnected, onMessageCreated, onTicketResolved, onTicketCreated } =
     useWebSocket();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
@@ -69,7 +68,7 @@ const Inbox: React.FC = () => {
         if (!q) {
           return true;
         }
-        const inName = t.customer?.name.toString().includes(q);
+        const inName = t.customer?.name?.toString().includes(q);
         const inContent = (t.message?.body.toString() || "").includes(q);
         const inTicketId = t.ticketNumber.toLowerCase().includes(q);
         return inName || inContent || inTicketId;
@@ -141,7 +140,9 @@ const Inbox: React.FC = () => {
         setError(null);
         if (isRefreshing) {
           setRefreshing(true);
-        } else {
+        }
+        if (!append) {
+          // Initial load or tab change - show loading
           setLoading(true);
         }
 
@@ -362,7 +363,7 @@ const Inbox: React.FC = () => {
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      {error ? (
+      {error && (
         <View style={{ alignItems: "center" }}>
           <Text style={[typography.body3, { color: themeColors.error }]}>
             {" "}
@@ -384,7 +385,8 @@ const Inbox: React.FC = () => {
             Retry
           </Text>
         </View>
-      ) : (
+      )}
+      {!loading && (
         <Text style={[typography.body3, { color: themeColors.dark3 }]}>
           No tickets available
         </Text>
@@ -407,7 +409,10 @@ const Inbox: React.FC = () => {
       <View style={styles.tabsContainer}>
         <InboxTabs
           activeTab={activeTab}
-          onChange={(t: string) => setActiveTab(t as any)}
+          onChange={(t: string) => {
+            setActiveTab(t as any);
+            setLoading(true);
+          }}
         />
       </View>
 

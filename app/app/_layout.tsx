@@ -1,4 +1,6 @@
 import React, { useEffect } from "react";
+import { TouchableOpacity } from "react-native";
+import Feathericons from "@expo/vector-icons/Feather";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NetworkProvider } from "@/contexts/NetworkContext";
@@ -56,6 +58,19 @@ export default function RootLayout() {
                       ),
                       headerRight: () => (
                         <HeaderOptions ticketID={route?.params?.ticketNumber} />
+                      ),
+                      headerLeft: () => (
+                        <TouchableOpacity
+                          onPress={() =>
+                            navigation.navigate("(tabs)", { screen: "inbox" })
+                          }
+                        >
+                          <Feathericons
+                            name="arrow-left"
+                            size={22}
+                            color="black"
+                          />
+                        </TouchableOpacity>
                       ),
                     })}
                   />

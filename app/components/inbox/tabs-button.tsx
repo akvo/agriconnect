@@ -47,7 +47,7 @@ export const TabsButton: React.FC<{
               : [typography.body3, { color: themeColors.dark3 }]
           }
         >
-          Responded
+          Resolved
         </Text>
       </TouchableOpacity>
     </View>

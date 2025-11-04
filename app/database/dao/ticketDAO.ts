@@ -161,7 +161,9 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     try {
       const result = stmt.executeSync<any>([id]);
       const row = result.getFirstSync();
-      if (!row) return null;
+      if (!row) {
+        return null;
+      }
       return this.mapRowToTicket(row);
     } catch (error) {
       console.error("Error finding ticket by id:", error);
@@ -197,11 +199,10 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     }
   }
 
-  // Find tickets by status with pagination and customer grouping
-  // Returns only one ticket per customer:
-  // - For open status: earliest (first) unresolved ticket
-  // - For resolved status: latest (most recent) resolved ticket
-  //   BUT exclude customers who have any open tickets
+  // Find tickets by status with pagination
+  // Business rules:
+  // - For OPEN status: show only earliest unresolved ticket per customer (customer grouping)
+  // - For RESOLVED status: show ALL resolved tickets (NO customer grouping)
   findByStatus(
     db: SQLiteDatabase,
     status: "open" | "resolved",
@@ -210,102 +211,123 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
   ): { tickets: Ticket[]; total: number; page: number; size: number } {
     const offset = (page - 1) * pageSize;
 
-    // Build WHERE clause based on status
-    // Handle both NULL and empty string for open tickets
-    const whereClause =
-      status === "open"
-        ? "(resolvedAt IS NULL OR resolvedAt = '')"
-        : "(resolvedAt IS NOT NULL AND resolvedAt != '')";
-    const whereClauseWithAlias =
-      status === "open"
-        ? "(t.resolvedAt IS NULL OR t.resolvedAt = '')"
-        : "(t.resolvedAt IS NOT NULL AND t.resolvedAt != '')";
-
-    // Determine aggregation function based on status
-    // OPEN: MIN(id) to get earliest unresolved ticket
-    // RESOLVED: MAX(id) to get latest resolved ticket
-    const aggregateFunc = status === "open" ? "MIN(id)" : "MAX(id)";
-
-    // For resolved status, we need to exclude customers who have any open tickets
-    let customerExclusionClause = "";
     if (status === "resolved") {
-      customerExclusionClause = `
-        AND customerId NOT IN (
-          SELECT DISTINCT customerId 
-          FROM tickets 
-          WHERE resolvedAt IS NULL OR resolvedAt = ''
-        )
-      `;
-    }
+      // RESOLVED: Show ALL resolved tickets (no customer grouping)
+      const whereClause = "(t.resolvedAt IS NOT NULL AND t.resolvedAt != '')";
 
-    // Get total count of unique customers with tickets matching the status
-    const countQuery =
-      status === "resolved"
-        ? `SELECT COUNT(DISTINCT t.customerId) as total 
-           FROM tickets t 
-           WHERE ${whereClauseWithAlias}
-           AND t.customerId NOT IN (
-             SELECT DISTINCT customerId 
-             FROM tickets 
-             WHERE resolvedAt IS NULL OR resolvedAt = ''
-           )`
-        : `SELECT COUNT(DISTINCT t.customerId) as total 
-           FROM tickets t 
-           WHERE ${whereClauseWithAlias}`;
+      // Count total resolved tickets
+      const countQuery = `SELECT COUNT(*) as total
+         FROM tickets t
+         WHERE ${whereClause}`;
 
-    const countStmt = db.prepareSync(countQuery);
+      const countStmt = db.prepareSync(countQuery);
 
-    let total = 0;
-    try {
-      const countResult = countStmt.executeSync<any>();
-      const countRow = countResult.getFirstSync();
-      total = countRow?.total || 0;
-    } catch (error) {
-      console.error("Error counting tickets:", error);
-    } finally {
-      countStmt.finalizeSync();
-    }
+      let total = 0;
+      try {
+        const countResult = countStmt.executeSync<any>();
+        const countRow = countResult.getFirstSync();
+        total = countRow?.total || 0;
+      } catch (error) {
+        console.error("Error counting resolved tickets:", error);
+      } finally {
+        countStmt.finalizeSync();
+      }
 
-    // Get paginated tickets - grouped by customer
-    // For OPEN: show earliest unresolved ticket per customer
-    // For RESOLVED: show latest resolved ticket per customer
-    //               (excluding customers with any open tickets)
-    const stmt = db.prepareSync(
-      `SELECT t.*, 
-        cu.fullName as customer_name,
-        cu.phoneNumber as customer_phone,
-        m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
-        r.id as resolver_id, r.fullName as resolver_name
-      FROM tickets t
-      INNER JOIN (
-        SELECT customerId, ${aggregateFunc} as selected_ticket_id
-        FROM tickets
-        WHERE ${whereClause}${customerExclusionClause}
-        GROUP BY customerId
-      ) selected ON t.id = selected.selected_ticket_id
-      LEFT JOIN customer_users cu ON t.customerId = cu.id
-      LEFT JOIN messages m ON t.messageId = m.id
-      LEFT JOIN users r ON t.resolvedBy = r.id
-      ORDER BY t.updatedAt DESC, t.createdAt DESC
-      LIMIT ? OFFSET ?`,
-    );
+      // Get ALL resolved tickets sorted by resolvedAt DESC
+      const stmt = db.prepareSync(
+        `SELECT t.*,
+          cu.fullName as customer_name,
+          cu.phoneNumber as customer_phone,
+          m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+          r.id as resolver_id, r.fullName as resolver_name
+        FROM tickets t
+        LEFT JOIN customer_users cu ON t.customerId = cu.id
+        LEFT JOIN messages m ON t.messageId = m.id
+        LEFT JOIN users r ON t.resolvedBy = r.id
+        WHERE ${whereClause}
+        ORDER BY t.resolvedAt DESC
+        LIMIT ? OFFSET ?`,
+      );
 
-    try {
-      const result = stmt.executeSync<any>([pageSize, offset]);
-      const rows = result.getAllSync();
-      const tickets = rows.map((r: any) => this.mapRowToTicket(r));
+      try {
+        const result = stmt.executeSync<any>([pageSize, offset]);
+        const rows = result.getAllSync();
+        const tickets = rows.map((r: any) => this.mapRowToTicket(r));
 
-      return {
-        tickets,
-        total,
-        page,
-        size: pageSize,
-      };
-    } catch (error) {
-      console.error("Error finding tickets by status:", error);
-      return { tickets: [], total: 0, page, size: pageSize };
-    } finally {
-      stmt.finalizeSync();
+        return {
+          tickets,
+          total,
+          page,
+          size: pageSize,
+        };
+      } catch (error) {
+        console.error("Error finding resolved tickets:", error);
+        return { tickets: [], total: 0, page, size: pageSize };
+      } finally {
+        stmt.finalizeSync();
+      }
+    } else {
+      // OPEN: Show earliest unresolved ticket per customer (customer grouping)
+      const whereClause = "(resolvedAt IS NULL OR resolvedAt = '')";
+      const whereClauseWithAlias =
+        "(t.resolvedAt IS NULL OR t.resolvedAt = '')";
+
+      // Count unique customers with open tickets
+      const countQuery = `SELECT COUNT(DISTINCT t.customerId) as total
+         FROM tickets t
+         WHERE ${whereClauseWithAlias}`;
+
+      const countStmt = db.prepareSync(countQuery);
+
+      let total = 0;
+      try {
+        const countResult = countStmt.executeSync<any>();
+        const countRow = countResult.getFirstSync();
+        total = countRow?.total || 0;
+      } catch (error) {
+        console.error("Error counting open tickets:", error);
+      } finally {
+        countStmt.finalizeSync();
+      }
+
+      // Get earliest unresolved ticket per customer
+      const stmt = db.prepareSync(
+        `SELECT t.*,
+          cu.fullName as customer_name,
+          cu.phoneNumber as customer_phone,
+          m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+          r.id as resolver_id, r.fullName as resolver_name
+        FROM tickets t
+        INNER JOIN (
+          SELECT customerId, MIN(id) as selected_ticket_id
+          FROM tickets
+          WHERE ${whereClause}
+          GROUP BY customerId
+        ) selected ON t.id = selected.selected_ticket_id
+        LEFT JOIN customer_users cu ON t.customerId = cu.id
+        LEFT JOIN messages m ON t.messageId = m.id
+        LEFT JOIN users r ON t.resolvedBy = r.id
+        ORDER BY t.updatedAt DESC, t.createdAt DESC
+        LIMIT ? OFFSET ?`,
+      );
+
+      try {
+        const result = stmt.executeSync<any>([pageSize, offset]);
+        const rows = result.getAllSync();
+        const tickets = rows.map((r: any) => this.mapRowToTicket(r));
+
+        return {
+          tickets,
+          total,
+          page,
+          size: pageSize,
+        };
+      } catch (error) {
+        console.error("Error finding open tickets:", error);
+        return { tickets: [], total: 0, page, size: pageSize };
+      } finally {
+        stmt.finalizeSync();
+      }
     }
   } // Find ticket by ticketNumber
   findByTicketNumber(db: SQLiteDatabase, ticketNumber: string): Ticket | null {
@@ -325,7 +347,9 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     try {
       const result = stmt.executeSync<any>([ticketNumber]);
       const row = result.getFirstSync();
-      if (!row) return null;
+      if (!row) {
+        return null;
+      }
       return this.mapRowToTicket(row);
     } catch (error) {
       console.error("Error finding ticket by number:", error);
@@ -398,5 +422,102 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     }
 
     return count;
+  }
+
+  /**
+   * Get the next ticket for the same customer (higher ticket ID)
+   * Used to determine the upper boundary for message loading
+   */
+  findNextTicket(db: SQLiteDatabase, ticketId: number): Ticket | null {
+    try {
+      // First get the current ticket to know the customer
+      const currentTicket = this.findById(db, ticketId);
+      if (!currentTicket) {
+        console.error(`Current ticket ${ticketId} not found`);
+        return null;
+      }
+
+      const stmt = db.prepareSync(
+        `SELECT t.*,
+          cu.fullName as customer_name,
+          cu.phoneNumber as customer_phone,
+          m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+          r.id as resolver_id, r.fullName as resolver_name
+        FROM tickets t
+        LEFT JOIN customer_users cu ON t.customerId = cu.id
+        LEFT JOIN messages m ON t.messageId = m.id
+        LEFT JOIN users r ON t.resolvedBy = r.id
+        WHERE t.customerId = ? AND t.id > ?
+        ORDER BY t.id ASC
+        LIMIT 1`,
+      );
+
+      try {
+        const result = stmt.executeSync<any>([
+          currentTicket.customer.id,
+          ticketId,
+        ]);
+        const row = result.getFirstSync();
+        if (!row) {
+          return null;
+        }
+        return this.mapRowToTicket(row);
+      } finally {
+        stmt.finalizeSync();
+      }
+    } catch (error) {
+      console.error(`Error finding next ticket for ticket ${ticketId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get the previous ticket for the same customer (lower ticket ID)
+   * Used to determine the lower boundary for message loading (pagination)
+   */
+  findPreviousTicket(db: SQLiteDatabase, ticketId: number): Ticket | null {
+    try {
+      // First get the current ticket to know the customer
+      const currentTicket = this.findById(db, ticketId);
+      if (!currentTicket) {
+        console.error(`Current ticket ${ticketId} not found`);
+        return null;
+      }
+
+      const stmt = db.prepareSync(
+        `SELECT t.*,
+          cu.fullName as customer_name,
+          cu.phoneNumber as customer_phone,
+          m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+          r.id as resolver_id, r.fullName as resolver_name
+        FROM tickets t
+        LEFT JOIN customer_users cu ON t.customerId = cu.id
+        LEFT JOIN messages m ON t.messageId = m.id
+        LEFT JOIN users r ON t.resolvedBy = r.id
+        WHERE t.customerId = ? AND t.id < ?
+        ORDER BY t.id DESC
+        LIMIT 1`,
+      );
+
+      try {
+        const result = stmt.executeSync<any>([
+          currentTicket.customer.id,
+          ticketId,
+        ]);
+        const row = result.getFirstSync();
+        if (!row) {
+          return null;
+        }
+        return this.mapRowToTicket(row);
+      } finally {
+        stmt.finalizeSync();
+      }
+    } catch (error) {
+      console.error(
+        `Error finding previous ticket for ticket ${ticketId}:`,
+        error,
+      );
+      return null;
+    }
   }
 }
