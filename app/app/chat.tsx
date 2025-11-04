@@ -282,8 +282,8 @@ const ChatScreen = () => {
 
               if (dbAiSuggestion?.body) {
                 setAISuggestion(dbAiSuggestion.body);
-                setAISuggestionLoading(false);
               }
+              setAISuggestionLoading(false);
 
               // Scroll to bottom to show new messages
               setTimeout(() => scrollToBottom(true), 300);
