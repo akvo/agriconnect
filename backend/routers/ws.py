@@ -621,12 +621,18 @@ async def emit_whisper_created(
     }
 
     # Emit to ticket room (for users viewing the chat)
-    await sio.emit("whisper_created", event_data, room=f"ticket:{ticket_id}")
-
-    logger.info(
-        f"Emitted whisper_created event for message {message_id} "
-        f"in ticket {ticket_id}"
-    )
+    try:
+        await sio.emit(
+            "whisper_created", event_data, room=f"ticket:{ticket_id}"
+        )
+        logger.info(
+            f"Emitted whisper_created event for message {message_id} "
+            f"in ticket {ticket_id}"
+        )
+    except Exception as e:
+        logger.error(
+            f"Error emitting whisper_created event: {e}", exc_info=True
+        )
 
 
 async def emit_playground_response(
