@@ -32,7 +32,7 @@ sio = socketio.AsyncServer(
     logger=True,
     engineio_logger=False,
     ping_timeout=90,  # 90s timeout (more lenient for mobile networks)
-    ping_interval=30,  # 30s interval (balanced between responsiveness and overhead)
+    ping_interval=30,  # 30s interval
 )
 
 # Socket.IO ASGI app - standard mounting approach
