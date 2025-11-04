@@ -31,8 +31,8 @@ sio = socketio.AsyncServer(
     cors_allowed_origins="*",  # Configure appropriately for production
     logger=True,
     engineio_logger=False,
-    ping_timeout=60,
-    ping_interval=25,
+    ping_timeout=90,  # 90s timeout (more lenient for mobile networks)
+    ping_interval=30,  # 30s interval (balanced between responsiveness and overhead)
 )
 
 # Socket.IO ASGI app - standard mounting approach
