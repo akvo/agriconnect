@@ -85,13 +85,13 @@ if [ ! -f ".env" ]; then
         HOST_IP="localhost"
     fi
 
-    echo "AGRICONNECT_SERVER_URL=http://${HOST_IP}:8000" > .env
+    echo "EXPO_PUBLIC_AGRICONNECT_SERVER_URL=http://${HOST_IP}:8000" > .env
     echo "✅ Created .env with backend URL: http://${HOST_IP}:8000"
     echo ""
     echo "If this IP is wrong, edit .env file manually"
 else
     echo "✅ .env file exists"
-    echo "Backend URL: $(cat .env | grep AGRICONNECT_SERVER_URL)"
+    echo "Backend URL: $(cat .env | grep EXPO_PUBLIC_AGRICONNECT_SERVER_URL)"
 fi
 
 echo ""

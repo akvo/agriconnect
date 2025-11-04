@@ -195,6 +195,7 @@ const ChatScreen = () => {
 
       try {
         if (forceRefresh) {
+          setAISuggestionLoading(true);
           setLoading(true);
         }
 
@@ -281,6 +282,7 @@ const ChatScreen = () => {
 
               if (dbAiSuggestion?.body) {
                 setAISuggestion(dbAiSuggestion.body);
+                setAISuggestionLoading(false);
               }
 
               // Scroll to bottom to show new messages
@@ -289,6 +291,7 @@ const ChatScreen = () => {
             .catch((error) => {
               console.error("[Chat] Background sync failed:", error);
               // Don't throw - background sync failure is non-fatal
+              setAISuggestionLoading(false);
             });
         } else {
           console.warn(`[Chat] Ticket not found in SQLite: ${ticketNumber}`);

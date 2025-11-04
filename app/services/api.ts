@@ -1,8 +1,8 @@
-// import { AGRICONNECT_SERVER_URL } from "@env";
+// import { EXPO_PUBLIC_AGRICONNECT_SERVER_URL } from "@env";
 
 // Simple solution - create a config file that imports from .env
 // This file will be processed by Expo's built-in environment variable support
-const API_BASE_URL = process.env.AGRICONNECT_SERVER_URL || "";
+const API_BASE_URL = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
 
 interface LoginCredentials {
   email: string;

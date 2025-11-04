@@ -15,10 +15,14 @@
 
 import { io, Socket } from "socket.io-client";
 
-const API_URL = process.env.AGRICONNECT_SERVER_URL || "";
+const API_URL = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
 const BASE_URL = API_URL.replace(/\/api\/?$/, "");
 
 console.log("[Socket] Initializing Socket.io client");
+console.log(
+  "[Socket] ENV URL:",
+  process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL,
+);
 console.log("[Socket] Server URL:", BASE_URL);
 console.log("[Socket] Path: /ws/socket.io");
 
@@ -41,9 +45,9 @@ export const socket: Socket = io(BASE_URL, {
   // Don't connect until we call socket.connect() with auth token
   autoConnect: false,
 
-  // Transport configuration for production (HTTPS)
-  // Polling establishes connection first, then upgrades to WebSocket
-  transports: ["polling", "websocket"],
+  // Transport configuration - WebSocket only (like web frontend)
+  // Direct WebSocket avoids 403 errors during polling->websocket upgrade
+  transports: ["websocket"],
 
   // Reconnection settings
   reconnection: true,
@@ -51,8 +55,8 @@ export const socket: Socket = io(BASE_URL, {
   reconnectionDelay: 1000,
   reconnectionDelayMax: 30000,
 
-  // Timeout settings (30s for production networks)
-  timeout: 30000,
+  // Timeout settings (60 seconds to allow for slow networks)
+  timeout: 60000,
 
   // Don't force new connection on reconnect
   forceNew: false,
