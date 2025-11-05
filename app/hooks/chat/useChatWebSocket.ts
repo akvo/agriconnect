@@ -24,6 +24,7 @@ interface UseChatWebSocketParams {
   db: SQLiteDatabase;
   ticket: TicketData;
   userId: number | undefined;
+  isConnected: boolean;
   onMessageCreated: (callback: (event: MessageCreatedEvent) => void) => () => void;
   onMessageStatusUpdated: (callback: (event: MessageStatusUpdatedEvent) => void) => () => void;
   onTicketResolved: (callback: (event: TicketResolvedEvent) => void) => () => void;
@@ -43,6 +44,7 @@ export const useChatWebSocket = ({
   db,
   ticket,
   userId,
+  isConnected,
   onMessageCreated,
   onMessageStatusUpdated,
   onTicketResolved,
@@ -244,7 +246,19 @@ export const useChatWebSocket = ({
 
   // Join/leave ticket room when screen mounts/unmounts
   // Skip joining for resolved tickets since they are read-only
+  // Skip if user is not authenticated (e.g., during logout)
+  // Skip if WebSocket is not connected
   useEffect(() => {
+    if (!userId) {
+      console.log(`[Chat] Skipping join/leave - user not authenticated`);
+      return;
+    }
+
+    if (!isConnected) {
+      console.log(`[Chat] Skipping join/leave - WebSocket not connected`);
+      return;
+    }
+
     if (!ticket?.id || ticket?.resolvedAt) {
       if (ticket?.resolvedAt) {
         console.log(`[Chat] Skipping join for resolved ticket: ${ticket.id}`);
@@ -256,11 +270,11 @@ export const useChatWebSocket = ({
     joinTicket(ticket.id);
 
     return () => {
-      if (!ticket?.id) {
+      if (!ticket?.id || !userId || !isConnected) {
         return;
       }
       console.log(`[Chat] Leaving ticket room: ${ticket.id}`);
       leaveTicket(ticket.id);
     };
-  }, [ticket?.id, ticket?.resolvedAt, joinTicket, leaveTicket, setActiveTicket]);
+  }, [ticket?.id, ticket?.resolvedAt, userId, isConnected, joinTicket, leaveTicket, setActiveTicket]);
 };
