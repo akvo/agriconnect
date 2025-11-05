@@ -97,6 +97,93 @@ class Settings(BaseSettings):
         .get("backoff_minutes", [5, 15, 60])
     )
 
+    # OpenAI Configuration
+    # API credentials (from .env)
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+
+    # General settings (from config.json)
+    openai_enabled: bool = _config.get("openai", {}).get("enabled", False)
+    openai_default_model: str = _config.get("openai", {}).get(
+        "default_model", "gpt-4o-mini"
+    )
+    openai_temperature: float = _config.get("openai", {}).get(
+        "temperature", 0.7
+    )
+    openai_max_tokens: int = _config.get("openai", {}).get(
+        "max_tokens", 1000
+    )
+    openai_timeout: int = _config.get("openai", {}).get("timeout", 30)
+    openai_max_retries: int = _config.get("openai", {}).get(
+        "max_retries", 3
+    )
+
+    # Model configurations
+    openai_chat_model: str = (
+        _config.get("openai", {}).get("models", {}).get("chat", "gpt-4o-mini")
+    )
+    openai_chat_advanced_model: str = (
+        _config.get("openai", {})
+        .get("models", {})
+        .get("chat_advanced", "gpt-4o")
+    )
+    openai_transcription_model: str = (
+        _config.get("openai", {})
+        .get("models", {})
+        .get("transcription", "whisper-1")
+    )
+    openai_embedding_model: str = (
+        _config.get("openai", {})
+        .get("models", {})
+        .get("embedding", "text-embedding-3-small")
+    )
+    openai_moderation_model: str = (
+        _config.get("openai", {})
+        .get("models", {})
+        .get("moderation", "text-moderation-latest")
+    )
+
+    # Feature flags (speech-to-text, NOT WHISPER message type)
+    openai_speech_to_text_enabled: bool = (
+        _config.get("openai", {})
+        .get("features", {})
+        .get("speech_to_text", {})
+        .get("enabled", True)
+    )
+    openai_speech_to_text_language: str = (
+        _config.get("openai", {})
+        .get("features", {})
+        .get("speech_to_text", {})
+        .get("language", "en")
+    )
+    openai_onboarding_enabled: bool = (
+        _config.get("openai", {})
+        .get("features", {})
+        .get("onboarding", {})
+        .get("enabled", True)
+    )
+    openai_onboarding_system_prompt: str = (
+        _config.get("openai", {})
+        .get("features", {})
+        .get("onboarding", {})
+        .get(
+            "system_prompt",
+            "You are a helpful agricultural assistant helping farmers "
+            "get started with AgriConnect. Be friendly, concise, "
+            "and practical.",
+        )
+    )
+    openai_content_moderation_enabled: bool = (
+        _config.get("openai", {})
+        .get("features", {})
+        .get("content_moderation", {})
+        .get("enabled", True)
+    )
+    openai_cost_tracking_enabled: bool = (
+        _config.get("openai", {})
+        .get("cost_tracking", {})
+        .get("enabled", False)
+    )
+
 
 # Global settings instance
 settings = Settings()

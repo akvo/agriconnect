@@ -32,6 +32,7 @@ services:
       - WEBDOMAIN=${WEBDOMAIN:-localhost}
       - STORAGE_SECRET=${STORAGE_SECRET}
       - WHATSAPP_CONFIRMATION_TEMPLATE_SID=${WHATSAPP_CONFIRMATION_TEMPLATE_SID}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     command: ["./dev.sh"]
     working_dir: /app
     volumes:
