@@ -84,7 +84,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     undefined,
   );
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, setRegisterDeviceAt } = useAuth();
 
   // Register for push notifications
   const registerForPushNotificationsAsync = async (): Promise<
@@ -168,8 +168,10 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
 
   // Register device with backend when user logs in and token is available
   const registerDevice = useCallback(async () => {
-    if (!user?.accessToken || !expoPushToken) {
-      console.log("[Device Registration] Skipping - missing token or user");
+    if (!user?.accessToken || !expoPushToken || user?.deviceRegisterAt) {
+      console.log(
+        "[Device Registration] Skipping registration - missing data or already registered",
+      );
       return;
     }
 
@@ -197,6 +199,9 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         app_version: appVersion,
       });
 
+      // Update profile with registration timestamp
+      setRegisterDeviceAt();
+
       console.log("[Device Registration] ✅ Device registered successfully");
     } catch (error) {
       console.error(
@@ -204,7 +209,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         error,
       );
     }
-  }, [user, expoPushToken]);
+  }, [user, expoPushToken, setRegisterDeviceAt]);
 
   useEffect(() => {
     registerDevice();

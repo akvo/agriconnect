@@ -9,6 +9,7 @@ export interface Profile {
   lastSyncAt: string | null;
   createdAt: string;
   updatedAt: string;
+  deviceRegisterAt: string | null;
 }
 
 // Extended profile interface with user details (used for JOIN queries)
@@ -38,4 +39,5 @@ export interface UpdateProfileData {
   syncInterval?: number;
   language?: string;
   lastSyncAt?: string | null;
+  deviceRegisterAt?: string | null;
 }

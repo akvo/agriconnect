@@ -70,6 +70,11 @@ export class ProfileDAO extends BaseDAOImpl<Profile> {
         values.push(data.lastSyncAt);
       }
 
+      if (data.deviceRegisterAt !== undefined) {
+        updates.push("deviceRegisterAt = ?");
+        values.push(data.deviceRegisterAt);
+      }
+
       if (updates.length === 0) {
         return false;
       }
@@ -120,6 +125,7 @@ export class ProfileDAO extends BaseDAOImpl<Profile> {
         p.lastSyncAt, 
         p.createdAt, 
         p.updatedAt,
+        p.deviceRegisterAt,
         u.email,
         u.fullName,
         u.phoneNumber,
