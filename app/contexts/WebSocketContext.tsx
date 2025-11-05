@@ -121,16 +121,38 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       console.log("[WebSocketContext] Connected");
       setIsConnected(true);
 
-      // Rejoin ticket rooms after reconnection
+      // Rejoin ticket rooms after reconnection with delay to avoid race condition
       if (joinedTicketsRef.current.size > 0) {
         console.log(
-          `[WebSocketContext] Rejoining ${joinedTicketsRef.current.size} ticket rooms`
+          `[WebSocketContext] Waiting 1s before rejoining ${joinedTicketsRef.current.size} ticket rooms`
         );
-        joinedTicketsRef.current.forEach((ticketId) => {
-          WebSocketService.joinTicket(ticketId).catch((error) => {
-            console.error(`[WebSocketContext] Failed to rejoin ticket ${ticketId}:`, error);
+
+        setTimeout(() => {
+          const rooms = Array.from(joinedTicketsRef.current);
+
+          // Rejoin rooms SEQUENTIALLY with delay to avoid rate limit
+          rooms.forEach((ticketId, index) => {
+            setTimeout(async () => {
+              try {
+                await WebSocketService.joinTicket(ticketId);
+                console.log(`[WebSocketContext] ✅ Successfully rejoined ticket ${ticketId}`);
+              } catch (error) {
+                console.error(`[WebSocketContext] ❌ Failed to rejoin ticket ${ticketId}:`, error);
+
+                // Retry ONCE after 2 seconds
+                setTimeout(async () => {
+                  try {
+                    await WebSocketService.joinTicket(ticketId);
+                    console.log(`[WebSocketContext] ✅ Retry successful for ticket ${ticketId}`);
+                  } catch (retryError) {
+                    console.error(`[WebSocketContext] ❌ Retry failed for ticket ${ticketId}:`, retryError);
+                    // Could emit event here to notify user of connection issues
+                  }
+                }, 2000);
+              }
+            }, index * 200); // 200ms between each rejoin
           });
-        });
+        }, 1000); // 1 second delay after connect
       }
     };
 
