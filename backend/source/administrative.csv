@@ -14,3 +14,102 @@ RFT-N-1,Eldoret Ward,ward,RFT-N
 RFT-N-2,Kitale Ward,ward,RFT-N
 RFT-S-1,Nakuru Ward,ward,RFT-S
 RFT-S-2,Naivasha Ward,ward,RFT-S
+NYA,Nyandarua,region,KEN
+NYA-KNG,Kinangop,district,NYA
+NYA-KNG-1,Engineer,ward,NYA-KNG
+NYA-KNG-2,Gathara,ward,NYA-KNG
+NYA-KNG-3,North Kinangop,ward,NYA-KNG
+NYA-KNG-4,Murungaru,ward,NYA-KNG
+NYA-KNG-5,Njabini/Kiburu,ward,NYA-KNG
+NYA-KNG-6,Nyakio,ward,NYA-KNG
+NYA-KNG-7,Githabai,ward,NYA-KNG
+NYA-KNG-8,Magumu,ward,NYA-KNG
+NYA-KPP,Kipipiri,district,NYA
+NYA-KPP-1,Wanjohi,ward,NYA-KPP
+NYA-KPP-2,Kipipiri,ward,NYA-KPP
+NYA-KPP-3,Geta,ward,NYA-KPP
+NYA-KPP-4,Githioro,ward,NYA-KPP
+NYA-OKL,Ol Kalou,district,NYA
+NYA-OKL-1,Karau,ward,NYA-OKL
+NYA-OKL-2,Kanjuiri Range,ward,NYA-OKL
+NYA-OKL-3,Mirangine,ward,NYA-OKL
+NYA-OKL-4,Kaimbaga,ward,NYA-OKL
+NYA-OKL-5,Rurii,ward,NYA-OKL
+NYA-OJK,Ol Jorok,district,NYA
+NYA-OJK-1,Gathanji,ward,NYA-OJK
+NYA-OJK-2,Gatimu,ward,NYA-OJK
+NYA-OJK-3,Weru,ward,NYA-OJK
+NYA-OJK-4,Charagita,ward,NYA-OJK
+NYA-NDR,Ndaragwa,district,NYA
+NYA-NDR-1,Leshau/Pondo,ward,NYA-NDR
+NYA-NDR-2,Kiriita,ward,NYA-NDR
+NYA-NDR-3,Central,ward,NYA-NDR
+NYA-NDR-4,Shamata,ward,NYA-NDR
+MUR,Murang'a,region,KEN
+MUR-KGM,Kangema,district,MUR
+MUR-KGM-1,Kanyenya-Ini,ward,MUR-KGM
+MUR-KGM-2,Muguru,ward,MUR-KGM
+MUR-KGM-3,Rwathia,ward,MUR-KGM
+MUR-MTH,Mathioya,district,MUR
+MUR-MTH-1,Gitugi,ward,MUR-MTH
+MUR-MTH-2,Kiru,ward,MUR-MTH
+MUR-MTH-3,Kamacharia,ward,MUR-MTH
+MUR-KHR,Kiharu,district,MUR
+MUR-KHR-1,Wangu,ward,MUR-KHR
+MUR-KHR-2,Mugoiri,ward,MUR-KHR
+MUR-KHR-3,Mbiri,ward,MUR-KHR
+MUR-KHR-4,Township,ward,MUR-KHR
+MUR-KHR-5,Murarandia,ward,MUR-KHR
+MUR-KHR-6,Gaturi,ward,MUR-KHR
+MUR-KGO,Kigumo,district,MUR
+MUR-KGO-1,Kahumbu,ward,MUR-KGO
+MUR-KGO-2,Muthithi,ward,MUR-KGO
+MUR-KGO-3,Kigumo,ward,MUR-KGO
+MUR-KGO-4,Kangari,ward,MUR-KGO
+MUR-KGO-5,Kinyona,ward,MUR-KGO
+MUR-MRG,Maragwa,district,MUR
+MUR-MRG-1,Kimorori/Wempa,ward,MUR-MRG
+MUR-MRG-2,Makuyu,ward,MUR-MRG
+MUR-MRG-3,Kambiti,ward,MUR-MRG
+MUR-MRG-4,Kamahuha,ward,MUR-MRG
+MUR-MRG-5,Ichagaki,ward,MUR-MRG
+MUR-MRG-6,Nginda,ward,MUR-MRG
+MUR-KND,Kandara,district,MUR
+MUR-KND-1,Ng'araria,ward,MUR-KND
+MUR-KND-2,Muruka,ward,MUR-KND
+MUR-KND-3,Kagundu-Ini,ward,MUR-KND
+MUR-KND-4,Gaichanjiru,ward,MUR-KND
+MUR-KND-5,Ithiru,ward,MUR-KND
+MUR-KND-6,Ruchu,ward,MUR-KND
+MUR-GTG,Gatanga,district,MUR
+MUR-GTG-1,Ithanga,ward,MUR-GTG
+MUR-GTG-2,Kakuzi/Mitubiri,ward,MUR-GTG
+MUR-GTG-3,Mugumo-Ini,ward,MUR-GTG
+MUR-GTG-4,Kihumbu-Ini,ward,MUR-GTG
+MUR-GTG-5,Gatanga,ward,MUR-GTG
+MUR-GTG-6,Kariara,ward,MUR-GTG
+EMB,Embu,region,KEN
+EMB-MNY,Manyatta,district,EMB
+EMB-MNY-1,Ruguru-Ngandori,ward,EMB-MNY
+EMB-MNY-2,Kithimu,ward,EMB-MNY
+EMB-MNY-3,Nginda,ward,EMB-MNY
+EMB-MNY-4,Mbeti North,ward,EMB-MNY
+EMB-MNY-5,Kirimari,ward,EMB-MNY
+EMB-MNY-6,Gaturi South,ward,EMB-MNY
+EMB-RNJ,Runyenjes,district,EMB
+EMB-RNJ-1,Gaturi North,ward,EMB-RNJ
+EMB-RNJ-2,Kagaari South,ward,EMB-RNJ
+EMB-RNJ-3,Kagaari North,ward,EMB-RNJ
+EMB-RNJ-4,Central,ward,EMB-RNJ
+EMB-RNJ-5,Kyeni North,ward,EMB-RNJ
+EMB-RNJ-6,Kyeni South,ward,EMB-RNJ
+EMB-MBS,Mbeere South,district,EMB
+EMB-MBS-1,Mwea,ward,EMB-MBS
+EMB-MBS-2,Makima,ward,EMB-MBS
+EMB-MBS-3,Mbeti South,ward,EMB-MBS
+EMB-MBS-4,Mavuria,ward,EMB-MBS
+EMB-MBS-5,Kiambere,ward,EMB-MBS
+EMB-MBN,Mbeere North,district,EMB
+EMB-MBN-1,Nthawa,ward,EMB-MBN
+EMB-MBN-2,Muminji,ward,EMB-MBN
+EMB-MBN-3,Evurore,ward,EMB-MBN
