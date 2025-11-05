@@ -269,7 +269,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
 
         // Deep link to chat screen with ticket details
         if (ticketNumber) {
-          router.push({
+          router.navigate({
             pathname: "/chat",
             params: {
               ticketNumber,
