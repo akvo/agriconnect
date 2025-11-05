@@ -21,17 +21,16 @@ class ChatRequest(BaseModel):
 class ModerationRequest(BaseModel):
     text: str
 
+
 router = APIRouter(prefix="/api/openai-demo", tags=["OpenAI Demo"])
 
 
 @router.post(
     "/chat",
     response_model=ChatCompletionResponse,
-    summary="Test chat completion"
+    summary="Test chat completion",
 )
-async def demo_chat_completion(
-    request: ChatRequest
-):
+async def demo_chat_completion(request: ChatRequest):
     """
     Demo endpoint for chat completion.
 
@@ -49,7 +48,7 @@ async def demo_chat_completion(
     if not service.is_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OpenAI service not configured"
+            detail="OpenAI service not configured",
         )
 
     result = await service.chat_completion(messages=request.messages)
@@ -57,7 +56,7 @@ async def demo_chat_completion(
     if not result:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate response"
+            detail="Failed to generate response",
         )
 
     return result
@@ -66,7 +65,7 @@ async def demo_chat_completion(
 @router.post(
     "/moderate",
     response_model=ModerationResponse,
-    summary="Test content moderation"
+    summary="Test content moderation",
 )
 async def demo_moderation(request: ModerationRequest):
     """
@@ -84,7 +83,7 @@ async def demo_moderation(request: ModerationRequest):
     if not service.is_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OpenAI service not configured"
+            detail="OpenAI service not configured",
         )
 
     result = await service.moderate_content(request.text)
@@ -92,16 +91,13 @@ async def demo_moderation(request: ModerationRequest):
     if not result:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to moderate content"
+            detail="Failed to moderate content",
         )
 
     return result
 
 
-@router.get(
-    "/usage-stats",
-    summary="Get OpenAI usage statistics"
-)
+@router.get("/usage-stats", summary="Get OpenAI usage statistics")
 async def get_usage_stats():
     """Get current usage statistics"""
     service = get_openai_service()
