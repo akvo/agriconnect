@@ -3,7 +3,7 @@
 	"whatsapp": {
 		"templates": {
 			"confirmation": {
-				"sid": "HX5101667dea7c8b3ec75bb6720eab8992",
+				"sid": "HX30987fb04aa06c8f06d80818455ba018",
 				"description": "Template sent after AI response asking if farmer needs human help",
 				"variables": {
 					"ai_answer": "ai_answer"
