@@ -396,8 +396,11 @@ const Inbox: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Connection Status Indicator */}
-      {!isConnected && (
+      {/**
+       * Connection Status Banner
+       * Reconnecting when WebSocket is disconnected and there are tickets
+       */}
+      {!isConnected && tickets.length > 0 && (
         <View style={styles.connectionBanner}>
           <Text style={[typography.caption1, { color: themeColors.error }]}>
             ⚠️ Reconnecting...

@@ -50,7 +50,6 @@ const ChatScreen = () => {
   const { isOnline } = useNetwork();
   const {
     isConnected,
-    transport,
     joinTicket,
     leaveTicket,
     onMessageCreated,
@@ -122,6 +121,7 @@ const ChatScreen = () => {
     db,
     ticket,
     userId: user?.id,
+    isConnected,
     onMessageCreated,
     onMessageStatusUpdated,
     onTicketResolved,
@@ -157,7 +157,10 @@ const ChatScreen = () => {
   // Handle sticky message from messageId parameter
   useEffect(() => {
     if (messageId && !loading && ticket?.customer?.id) {
-      const dbMessage = daoManager.message.findById(db, parseInt(messageId, 10));
+      const dbMessage = daoManager.message.findById(
+        db,
+        parseInt(messageId, 10),
+      );
       if (dbMessage?.body) {
         setStickyMessage({
           id: dbMessage.id,
@@ -186,11 +189,7 @@ const ChatScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
-      <ConnectionStatusBanner
-        isConnected={isConnected}
-        isOnline={isOnline}
-        transport={transport}
-      />
+      <ConnectionStatusBanner isConnected={isConnected} isOnline={isOnline} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -221,15 +220,16 @@ const ChatScreen = () => {
             onLoadMore={loadOlderMessages}
             flatListRef={flatListRef}
           />
-          {(aiSuggestion || aiSuggestionLoading) && !ticket?.resolvedAt && (
-            <AISuggestionChip
-              suggestion={aiSuggestion}
-              loading={aiSuggestionLoading}
-              onAccept={handleAcceptSuggestion}
-              onExpand={onExpandAISuggestion}
-            />
-          )}
         </View>
+
+        {(aiSuggestion || aiSuggestionLoading) && !ticket?.resolvedAt && (
+          <AISuggestionChip
+            suggestion={aiSuggestion}
+            loading={aiSuggestionLoading}
+            onAccept={handleAcceptSuggestion}
+            onExpand={onExpandAISuggestion}
+          />
+        )}
 
         {!ticket?.resolvedAt && (
           <ChatInput
