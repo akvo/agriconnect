@@ -36,7 +36,7 @@
 			"chat_advanced": "gpt-4o",
 			"transcription": "whisper-1",
 			"embedding": "text-embedding-3-small",
-			"moderation": "text-moderation-latest"
+			"moderation": "omni-moderation-latest"
 		},
 		"features": {
 			"speech_to_text": {
