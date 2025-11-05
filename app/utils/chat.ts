@@ -14,7 +14,9 @@ const groupMessagesByDate = (messages: Message[]) => {
     const key = isNaN(dt.getTime())
       ? m.timestamp.split(" ")[0]
       : dt.toDateString();
-    if (!groups[key]) groups[key] = [];
+    if (!groups[key]) {
+      groups[key] = [];
+    }
     groups[key].push(m);
   });
 

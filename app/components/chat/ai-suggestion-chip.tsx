@@ -15,6 +15,7 @@ import themeColors from "@/styles/colors";
 interface AISuggestionChipProps {
   suggestion: string | null;
   onAccept: (suggestion: string) => void;
+  onExpand?: (expanded: boolean) => void;
   containerStyle?: object;
   loading?: boolean;
 }
@@ -31,6 +32,7 @@ interface AISuggestionChipProps {
 const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
   suggestion,
   onAccept,
+  onExpand,
   containerStyle,
   loading = false,
 }) => {
@@ -49,6 +51,7 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
   // Toggle expanded state
   const toggleExpanded = () => {
     setExpanded(!expanded);
+    onExpand?.(!expanded);
   };
 
   // Calculate dynamic height based on expanded state
@@ -59,8 +62,9 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
     if (suggestion !== text) {
       setText(suggestion);
       setExpanded(true);
+      onExpand?.(true);
     }
-  }, [suggestion, text]);
+  }, [suggestion, text, onExpand]);
 
   // Don't render if no suggestion and not loading
   if (!suggestion && !loading) {
