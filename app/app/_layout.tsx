@@ -57,19 +57,6 @@ export default function RootLayout() {
                       headerRight: () => (
                         <HeaderOptions ticketID={route?.params?.ticketNumber} />
                       ),
-                      // headerLeft: () => (
-                      //   <TouchableOpacity
-                      //     onPress={() =>
-                      //       navigation.navigate("(tabs)", { screen: "inbox" })
-                      //     }
-                      //   >
-                      //     <Feathericons
-                      //       name="arrow-left"
-                      //       size={22}
-                      //       color="black"
-                      //     />
-                      //   </TouchableOpacity>
-                      // ),
                     })}
                   />
                   <Stack.Screen
