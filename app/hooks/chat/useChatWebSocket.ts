@@ -243,8 +243,12 @@ export const useChatWebSocket = ({
   }, [onWhisperCreated, ticket?.id, setAISuggestion, setAISuggestionLoading, setAISuggestionUsed]);
 
   // Join/leave ticket room when screen mounts/unmounts
+  // Skip joining for resolved tickets since they are read-only
   useEffect(() => {
-    if (!ticket?.id) {
+    if (!ticket?.id || ticket?.resolvedAt) {
+      if (ticket?.resolvedAt) {
+        console.log(`[Chat] Skipping join for resolved ticket: ${ticket.id}`);
+      }
       return;
     }
 
@@ -258,5 +262,5 @@ export const useChatWebSocket = ({
       console.log(`[Chat] Leaving ticket room: ${ticket.id}`);
       leaveTicket(ticket.id);
     };
-  }, [ticket?.id, joinTicket, leaveTicket, setActiveTicket]);
+  }, [ticket?.id, ticket?.resolvedAt, joinTicket, leaveTicket, setActiveTicket]);
 };
