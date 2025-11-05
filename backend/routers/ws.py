@@ -1,13 +1,12 @@
 """
-WebSocket (Socket.IO) router for real-time chat and ticket updates.
+WebSocket (Socket.IO) router - REFACTORED with rag-doll patterns
 
-Implements requirements from ws_requirements.md:
-- Socket.IO endpoint /ws with WebSocket transport
-- Bearer token authentication on connect
-- Room-based event distribution (ward-based and ticket-based)
-- Events: message_created, message_status_updated, ticket_resolved
-- Automatic reconnection support with heartbeat/ping
-- Rate limiting on client emits
+Improvements:
+- User cache for fast lookups (rag-doll pattern)
+- Better logging with [TAGS] (rag-doll pattern)
+- Room verification before emit (websocket-issue-analysis.md)
+- Improved rate limiting with detailed logs
+- Keep AgriConnect's room architecture (ward + ticket rooms)
 """
 
 import logging
@@ -25,81 +24,113 @@ from utils.auth import verify_token
 
 logger = logging.getLogger(__name__)
 
-# Create Socket.IO server with async mode
+# Socket.IO server (rag-doll-inspired config, mobile-optimized)
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins="*",  # Configure appropriately for production
+    cors_allowed_origins="*",
     logger=True,
     engineio_logger=False,
-    ping_timeout=90,  # 90s timeout (more lenient for mobile networks)
-    ping_interval=30,  # 30s interval
+    ping_timeout=120,  # 2 minutes (lenient for mobile)
+    ping_interval=30,  # 30 seconds
+    transports=["websocket", "polling"],  # Server supports both
 )
 
-# Socket.IO ASGI app - standard mounting approach
-# This will be mounted at /ws in main.py
 sio_app = socketio.ASGIApp(
     sio,
-    socketio_path="",  # Empty path since we mount at /ws/socket.io
+    socketio_path="",  # Empty since mounted at /ws/socket.io
 )
 
+# Connection storage (rag-doll pattern: separate cache and connections)
+USER_CACHE: Dict[int, str] = {}  # user_id -> sid (for fast lookups)
+CONNECTIONS: Dict[str, dict] = {}  # sid -> connection info
 
-# In-memory storage for connection metadata
-
-connections: Dict[str, dict] = {}
-
-# Rate limiting storage
-# Format: {sid: {"join_count": int, "leave_count": int,
-#               "window_start": datetime}}
-rate_limits: Dict[str, dict] = {}
-
-# Rate limit configuration
-RATE_LIMIT_WINDOW = timedelta(seconds=60)  # 1 minute window
-MAX_JOINS_PER_WINDOW = 30
-MAX_LEAVES_PER_WINDOW = 30
+# Rate limiting
+RATE_LIMITS: Dict[str, dict] = {}
+RATE_LIMIT_WINDOW = timedelta(seconds=60)
+MAX_JOINS_PER_WINDOW = 50  # Increased from 30
+MAX_LEAVES_PER_WINDOW = 50
 
 
-def get_user_adm_ids(user: User, db: Session) -> list[int]:
-    """Get list of ward (administrative) IDs accessible by the user."""
+def set_user_cache(user_id: int, sid: str):
+    """Cache user's SID (rag-doll pattern)"""
+    USER_CACHE[user_id] = sid
+    logger.info(f"[CACHE] Set: user {user_id} -> sid {sid}")
+
+
+def get_user_cache(user_id: int) -> Optional[str]:
+    """Get cached SID for user"""
+    sid = USER_CACHE.get(user_id)
+    if sid:
+        logger.debug(f"[CACHE] Get: user {user_id} -> sid {sid}")
+    return sid
+
+
+def delete_user_cache(user_id: int):
+    """Remove user from cache"""
+    if user_id in USER_CACHE:
+        sid = USER_CACHE.pop(user_id)
+        logger.info(f"[CACHE] Delete: user {user_id} (was sid {sid})")
+
+
+def get_user_wards(user: User, db: Session) -> list[int]:
+    """Get list of ward IDs accessible by user"""
     if user.user_type == UserType.ADMIN:
-        # Admin can access all wards - return empty list as a marker
-        return []
+        return []  # Empty = admin (all wards)
 
-    # EO can only access their assigned wards
     user_admins = (
         db.query(UserAdministrative)
         .filter(UserAdministrative.user_id == user.id)
         .all()
     )
-
     return [ua.administrative_id for ua in user_admins]
 
 
 def check_rate_limit(sid: str, action: str) -> bool:
-    """Check if the client has exceeded rate limits for join/leave actions."""
+    """
+    Check rate limits with detailed logging (improved from analysis)
+    """
     now = datetime.utcnow()
 
-    if sid not in rate_limits:
-        rate_limits[sid] = {
+    if sid not in RATE_LIMITS:
+        RATE_LIMITS[sid] = {
             "join_count": 0,
             "leave_count": 0,
             "window_start": now,
         }
 
-    limits = rate_limits[sid]
+    limits = RATE_LIMITS[sid]
 
     # Reset window if expired
     if now - limits["window_start"] > RATE_LIMIT_WINDOW:
+        if limits["join_count"] > 0 or limits["leave_count"] > 0:
+            logger.info(
+                f"[RATE_LIMIT] Window reset for {sid}: "
+                f"joins={limits['join_count']}, leaves={limits['leave_count']}"
+            )
         limits["join_count"] = 0
         limits["leave_count"] = 0
         limits["window_start"] = now
 
-    # Check limits
+    # Check and LOG violations (websocket-issue-analysis.md)
     if action == "join" and limits["join_count"] >= MAX_JOINS_PER_WINDOW:
-        return False
-    if action == "leave" and limits["leave_count"] >= MAX_LEAVES_PER_WINDOW:
+        user_info = CONNECTIONS.get(sid, {})
+        logger.warning(
+            f"[RATE_LIMIT_EXCEEDED] Join limit for {sid} "
+            f"(user {user_info.get('user_id')}): "
+            f"{limits['join_count']}/{MAX_JOINS_PER_WINDOW}"
+        )
         return False
 
-    # Increment counter
+    if action == "leave" and limits["leave_count"] >= MAX_LEAVES_PER_WINDOW:
+        user_info = CONNECTIONS.get(sid, {})
+        logger.warning(
+            f"[RATE_LIMIT_EXCEEDED] Leave limit for {sid} "
+            f"(user {user_info.get('user_id')}): "
+            f"{limits['leave_count']}/{MAX_LEAVES_PER_WINDOW}"
+        )
+        return False
+
+    # Increment
     if action == "join":
         limits["join_count"] += 1
     elif action == "leave":
@@ -111,83 +142,79 @@ def check_rate_limit(sid: str, action: str) -> bool:
 @sio.event
 async def connect(sid: str, environ: dict, auth: Optional[dict] = None):
     """
-    Handle client connection.
-    Verify Bearer token and join user to their ward rooms.
+    Handle client connection (rag-doll-inspired, AgriConnect auth)
     """
-    logger.info(f"Client attempting to connect: {sid}")
-    logger.info(f"Auth dict: {auth}")
-    auth_header = environ.get("HTTP_AUTHORIZATION", "NOT PRESENT")
-    logger.info(f"HTTP_AUTHORIZATION header: {auth_header}")
+    logger.info(f"[CONNECT] Client attempting: {sid}")
 
     try:
-        # Extract token from auth dict or Authorization header
+        # Extract token
         token = None
         if auth and "token" in auth:
             token = auth["token"]
-            token_preview = f"{token[:20]}..." if token else "No token"
-            logger.info(f"Token from auth dict: {token_preview}")
+            logger.debug("[CONNECT] Token from auth dict")
         elif "HTTP_AUTHORIZATION" in environ:
             auth_header = environ["HTTP_AUTHORIZATION"]
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
-                token_preview = f"{token[:20]}..." if token else "No token"
-                logger.info(f"Token from header: {token_preview}")
+                logger.debug("[CONNECT] Token from header")
 
         if not token:
-            logger.warning(f"No token provided for connection: {sid}")
-            logger.warning(f"Available environ keys: {list(environ.keys())}")
+            logger.warning(f"[CONNECT] No token: {sid}")
             return False
 
-        # Verify token and get user
+        # Verify token
         try:
             payload = verify_token(token)
             email = payload.get("sub")
             if not email:
-                logger.warning(f"Invalid token payload for connection: {sid}")
+                logger.warning(f"[CONNECT] Invalid payload: {sid}")
                 return False
         except Exception as e:
-            logger.warning(f"Token verification failed: {e}")
+            logger.warning(f"[CONNECT] Token verify failed: {e}")
             return False
 
-        # Get user from database
+        # Get user
         db: Session = next(get_db())
         try:
             from services.user_service import UserService
 
             user = UserService.get_user_by_email(db, email)
             if not user or not user.is_active:
-                logger.warning(
-                    f"User not found or inactive for connection: {sid}"
-                )
+                logger.warning(f"[CONNECT] User not found/inactive: {sid}")
                 return False
 
-            # Get user's ward IDs
-            administrative_ids = get_user_adm_ids(user, db)
+            # Get wards
+            ward_ids = get_user_wards(user, db)
 
-            # Store connection metadata
-            connections[sid] = {
+            # Store connection (rag-doll pattern + AgriConnect data)
+            CONNECTIONS[sid] = {
                 "user_id": user.id,
-                "administrative_ids": administrative_ids,
-                "last_action": datetime.utcnow(),
                 "user_type": user.user_type.value,
+                "ward_ids": ward_ids,
+                "connected_at": datetime.utcnow(),
+                "last_activity": datetime.utcnow(),
             }
+
+            # Cache user SID (rag-doll pattern)
+            set_user_cache(user.id, sid)
 
             # Join ward rooms
             if user.user_type == UserType.ADMIN:
-                # Admin joins a special "admin" room to receive all events
                 await sio.enter_room(sid, "ward:admin")
-                logger.info(f"Admin user {user.id} joined ward:admin room")
+                logger.info(
+                    f"[CONNECT] Admin user {user.id} joined ward:admin"
+                )
             else:
-                for administrative_id in administrative_ids:
-                    room_name = f"ward:{administrative_id}"
+                for ward_id in ward_ids:
+                    room_name = f"ward:{ward_id}"
                     await sio.enter_room(sid, room_name)
                     logger.info(
-                        f"User {user.id} joined room {room_name} (sid: {sid})"
+                        f"[CONNECT] User {user.id} joined {room_name}"
                     )
 
             logger.info(
-                f"Client connected successfully: {sid}, "
-                f"user_id: {user.id}, wards: {administrative_ids}"
+                f"[CONNECT] ✅ Success: {sid} "
+                f"(user {user.id}, {user.user_type.value}, wards {ward_ids})"
             )
             return True
 
@@ -195,49 +222,49 @@ async def connect(sid: str, environ: dict, auth: Optional[dict] = None):
             db.close()
 
     except Exception as e:
-        logger.error(f"Error during connection: {e}", exc_info=True)
+        logger.error(f"[CONNECT] ❌ Error: {e}", exc_info=True)
         return False
 
 
 @sio.event
 async def disconnect(sid: str):
-    """Handle client disconnection."""
-    logger.info(f"Client disconnected: {sid}")
+    """
+    Handle disconnection (rag-doll pattern)
+    """
+    logger.info(f"[DISCONNECT] Client: {sid}")
 
-    # Clean up connection metadata
-    if sid in connections:
-        user_info = connections.pop(sid)
-        logger.info(
-            f"Cleaned up connection data for user_id: "
-            f"{user_info.get('user_id')}"
-        )
+    # Clean connection
+    if sid in CONNECTIONS:
+        user_info = CONNECTIONS.pop(sid)
+        user_id = user_info.get("user_id")
+        logger.info(f"[DISCONNECT] Cleaned user {user_id}")
 
-    # Clean up rate limit data
-    if sid in rate_limits:
-        rate_limits.pop(sid)
+        # Remove from cache
+        if user_id:
+            delete_user_cache(user_id)
+
+    # Clean rate limits
+    if sid in RATE_LIMITS:
+        RATE_LIMITS.pop(sid)
 
 
 @sio.event
 async def join_ticket(sid: str, data: dict):
     """
-    Handle client joining a specific ticket room.
-    Emitted when user opens a ticket chat view.
+    Join ticket room (needed for AgriConnect multi-user coordination)
     """
-    if sid not in connections:
-        logger.warning(f"Unknown client attempting to join ticket: {sid}")
+    if sid not in CONNECTIONS:
+        logger.warning(f"[JOIN_TICKET] Unknown client: {sid}")
         return {"success": False, "error": "Not authenticated"}
 
-    # Rate limiting
     if not check_rate_limit(sid, "join"):
-        logger.warning(f"Rate limit exceeded for join_ticket: {sid}")
         return {"success": False, "error": "Rate limit exceeded"}
 
     ticket_id = data.get("ticket_id")
     if not ticket_id:
-        return {"success": False, "error": "ticket_id is required"}
+        return {"success": False, "error": "ticket_id required"}
 
     try:
-        # Verify user has access to this ticket
         db: Session = next(get_db())
         try:
             from models.ticket import Ticket
@@ -246,125 +273,118 @@ async def join_ticket(sid: str, data: dict):
             if not ticket:
                 return {"success": False, "error": "Ticket not found"}
 
-            user_info = connections[sid]
+            user_info = CONNECTIONS[sid]
             user_type = user_info.get("user_type")
 
-            # Check access: admin has access to all, EO only to their wards
+            # Check access
             if user_type != UserType.ADMIN.value:
-                administrative_ids = user_info.get("administrative_ids", [])
-                if ticket.administrative_id not in administrative_ids:
+                ward_ids = user_info.get("ward_ids", [])
+                if ticket.administrative_id not in ward_ids:
                     logger.warning(
-                        f"User {user_info['user_id']} denied access "
-                        f"to ticket {ticket_id}"
+                        f"[JOIN_TICKET] Access denied: "
+                        f"user {user_info['user_id']} to ticket {ticket_id}"
                     )
                     return {"success": False, "error": "Access denied"}
 
-            # Join ticket room
+            # Join room
             room_name = f"ticket:{ticket_id}"
             await sio.enter_room(sid, room_name)
 
-            connections[sid]["last_action"] = datetime.utcnow()
-            logger.info(
-                f"User {user_info['user_id']} joined ticket room "
-                f"{room_name} (sid: {sid})"
-            )
+            CONNECTIONS[sid]["last_activity"] = datetime.utcnow()
 
+            logger.info(
+                f"[JOIN_TICKET] ✅ User {user_info['user_id']} "
+                f"joined {room_name}"
+            )
             return {"success": True, "ticket_id": ticket_id}
 
         finally:
             db.close()
 
     except Exception as e:
-        logger.error(f"Error joining ticket room: {e}", exc_info=True)
+        logger.error(f"[JOIN_TICKET] ❌ Error: {e}", exc_info=True)
         return {"success": False, "error": "Internal error"}
 
 
 @sio.event
 async def leave_ticket(sid: str, data: dict):
-    """
-    Handle client leaving a specific ticket room.
-    Emitted when user closes/leaves a ticket chat view.
-    """
-    if sid not in connections:
-        logger.warning(f"Unknown client attempting to leave ticket: {sid}")
+    """Leave ticket room"""
+    if sid not in CONNECTIONS:
         return {"success": False, "error": "Not authenticated"}
 
-    # Rate limiting
     if not check_rate_limit(sid, "leave"):
-        logger.warning(f"Rate limit exceeded for leave_ticket: {sid}")
         return {"success": False, "error": "Rate limit exceeded"}
 
     ticket_id = data.get("ticket_id")
     if not ticket_id:
-        return {"success": False, "error": "ticket_id is required"}
+        return {"success": False, "error": "ticket_id required"}
 
     try:
         room_name = f"ticket:{ticket_id}"
         await sio.leave_room(sid, room_name)
 
-        user_info = connections[sid]
-        connections[sid]["last_action"] = datetime.utcnow()
+        user_info = CONNECTIONS[sid]
+        CONNECTIONS[sid]["last_activity"] = datetime.utcnow()
 
         logger.info(
-            f"User {user_info['user_id']} left ticket room "
-            f"{room_name} (sid: {sid})"
+            f"[LEAVE_TICKET] User {user_info['user_id']} left {room_name}"
         )
-
         return {"success": True, "ticket_id": ticket_id}
 
     except Exception as e:
-        logger.error(f"Error leaving ticket room: {e}", exc_info=True)
+        logger.error(f"[LEAVE_TICKET] Error: {e}", exc_info=True)
         return {"success": False, "error": "Internal error"}
 
 
 @sio.event
 async def join_playground(sid: str, data: dict):
-    """
-    Handle client joining a playground session room.
-    Emitted when admin opens playground with a session.
-    """
-    if sid not in connections:
-        logger.warning(f"Unknown client attempting to join playground: {sid}")
+    """Join playground session (admin only)"""
+    if sid not in CONNECTIONS:
         return {"success": False, "error": "Not authenticated"}
 
-    # Rate limiting
     if not check_rate_limit(sid, "join"):
-        logger.warning(f"Rate limit exceeded for join_playground: {sid}")
         return {"success": False, "error": "Rate limit exceeded"}
+
+    user_info = CONNECTIONS[sid]
+    if user_info.get("user_type") != UserType.ADMIN.value:
+        return {"success": False, "error": "Admin access required"}
 
     session_id = data.get("session_id")
     if not session_id:
-        return {"success": False, "error": "session_id is required"}
+        return {"success": False, "error": "session_id required"}
 
     try:
-        # Verify user is admin
-        user_info = connections[sid]
-        if user_info.get("user_type") != UserType.ADMIN.value:
-            logger.warning(
-                f"Non-admin user {user_info['user_id']} "
-                f"attempted to join playground"
-            )
-            return {"success": False, "error": "Admin access required"}
-
-        # Join playground session room
         room_name = f"playground:{session_id}"
         await sio.enter_room(sid, room_name)
 
-        connections[sid]["last_action"] = datetime.utcnow()
-        logger.info(
-            f"Admin user {user_info['user_id']} joined playground room "
-            f"{room_name} (sid: {sid})"
-        )
+        CONNECTIONS[sid]["last_activity"] = datetime.utcnow()
 
+        logger.info(
+            f"[JOIN_PLAYGROUND] Admin {user_info['user_id']} "
+            f"joined {room_name}"
+        )
         return {"success": True, "session_id": session_id}
 
     except Exception as e:
-        logger.error(f"Error joining playground room: {e}", exc_info=True)
+        logger.error(f"[JOIN_PLAYGROUND] Error: {e}", exc_info=True)
         return {"success": False, "error": "Internal error"}
 
 
-# Helper functions for emitting events (called from REST endpoints)
+@sio.event
+async def ping(sid: str, data: dict = None):
+    """
+    Connection verification ping (from websocket-issue-analysis.md)
+    """
+    if sid in CONNECTIONS:
+        CONNECTIONS[sid]["last_activity"] = datetime.utcnow()
+        logger.debug(f"[PING] {sid} -> pong")
+        return "pong"
+    else:
+        logger.warning(f"[PING] Unknown client: {sid}")
+        return None
 
+
+# Emit helpers with room verification (websocket-issue-analysis.md)
 
 async def emit_message_created(
     ticket_id: int,
@@ -379,11 +399,7 @@ async def emit_message_created(
     customer_name: str = None,
     sender_user_id: Optional[int] = None,
 ):
-    """
-    Emit message_created event to ticket room and ward room.
-    Called when a new message is created via REST API.
-    Also sends push notifications to users in the ward (excluding sender).
-    """
+    """Emit message_created with room verification"""
     event_data = {
         "ticket_id": ticket_id,
         "message_id": message_id,
@@ -394,80 +410,82 @@ async def emit_message_created(
         "ts": ts,
     }
 
-    # Emit to ticket room (for users viewing the chat)
-    await sio.emit("message_created", event_data, room=f"ticket:{ticket_id}")
+    # Emit to ticket room WITH VERIFICATION
+    room_name = f"ticket:{ticket_id}"
+    try:
+        participants = list(sio.manager.get_participants("/", room_name))
 
-    # Emit to ward room (for inbox updates)
+        if participants:
+            logger.info(
+                f"[EMIT] message_created to {len(participants)} "
+                f"clients in {room_name}: {participants}"
+            )
+            await sio.emit("message_created", event_data, room=room_name)
+        else:
+            logger.warning(
+                f"[EMIT_SKIP] No participants in {room_name} "
+                f"for message {message_id}"
+            )
+    except Exception as e:
+        logger.error(f"[EMIT_ERROR] {room_name}: {e}")
+
+    # Emit to ward room
     if administrative_id:
-        await sio.emit(
-            "message_created", event_data, room=f"ward:{administrative_id}"
-        )
+        try:
+            ward_room = f"ward:{administrative_id}"
+            ward_participants = list(
+                sio.manager.get_participants("/", ward_room)
+            )
+            logger.info(
+                f"[EMIT] message_created to {ward_room} "
+                f"({len(ward_participants)} participants)"
+            )
+            await sio.emit("message_created", event_data, room=ward_room)
+        except Exception as e:
+            logger.error(f"[EMIT_ERROR] ward room: {e}")
 
     # Emit to admin room
-    await sio.emit("message_created", event_data, room="ward:admin")
+    try:
+        await sio.emit("message_created", event_data, room="ward:admin")
+    except Exception as e:
+        logger.error(f"[EMIT_ERROR] admin room: {e}")
 
     logger.info(
-        f"Emitted message_created event for message {message_id} "
-        f"in ticket {ticket_id}"
+        f"[EMIT] Completed message_created for message {message_id}"
     )
 
-    # Send push notifications if we have the required data
-    # Only send for messages in open tickets
+    # Push notifications (only if no active viewers)
     if all([administrative_id, ticket_number, customer_name]):
         try:
-            # Get database session
-            db = next(get_db())
-            push_service = PushNotificationService(db)
+            participants = list(sio.manager.get_participants("/", room_name))
 
-            # Check if there are active WebSocket connections viewing
-            # this ticket. If so, skip push to avoid duplicate notifications
-            # Use Socket.IO's manager to check room membership
-            room_name = f"ticket:{ticket_id}"
-            try:
-                active_viewers = list(
-                    sio.manager.get_participants("/", room_name)
-                )
-            except (AttributeError, KeyError):
-                # Fallback if method not available
-                active_viewers = []
-
-            logger.info(
-                f"Active viewers for ticket {ticket_id}: {len(active_viewers)}"
-            )
-
-            if active_viewers:
-                logger.info(
-                    f"Skipping push notifications for message {message_id} - "
-                    f"{len(active_viewers)} users actively viewing ticket"
-                )
+            if not participants:
+                # No one viewing - send push
+                db = next(get_db())
+                try:
+                    push_service = PushNotificationService(db)
+                    push_service.notify_new_message(
+                        ticket_id=ticket_id,
+                        ticket_number=ticket_number,
+                        customer_name=customer_name,
+                        administrative_id=administrative_id,
+                        message_id=message_id,
+                        message_body=body,
+                        sender_user_id=sender_user_id,
+                    )
+                    logger.info(
+                        f"[PUSH] Sent for message {message_id} "
+                        f"(ticket {ticket_number})"
+                    )
+                finally:
+                    db.close()
             else:
-                # Send push notifications (excluding the sender)
-                push_service.notify_new_message(
-                    ticket_id=ticket_id,
-                    ticket_number=ticket_number,
-                    customer_name=customer_name,
-                    administrative_id=administrative_id,
-                    message_id=message_id,
-                    message_body=body,
-                    sender_user_id=sender_user_id,
-                )
-
                 logger.info(
-                    f"Sent push notifications for new message "
-                    f"in ticket {ticket_number}"
+                    f"[PUSH] Skipped for message {message_id} - "
+                    f"{len(participants)} users viewing"
                 )
         except Exception as e:
-            # Don't fail the WebSocket event if push notification fails
-            logger.error(
-                f"Failed to send push notifications: {e}", exc_info=True
-            )
-        finally:
-            db.close()
-    else:
-        logger.warning(
-            f"Skipping push notifications for message {message_id} - "
-            "missing required data"
-        )
+            logger.error(f"[PUSH_ERROR]: {e}", exc_info=True)
 
 
 async def emit_message_status_updated(
@@ -478,10 +496,7 @@ async def emit_message_status_updated(
     updated_by: Optional[int] = None,
     administrative_id: Optional[int] = None,
 ):
-    """
-    Emit message_status_updated event to ticket room and ward room.
-    Called when a message status is changed via REST API.
-    """
+    """Emit message status update"""
     event_data = {
         "ticket_id": ticket_id,
         "message_id": message_id,
@@ -490,12 +505,10 @@ async def emit_message_status_updated(
         "updated_by": updated_by,
     }
 
-    # Emit to ticket room (for users viewing the chat)
     await sio.emit(
         "message_status_updated", event_data, room=f"ticket:{ticket_id}"
     )
 
-    # Emit to ward room (for inbox updates)
     if administrative_id:
         await sio.emit(
             "message_status_updated",
@@ -503,11 +516,10 @@ async def emit_message_status_updated(
             room=f"ward:{administrative_id}",
         )
 
-    # Emit to admin room
     await sio.emit("message_status_updated", event_data, room="ward:admin")
 
     logger.info(
-        f"Emitted message_status_updated event for message {message_id} "
+        f"[EMIT] message_status_updated for message {message_id} "
         f"in ticket {ticket_id}"
     )
 
@@ -515,28 +527,22 @@ async def emit_message_status_updated(
 async def emit_ticket_resolved(
     ticket_id: int, resolved_at: str, administrative_id: Optional[int] = None
 ):
-    """
-    Emit ticket_resolved event to ticket room and ward room.
-    Called when a ticket is marked as resolved via REST API.
-    """
+    """Emit ticket resolved event"""
     event_data = {
         "ticket_id": ticket_id,
         "resolved_at": resolved_at,
     }
 
-    # Emit to ticket room (for users viewing the chat)
     await sio.emit("ticket_resolved", event_data, room=f"ticket:{ticket_id}")
 
-    # Emit to ward room (for inbox updates)
     if administrative_id:
         await sio.emit(
             "ticket_resolved", event_data, room=f"ward:{administrative_id}"
         )
 
-    # Emit to admin room
     await sio.emit("ticket_resolved", event_data, room="ward:admin")
 
-    logger.info(f"Emitted ticket_resolved event for ticket {ticket_id}")
+    logger.info(f"[EMIT] ticket_resolved for ticket {ticket_id}")
 
 
 async def emit_ticket_created(
@@ -549,11 +555,7 @@ async def emit_ticket_created(
     message_id: int = None,
     message_preview: str = None,
 ):
-    """
-    Emit ticket_created event to ward room.
-    Called when a new ticket is created via REST API.
-    Also sends push notifications to users in the ward.
-    """
+    """Emit ticket created with push notifications"""
     event_data = {
         "ticket_id": ticket_id,
         "customer_id": customer_id,
@@ -561,48 +563,34 @@ async def emit_ticket_created(
         "created_at": created_at,
     }
 
-    # Emit to ward room (for inbox updates)
     await sio.emit(
         "ticket_created", event_data, room=f"ward:{administrative_id}"
     )
-
-    # Emit to admin room
     await sio.emit("ticket_created", event_data, room="ward:admin")
 
-    logger.info(f"Emitted ticket_created event for ticket {ticket_id}")
+    logger.info(f"[EMIT] ticket_created for ticket {ticket_id}")
 
-    # Send push notifications if we have the required data
+    # Push notifications
     if all([ticket_number, customer_name, message_id, message_preview]):
         try:
-            # Get database session
             db = next(get_db())
-            push_service = PushNotificationService(db)
-
-            # Send push notifications
-            push_service.notify_new_ticket(
-                ticket_id=ticket_id,
-                ticket_number=ticket_number,
-                customer_name=customer_name,
-                administrative_id=administrative_id,
-                message_id=message_id,
-                message_preview=message_preview,
-            )
-
-            logger.info(
-                f"Sent push notifications for new ticket {ticket_number}"
-            )
+            try:
+                push_service = PushNotificationService(db)
+                push_service.notify_new_ticket(
+                    ticket_id=ticket_id,
+                    ticket_number=ticket_number,
+                    customer_name=customer_name,
+                    administrative_id=administrative_id,
+                    message_id=message_id,
+                    message_preview=message_preview,
+                )
+                logger.info(
+                    f"[PUSH] Sent for new ticket {ticket_number}"
+                )
+            finally:
+                db.close()
         except Exception as e:
-            # Don't fail the WebSocket event if push notification fails
-            logger.error(
-                f"Failed to send push notifications: {e}", exc_info=True
-            )
-        finally:
-            db.close()
-    else:
-        logger.warning(
-            f"Skipping push notifications for ticket {ticket_id} - "
-            "missing required data"
-        )
+            logger.error(f"[PUSH_ERROR]: {e}", exc_info=True)
 
 
 async def emit_whisper_created(
@@ -610,38 +598,25 @@ async def emit_whisper_created(
     message_id: int,
     suggestion: str,
 ):
-    """
-    Emit whisper_created event to ticket room.
-    Called when a new whisper message is created via REST API.
-    """
+    """Emit whisper (AI suggestion) event"""
     event_data = {
         "ticket_id": ticket_id,
         "message_id": message_id,
         "suggestion": suggestion,
     }
 
-    # Emit to ticket room (for users viewing the chat)
-    try:
-        await sio.emit(
-            "whisper_created", event_data, room=f"ticket:{ticket_id}"
-        )
-        logger.info(
-            f"Emitted whisper_created event for message {message_id} "
-            f"in ticket {ticket_id}"
-        )
-    except Exception as e:
-        logger.error(
-            f"Error emitting whisper_created event: {e}", exc_info=True
-        )
+    await sio.emit("whisper_created", event_data, room=f"ticket:{ticket_id}")
+
+    logger.info(
+        f"[EMIT] whisper_created for message {message_id} "
+        f"in ticket {ticket_id}"
+    )
 
 
 async def emit_playground_response(
     session_id: str, message_id: int, content: str, response_time_ms: int
 ):
-    """
-    Emit playground_response event to playground session room.
-    Called when AI callback completes for playground message.
-    """
+    """Emit playground response"""
     event_data = {
         "session_id": session_id,
         "message_id": message_id,
@@ -651,17 +626,16 @@ async def emit_playground_response(
         "status": "completed",
     }
 
-    # Emit to playground session room
     room_name = f"playground:{session_id}"
     await sio.emit("playground_response", event_data, room=room_name)
 
     logger.info(
-        f"Emitted playground_response event for session {session_id}, "
+        f"[EMIT] playground_response for session {session_id}, "
         f"message {message_id} (response_time: {response_time_ms}ms)"
     )
 
 
-# Export for use in other routers
+# Export
 __all__ = [
     "sio",
     "sio_app",

@@ -20,13 +20,16 @@ from routers.ws import (
     disconnect,
     join_ticket,
     leave_ticket,
-    get_user_adm_ids,
+    get_user_wards,
     check_rate_limit,
     emit_message_created,
-    # emit_message_status_updated,
     emit_ticket_resolved,
-    connections,
-    rate_limits,
+    CONNECTIONS,
+    RATE_LIMITS,
+    USER_CACHE,
+    set_user_cache,
+    get_user_cache,
+    delete_user_cache,
 )
 from models.user import User, UserType
 from models.administrative import UserAdministrative
@@ -41,8 +44,9 @@ class TestWebSocketConnection:
     async def test_connect_with_valid_token(self, db_session, sample_user):
         """Test successful connection with valid Bearer token"""
         # Clear any leftover connections
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
         # Mock Socket.IO server
         mock_sio = MagicMock()
@@ -61,15 +65,18 @@ class TestWebSocketConnection:
                     result = await connect("test_sid", environ)
 
                     assert result is True
-                    assert "test_sid" in connections
-                    assert connections["test_sid"]["user_id"] == sample_user.id
+                    assert "test_sid" in CONNECTIONS
+                    assert CONNECTIONS["test_sid"]["user_id"] == sample_user.id
+                    assert sample_user.id in USER_CACHE
+                    assert USER_CACHE[sample_user.id] == "test_sid"
 
     @pytest.mark.asyncio
     async def test_connect_without_token(self, db_session):
         """Test connection fails without token"""
         # Clear any leftover connections
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
         mock_sio = MagicMock()
 
@@ -78,14 +85,15 @@ class TestWebSocketConnection:
             result = await connect("test_sid", environ)
 
             assert result is False
-            assert "test_sid" not in connections
+            assert "test_sid" not in CONNECTIONS
 
     @pytest.mark.asyncio
     async def test_connect_with_invalid_token(self, db_session):
         """Test connection fails with invalid token"""
         # Clear any leftover connections
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
         mock_sio = MagicMock()
 
@@ -97,27 +105,31 @@ class TestWebSocketConnection:
                 result = await connect("test_sid", environ)
 
                 assert result is False
-                assert "test_sid" not in connections
+                assert "test_sid" not in CONNECTIONS
 
     @pytest.mark.asyncio
     async def test_disconnect_cleanup(self):
         """Test disconnect cleans up connection data"""
         # Add test connection
-        connections["test_sid"] = {
+        CONNECTIONS["test_sid"] = {
             "user_id": 1,
-            "administrative_ids": [1, 2],
-            "last_action": datetime.utcnow(),
+            "ward_ids": [1, 2],
+            "user_type": "extension_officer",
+            "connected_at": datetime.utcnow(),
+            "last_activity": datetime.utcnow(),
         }
-        rate_limits["test_sid"] = {
+        RATE_LIMITS["test_sid"] = {
             "join_count": 5,
             "leave_count": 3,
             "window_start": datetime.utcnow(),
         }
+        USER_CACHE[1] = "test_sid"
 
         await disconnect("test_sid")
 
-        assert "test_sid" not in connections
-        assert "test_sid" not in rate_limits
+        assert "test_sid" not in CONNECTIONS
+        assert "test_sid" not in RATE_LIMITS
+        assert 1 not in USER_CACHE
 
 
 class TestWardRoomSubscription:
@@ -129,8 +141,9 @@ class TestWardRoomSubscription:
     ):
         """Test EO joins their assigned ward rooms"""
         # Clear any leftover connections
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
         # Create ward assignment
         ward_assignment = UserAdministrative(
@@ -169,8 +182,9 @@ class TestWardRoomSubscription:
     async def test_admin_joins_admin_room(self, db_session, sample_admin_user):
         """Test admin joins the special admin room"""
         # Clear any leftover connections
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
         mock_sio = MagicMock()
         entered_rooms = []
@@ -203,8 +217,9 @@ class TestTicketRoomManagement:
     ):
         """Test successful ticket room join"""
         # Clear any leftover connections
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
         # Setup: assign EO to ward
         ward_assignment = UserAdministrative(
@@ -218,11 +233,12 @@ class TestTicketRoomManagement:
         db_session.commit()
 
         # Setup connection state
-        connections["test_sid"] = {
+        CONNECTIONS["test_sid"] = {
             "user_id": sample_eo_user.id,
-            "administrative_ids": [sample_administrative.id],
+            "ward_ids": [sample_administrative.id],
             "user_type": UserType.EXTENSION_OFFICER.value,
-            "last_action": datetime.utcnow(),
+            "connected_at": datetime.utcnow(),
+            "last_activity": datetime.utcnow(),
         }
 
         # Mock Socket.IO
@@ -251,15 +267,17 @@ class TestTicketRoomManagement:
     ):
         """Test ticket room join fails when EO not assigned to ward"""
         # Clear any leftover connections
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
         # Setup connection state with different ward
-        connections["test_sid"] = {
+        CONNECTIONS["test_sid"] = {
             "user_id": sample_eo_user.id,
-            "administrative_ids": [999],  # Different ward
+            "ward_ids": [999],  # Different ward
             "user_type": UserType.EXTENSION_OFFICER.value,
-            "last_action": datetime.utcnow(),
+            "connected_at": datetime.utcnow(),
+            "last_activity": datetime.utcnow(),
         }
 
         with patch("routers.ws.get_db") as mock_get_db:
@@ -276,14 +294,16 @@ class TestTicketRoomManagement:
     async def test_leave_ticket_success(self):
         """Test successful ticket room leave"""
         # Clear any leftover connections
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
-        connections["test_sid"] = {
+        CONNECTIONS["test_sid"] = {
             "user_id": 1,
-            "administrative_ids": [1],
+            "ward_ids": [1],
             "user_type": UserType.EXTENSION_OFFICER.value,
-            "last_action": datetime.utcnow(),
+            "connected_at": datetime.utcnow(),
+            "last_activity": datetime.utcnow(),
         }
 
         mock_sio = MagicMock()
@@ -303,13 +323,14 @@ class TestTicketRoomManagement:
     def test_rate_limiting(self):
         """Test rate limiting on join/leave actions"""
         # Clear any leftover rate limits
-        connections.clear()
-        rate_limits.clear()
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
 
         sid = "test_rate_limit_sid"
 
-        # Should allow initial joins
-        for i in range(30):
+        # Should allow initial joins (limit is now 50)
+        for i in range(50):
             assert check_rate_limit(sid, "join") is True
 
         # Should block after limit
@@ -333,6 +354,11 @@ class TestEventEmissions:
 
         mock_sio.emit = mock_emit
 
+        # Mock manager.get_participants to return empty list (no viewers)
+        mock_manager = MagicMock()
+        mock_manager.get_participants.return_value = []
+        mock_sio.manager = mock_manager
+
         with patch("routers.ws.sio", mock_sio):
             await emit_message_created(
                 ticket_id=1,
@@ -345,9 +371,9 @@ class TestEventEmissions:
                 administrative_id=10,
             )
 
-            # Should emit to ticket room, ward room, and admin room
-            assert len(emitted_events) == 3
-            assert any(e["room"] == "ticket:1" for e in emitted_events)
+            # Should emit to ward room and
+            # admin room (skips ticket room - no participants)
+            assert len(emitted_events) >= 2
             assert any(e["room"] == "ward:10" for e in emitted_events)
             assert any(e["room"] == "ward:admin" for e in emitted_events)
 
@@ -377,7 +403,7 @@ class TestEventEmissions:
 class TestHelperFunctions:
     """Test helper functions"""
 
-    def test_get_user_adm_ids_for_eo(
+    def test_get_user_wards_for_eo(
         self, db_session, sample_eo_user, sample_administrative
     ):
         """Test getting ward IDs for EO user"""
@@ -388,15 +414,39 @@ class TestHelperFunctions:
         db_session.add(ward_assignment)
         db_session.commit()
 
-        administrative_ids = get_user_adm_ids(sample_eo_user, db_session)
+        ward_ids = get_user_wards(sample_eo_user, db_session)
 
-        assert sample_administrative.id in administrative_ids
+        assert sample_administrative.id in ward_ids
 
-    def test_get_user_adm_ids_for_admin(self, sample_admin_user, db_session):
+    def test_get_user_wards_for_admin(self, sample_admin_user, db_session):
         """Test admin returns empty list (marker for all access)"""
-        administrative_ids = get_user_adm_ids(sample_admin_user, db_session)
+        ward_ids = get_user_wards(sample_admin_user, db_session)
 
-        assert administrative_ids == []
+        assert ward_ids == []
+
+    def test_user_cache_operations(self):
+        """Test user cache set/get/delete operations"""
+        USER_CACHE.clear()
+
+        # Test set
+        set_user_cache(123, "sid_abc")
+        assert 123 in USER_CACHE
+        assert USER_CACHE[123] == "sid_abc"
+
+        # Test get
+        sid = get_user_cache(123)
+        assert sid == "sid_abc"
+
+        # Test get non-existent
+        sid = get_user_cache(999)
+        assert sid is None
+
+        # Test delete
+        delete_user_cache(123)
+        assert 123 not in USER_CACHE
+
+        # Test delete non-existent (should not raise error)
+        delete_user_cache(999)
 
 
 # Fixtures for tests
