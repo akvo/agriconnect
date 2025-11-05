@@ -28,12 +28,14 @@ interface User {
   invitationStatus?: string;
   administrativeLocation?: AdministrativeLocation | null;
   accessToken?: string;
+  deviceRegisterAt?: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   login: (accessToken: string, userData: User) => Promise<void>;
   logout: () => Promise<void>;
+  setRegisterDeviceAt: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -95,6 +97,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         invitationStatus: profileDB.invitationStatus,
         administrativeLocation: adm,
         accessToken: profileDB.accessToken,
+        deviceRegisterAt: profileDB.deviceRegisterAt,
       });
     }
 
@@ -144,7 +147,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         router.replace("/login");
       }
     }
-  }, [user, segments, router, routeToken, isValid]);
+  }, [user, segments, router, routeToken, isValid, dao, db]);
 
   useEffect(() => {
     checkAuth();
@@ -252,8 +255,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  const setRegisterDeviceAt = useCallback(async () => {
+    dao.profile.update(db, user!.id, {
+      deviceRegisterAt: new Date().toISOString(),
+    });
+  }, [dao, db, user]);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, setRegisterDeviceAt }}>
       {children}
     </AuthContext.Provider>
   );

@@ -64,14 +64,18 @@ interface WebSocketContextType {
   joinTicket: (ticketId: number) => Promise<void>;
   leaveTicket: (ticketId: number) => Promise<void>;
   onMessageCreated: (
-    callback: (data: MessageCreatedEvent) => void
+    callback: (data: MessageCreatedEvent) => void,
   ) => () => void;
   onMessageStatusUpdated: (
-    callback: (data: MessageStatusUpdatedEvent) => void
+    callback: (data: MessageStatusUpdatedEvent) => void,
   ) => () => void;
-  onTicketResolved: (callback: (data: TicketResolvedEvent) => void) => () => void;
+  onTicketResolved: (
+    callback: (data: TicketResolvedEvent) => void,
+  ) => () => void;
   onTicketCreated: (callback: (data: TicketCreatedEvent) => void) => () => void;
-  onWhisperCreated: (callback: (data: WhisperCreatedEvent) => void) => () => void;
+  onWhisperCreated: (
+    callback: (data: WhisperCreatedEvent) => void,
+  ) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -96,6 +100,20 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
   const [isConnected, setIsConnected] = useState(false);
   const joinedTicketsRef = useRef<Set<number>>(new Set());
+  const previousUserIdRef = useRef<number | null>(null);
+  const isInitialConnectionRef = useRef<boolean>(true);
+
+  // Clear joined tickets when user changes (logout/login with different user)
+  useEffect(() => {
+    if (user?.id !== previousUserIdRef.current) {
+      console.log(
+        `[WebSocketContext] User changed from ${previousUserIdRef.current} to ${user?.id}, clearing joined tickets`,
+      );
+      joinedTicketsRef.current.clear();
+      previousUserIdRef.current = user?.id || null;
+      isInitialConnectionRef.current = true; // Reset flag for new user
+    }
+  }, [user?.id]);
 
   // Manage connection based on auth and network status
   useEffect(() => {
@@ -121,16 +139,61 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       console.log("[WebSocketContext] Connected");
       setIsConnected(true);
 
-      // Rejoin ticket rooms after reconnection
-      if (joinedTicketsRef.current.size > 0) {
+      // Rejoin ticket rooms after RECONNECTION (not initial connection)
+      // This handles network interruptions while user has active chat screens
+      if (
+        !isInitialConnectionRef.current &&
+        joinedTicketsRef.current.size > 0
+      ) {
         console.log(
-          `[WebSocketContext] Rejoining ${joinedTicketsRef.current.size} ticket rooms`
+          `[WebSocketContext] Reconnection detected. Waiting 1s before rejoining ${joinedTicketsRef.current.size} ticket rooms`,
         );
-        joinedTicketsRef.current.forEach((ticketId) => {
-          WebSocketService.joinTicket(ticketId).catch((error) => {
-            console.error(`[WebSocketContext] Failed to rejoin ticket ${ticketId}:`, error);
+
+        setTimeout(() => {
+          const rooms = Array.from(joinedTicketsRef.current);
+
+          // Rejoin rooms SEQUENTIALLY with delay to avoid rate limit
+          rooms.forEach((ticketId, index) => {
+            setTimeout(async () => {
+              try {
+                await WebSocketService.joinTicket(ticketId);
+                console.log(
+                  `[WebSocketContext] ✅ Successfully rejoined ticket ${ticketId}`,
+                );
+              } catch (error) {
+                console.error(
+                  `[WebSocketContext] ❌ Failed to rejoin ticket ${ticketId}:`,
+                  error,
+                );
+
+                // Retry ONCE after 2 seconds
+                setTimeout(async () => {
+                  try {
+                    await WebSocketService.joinTicket(ticketId);
+                    console.log(
+                      `[WebSocketContext] ✅ Retry successful for ticket ${ticketId}`,
+                    );
+                  } catch (retryError) {
+                    console.error(
+                      `[WebSocketContext] ❌ Retry failed for ticket ${ticketId}:`,
+                      retryError,
+                    );
+                    // Could emit event here to notify user of connection issues
+                  }
+                }, 2000);
+              }
+            }, index * 200); // 200ms between each rejoin
           });
-        });
+        }, 1000); // 1 second delay after connect
+      } else if (isInitialConnectionRef.current) {
+        console.log(
+          `[WebSocketContext] Initial connection - tickets will be joined when user navigates to chat screens`,
+        );
+        isInitialConnectionRef.current = false; // Mark that initial connection is complete
+      } else {
+        console.log(
+          `[WebSocketContext] Reconnection but no active tickets to rejoin`,
+        );
       }
     };
 
@@ -164,7 +227,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       joinedTicketsRef.current.add(ticketId);
       console.log(`[WebSocketContext] Joined ticket ${ticketId}`);
     } catch (error) {
-      console.error(`[WebSocketContext] Failed to join ticket ${ticketId}:`, error);
+      console.error(
+        `[WebSocketContext] Failed to join ticket ${ticketId}:`,
+        error,
+      );
       throw error;
     }
   }, []);
@@ -176,7 +242,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       joinedTicketsRef.current.delete(ticketId);
       console.log(`[WebSocketContext] Left ticket ${ticketId}`);
     } catch (error) {
-      console.error(`[WebSocketContext] Failed to leave ticket ${ticketId}:`, error);
+      console.error(
+        `[WebSocketContext] Failed to leave ticket ${ticketId}:`,
+        error,
+      );
       // Don't throw - not critical if leave fails
     }
   }, []);
@@ -189,7 +258,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         WebSocketService.off("message_created", callback);
       };
     },
-    []
+    [],
   );
 
   const onMessageStatusUpdated = useCallback(
@@ -199,7 +268,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         WebSocketService.off("message_status_updated", callback);
       };
     },
-    []
+    [],
   );
 
   const onTicketResolved = useCallback(
@@ -209,7 +278,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         WebSocketService.off("ticket_resolved", callback);
       };
     },
-    []
+    [],
   );
 
   const onTicketCreated = useCallback(
@@ -219,7 +288,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         WebSocketService.off("ticket_created", callback);
       };
     },
-    []
+    [],
   );
 
   const onWhisperCreated = useCallback(
@@ -229,7 +298,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         WebSocketService.off("whisper_created", callback);
       };
     },
-    []
+    [],
   );
 
   return (
