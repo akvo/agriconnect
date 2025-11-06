@@ -36,7 +36,6 @@ const ChatScreen = () => {
   const params = useLocalSearchParams();
   const ticketNumber = params.ticketNumber as string | undefined;
   const ticketId = params.ticketId as string | undefined;
-  const messageId = params.messageId as string | undefined;
   const refresh = params.refresh as string | undefined;
   const [text, setText] = useState<string>("");
   const [stickyMessage, setStickyMessage] = useState<Message | null>(null);
@@ -89,7 +88,7 @@ const ChatScreen = () => {
     ticketNumber,
     ticketId,
     user?.id,
-    user?.accessToken,
+    user?.accessToken ?? undefined,
     scrollToBottom,
     setAISuggestionLoading,
     setAISuggestion,
@@ -101,7 +100,7 @@ const ChatScreen = () => {
     ticket.id,
     ticket.customer?.id,
     user?.id,
-    user?.accessToken,
+    user?.accessToken ?? undefined,
     oldestTimestamp,
     setMessages,
     setOldestTimestamp,
@@ -123,30 +122,56 @@ const ChatScreen = () => {
     setAISuggestionUsed,
   });
 
+  const [totalMessages, setTotalMessages] = useState<number>(0);
+
   // Load initial ticket data (only once on mount)
   useEffect(() => {
     if (!hasLoadedInitially.current) {
       hasLoadedInitially.current = true;
-      loadTicketAndMessages();
+      loadTicketAndMessages(refresh === "true");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadTicketAndMessages, refresh]);
 
   // Handle refresh parameter
   useEffect(() => {
-    if (refresh === "true" && !loading && ticket?.customer?.id) {
+    if (
+      aiSuggestionLoading &&
+      !ticket?.resolvedAt &&
+      !loading &&
+      totalMessages === messages.length
+    ) {
+      /**
+       * When AI suggestion is loading and the ticket still open,
+       * we trigger a refresh to ensure
+       * that any new messages not yet in the local DB are fetched.
+       */
+      console.log("[ChatScreen] Refresh triggered by AI suggestion loading");
+      setTotalMessages(totalMessages + 1);
       loadTicketAndMessages(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refresh]);
+
+    if (totalMessages !== messages.length && !loading) {
+      setTotalMessages(messages.length);
+    }
+
+    if (aiSuggestionLoading && ticket?.resolvedAt) {
+      setAISuggestionLoading(false);
+    }
+  }, [
+    aiSuggestionLoading,
+    messages.length,
+    totalMessages,
+    loading,
+    ticket?.customer?.id,
+    ticket?.resolvedAt,
+    setAISuggestionLoading,
+    loadTicketAndMessages,
+  ]);
 
   // Handle sticky message from messageId parameter
   useEffect(() => {
-    if (messageId && !loading && ticket?.customer?.id) {
-      const dbMessage = daoManager.message.findById(
-        db,
-        parseInt(messageId, 10),
-      );
+    if (ticket?.messageId && !loading && ticket?.customer?.id) {
+      const dbMessage = daoManager.message.findById(db, ticket.messageId);
       if (dbMessage?.body) {
         setStickyMessage({
           id: dbMessage.id,
@@ -158,7 +183,13 @@ const ChatScreen = () => {
         });
       }
     }
-  }, [messageId, loading, ticket?.customer?.id, db, daoManager.message]);
+  }, [
+    db,
+    daoManager.message,
+    loading,
+    ticket?.customer?.id,
+    ticket?.messageId,
+  ]);
 
   if (loading) {
     return (
@@ -225,10 +256,6 @@ const ChatScreen = () => {
             text={text}
             setText={setText}
             ticket={ticket}
-            userId={user?.id}
-            accessToken={user?.accessToken}
-            db={db}
-            daoManager={daoManager}
             aiSuggestionUsed={aiSuggestionUsed}
             scrollToBottom={scrollToBottom}
             setMessages={setMessages}

@@ -225,7 +225,6 @@ class ApiClient {
       tickets: res.tickets.map((ticket: any) => ({
         ...ticket,
         ticketNumber: ticket.ticket_number,
-        unreadCount: ticket.resolved_at ? 0 : 1,
       })),
     };
   }
