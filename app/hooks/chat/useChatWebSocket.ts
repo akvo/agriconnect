@@ -189,6 +189,27 @@ export const useChatWebSocket = ({
         return;
       }
       console.log("[Chat] AI suggestion created:", event);
+
+      // Save WHISPER message to SQLite
+      try {
+        daoManager.message.upsert(db, {
+          id: event.message_id,
+          from_source: event.from_source,
+          message_sid: event.message_sid,
+          customer_id: event.customer_id,
+          user_id: null,
+          body: event.suggestion,
+          message_type: event.message_type,
+          is_used: 0, // Initially not used
+          createdAt: event.ts,
+        });
+        console.log(
+          `[Chat] WHISPER message ${event.message_id} saved to SQLite`,
+        );
+      } catch (error) {
+        console.error("[Chat] Error saving WHISPER message:", error);
+      }
+
       setAISuggestion(event.suggestion);
       setAISuggestionLoading(false);
       setAISuggestionUsed(false);
@@ -198,6 +219,8 @@ export const useChatWebSocket = ({
   }, [
     onWhisperCreated,
     ticket?.id,
+    db,
+    daoManager,
     setAISuggestion,
     setAISuggestionLoading,
     setAISuggestionUsed,

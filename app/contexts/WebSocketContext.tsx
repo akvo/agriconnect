@@ -44,6 +44,11 @@ export interface WhisperCreatedEvent {
   message_id: number;
   ticket_id: number;
   suggestion: string;
+  customer_id: number;
+  message_sid: string;
+  from_source: number;
+  message_type: string;
+  ts: string;
 }
 
 interface WebSocketContextType {
