@@ -21,7 +21,7 @@ from services.whatsapp_service import WhatsAppService
 from services.external_ai_service import get_external_ai_service
 from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
-from routers.ws import emit_message_created, emit_ticket_created
+from services.socketio_service import emit_message_received
 from schemas.callback import TwilioStatusCallback, TwilioMessageStatus
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
@@ -123,19 +123,6 @@ async def whatsapp_webhook(
                 ticket = customer_service.create_ticket_for_customer(
                     customer=customer, message_id=message.id
                 )
-                if ticket:
-                    asyncio.create_task(
-                        emit_ticket_created(
-                            ticket_id=ticket.id,
-                            customer_id=customer.id,
-                            administrative_id=ticket.administrative_id,
-                            created_at=ticket.created_at.isoformat(),
-                            ticket_number=ticket.ticket_number,
-                            customer_name=customer.full_name,
-                            message_id=message.id,
-                            message_preview=message.body,
-                        )
-                    )
 
             if ticket:
                 # Get chat history for AI context
@@ -212,7 +199,7 @@ async def whatsapp_webhook(
                 if customer.full_name:
                     customer_name = customer.full_name
                 asyncio.create_task(
-                    emit_message_created(
+                    emit_message_received(
                         ticket_id=ticket.id,
                         message_id=message.id,
                         message_sid=MessageSid,
@@ -339,7 +326,7 @@ async def whatsapp_webhook(
             if customer.full_name:
                 customer_name = customer.full_name
             asyncio.create_task(
-                emit_message_created(
+                emit_message_received(
                     ticket_id=existing_ticket.id,
                     message_id=message.id,
                     message_sid=MessageSid,

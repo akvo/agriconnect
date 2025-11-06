@@ -11,10 +11,9 @@ from models.user import User, UserType
 from models.administrative import UserAdministrative
 from utils.auth_dependencies import get_current_user
 from services.whatsapp_service import WhatsAppService
-from routers.ws import (
-    emit_message_created,
-    emit_message_status_updated,
-    emit_ticket_resolved,
+from services.socketio_service import (
+    emit_message_received,
+    emit_ticket_resolved
 )
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -139,15 +138,6 @@ async def update_message_status(
 
     # Emit WebSocket events
     if ticket:
-        # Emit message status update
-        await emit_message_status_updated(
-            ticket_id=ticket.id,
-            message_id=message.id,
-            status=message.status,
-            updated_at=datetime.now(timezone.utc).isoformat(),
-            updated_by=current_user.id,
-            administrative_id=ticket.administrative_id,
-        )
 
         # If resolved, also emit ticket resolved event
         if status_update.status == MessageStatus.RESOLVED:
@@ -295,7 +285,7 @@ async def create_message(
     customer_name = ticket.customer.phone_number
     if ticket.customer.full_name:
         customer_name = ticket.customer.full_name
-    await emit_message_created(
+    await emit_message_received(
         ticket_id=ticket.id,
         message_id=new_message.id,
         message_sid=new_message.message_sid,
@@ -308,19 +298,6 @@ async def create_message(
         customer_name=customer_name,
         sender_user_id=sender_id,
     )
-
-    # If escalated message status changed, emit status update
-    if message_data.from_source == MessageFrom.USER and ticket.message:
-        escalated_message = ticket.message
-        if escalated_message.status == MessageStatus.REPLIED:
-            await emit_message_status_updated(
-                ticket_id=ticket.id,
-                message_id=escalated_message.id,
-                status=escalated_message.status,
-                updated_at=datetime.now(timezone.utc).isoformat(),
-                updated_by=current_user.id,
-                administrative_id=ticket.administrative_id,
-            )
 
     return MessageResponse(
         id=new_message.id,

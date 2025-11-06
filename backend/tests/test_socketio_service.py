@@ -1,28 +1,30 @@
 """
-Tests for WebSocket (Socket.IO) functionality.
+Tests for Socket.IO Service functionality.
 
 Tests cover:
 - Connection with authentication
 - Ward room subscriptions
-- Ticket room joining/leaving
-- Event emissions (message_created, message_status_updated, ticket_resolved)
-- Reconnection and room restoration
-- Access control
+- Playground room joining
+- Event emissions (
+    message_received, ticket_resolved, whisper_created, playground_response
+)
+- Helper functions (user cache, wards, rate limiting)
+- Disconnection and cleanup
 """
 
 import pytest
-import asyncio
-from unittest.mock import patch, MagicMock
-from datetime import datetime
+from unittest.mock import patch, MagicMock, AsyncMock
+from datetime import datetime, timezone
 
-from routers.ws import (
+from services.socketio_service import (
     connect,
     disconnect,
-    join_ticket,
-    leave_ticket,
+    join_playground,
     get_user_wards,
     check_rate_limit,
-    emit_message_created,
+    emit_message_received,
+    emit_playground_response,
+    emit_whisper_created,
     emit_ticket_resolved,
     CONNECTIONS,
     RATE_LIMITS,
@@ -33,12 +35,10 @@ from routers.ws import (
 )
 from models.user import User, UserType
 from models.administrative import UserAdministrative
-from models.ticket import Ticket
-from models.message import MessageFrom
 
 
-class TestWebSocketConnection:
-    """Test WebSocket connection and authentication"""
+class TestSocketIOConnection:
+    """Test Socket.IO connection and authentication"""
 
     @pytest.mark.asyncio
     async def test_connect_with_valid_token(self, db_session, sample_user):
@@ -50,16 +50,16 @@ class TestWebSocketConnection:
 
         # Mock Socket.IO server
         mock_sio = MagicMock()
-        mock_sio.enter_room = asyncio.coroutine(lambda sid, room: None)
+        mock_sio.enter_room = AsyncMock()
 
         # Mock token verification
-        with patch("routers.ws.verify_token") as mock_verify:
+        with patch("services.socketio_service.verify_token") as mock_verify:
             mock_verify.return_value = {"sub": sample_user.email}
 
-            with patch("routers.ws.get_db") as mock_get_db:
+            with patch("services.socketio_service.get_db") as mock_get_db:
                 mock_get_db.return_value = iter([db_session])
 
-                with patch("routers.ws.sio", mock_sio):
+                with patch("services.socketio_service.sio_server", mock_sio):
                     # Test connection
                     environ = {"HTTP_AUTHORIZATION": "Bearer valid_token_123"}
                     result = await connect("test_sid", environ)
@@ -80,7 +80,7 @@ class TestWebSocketConnection:
 
         mock_sio = MagicMock()
 
-        with patch("routers.ws.sio", mock_sio):
+        with patch("services.socketio_service.sio_server", mock_sio):
             environ = {}
             result = await connect("test_sid", environ)
 
@@ -97,15 +97,40 @@ class TestWebSocketConnection:
 
         mock_sio = MagicMock()
 
-        with patch("routers.ws.verify_token") as mock_verify:
+        with patch("services.socketio_service.verify_token") as mock_verify:
             mock_verify.side_effect = Exception("Invalid token")
 
-            with patch("routers.ws.sio", mock_sio):
+            with patch("services.socketio_service.sio_server", mock_sio):
                 environ = {"HTTP_AUTHORIZATION": "Bearer invalid_token"}
                 result = await connect("test_sid", environ)
 
                 assert result is False
                 assert "test_sid" not in CONNECTIONS
+
+    @pytest.mark.asyncio
+    async def test_connect_with_auth_dict(self, db_session, sample_user):
+        """Test connection with token in auth dict"""
+        # Clear any leftover connections
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
+
+        mock_sio = MagicMock()
+        mock_sio.enter_room = AsyncMock()
+
+        with patch("services.socketio_service.verify_token") as mock_verify:
+            mock_verify.return_value = {"sub": sample_user.email}
+
+            with patch("services.socketio_service.get_db") as mock_get_db:
+                mock_get_db.return_value = iter([db_session])
+
+                with patch("services.socketio_service.sio_server", mock_sio):
+                    environ = {}
+                    auth = {"token": "valid_token_123"}
+                    result = await connect("test_sid", environ, auth)
+
+                    assert result is True
+                    assert "test_sid" in CONNECTIONS
 
     @pytest.mark.asyncio
     async def test_disconnect_cleanup(self):
@@ -115,13 +140,13 @@ class TestWebSocketConnection:
             "user_id": 1,
             "ward_ids": [1, 2],
             "user_type": "extension_officer",
-            "connected_at": datetime.utcnow(),
-            "last_activity": datetime.utcnow(),
+            "connected_at": datetime.now(timezone.utc),
+            "last_activity": datetime.now(timezone.utc),
         }
         RATE_LIMITS["test_sid"] = {
             "join_count": 5,
             "leave_count": 3,
-            "window_start": datetime.utcnow(),
+            "window_start": datetime.now(timezone.utc),
         }
         USER_CACHE[1] = "test_sid"
 
@@ -165,13 +190,13 @@ class TestWardRoomSubscription:
 
         mock_sio.enter_room = mock_enter_room
 
-        with patch("routers.ws.verify_token") as mock_verify:
+        with patch("services.socketio_service.verify_token") as mock_verify:
             mock_verify.return_value = {"sub": sample_eo_user.email}
 
-            with patch("routers.ws.get_db") as mock_get_db:
+            with patch("services.socketio_service.get_db") as mock_get_db:
                 mock_get_db.return_value = iter([db_session])
 
-                with patch("routers.ws.sio", mock_sio):
+                with patch("services.socketio_service.sio_server", mock_sio):
                     environ = {"HTTP_AUTHORIZATION": "Bearer token"}
                     result = await connect("test_sid", environ)
 
@@ -194,13 +219,13 @@ class TestWardRoomSubscription:
 
         mock_sio.enter_room = mock_enter_room
 
-        with patch("routers.ws.verify_token") as mock_verify:
+        with patch("services.socketio_service.verify_token") as mock_verify:
             mock_verify.return_value = {"sub": sample_admin_user.email}
 
-            with patch("routers.ws.get_db") as mock_get_db:
+            with patch("services.socketio_service.get_db") as mock_get_db:
                 mock_get_db.return_value = iter([db_session])
 
-                with patch("routers.ws.sio", mock_sio):
+                with patch("services.socketio_service.sio_server", mock_sio):
                     environ = {"HTTP_AUTHORIZATION": "Bearer token"}
                     result = await connect("test_sid", environ)
 
@@ -208,37 +233,26 @@ class TestWardRoomSubscription:
                     assert "ward:admin" in entered_rooms
 
 
-class TestTicketRoomManagement:
-    """Test ticket room joining and leaving"""
+class TestPlaygroundRoomManagement:
+    """Test playground room joining"""
 
     @pytest.mark.asyncio
-    async def test_join_ticket_success(
-        self, db_session, sample_ticket, sample_eo_user, sample_administrative
+    async def test_join_playground_success(
+        self, db_session, sample_admin_user
     ):
-        """Test successful ticket room join"""
+        """Test successful playground room join"""
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
         USER_CACHE.clear()
 
-        # Setup: assign EO to ward
-        ward_assignment = UserAdministrative(
-            user_id=sample_eo_user.id,
-            administrative_id=sample_administrative.id,
-        )
-        db_session.add(ward_assignment)
-
-        # Update ticket with this ward
-        sample_ticket.administrative_id = sample_administrative.id
-        db_session.commit()
-
         # Setup connection state
         CONNECTIONS["test_sid"] = {
-            "user_id": sample_eo_user.id,
-            "ward_ids": [sample_administrative.id],
-            "user_type": UserType.EXTENSION_OFFICER.value,
-            "connected_at": datetime.utcnow(),
-            "last_activity": datetime.utcnow(),
+            "user_id": sample_admin_user.id,
+            "ward_ids": [],
+            "user_type": UserType.ADMIN.value,
+            "connected_at": datetime.now(timezone.utc),
+            "last_activity": datetime.now(timezone.utc),
         }
 
         # Mock Socket.IO
@@ -250,78 +264,65 @@ class TestTicketRoomManagement:
 
         mock_sio.enter_room = mock_enter_room
 
-        with patch("routers.ws.get_db") as mock_get_db:
-            mock_get_db.return_value = iter([db_session])
-
-            with patch("routers.ws.sio", mock_sio):
-                result = await join_ticket(
-                    "test_sid", {"ticket_id": sample_ticket.id}
-                )
-
-                assert result["success"] is True
-                assert f"ticket:{sample_ticket.id}" in entered_rooms
-
-    @pytest.mark.asyncio
-    async def test_join_ticket_access_denied(
-        self, db_session, sample_ticket, sample_eo_user
-    ):
-        """Test ticket room join fails when EO not assigned to ward"""
-        # Clear any leftover connections
-        CONNECTIONS.clear()
-        RATE_LIMITS.clear()
-        USER_CACHE.clear()
-
-        # Setup connection state with different ward
-        CONNECTIONS["test_sid"] = {
-            "user_id": sample_eo_user.id,
-            "ward_ids": [999],  # Different ward
-            "user_type": UserType.EXTENSION_OFFICER.value,
-            "connected_at": datetime.utcnow(),
-            "last_activity": datetime.utcnow(),
-        }
-
-        with patch("routers.ws.get_db") as mock_get_db:
-            mock_get_db.return_value = iter([db_session])
-
-            result = await join_ticket(
-                "test_sid", {"ticket_id": sample_ticket.id}
+        with patch("services.socketio_service.sio_server", mock_sio):
+            result = await join_playground(
+                "test_sid", {"session_id": "session_123"}
             )
 
-            assert result["success"] is False
-            assert "Access denied" in result["error"]
+            assert result["success"] is True
+            assert "playground:session_123" in entered_rooms
 
     @pytest.mark.asyncio
-    async def test_leave_ticket_success(self):
-        """Test successful ticket room leave"""
+    async def test_join_playground_access_denied(
+        self, db_session, sample_eo_user
+    ):
+        """Test playground room join fails for non-admin"""
+        # Clear any leftover connections
+        CONNECTIONS.clear()
+        RATE_LIMITS.clear()
+        USER_CACHE.clear()
+
+        # Setup connection state with EO user
+        CONNECTIONS["test_sid"] = {
+            "user_id": sample_eo_user.id,
+            "ward_ids": [1],
+            "user_type": UserType.EXTENSION_OFFICER.value,
+            "connected_at": datetime.now(timezone.utc),
+            "last_activity": datetime.now(timezone.utc),
+        }
+
+        result = await join_playground(
+            "test_sid", {"session_id": "session_123"}
+        )
+
+        assert result["success"] is False
+        assert "Admin access required" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_join_playground_without_session_id(
+        self, db_session, sample_admin_user
+    ):
+        """Test playground join fails without session_id"""
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
         USER_CACHE.clear()
 
         CONNECTIONS["test_sid"] = {
-            "user_id": 1,
-            "ward_ids": [1],
-            "user_type": UserType.EXTENSION_OFFICER.value,
-            "connected_at": datetime.utcnow(),
-            "last_activity": datetime.utcnow(),
+            "user_id": sample_admin_user.id,
+            "ward_ids": [],
+            "user_type": UserType.ADMIN.value,
+            "connected_at": datetime.now(timezone.utc),
+            "last_activity": datetime.now(timezone.utc),
         }
 
-        mock_sio = MagicMock()
-        left_rooms = []
+        result = await join_playground("test_sid", {})
 
-        async def mock_leave_room(sid, room):
-            left_rooms.append(room)
-
-        mock_sio.leave_room = mock_leave_room
-
-        with patch("routers.ws.sio", mock_sio):
-            result = await leave_ticket("test_sid", {"ticket_id": 123})
-
-            assert result["success"] is True
-            assert "ticket:123" in left_rooms
+        assert result["success"] is False
+        assert "session_id required" in result["error"]
 
     def test_rate_limiting(self):
-        """Test rate limiting on join/leave actions"""
+        """Test rate limiting on join actions"""
         # Clear any leftover rate limits
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
@@ -329,7 +330,7 @@ class TestTicketRoomManagement:
 
         sid = "test_rate_limit_sid"
 
-        # Should allow initial joins (limit is now 50)
+        # Should allow initial joins (limit is 50)
         for i in range(50):
             assert check_rate_limit(sid, "join") is True
 
@@ -341,11 +342,11 @@ class TestTicketRoomManagement:
 
 
 class TestEventEmissions:
-    """Test WebSocket event emissions"""
+    """Test Socket.IO event emissions"""
 
     @pytest.mark.asyncio
-    async def test_emit_message_created(self):
-        """Test message_created event emission"""
+    async def test_emit_message_received(self):
+        """Test message_received event emission"""
         mock_sio = MagicMock()
         emitted_events = []
 
@@ -354,28 +355,31 @@ class TestEventEmissions:
 
         mock_sio.emit = mock_emit
 
-        # Mock manager.get_participants to return empty list (no viewers)
-        mock_manager = MagicMock()
-        mock_manager.get_participants.return_value = []
-        mock_sio.manager = mock_manager
+        # Mock get_db for push notifications (returns mock db session)
+        with patch("services.socketio_service.get_db") as mock_get_db:
+            mock_db = MagicMock()
+            mock_db.close = MagicMock()
+            mock_get_db.return_value = iter([mock_db])
 
-        with patch("routers.ws.sio", mock_sio):
-            await emit_message_created(
-                ticket_id=1,
-                message_id=100,
-                message_sid="SM123456",
-                customer_id=50,
-                body="Test message",
-                from_source=MessageFrom.CUSTOMER,
-                ts="2024-01-01T12:00:00",
-                administrative_id=10,
-            )
+            with patch("services.socketio_service.sio_server", mock_sio):
+                await emit_message_received(
+                    ticket_id=1,
+                    message_id=100,
+                    message_sid="SM123456",
+                    customer_id=50,
+                    body="Test message",
+                    from_source=1,
+                    ts="2024-01-01T12:00:00",
+                    administrative_id=10,
+                )
 
-            # Should emit to ward room and
-            # admin room (skips ticket room - no participants)
-            assert len(emitted_events) >= 2
-            assert any(e["room"] == "ward:10" for e in emitted_events)
-            assert any(e["room"] == "ward:admin" for e in emitted_events)
+                # Should emit to ward room and admin room
+                assert len(emitted_events) >= 2
+                assert any(e["room"] == "ward:10" for e in emitted_events)
+                assert any(e["room"] == "ward:admin" for e in emitted_events)
+                assert all(
+                    e["event"] == "message_received" for e in emitted_events
+                )
 
     @pytest.mark.asyncio
     async def test_emit_ticket_resolved(self):
@@ -388,16 +392,67 @@ class TestEventEmissions:
 
         mock_sio.emit = mock_emit
 
-        with patch("routers.ws.sio", mock_sio):
+        with patch("services.socketio_service.sio_server", mock_sio):
             await emit_ticket_resolved(
                 ticket_id=1,
                 resolved_at="2024-01-01T12:00:00",
                 administrative_id=10,
             )
 
-            # Should emit to ticket room, ward room, and admin room
-            assert len(emitted_events) == 3
+            # Should emit to ward room and admin room
+            assert len(emitted_events) == 2
             assert all(e["event"] == "ticket_resolved" for e in emitted_events)
+            assert any(e["room"] == "ward:10" for e in emitted_events)
+            assert any(e["room"] == "ward:admin" for e in emitted_events)
+
+    @pytest.mark.asyncio
+    async def test_emit_whisper_created(self):
+        """Test whisper event emission"""
+        mock_sio = MagicMock()
+        emitted_events = []
+
+        async def mock_emit(event, data, room):
+            emitted_events.append({"event": event, "data": data, "room": room})
+
+        mock_sio.emit = mock_emit
+
+        with patch("services.socketio_service.sio_server", mock_sio):
+            await emit_whisper_created(
+                ticket_id=1,
+                message_id=100,
+                suggestion="This is an AI suggestion",
+                administrative_id=10,
+            )
+
+            # Should emit to ward room and admin room
+            assert len(emitted_events) == 2
+            assert all(e["event"] == "whisper" for e in emitted_events)
+            assert any(e["room"] == "ward:admin" for e in emitted_events)
+            assert any(e["room"] == "ward:10" for e in emitted_events)
+
+    @pytest.mark.asyncio
+    async def test_emit_playground_response(self):
+        """Test playground_response event emission"""
+        mock_sio = MagicMock()
+        emitted_events = []
+
+        async def mock_emit(event, data, room):
+            emitted_events.append({"event": event, "data": data, "room": room})
+
+        mock_sio.emit = mock_emit
+
+        with patch("services.socketio_service.sio_server", mock_sio):
+            await emit_playground_response(
+                session_id="session_123",
+                message_id=1,
+                content="AI response",
+                response_time_ms=150,
+            )
+
+            assert len(emitted_events) == 1
+            assert emitted_events[0]["event"] == "playground_response"
+            assert emitted_events[0]["room"] == "playground:session_123"
+            assert emitted_events[0]["data"]["content"] == "AI response"
 
 
 class TestHelperFunctions:
@@ -515,33 +570,3 @@ def sample_administrative(db_session):
     db_session.add(admin)
     db_session.commit()
     return admin
-
-
-@pytest.fixture
-def sample_ticket(db_session, sample_administrative):
-    """Create a sample ticket"""
-    from models.customer import Customer
-    from models.message import Message, MessageFrom
-
-    customer = Customer(phone_number="+9876543210", full_name="Test Customer")
-    db_session.add(customer)
-    db_session.commit()
-
-    message = Message(
-        message_sid="SM123",
-        customer_id=customer.id,
-        body="Test message",
-        from_source=MessageFrom.CUSTOMER,
-    )
-    db_session.add(message)
-    db_session.commit()
-
-    ticket = Ticket(
-        ticket_number="T001",
-        administrative_id=sample_administrative.id,
-        customer_id=customer.id,
-        message_id=message.id,
-    )
-    db_session.add(ticket)
-    db_session.commit()
-    return ticket

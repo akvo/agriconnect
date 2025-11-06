@@ -235,6 +235,9 @@ def mock_websocket_emitters(monkeypatch):
         def notify_new_ticket(self, *args, **kwargs):
             pass
 
+        def notify_new_message(self, *args, **kwargs):
+            pass
+
         def notify_ticket_resolved(self, *args, **kwargs):
             pass
 
@@ -278,15 +281,22 @@ def mock_websocket_emitters(monkeypatch):
         async def send_password_reset_email(self, *args, **kwargs):
             return True
 
-    monkeypatch.setattr("routers.messages.emit_message_created", mock_emit)
+    # Mock emit functions from services.socketio_service (new location)
     monkeypatch.setattr(
-        "routers.messages.emit_message_status_updated", mock_emit
+        "services.socketio_service.emit_message_received", mock_emit
     )
-    monkeypatch.setattr("routers.messages.emit_ticket_resolved", mock_emit)
-    monkeypatch.setattr("routers.tickets.emit_ticket_created", mock_emit)
-    monkeypatch.setattr("routers.callbacks.emit_whisper_created", mock_emit)
     monkeypatch.setattr(
-        "routers.ws.PushNotificationService", MockPushNotificationService
+        "services.socketio_service.emit_playground_response", mock_emit
+    )
+    monkeypatch.setattr(
+        "services.socketio_service.emit_whisper_created", mock_emit
+    )
+    monkeypatch.setattr(
+        "services.socketio_service.emit_ticket_resolved", mock_emit
+    )
+    monkeypatch.setattr(
+        "services.socketio_service.PushNotificationService",
+        MockPushNotificationService
     )
 
     # CRITICAL: Patch WhatsAppService in ALL routers to prevent real API calls
