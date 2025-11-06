@@ -1,5 +1,6 @@
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 
 from database import Base
 
@@ -33,6 +34,9 @@ class ServiceToken(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    # Relationships
+    knowledge_bases = relationship("KnowledgeBase", back_populates="service")
 
     def __repr__(self):
         return (
