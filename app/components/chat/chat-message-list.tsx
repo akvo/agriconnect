@@ -97,9 +97,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
       ref={flatListRef}
       data={flattenedData}
       keyExtractor={(item: any, index: number) =>
-        item.type === "header"
-          ? `header-${index}`
-          : `message-${item.data.id}`
+        item.type === "header" ? `header-${index}` : `message-${item.data.id}`
       }
       renderItem={renderItem}
       contentContainerStyle={{

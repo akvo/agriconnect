@@ -10,22 +10,17 @@ interface UseAISuggestionReturn {
   handleAcceptSuggestion: (suggestion: string) => void;
 }
 
-export const useAISuggestion = (
-  setText: React.Dispatch<React.SetStateAction<string>>,
-): UseAISuggestionReturn => {
+export const useAISuggestion = (): UseAISuggestionReturn => {
   const [aiSuggestion, setAISuggestion] = useState<string | null>(null);
-  const [aiSuggestionLoading, setAISuggestionLoading] = useState<boolean>(false);
+  const [aiSuggestionLoading, setAISuggestionLoading] =
+    useState<boolean>(false);
   const [aiSuggestionUsed, setAISuggestionUsed] = useState<boolean>(false);
 
-  const handleAcceptSuggestion = useCallback(
-    (suggestion: string) => {
-      setText(suggestion);
-      setAISuggestion(null);
-      setAISuggestionLoading(false);
-      setAISuggestionUsed(true);
-    },
-    [setText],
-  );
+  const handleAcceptSuggestion = useCallback((suggestion: string) => {
+    setAISuggestion(null);
+    setAISuggestionLoading(false);
+    setAISuggestionUsed(true);
+  }, []);
 
   return {
     aiSuggestion,

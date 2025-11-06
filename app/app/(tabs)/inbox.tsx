@@ -20,7 +20,6 @@ import {
   useWebSocket,
   MessageCreatedEvent,
   TicketResolvedEvent,
-  TicketCreatedEvent,
 } from "@/contexts/WebSocketContext";
 import { DAOManager } from "@/database/dao";
 
@@ -49,8 +48,7 @@ const Inbox: React.FC = () => {
   const isFetchingRef = React.useRef(false); // prevent duplicate fetches
   const isInitialMount = React.useRef(true); // track initial mount
   const db = useDatabase();
-  const { isConnected, onMessageCreated, onTicketResolved, onTicketCreated } =
-    useWebSocket();
+  const { isConnected, onMessageCreated, onTicketResolved } = useWebSocket();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
   const filtered = useMemo(() => {
@@ -78,14 +76,14 @@ const Inbox: React.FC = () => {
         if ((b.unreadCount || 0) !== (a.unreadCount || 0)) {
           return (b.unreadCount || 0) - (a.unreadCount || 0);
         }
-        // Sort by updatedAt desc if available, else createdAt desc
+        // Then by updatedAt or createdAt desc
         const aTime = a.updatedAt
           ? new Date(a.updatedAt).getTime()
           : new Date(a.createdAt).getTime();
         const bTime = b.updatedAt
           ? new Date(b.updatedAt).getTime()
           : new Date(b.createdAt).getTime();
-        return bTime - aTime;
+        return aTime - bTime;
       });
   }, [tickets, activeTab, query]);
   const { user } = useAuth();
@@ -109,8 +107,9 @@ const Inbox: React.FC = () => {
         ? ticket.customer?.phoneNumber
         : ticket.customer?.name || "Chat";
     router.push({
-      pathname: "/chat",
+      pathname: "/chat/[ticketId]",
       params: {
+        ticketId: ticket.id,
         ticketNumber: ticket.ticketNumber,
         name: chatName,
         messageId: ticket.message?.id || undefined,
@@ -199,6 +198,7 @@ const Inbox: React.FC = () => {
           const newUnreadCount = (ticket.unreadCount || 0) + 1;
           await daoManager.ticket.update(db, ticket.id, {
             unreadCount: newUnreadCount,
+            lastMessageId: event.message_id,
           });
 
           // Update local state immediately for instant UI update
@@ -208,8 +208,9 @@ const Inbox: React.FC = () => {
                 ? {
                     ...t,
                     unreadCount: newUnreadCount,
+                    lastMessageId: event.message_id,
                     lastMessage: {
-                      content: event.body,
+                      body: event.body,
                       timestamp: event.ts,
                     },
                     updatedAt: event.ts,
@@ -303,27 +304,6 @@ const Inbox: React.FC = () => {
 
     return unsubscribe;
   }, [onTicketResolved, tickets, db, daoManager, activeTab]);
-
-  // Handle real-time ticket_created events
-  useEffect(() => {
-    const unsubscribe = onTicketCreated(async (event: TicketCreatedEvent) => {
-      console.log("[Inbox] Received ticket_created event:", event);
-
-      try {
-        // Only refresh if we're on the first page of pending tickets
-        // to avoid disrupting pagination
-        if (activeTab === Tabs.PENDING && page === 1) {
-          console.log("[Inbox] Refreshing ticket list for new ticket");
-          // Refetch tickets to include the new one
-          await fetchTickets(activeTab, 1, false, false);
-        }
-      } catch (error) {
-        console.error("[Inbox] Error handling ticket_created event:", error);
-      }
-    });
-
-    return unsubscribe;
-  }, [onTicketCreated, activeTab, page, fetchTickets]);
 
   // Reset list when tab changes
   useEffect(() => {

@@ -487,7 +487,7 @@ class TestTicketBasedMessageTypeRouting:
         Test that a customer with an existing unresolved ticket
         has message stored correctly (WHISPER mode path)
         """
-        with patch("routers.whatsapp.emit_message_created") as mock_emit:
+        with patch("routers.whatsapp.emit_message_received") as mock_emit:
             response = client.post(
                 "/api/whatsapp/webhook",
                 data={
@@ -510,7 +510,7 @@ class TestTicketBasedMessageTypeRouting:
         assert message.body == "I need more help with my crops"
         assert message.customer_id == test_customer.id
 
-        # Verify emit_message_created was called for mobile notifications
+        # Verify emit_message_received was called for mobile notifications
         # (This happens in WHISPER mode with existing ticket)
         mock_emit.assert_called_once()
         call_kwargs = mock_emit.call_args[1]
@@ -527,7 +527,7 @@ class TestTicketBasedMessageTypeRouting:
         Test that a customer without an existing ticket
         has message stored correctly (REPLY mode path)
         """
-        with patch("routers.whatsapp.emit_message_created") as mock_emit:
+        with patch("routers.whatsapp.emit_message_received") as mock_emit:
             response = client.post(
                 "/api/whatsapp/webhook",
                 data={
@@ -557,7 +557,7 @@ class TestTicketBasedMessageTypeRouting:
         assert customer is not None
         assert message.customer_id == customer.id
 
-        # Verify emit_message_created was NOT called
+        # Verify emit_message_received was NOT called
         # (REPLY mode without ticket - no EO notification needed)
         mock_emit.assert_not_called()
 
@@ -578,7 +578,7 @@ class TestTicketBasedMessageTypeRouting:
         test_ticket.resolved_at = datetime.utcnow()
         db_session.commit()
 
-        with patch("routers.whatsapp.emit_message_created") as mock_emit:
+        with patch("routers.whatsapp.emit_message_received") as mock_emit:
             response = client.post(
                 "/api/whatsapp/webhook",
                 data={
@@ -599,7 +599,7 @@ class TestTicketBasedMessageTypeRouting:
         assert message is not None
         assert message.body == "I have a new question"
 
-        # Verify emit_message_created was NOT called
+        # Verify emit_message_received was NOT called
         # (no unresolved ticket, so REPLY mode - no EO notification)
         mock_emit.assert_not_called()
 
@@ -647,8 +647,7 @@ class TestTicketBasedMessageTypeRouting:
         seed_administrative_data(db_session, rows)
 
         with (
-            patch("routers.whatsapp.emit_message_created"),
-            patch("routers.whatsapp.emit_ticket_created") as mock_emit_ticket,
+            patch("routers.whatsapp.emit_message_received"),
         ):
             response = client.post(
                 "/api/whatsapp/webhook",
@@ -689,9 +688,6 @@ class TestTicketBasedMessageTypeRouting:
             "AI reply with escalate button",
         ]
 
-        # Verify ticket created event was emitted
-        mock_emit_ticket.assert_called_once()
-
     def test_multiple_messages_with_unresolved_ticket_all_emit(
         self,
         client: TestClient,
@@ -705,7 +701,7 @@ class TestTicketBasedMessageTypeRouting:
         """
         message_sids = ["SM_MSG1", "SM_MSG2", "SM_MSG3"]
 
-        with patch("routers.whatsapp.emit_message_created") as mock_emit:
+        with patch("routers.whatsapp.emit_message_received") as mock_emit:
             for i, sid in enumerate(message_sids):
                 response = client.post(
                     "/api/whatsapp/webhook",
@@ -730,7 +726,7 @@ class TestTicketBasedMessageTypeRouting:
             assert msg.body == f"Follow-up question {i + 1}"
             assert msg.customer_id == test_customer.id
 
-        # Verify emit_message_created was called for each message
+        # Verify emit_message_received was called for each message
         # (WHISPER mode with existing ticket emits for EO notifications)
         assert mock_emit.call_count == 3
         for call in mock_emit.call_args_list:

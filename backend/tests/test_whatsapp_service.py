@@ -16,6 +16,7 @@ class TestWhatsAppService:
                 "TWILIO_WHATSAPP_NUMBER": "whatsapp:+1234567890",
                 "TESTING": "false",  # Test production path with mocked client
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
                 service = WhatsAppService()
@@ -58,6 +59,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "false",  # Test production path
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client"):
                 service = WhatsAppService()
@@ -71,6 +73,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "false",  # Test production path with mocked client
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
                 mock_message = Mock()
@@ -109,6 +112,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "false",  # Test production path with mocked client
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
                 mock_client_instance = Mock()
@@ -133,6 +137,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "true",  # Use testing mode for these tests
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client"):
                 service = WhatsAppService()
@@ -159,6 +164,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "true",  # Use testing mode
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client"):
                 service = WhatsAppService()
@@ -185,6 +191,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "true",  # Use testing mode
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client"):
                 service = WhatsAppService()
@@ -209,6 +216,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "true",  # Use testing mode
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client"):
                 service = WhatsAppService()
@@ -234,6 +242,7 @@ class TestWhatsAppService:
                 "TWILIO_WHATSAPP_NUMBER": "+1987654321",
                 "TESTING": "false",  # Test production path
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
                 mock_message = Mock()
@@ -265,6 +274,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "false",  # Test production path
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
                 mock_message = Mock()
@@ -306,6 +316,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "false",  # Test production path
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
                 mock_client_instance = Mock()
@@ -335,6 +346,7 @@ class TestWhatsAppService:
                 "TWILIO_WHATSAPP_NUMBER": "whatsapp:+1987654321",
                 "TESTING": "false",  # Test production path
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
                 mock_message = Mock()
@@ -371,6 +383,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "false",  # Test production path
             },
+            clear=True,
         ):
             with patch("services.whatsapp_service.Client") as mock_client:
                 mock_message = Mock()
@@ -521,6 +534,7 @@ class TestWhatsAppService:
                 "TWILIO_AUTH_TOKEN": "test_token",
                 "TESTING": "1",
             },
+            clear=True
         ):
             with patch("services.whatsapp_service.Client"):
                 service = WhatsAppService()

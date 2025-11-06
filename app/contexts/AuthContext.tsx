@@ -25,9 +25,9 @@ interface User {
   phoneNumber: string;
   userType: string;
   isActive: boolean;
-  invitationStatus?: string;
+  invitationStatus?: string | null;
   administrativeLocation?: AdministrativeLocation | null;
-  accessToken?: string;
+  accessToken?: string | null;
   deviceRegisterAt?: string | null;
 }
 
@@ -133,6 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         invitationStatus: apiData.invitation_status,
         administrativeLocation: apiData.administrative_location,
         accessToken: accessToken,
+        deviceRegisterAt: profileDB?.deviceRegisterAt || null,
       };
 
       setUser(userData);
@@ -140,7 +141,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       if (segments[0] === "login") {
         router.replace("/home");
       }
-    } catch (error) {
+    } catch {
       if (segments[0] !== "login" && routeToken) {
         setUser(null);
         setIsValid(false);

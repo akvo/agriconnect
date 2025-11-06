@@ -18,7 +18,8 @@ from services.message_service import MessageService
 from services.whatsapp_service import WhatsAppService
 from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
-from routers.ws import emit_whisper_created
+from services.socketio_service import emit_whisper_created
+from services.socketio_service import emit_playground_response
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
 logger = logging.getLogger(__name__)
@@ -91,9 +92,6 @@ async def handle_playground_callback(payload: AIWebhookCallback, db: Session):
             f"✓ Playground message {pg_message.id} completed "
             f"(session: {pg_message.session_id}, response_time: {response_time_ms}ms)"
         )
-
-        # Emit WebSocket event to playground room
-        from routers.ws import emit_playground_response
 
         session_id = payload.callback_params.session_id
         if session_id:
@@ -286,6 +284,7 @@ async def ai_callback(
 
                         # Find ticket and emit WebSocket event
                         ticket_id = payload.callback_params.ticket_id
+                        administrative_id = None
                         if not ticket_id:
                             # Find open ticket for customer
                             ticket = (
@@ -300,6 +299,7 @@ async def ai_callback(
                             )
                             if ticket:
                                 ticket_id = ticket.id
+                                administrative_id = ticket.administrative_id
 
                         if ticket_id:
                             logger.info(
@@ -311,6 +311,10 @@ async def ai_callback(
                                     ticket_id=ticket_id,
                                     message_id=ai_message.id,
                                     suggestion=ai_message.body,
+                                    customer_id=ai_message.customer_id,
+                                    message_sid=ai_message.message_sid,
+                                    created_at=ai_message.created_at.isoformat(),
+                                    administrative_id=administrative_id,
                                 )
                             )
         elif payload.status in [CallbackStage.FAILED, CallbackStage.TIMEOUT]:

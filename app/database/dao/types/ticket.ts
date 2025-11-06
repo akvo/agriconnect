@@ -11,7 +11,8 @@ export type Ticket = {
   resolver: User;
   ticketNumber: string;
   unreadCount?: number;
-  lastMessage?: { content: string; timestamp: string };
+  lastMessage?: { body: string; timestamp: string };
+  lastMessageId?: number | null;
   resolvedAt?: string | null;
   respondedBy?: User;
   updatedAt?: string | null;
@@ -33,4 +34,5 @@ export interface UpdateTicketData {
   resolvedAt?: string | null;
   resolvedBy?: number | null;
   unreadCount?: number;
+  lastMessageId?: number | null;
 }
