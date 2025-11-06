@@ -27,7 +27,7 @@ export interface CreateMessageData {
   user_id: number | null;
   body: string;
   createdAt: string;
-  message_type?: number;
+  message_type?: number | string;
   status?: number; // Use MessageStatus constants (default: PENDING=1)
   is_used?: number; // 0=not used, 1=used (default: 0)
   delivery_status?: string; // Twilio delivery status (default: PENDING)

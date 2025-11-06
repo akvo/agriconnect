@@ -20,9 +20,13 @@ const TicketItem: React.FC<{
 }) => {
   // Compute display values from API response
   const isUnread = ticket.unreadCount ?? 0;
-  const messageContent = ticket.message?.body || "";
-  const messageTimestamp = ticket.message?.timestamp || ticket.createdAt;
+  const messageContent = ticket.lastMessage?.body || ticket.message?.body || "";
+  const messageTimestamp =
+    ticket.lastMessage?.timestamp ||
+    ticket.message?.timestamp ||
+    ticket.createdAt;
   const respondedBy = ticket.resolver;
+  const customerName = ticket.customer?.name || "";
 
   return (
     <Pressable
@@ -35,7 +39,7 @@ const TicketItem: React.FC<{
     >
       <View style={styles.ticketBody}>
         <View style={styles.avatarContainer}>
-          <Avatar initials={initialsFromName(ticket.customer.name)} size={48} />
+          <Avatar initials={initialsFromName(customerName)} size={48} />
         </View>
         <View style={styles.ticketMeta}>
           <View
@@ -55,9 +59,9 @@ const TicketItem: React.FC<{
                 { color: themeColors.textPrimary },
               ]}
             >
-              {ticket.customer.name?.trim().length === 0
+              {customerName.trim().length === 0
                 ? ticket.customer.phoneNumber
-                : ticket.customer.name}
+                : customerName}
             </Text>
             <Text
               style={[

@@ -76,14 +76,14 @@ const Inbox: React.FC = () => {
         if ((b.unreadCount || 0) !== (a.unreadCount || 0)) {
           return (b.unreadCount || 0) - (a.unreadCount || 0);
         }
-        // Sort by updatedAt desc if available, else createdAt desc
+        // Then by updatedAt or createdAt desc
         const aTime = a.updatedAt
           ? new Date(a.updatedAt).getTime()
           : new Date(a.createdAt).getTime();
         const bTime = b.updatedAt
           ? new Date(b.updatedAt).getTime()
           : new Date(b.createdAt).getTime();
-        return bTime - aTime;
+        return aTime - bTime;
       });
   }, [tickets, activeTab, query]);
   const { user } = useAuth();
@@ -198,6 +198,7 @@ const Inbox: React.FC = () => {
           const newUnreadCount = (ticket.unreadCount || 0) + 1;
           await daoManager.ticket.update(db, ticket.id, {
             unreadCount: newUnreadCount,
+            lastMessageId: event.message_id,
           });
 
           // Update local state immediately for instant UI update
@@ -207,8 +208,9 @@ const Inbox: React.FC = () => {
                 ? {
                     ...t,
                     unreadCount: newUnreadCount,
+                    lastMessageId: event.message_id,
                     lastMessage: {
-                      content: event.body,
+                      body: event.body,
                       timestamp: event.ts,
                     },
                     updatedAt: event.ts,
