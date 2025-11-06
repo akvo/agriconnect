@@ -288,8 +288,7 @@ async def create_message(
     await emit_message_received(
         ticket_id=ticket.id,
         message_id=new_message.id,
-        message_sid=new_message.message_sid,
-        customer_id=ticket.customer_id,
+        phone_number=ticket.customer.phone_number,
         body=new_message.body,
         from_source=message_data.from_source,
         ts=new_message.created_at.isoformat(),
@@ -297,6 +296,7 @@ async def create_message(
         ticket_number=ticket.ticket_number,
         customer_name=customer_name,
         sender_user_id=sender_id,
+        customer_id=ticket.customer_id,
     )
 
     return MessageResponse(

@@ -239,8 +239,7 @@ async def join_playground(sid: str, data: dict):
 async def emit_message_received(
     ticket_id: int,
     message_id: int,
-    message_sid: str,
-    customer_id: int,
+    phone_number: str,
     body: str,
     from_source: int,
     ts: str,  # timestamp as ISO string
@@ -248,16 +247,20 @@ async def emit_message_received(
     ticket_number: str = None,
     customer_name: str = None,
     sender_user_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
 ):
-    """Emit message"""
+    """Emit message with ticket metadata for optimistic UI display"""
     event_data = {
         "ticket_id": ticket_id,
         "message_id": message_id,
-        "message_sid": message_sid,
-        "customer_id": customer_id,
+        "phone_number": phone_number,
         "body": body,
         "from_source": from_source,
         "ts": ts,
+        # Ticket metadata for optimistic display (not administrative_id - used for routing only)
+        "ticket_number": ticket_number,
+        "customer_name": customer_name,
+        "customer_id": customer_id,
     }
 
     # Emit to ward room

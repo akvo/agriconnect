@@ -202,8 +202,7 @@ async def whatsapp_webhook(
                     emit_message_received(
                         ticket_id=ticket.id,
                         message_id=message.id,
-                        message_sid=MessageSid,
-                        customer_id=customer.id,
+                        phone_number=customer.phone_number,
                         body=original_message.body,
                         from_source=MessageFrom.CUSTOMER,
                         ts=message.created_at.isoformat(),
@@ -211,6 +210,7 @@ async def whatsapp_webhook(
                         ticket_number=ticket.ticket_number,
                         customer_name=customer_name,
                         sender_user_id=None,
+                        customer_id=customer.id,
                     )
                 )
 
@@ -329,8 +329,7 @@ async def whatsapp_webhook(
                 emit_message_received(
                     ticket_id=existing_ticket.id,
                     message_id=message.id,
-                    message_sid=MessageSid,
-                    customer_id=customer.id,
+                    phone_number=customer.phone_number,
                     body=Body,
                     from_source=MessageFrom.CUSTOMER,
                     ts=message.created_at.isoformat(),
@@ -338,6 +337,7 @@ async def whatsapp_webhook(
                     ticket_number=existing_ticket.ticket_number,
                     customer_name=customer_name,
                     sender_user_id=None,
+                    customer_id=customer.id,
                 )
             )
 
