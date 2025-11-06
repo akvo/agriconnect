@@ -5,10 +5,12 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Enum,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from schemas.callback import CallbackStage
 
 from database import Base
 
@@ -28,7 +30,9 @@ class Document(Base):
     file_path = Column(String, nullable=True)
     content_type = Column(String, nullable=True)
     file_size = Column(BigInteger, nullable=True)
-    status = Column(String, default="queued", index=True)
+    status = Column(
+        Enum(CallbackStage), default=CallbackStage.QUEUED, nullable=False
+    )
     extra_data = Column(JSONB, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
