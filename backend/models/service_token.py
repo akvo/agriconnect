@@ -18,6 +18,12 @@ class ServiceToken(Base):
     upload_url = Column(
         String, nullable=True
     )  # URL for KB upload job requests
+
+    kb_url = Column(String, nullable=True)  # URL for KB CRUD operations
+    document_url = Column(
+        String, nullable=True
+    )  # URL for document CRUD operations
+
     default_prompt = Column(
         String, nullable=True
     )  # Default system prompt for AI service
