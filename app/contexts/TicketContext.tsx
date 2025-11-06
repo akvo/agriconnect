@@ -12,7 +12,7 @@ import React, {
   ReactNode,
 } from "react";
 
-const TicketContext = createContext(null);
+const TicketContext = createContext<any>(null);
 
 export const useTicket = () => {
   const context = useContext(TicketContext);
@@ -27,7 +27,7 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
 }: {
   children: ReactNode;
 }) => {
-  const [tickets, setTickets] = useState([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const db = useDatabase();
   const isMounted = useRef(true);
 

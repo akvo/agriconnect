@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useWebSocket } from "@/contexts/WebSocketContext";
 import { useDatabase } from "@/database/context";
+import { useWebSocket } from "@/contexts/WebSocketContext";
 import { DAOManager } from "@/database/dao";
 import themeColors from "@/styles/colors";
 import { Message } from "@/utils/chat";
@@ -24,13 +24,12 @@ import { StickyMessageBubble } from "@/components/chat/sticky-message-bubble";
 import { ChatMessageList } from "@/components/chat/chat-message-list";
 import { ChatInput } from "@/components/chat/chat-input";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNotifications } from "@/contexts/NotificationContext";
 import { useNetwork } from "@/contexts/NetworkContext";
 import {
   useTicketData,
   useMessages,
-  useChatWebSocket,
   useAISuggestion,
+  useChatWebSocket,
 } from "@/hooks/chat";
 
 const ChatScreen = () => {
@@ -46,17 +45,9 @@ const ChatScreen = () => {
   const db = useDatabase();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
   const { user } = useAuth();
-  const { setActiveTicket } = useNotifications();
   const { isOnline } = useNetwork();
-  const {
-    isConnected,
-    joinTicket,
-    leaveTicket,
-    onMessageCreated,
-    onMessageStatusUpdated,
-    onTicketResolved,
-    onWhisperCreated,
-  } = useWebSocket();
+  const { isConnected, onMessageCreated, onTicketResolved, onWhisperCreated } =
+    useWebSocket();
 
   const scrollToBottom = useCallback((animated = false) => {
     setTimeout(() => {
@@ -82,7 +73,7 @@ const ChatScreen = () => {
     setAISuggestionLoading,
     setAISuggestionUsed,
     handleAcceptSuggestion,
-  } = useAISuggestion(setText);
+  } = useAISuggestion();
 
   // Ticket data hook
   const {
@@ -121,20 +112,15 @@ const ChatScreen = () => {
     db,
     ticket,
     userId: user?.id,
-    isConnected,
     onMessageCreated,
-    onMessageStatusUpdated,
     onTicketResolved,
     onWhisperCreated,
-    joinTicket,
-    leaveTicket,
     scrollToBottom,
     setMessages,
     setTicket,
     setAISuggestion,
     setAISuggestionLoading,
     setAISuggestionUsed,
-    setActiveTicket,
   });
 
   // Load initial ticket data (only once on mount)
@@ -226,7 +212,10 @@ const ChatScreen = () => {
           <AISuggestionChip
             suggestion={aiSuggestion}
             loading={aiSuggestionLoading}
-            onAccept={handleAcceptSuggestion}
+            onAccept={(value) => {
+              handleAcceptSuggestion(value);
+              setText(value);
+            }}
             onExpand={onExpandAISuggestion}
           />
         )}

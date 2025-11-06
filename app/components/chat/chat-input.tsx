@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import { View, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import { SQLiteDatabase } from "expo-sqlite";
 import { api } from "@/services/api";
@@ -115,8 +110,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           // Check if backend message already exists (added by WebSocket)
           const backendMessageExists = prev.some(
             (m) =>
-              m.id === response.id ||
-              m.message_sid === response.message_sid,
+              m.id === response.id || m.message_sid === response.message_sid,
           );
 
           if (backendMessageExists) {
@@ -158,17 +152,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           }
         }
       } catch (apiError) {
-        console.error(
-          "❌ [Chat] Failed to send message to backend:",
-          apiError,
-        );
+        console.error("❌ [Chat] Failed to send message to backend:", apiError);
         console.error("[Chat] Error details:", {
           message:
-            apiError instanceof Error
-              ? apiError.message
-              : String(apiError),
-          stack:
-            apiError instanceof Error ? apiError.stack : undefined,
+            apiError instanceof Error ? apiError.message : String(apiError),
+          stack: apiError instanceof Error ? apiError.stack : undefined,
         });
 
         // Remove optimistic message from UI on failure
@@ -177,9 +165,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         );
 
         // TODO: Show error to user and implement retry mechanism
-        console.log(
-          "[Chat] Removed optimistic message due to send failure",
-        );
+        console.log("[Chat] Removed optimistic message due to send failure");
       }
     } catch (error) {
       console.error("[Chat] Error sending message:", error);
@@ -201,10 +187,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         placeholderTextColor={themeColors.dark3}
         multiline
       />
-      <TouchableOpacity
-        onPress={handleSend}
-        style={styles.sendButton}
-      >
+      <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
         <Feathericons name="send" size={20} color={themeColors.white} />
       </TouchableOpacity>
     </View>

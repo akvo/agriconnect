@@ -50,13 +50,13 @@ interface WebSocketContextType {
   socket: Socket | null;
   isConnected: boolean;
   onMessageCreated: (
-    callback: (data: MessageCreatedEvent) => void
+    callback: (data: MessageCreatedEvent) => void,
   ) => () => void;
   onTicketResolved: (
-    callback: (data: TicketResolvedEvent) => void
+    callback: (data: TicketResolvedEvent) => void,
   ) => () => void;
   onWhisperCreated: (
-    callback: (data: WhisperCreatedEvent) => void
+    callback: (data: WhisperCreatedEvent) => void,
   ) => () => void;
 }
 
@@ -121,7 +121,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       newSocket.close();
     };
   }, [user?.accessToken, user?.id, isOnline]);
-  
+
   // Event handler registration functions
   const onMessageCreated = useCallback(
     (callback: (data: MessageCreatedEvent) => void) => {
@@ -133,7 +133,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         socket.off("message_received", callback);
       };
     },
-    [socket]
+    [socket],
   );
 
   const onTicketResolved = useCallback(
@@ -146,7 +146,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         socket.off("ticket_resolved", callback);
       };
     },
-    [socket]
+    [socket],
   );
 
   const onWhisperCreated = useCallback(
@@ -159,7 +159,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         socket.off("whisper", callback);
       };
     },
-    [socket]
+    [socket],
   );
 
   return (

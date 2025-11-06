@@ -41,7 +41,7 @@ export default function RootLayout() {
                   />
                   <Stack.Screen name="login" options={{ headerShown: false }} />
                   <Stack.Screen
-                    name="chat"
+                    name="chat/[ticketId]"
                     options={({
                       navigation,
                       route,
