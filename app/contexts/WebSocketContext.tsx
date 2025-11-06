@@ -2,7 +2,7 @@
  * WebSocket Context - Refactored
  *
  * Following best practices:
- * - Uses centralized WebSocketService singleton
+ * - Uses centralized socket singleton
  * - Simplified context (no connection management here)
  * - Clean callback registration/cleanup
  * - Automatic token refresh integration
@@ -13,14 +13,16 @@ import React, {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   ReactNode,
   useCallback,
 } from "react";
-import WebSocketService from "@/services/WebSocketService";
+import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 import { useNetwork } from "./NetworkContext";
+
+const apiUrl = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
+const baseUrl = apiUrl.replace(/\/api\/?$/, "");
 
 // WebSocket event types
 export interface MessageCreatedEvent {
@@ -33,24 +35,9 @@ export interface MessageCreatedEvent {
   ts: string;
 }
 
-export interface MessageStatusUpdatedEvent {
-  ticket_id: number;
-  message_id: number;
-  status: number;
-  updated_at: string;
-  updated_by?: number;
-}
-
 export interface TicketResolvedEvent {
   ticket_id: number;
   resolved_at: string;
-}
-
-export interface TicketCreatedEvent {
-  ticket_id: number;
-  customer_id: number;
-  administrative_id: number;
-  created_at: string;
 }
 
 export interface WhisperCreatedEvent {
@@ -60,21 +47,16 @@ export interface WhisperCreatedEvent {
 }
 
 interface WebSocketContextType {
+  socket: Socket | null;
   isConnected: boolean;
-  joinTicket: (ticketId: number) => Promise<void>;
-  leaveTicket: (ticketId: number) => Promise<void>;
   onMessageCreated: (
-    callback: (data: MessageCreatedEvent) => void,
-  ) => () => void;
-  onMessageStatusUpdated: (
-    callback: (data: MessageStatusUpdatedEvent) => void,
+    callback: (data: MessageCreatedEvent) => void
   ) => () => void;
   onTicketResolved: (
-    callback: (data: TicketResolvedEvent) => void,
+    callback: (data: TicketResolvedEvent) => void
   ) => () => void;
-  onTicketCreated: (callback: (data: TicketCreatedEvent) => void) => () => void;
   onWhisperCreated: (
-    callback: (data: WhisperCreatedEvent) => void,
+    callback: (data: WhisperCreatedEvent) => void
   ) => () => void;
 }
 
@@ -99,218 +81,94 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const { isOnline } = useNetwork();
 
   const [isConnected, setIsConnected] = useState(false);
-  const joinedTicketsRef = useRef<Set<number>>(new Set());
-  const previousUserIdRef = useRef<number | null>(null);
-  const isInitialConnectionRef = useRef<boolean>(true);
-
-  // Clear joined tickets when user changes (logout/login with different user)
-  useEffect(() => {
-    if (user?.id !== previousUserIdRef.current) {
-      console.log(
-        `[WebSocketContext] User changed from ${previousUserIdRef.current} to ${user?.id}, clearing joined tickets`,
-      );
-      joinedTicketsRef.current.clear();
-      previousUserIdRef.current = user?.id || null;
-      isInitialConnectionRef.current = true; // Reset flag for new user
-    }
-  }, [user?.id]);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   // Manage connection based on auth and network status
   useEffect(() => {
     if (!user?.accessToken || !user?.id) {
       console.log("[WebSocketContext] No user, disconnecting");
-      WebSocketService.disconnect();
       setIsConnected(false);
       return;
     }
 
     if (!isOnline) {
       console.log("[WebSocketContext] Offline, disconnecting");
-      WebSocketService.disconnect();
       setIsConnected(false);
       return;
     }
 
-    console.log("[WebSocketContext] Connecting with token");
-    WebSocketService.connect(user.accessToken, user.id);
+    const newSocket = io(baseUrl, {
+      path: "/ws/socket.io",
+      auth: {
+        token: user.accessToken,
+      },
+      transports: ["websocket"],
+    });
 
-    // Setup connection status listeners
-    const handleConnect = () => {
-      console.log("[WebSocketContext] Connected");
+    newSocket.on("connect", () => {
       setIsConnected(true);
+      console.log("WebSocket connected:", newSocket.id);
+    });
 
-      // Rejoin ticket rooms after RECONNECTION (not initial connection)
-      // This handles network interruptions while user has active chat screens
-      if (
-        !isInitialConnectionRef.current &&
-        joinedTicketsRef.current.size > 0
-      ) {
-        console.log(
-          `[WebSocketContext] Reconnection detected. Waiting 1s before rejoining ${joinedTicketsRef.current.size} ticket rooms`,
-        );
-
-        setTimeout(() => {
-          const rooms = Array.from(joinedTicketsRef.current);
-
-          // Rejoin rooms SEQUENTIALLY with delay to avoid rate limit
-          rooms.forEach((ticketId, index) => {
-            setTimeout(async () => {
-              try {
-                await WebSocketService.joinTicket(ticketId);
-                console.log(
-                  `[WebSocketContext] ✅ Successfully rejoined ticket ${ticketId}`,
-                );
-              } catch (error) {
-                console.error(
-                  `[WebSocketContext] ❌ Failed to rejoin ticket ${ticketId}:`,
-                  error,
-                );
-
-                // Retry ONCE after 2 seconds
-                setTimeout(async () => {
-                  try {
-                    await WebSocketService.joinTicket(ticketId);
-                    console.log(
-                      `[WebSocketContext] ✅ Retry successful for ticket ${ticketId}`,
-                    );
-                  } catch (retryError) {
-                    console.error(
-                      `[WebSocketContext] ❌ Retry failed for ticket ${ticketId}:`,
-                      retryError,
-                    );
-                    // Could emit event here to notify user of connection issues
-                  }
-                }, 2000);
-              }
-            }, index * 200); // 200ms between each rejoin
-          });
-        }, 1000); // 1 second delay after connect
-      } else if (isInitialConnectionRef.current) {
-        console.log(
-          `[WebSocketContext] Initial connection - tickets will be joined when user navigates to chat screens`,
-        );
-        isInitialConnectionRef.current = false; // Mark that initial connection is complete
-      } else {
-        console.log(
-          `[WebSocketContext] Reconnection but no active tickets to rejoin`,
-        );
-      }
-    };
-
-    const handleDisconnect = () => {
-      console.log("[WebSocketContext] Disconnected");
+    newSocket.on("disconnect", () => {
       setIsConnected(false);
-    };
+      console.log("[Inbox] WebSocket disconnected");
+    });
 
-    const handleAuthError = () => {
-      console.log("[WebSocketContext] Auth error - user needs to re-login");
-      setIsConnected(false);
-      // Could trigger a logout here or show an error message
-    };
+    setSocket(newSocket);
 
-    WebSocketService.on("connect", handleConnect);
-    WebSocketService.on("disconnect", handleDisconnect);
-    WebSocketService.on("auth_error", handleAuthError);
-
-    // Cleanup
     return () => {
-      WebSocketService.off("connect", handleConnect);
-      WebSocketService.off("disconnect", handleDisconnect);
-      WebSocketService.off("auth_error", handleAuthError);
+      newSocket.close();
     };
   }, [user?.accessToken, user?.id, isOnline]);
-
-  // Join ticket room
-  const joinTicket = useCallback(async (ticketId: number) => {
-    try {
-      await WebSocketService.joinTicket(ticketId);
-      joinedTicketsRef.current.add(ticketId);
-      console.log(`[WebSocketContext] Joined ticket ${ticketId}`);
-    } catch (error) {
-      console.error(
-        `[WebSocketContext] Failed to join ticket ${ticketId}:`,
-        error,
-      );
-      throw error;
-    }
-  }, []);
-
-  // Leave ticket room
-  const leaveTicket = useCallback(async (ticketId: number) => {
-    try {
-      await WebSocketService.leaveTicket(ticketId);
-      joinedTicketsRef.current.delete(ticketId);
-      console.log(`[WebSocketContext] Left ticket ${ticketId}`);
-    } catch (error) {
-      console.error(
-        `[WebSocketContext] Failed to leave ticket ${ticketId}:`,
-        error,
-      );
-      // Don't throw - not critical if leave fails
-    }
-  }, []);
-
+  
   // Event handler registration functions
   const onMessageCreated = useCallback(
     (callback: (data: MessageCreatedEvent) => void) => {
-      WebSocketService.on("message_created", callback);
+      if (!socket) {
+        return () => {};
+      }
+      socket.on("message_received", callback);
       return () => {
-        WebSocketService.off("message_created", callback);
+        socket.off("message_received", callback);
       };
     },
-    [],
-  );
-
-  const onMessageStatusUpdated = useCallback(
-    (callback: (data: MessageStatusUpdatedEvent) => void) => {
-      WebSocketService.on("message_status_updated", callback);
-      return () => {
-        WebSocketService.off("message_status_updated", callback);
-      };
-    },
-    [],
+    [socket]
   );
 
   const onTicketResolved = useCallback(
     (callback: (data: TicketResolvedEvent) => void) => {
-      WebSocketService.on("ticket_resolved", callback);
+      if (!socket) {
+        return () => {};
+      }
+      socket.on("ticket_resolved", callback);
       return () => {
-        WebSocketService.off("ticket_resolved", callback);
+        socket.off("ticket_resolved", callback);
       };
     },
-    [],
-  );
-
-  const onTicketCreated = useCallback(
-    (callback: (data: TicketCreatedEvent) => void) => {
-      WebSocketService.on("ticket_created", callback);
-      return () => {
-        WebSocketService.off("ticket_created", callback);
-      };
-    },
-    [],
+    [socket]
   );
 
   const onWhisperCreated = useCallback(
     (callback: (data: WhisperCreatedEvent) => void) => {
-      WebSocketService.on("whisper_created", callback);
+      if (!socket) {
+        return () => {};
+      }
+      socket.on("whisper", callback);
       return () => {
-        WebSocketService.off("whisper_created", callback);
+        socket.off("whisper", callback);
       };
     },
-    [],
+    [socket]
   );
 
   return (
     <WebSocketContext.Provider
       value={{
+        socket,
         isConnected,
-        joinTicket,
-        leaveTicket,
         onMessageCreated,
-        onMessageStatusUpdated,
         onTicketResolved,
-        onTicketCreated,
         onWhisperCreated,
       }}
     >
