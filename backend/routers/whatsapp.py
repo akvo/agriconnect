@@ -16,12 +16,14 @@ from models.message import (
 )
 from models.ticket import Ticket
 from models.administrative import Administrative
+from models.customer import OnboardingStatus
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
 from services.external_ai_service import get_external_ai_service
 from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
 from services.socketio_service import emit_message_received
+from services.onboarding_service import get_onboarding_service
 from schemas.callback import TwilioStatusCallback, TwilioMessageStatus
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
@@ -77,6 +79,61 @@ async def whatsapp_webhook(
                     f"(24+ hours inactive)"
                 )
                 # Continue processing message normally after reconnection
+
+        # ========================================
+        # AI ONBOARDING: Check if location onboarding needed
+        # ========================================
+        onboarding_service = get_onboarding_service(db)
+
+        if onboarding_service.needs_onboarding(customer):
+            logger.info(
+                f"Customer {phone_number} needs onboarding "
+                f"(status: {customer.onboarding_status.value})"
+            )
+
+            # Check if awaiting selection (from previous ambiguous match)
+            if (
+                customer.onboarding_status == OnboardingStatus.IN_PROGRESS
+                and customer.onboarding_candidates
+            ):
+                # Process selection
+                onboarding_response = (
+                    await onboarding_service.process_selection(customer, Body)
+                )
+            else:
+                # Process location message
+                onboarding_response = (
+                    await onboarding_service.process_location_message(
+                        customer, Body
+                    )
+                )
+
+            # Send onboarding response to farmer
+            whatsapp_service = WhatsAppService()
+            whatsapp_service.send_message(
+                phone_number, onboarding_response.message
+            )
+
+            logger.info(
+                f"Onboarding response sent to {phone_number} "
+                f"(status: {onboarding_response.status})"
+            )
+
+            # If onboarding still in progress, don't process message further
+            if onboarding_response.status in [
+                "in_progress",
+                "awaiting_selection",
+            ]:
+                return {
+                    "status": "success",
+                    "message": "Onboarding in progress",
+                }
+
+            # If onboarding completed or failed, continue to regular flow
+            logger.info(
+                f"Onboarding {onboarding_response.status} for {phone_number}, "
+                f"continuing to regular flow"
+            )
 
         escalate_payload = settings.whatsapp_escalate_button_payload
 
@@ -290,9 +347,7 @@ async def whatsapp_webhook(
             # Create WHISPER job (AI suggests to EO) if not testing
             if not os.getenv("TESTING"):
                 ai_service = get_external_ai_service(db)
-                trace_id = (
-                    f"whisper_t{existing_ticket.id}_m{message.id}"
-                )
+                trace_id = f"whisper_t{existing_ticket.id}_m{message.id}"
                 asyncio.create_task(
                     ai_service.create_chat_job(
                         message_id=message.id,
@@ -318,9 +373,7 @@ async def whatsapp_webhook(
                 hasattr(customer, "customer_administrative")
                 and len(customer.customer_administrative) > 0
             ):
-                ward_id = customer.customer_administrative[
-                    0
-                ].administrative_id
+                ward_id = customer.customer_administrative[0].administrative_id
 
             customer_name = customer.phone_number
             if customer.full_name:
@@ -405,8 +458,7 @@ async def whatsapp_webhook(
         if not is_new_customer:
             reconnection_service = ReconnectionService(db)
             reconnection_service.update_customer_last_message(
-                customer_id=customer.id,
-                from_source=MessageFrom.CUSTOMER
+                customer_id=customer.id, from_source=MessageFrom.CUSTOMER
             )
 
         return {"status": "success", "message": "Message processed"}

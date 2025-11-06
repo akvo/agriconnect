@@ -12,11 +12,23 @@ from models import Administrative, AdministrativeLevel, Base
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def build_ltree_path(parent_path: str, code: str) -> str:
-    """Build ltree path from parent path and code"""
+def build_human_readable_path(parent_path: str, name: str) -> str:
+    """
+    Build human-readable path from parent path and name.
+
+    Format: "Country > Region > District > Ward"
+    Example: "Kenya > Nairobi Region > Central District > Westlands Ward"
+
+    Args:
+        parent_path: Parent's path (or empty for root)
+        name: Current administrative area name
+
+    Returns:
+        Full hierarchical path with '>' separator
+    """
     if parent_path:
-        return f"{parent_path}.{code}"
-    return code
+        return f"{parent_path} > {name}"
+    return name
 
 
 def get_or_create_level(db: Session, level_name: str) -> AdministrativeLevel:
@@ -156,15 +168,17 @@ def seed_administrative_data(db: Session, rows: list) -> dict:
                 ):
                     existing.name = name
                     existing.parent_id = parent.id if parent else None
-                    existing.path = build_ltree_path(
-                        parent.path if parent else "", code
+                    existing.path = build_human_readable_path(
+                        parent.path if parent else "", name
                     )
                     stats["updated"] += 1
                 else:
                     stats["skipped"] += 1
             else:
                 # Create new
-                path = build_ltree_path(parent.path if parent else "", code)
+                path = build_human_readable_path(
+                    parent.path if parent else "", name
+                )
                 admin = Administrative(
                     code=code,
                     name=name,
