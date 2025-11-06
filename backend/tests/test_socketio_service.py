@@ -35,6 +35,7 @@ from services.socketio_service import (
 )
 from models.user import User, UserType
 from models.administrative import UserAdministrative
+from models.message import MessageFrom
 
 
 class TestSocketIOConnection:
@@ -421,6 +422,9 @@ class TestEventEmissions:
                 ticket_id=1,
                 message_id=100,
                 suggestion="This is an AI suggestion",
+                customer_id=5,
+                message_sid="ai_test_123",
+                created_at="2025-11-06T10:00:00Z",
                 administrative_id=10,
             )
 
@@ -429,6 +433,19 @@ class TestEventEmissions:
             assert all(e["event"] == "whisper" for e in emitted_events)
             assert any(e["room"] == "ward:admin" for e in emitted_events)
             assert any(e["room"] == "ward:10" for e in emitted_events)
+            # Verify event data includes all required fields
+            assert all(e["data"]["customer_id"] == 5 for e in emitted_events)
+            assert all(
+                e["data"]["message_sid"] == "ai_test_123"
+                for e in emitted_events
+            )
+            assert all(
+                e["data"]["from_source"] == MessageFrom.LLM
+                for e in emitted_events
+            )
+            assert all(
+                e["data"]["message_type"] == "WHISPER" for e in emitted_events
+            )
 
     @pytest.mark.asyncio
     async def test_emit_playground_response(self):
