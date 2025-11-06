@@ -14,23 +14,49 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models.customer import Customer
+from models.customer import Customer, OnboardingStatus
 from models.message import Message, MessageType
 from models.ticket import Ticket
-from models.administrative import Administrative
+from models.administrative import Administrative, CustomerAdministrative
 from seeder.administrative import seed_administrative_data
 
 
 @pytest.fixture
 def test_customer(db_session: Session):
-    """Create a test customer"""
+    """Create a test customer with completed onboarding"""
     customer = Customer(
         phone_number="+1234567890",
         full_name="Test Farmer",
+        onboarding_status=OnboardingStatus.COMPLETED,
     )
     db_session.add(customer)
     db_session.commit()
     db_session.refresh(customer)
+
+    # Link to administrative data to skip onboarding
+    rows = [
+        {
+            "code": "TEST_WARD",
+            "name": "Test Ward",
+            "level": "Ward",
+            "parent_code": "",
+        }
+    ]
+    seed_administrative_data(db_session, rows)
+
+    admin = (
+        db_session.query(Administrative)
+        .filter(Administrative.code == "TEST_WARD")
+        .first()
+    )
+
+    customer_admin = CustomerAdministrative(
+        customer_id=customer.id,
+        administrative_id=admin.id,
+    )
+    db_session.add(customer_admin)
+    db_session.commit()
+
     return customer
 
 
@@ -527,7 +553,15 @@ class TestTicketBasedMessageTypeRouting:
         Test that a customer without an existing ticket
         has message stored correctly (REPLY mode path)
         """
-        with patch("routers.whatsapp.emit_message_received") as mock_emit:
+        with (
+            patch("routers.whatsapp.emit_message_received") as mock_emit,
+            patch("routers.whatsapp.get_onboarding_service") as mock_onb_svc,
+        ):
+            # Mock onboarding service to skip onboarding
+            mock_onb_instance = MagicMock()
+            mock_onb_instance.needs_onboarding.return_value = False
+            mock_onb_svc.return_value = mock_onb_instance
+
             response = client.post(
                 "/api/whatsapp/webhook",
                 data={
@@ -632,19 +666,6 @@ class TestTicketBasedMessageTypeRouting:
         )
         db_session.add(ai_reply)
         db_session.commit()
-
-        # Seed administrative data for ticket creation
-        from seeder.administrative import seed_administrative_data
-
-        rows = [
-            {
-                "code": "WARD1",
-                "name": "Ward 1",
-                "level": "Ward",
-                "parent_code": "",
-            }
-        ]
-        seed_administrative_data(db_session, rows)
 
         with (
             patch("routers.whatsapp.emit_message_received"),

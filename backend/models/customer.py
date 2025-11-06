@@ -1,6 +1,14 @@
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, Integer, String, ForeignKey
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Enum,
+    Integer,
+    String,
+    ForeignKey,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -16,6 +24,13 @@ class AgeGroup(enum.Enum):
     AGE_20_35 = "20-35"
     AGE_36_50 = "36-50"
     AGE_51_PLUS = "51+"
+
+
+class OnboardingStatus(enum.Enum):
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class Customer(Base):
@@ -35,6 +50,17 @@ class Customer(Base):
     last_message_at = Column(DateTime(timezone=True), nullable=True)
     last_message_from = Column(Integer, nullable=True)  # MessageFrom value
 
+    # AI Onboarding tracking
+    onboarding_status = Column(
+        Enum(OnboardingStatus),
+        default=OnboardingStatus.NOT_STARTED,
+        nullable=False,
+    )
+    onboarding_attempts = Column(Integer, default=0, nullable=False)
+    onboarding_candidates = Column(
+        Text, nullable=True
+    )  # JSON array of ward IDs
+
     messages = relationship(
         "Message", back_populates="customer", cascade="all, delete-orphan"
     )
@@ -42,9 +68,7 @@ class Customer(Base):
         "CustomerAdministrative", back_populates="customer"
     )
     tickets = relationship("Ticket", back_populates="customer")
-    crop_type = relationship(
-        "CropType", back_populates="customers"
-    )
+    crop_type = relationship("CropType", back_populates="customers")
 
     def needs_reconnection_template(self, threshold_hours: int = 24) -> bool:
         """
@@ -81,6 +105,4 @@ class CropType(Base):
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    customers = relationship(
-        "Customer", back_populates="crop_type"
-    )
+    customers = relationship("Customer", back_populates="crop_type")

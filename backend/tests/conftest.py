@@ -54,7 +54,7 @@ from sqlalchemy.orm import sessionmaker
 
 from database import Base, get_db
 from main import app
-from models.customer import AgeGroup
+from models.customer import AgeGroup, OnboardingStatus
 from models.message import DeliveryStatus
 
 # CRITICAL: Set testing environment to prevent real API calls
@@ -78,9 +78,11 @@ def test_db():
     # Create enum types before creating tables
     age_group_enum = sa.Enum(AgeGroup, name="agegroup")
     delivery_status_enum = sa.Enum(DeliveryStatus, name="deliverystatus")
+    onboarding_status_enum = sa.Enum(OnboardingStatus, name="onboardingstatus")
 
     age_group_enum.create(engine, checkfirst=True)
     delivery_status_enum.create(engine, checkfirst=True)
+    onboarding_status_enum.create(engine, checkfirst=True)
 
     # Create tables
     Base.metadata.create_all(bind=engine)
@@ -89,6 +91,7 @@ def test_db():
     Base.metadata.drop_all(bind=engine)
 
     # Drop enum types
+    onboarding_status_enum.drop(engine, checkfirst=True)
     delivery_status_enum.drop(engine, checkfirst=True)
     age_group_enum.drop(engine, checkfirst=True)
 
