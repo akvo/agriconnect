@@ -92,6 +92,11 @@ export const useChatWebSocket = ({
             savedMessage.id,
           );
 
+          // Update last message info in ticket
+          await daoManager.ticket.update(db, ticket.id, {
+            lastMessageId: event.message_id,
+          });
+
           if (dbMessage) {
             const uiMessage = convertToUIMessage(dbMessage, userId);
 

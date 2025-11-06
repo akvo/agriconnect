@@ -40,6 +40,7 @@ interface TicketData {
   resolver?: { id: number; name: string } | null;
   resolvedAt?: string | null;
   createdAt?: string | null;
+  messageId?: number;
 }
 
 interface UseTicketDataReturn {
@@ -103,6 +104,7 @@ export const useTicketData = (
             resolver: ticketData.resolver,
             resolvedAt: ticketData.resolvedAt,
             createdAt: ticketData.createdAt,
+            messageId: ticketData.message?.id,
           });
 
           console.log(

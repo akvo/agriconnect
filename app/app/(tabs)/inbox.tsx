@@ -198,8 +198,31 @@ const Inbox: React.FC = () => {
           const newUnreadCount = (ticket.unreadCount || 0) + 1;
           await daoManager.ticket.update(db, ticket.id, {
             unreadCount: newUnreadCount,
-            lastMessageId: event.message_id,
           });
+
+          // find message id before adding to lastMessage
+          const lastMessage = await daoManager.message.findById(
+            db,
+            event.message_id,
+          );
+          if (lastMessage) {
+            await daoManager.ticket.update(db, ticket.id, {
+              lastMessageId: lastMessage.id,
+            });
+          } else {
+            daoManager.message.upsert(db, {
+              id: event.message_id,
+              from_source: event.from_source,
+              message_sid: event.message_sid,
+              customer_id: event.customer_id,
+              user_id: null,
+              body: event.body,
+              createdAt: event.ts,
+            });
+            await daoManager.ticket.update(db, ticket.id, {
+              lastMessageId: event.message_id,
+            });
+          }
 
           // Update local state immediately for instant UI update
           setTickets((prev: Ticket[]) =>
@@ -227,11 +250,8 @@ const Inbox: React.FC = () => {
           console.log(
             `[Inbox] Ticket ${event.ticket_id} not found in current list`,
           );
-          // Optionally fetch the ticket if it's a new one
-          if (activeTab === Tabs.PENDING && page === 1) {
-            // Refresh first page to include new ticket
-            fetchTickets(activeTab, 1, false, false);
-          }
+          // Refresh first page to include new ticket
+          fetchTickets(activeTab, 1, false, false);
         }
       } catch (error) {
         console.error("[Inbox] Error handling message_created event:", error);

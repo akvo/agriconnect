@@ -1,11 +1,12 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
-import { SQLiteDatabase } from "expo-sqlite";
 import { api } from "@/services/api";
 import { DAOManager } from "@/database/dao";
 import { Message } from "@/utils/chat";
 import { MessageFrom } from "@/constants/messageSource";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDatabase } from "@/database/context";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 
@@ -22,10 +23,6 @@ interface ChatInputProps {
   text: string;
   setText: React.Dispatch<React.SetStateAction<string>>;
   ticket: TicketData;
-  userId: number | undefined;
-  accessToken: string | undefined;
-  db: SQLiteDatabase;
-  daoManager: DAOManager;
   aiSuggestionUsed: boolean;
   scrollToBottom: (animated?: boolean) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -35,20 +32,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   text,
   setText,
   ticket,
-  userId,
-  accessToken,
-  db,
-  daoManager,
   aiSuggestionUsed,
   scrollToBottom,
   setMessages,
 }) => {
+  const { user } = useAuth();
+  const db = useDatabase();
+  const daoManager = useMemo(() => new DAOManager(db), [db]);
+
   const handleSend = async () => {
     if (
       text.trim().length === 0 ||
       !ticket?.id ||
       !ticket?.customer?.id ||
-      !userId
+      !user?.id
     ) {
       return;
     }
@@ -82,7 +79,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       );
       try {
         const response = await api.sendMessage(
-          accessToken || "",
+          user?.accessToken || "",
           ticket.id,
           messageText,
           MessageFrom.USER,
@@ -99,7 +96,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           from_source: MessageFrom.USER,
           message_sid: response.message_sid,
           customer_id: ticket.customer.id,
-          user_id: userId || null,
+          user_id: user?.id || null,
           body: messageText,
           createdAt: response.created_at,
         });
