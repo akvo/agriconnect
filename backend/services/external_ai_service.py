@@ -224,6 +224,87 @@ class ExternalAIService:
         )
         return None  # Placeholder
 
+    async def manage_knowledge_base(
+        self,
+        operation: str,
+        name: str,
+        description: Optional[str] = None,
+        kb_id: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Perform knowledge base operations with external AI service.
+
+        Args:
+            operation: Operation type (e.g., 'create', 'update', 'delete')
+            name: Knowledge base name
+            description: Optional description
+
+        Returns:
+            Operation response, or None if not configured
+        """
+        if not self.is_configured():
+            logger.error(
+                "[ExternalAIService] Cannot perform KB operation - "
+                "not configured or kb_url missing"
+            )
+            return None
+
+        url = self.token.kb_url
+        headers = {"Authorization": f"Bearer {self.token.access_token}"}
+
+        payload = {
+            "name": name,
+            "description": description,
+            "is_default": False,
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                if operation == "create":
+                    response = await client.post(
+                        url, json=payload, headers=headers, timeout=30.0
+                    )
+                elif operation == "update":
+                    response = await client.put(
+                        f"{url}/{kb_id}",
+                        json=payload,
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                elif operation == "delete":
+                    response = await client.delete(
+                        f"{url}/{kb_id}",
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                else:
+                    logger.error(
+                        f"[ExternalAIService] Unknown KB operation: {operation}"  # noqa
+                    )
+                    return None
+
+                logger.debug(
+                    f"[ExternalAIService] Response body: {response.text}"
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                logger.info(
+                    f"✓ KB operation '{operation}' successful for '{name}' "
+                    f"(service: {self.token.service_name})"
+                )
+                return data
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"✗ Failed KB operation '{operation}': "
+                f"HTTP {e.response.status_code} - {e.response.text}"
+                f"URL: {url}"
+            )
+            return None
+        except Exception as e:
+            logger.error(f"✗ Failed KB operation '{operation}': {e}")
+            return None
+
 
 def get_external_ai_service(db: Session) -> ExternalAIService:
     """Get ExternalAIService instance"""

@@ -17,10 +17,11 @@ class KnowledgeBaseService:
         description: Optional[str] = None,
         extra_data: Optional[dict] = None,
         service_id: Optional[int] = None,
+        id: Optional[str] = None,
     ) -> KnowledgeBase:
         """Create a new knowledge base entry."""
         kb = KnowledgeBase(
-            id=str(uuid4()),
+            id=id or str(uuid4()),
             user_id=user_id,
             title=title,
             description=description,

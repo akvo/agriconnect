@@ -11,9 +11,6 @@ class KnowledgeBaseCreate(BaseModel):
     extra_data: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata"
     )
-    service_id: Optional[int] = Field(
-        None, description="Linked service ID (optional)"
-    )
 
 
 class KnowledgeBaseUpdate(BaseModel):

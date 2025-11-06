@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models import ServiceToken
@@ -13,6 +14,8 @@ def service_token(db_session: Session) -> ServiceToken:
         access_token="testtoken",
         chat_url="https://api.testservice.com/chat",
         upload_url="https://api.testservice.com/upload",
+        kb_url="https://api.testservice.com/kb",
+        document_url="https://api.testservice.com/document",
         default_prompt="You are an AI assistant.",
         active=1,
     )
@@ -22,25 +25,43 @@ def service_token(db_session: Session) -> ServiceToken:
     return token
 
 
+@pytest.fixture(scope="function")
+def mock_external_ai_service():
+    with patch(
+        "services.external_ai_service.ExternalAIService.manage_knowledge_base",
+        new_callable=AsyncMock,
+    ) as mock_method:
+        # Default mock return value
+        mock_method.return_value = {
+            "id": "mock-app-kb-id-123",
+            "knowledge_base_id": "mock-kb-id-456",
+            "name": "mock-kb-name",
+            "description": "mock-kb-description",
+            "is_default": False,
+        }
+        yield mock_method
+
+
 class TestKnowledgeBaseEndpoints:
     """Comprehensive tests for Knowledge Base API"""
 
     # ─────────────────────────────
     # CREATE
     # ─────────────────────────────
-    def test_create_knowledge_base_success(
+    @pytest.mark.asyncio
+    async def test_create_knowledge_base_success(
         self,
         client: TestClient,
         auth_headers_factory,
         db_session: Session,
         service_token: ServiceToken,
+        mock_external_ai_service,
     ):
         headers, user = auth_headers_factory(user_type="eo")
         payload = {
             "title": "My Knowledge Base",
             "description": "This is a new KB for testing.",
             "extra_data": {"topic": "AI"},
-            "service_id": service_token.id,
         }
 
         response = client.post("/api/kb", json=payload, headers=headers)
@@ -49,6 +70,13 @@ class TestKnowledgeBaseEndpoints:
         assert data["title"] == payload["title"]
         assert data["description"] == payload["description"]
         assert data["user_id"] == user.id
+
+        # Verify external service was called
+        mock_external_ai_service.assert_awaited_once_with(
+            operation="create",
+            name=payload["title"],
+            description=payload["description"],
+        )
 
     def test_create_knowledge_base_invalid_payload(
         self, client: TestClient, auth_headers_factory

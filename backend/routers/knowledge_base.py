@@ -13,9 +13,13 @@ from schemas.knowledge_base import (
 )
 from services.knowledge_base_service import KnowledgeBaseService
 from services.service_token_service import ServiceTokenService
+from services.external_ai_service import ExternalAIService
 from utils.auth_dependencies import get_current_user
 
 router = APIRouter(prefix="/kb", tags=["knowledge_base"])
+
+# TODO :: Add PATCH/PUT endpoints to update KB in RAG
+# (currently only have to set default)
 
 
 @router.post(
@@ -32,24 +36,40 @@ async def create_knowledge_base(
 ):
     """Create a new Knowledge Base"""
 
-    # check for service token if service_id is provided
-    if kb_data.service_id:
-        service_token = ServiceTokenService.get_service_token_by_id(
-            db=db, token_id=kb_data.service_id
+    # check for active service token
+    service_token = ServiceTokenService.get_active_token(db=db)
+    if not service_token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active service configured",
         )
-        if not service_token:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid service ID provided.",
-            )
+
+    # Get active service
+    ai_service = ExternalAIService(db)
+    if not ai_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No active AI service configured",
+        )
+
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="create", name=kb_data.title, description=kb_data.description
+    )
+
+    if not rag_kb_response:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to create knowledge base on external AI service.",
+        )
 
     kb = KnowledgeBaseService.create_knowledge_base(
         db=db,
+        id=str(rag_kb_response.get("knowledge_base_id")),
         user_id=current_user.id,
         title=kb_data.title,
         description=kb_data.description,
         extra_data=kb_data.extra_data,
-        service_id=kb_data.service_id,
+        service_id=service_token.id,
     )
     return kb
 
