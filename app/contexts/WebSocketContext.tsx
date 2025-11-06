@@ -28,11 +28,14 @@ const baseUrl = apiUrl.replace(/\/api\/?$/, "");
 export interface MessageCreatedEvent {
   ticket_id: number;
   message_id: number;
-  message_sid: string;
-  customer_id: number;
+  phone_number: string;
   body: string;
   from_source: number;
   ts: string;
+  // Ticket metadata for optimistic display
+  ticket_number?: string;
+  customer_name?: string;
+  customer_id?: number;
 }
 
 export interface TicketResolvedEvent {
