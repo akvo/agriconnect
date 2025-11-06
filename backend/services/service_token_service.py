@@ -55,6 +55,15 @@ class ServiceTokenService:
         )
 
     @staticmethod
+    def get_service_token_by_id(
+        db: Session, token_id: str
+    ) -> Optional[ServiceToken]:
+        """Get a service token by service name."""
+        return (
+            db.query(ServiceToken).filter(ServiceToken.id == token_id).first()
+        )
+
+    @staticmethod
     def update_token_config(
         db: Session,
         token_id: int,

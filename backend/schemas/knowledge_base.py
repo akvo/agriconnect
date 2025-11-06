@@ -1,52 +1,35 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-
 from pydantic import BaseModel, Field
-
-from schemas.callback import CallbackStage
 
 
 class KnowledgeBaseCreate(BaseModel):
-    """Schema for creating a knowledge base entry"""
-
-    filename: str = Field(
-        ..., description="Original filename of the uploaded file"
-    )
     title: str = Field(..., description="Title for the knowledge base")
     description: Optional[str] = Field(
-        None, description="Description of the knowledge base content"
+        None, description="Description of the KB"
     )
     extra_data: Optional[Dict[str, Any]] = Field(
-        None, description="Additional metadata as JSON"
+        None, description="Additional metadata"
+    )
+    service_id: Optional[int] = Field(
+        None, description="Linked service ID (optional)"
     )
 
 
 class KnowledgeBaseUpdate(BaseModel):
-    """Schema for updating a knowledge base entry"""
-
-    title: Optional[str] = Field(None, description="Updated title")
-    description: Optional[str] = Field(None, description="Updated description")
-    extra_data: Optional[Dict[str, Any]] = Field(
-        None, description="Updated metadata"
-    )
-
-
-class KnowledgeBaseStatusUpdate(BaseModel):
-    """Schema for updating KB status (used internally by callbacks)"""
-
-    status: CallbackStage = Field(..., description="New status")
+    title: Optional[str] = None
+    description: Optional[str] = None
+    extra_data: Optional[Dict[str, Any]] = None
+    active: Optional[bool] = None
 
 
 class KnowledgeBaseResponse(BaseModel):
-    """Schema for knowledge base response"""
-
-    id: int
+    id: str
     user_id: int
-    filename: str
     title: str
     description: Optional[str]
     extra_data: Optional[Dict[str, Any]]
-    status: CallbackStage
+    active: bool
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -55,9 +38,7 @@ class KnowledgeBaseResponse(BaseModel):
 
 
 class KnowledgeBaseListResponse(BaseModel):
-    """Schema for paginated knowledge base list"""
-
-    knowledge_bases: List[KnowledgeBaseResponse]
+    data: List[KnowledgeBaseResponse]
     total: int
     page: int
     size: int
