@@ -25,7 +25,6 @@ class DocumentUpdate(BaseModel):
 
     title: Optional[str] = None
     description: Optional[str] = None
-    extra_data: Optional[Dict[str, Any]] = None
 
 
 class DocumentListResponse(BaseModel):

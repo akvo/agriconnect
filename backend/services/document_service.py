@@ -85,8 +85,6 @@ class DocumentService:
     def update_document(
         db: Session,
         document_id: int,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
         extra_data: Optional[dict] = None,
     ) -> Optional[Document]:
         """Update document metadata."""
@@ -95,12 +93,8 @@ class DocumentService:
             return None
 
         # Title/description are optional, may not exist in model
-        if hasattr(document, "title") and title is not None:
-            document.title = title
-        if hasattr(document, "description") and description is not None:
-            document.description = description
         if extra_data is not None:
-            document.extra_data = extra_data
+            document.extra_data = {**document.extra_data, **extra_data}
 
         db.commit()
         db.refresh(document)
@@ -126,14 +120,3 @@ class DocumentService:
         db.commit()
         db.refresh(doc)
         return doc
-
-    @staticmethod
-    def delete_document(db: Session, document_id: int) -> bool:
-        """Delete a document."""
-        doc = DocumentService.get_document_by_id(db, document_id)
-        if not doc:
-            return False
-
-        db.delete(doc)
-        db.commit()
-        return True

@@ -216,48 +216,16 @@ async def update_document(
             detail="Not authorized to update this document.",
         )
 
+    extra_data = {}
+    if document_update.title is not None:
+        extra_data["title"] = document_update.title
+    if document_update.description is not None:
+        extra_data["description"] = document_update.description
+
     updated_doc = DocumentService.update_document(
         db=db,
         document_id=document_id,
-        extra_data=document_update.extra_data,
+        extra_data=extra_data,
     )
 
     return updated_doc
-
-
-@router.delete(
-    "/{document_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete Document",
-    description="Delete a document. Only admins or owners can delete.",
-)
-async def delete_document(
-    document_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    document = DocumentService.get_document_by_id(db, document_id)
-
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found.",
-        )
-
-    if (
-        current_user.user_type.value != "admin"
-        and document.user_id != current_user.id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete this document.",
-        )
-
-    success = DocumentService.delete_document(db, document_id)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete document.",
-        )
-
-    return None
