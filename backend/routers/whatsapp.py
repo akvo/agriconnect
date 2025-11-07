@@ -252,9 +252,9 @@ async def whatsapp_webhook(
                         0
                     ].administrative_id
 
-                customer_name = customer.phone_number
+                sender_name = customer.phone_number
                 if customer.full_name:
-                    customer_name = customer.full_name
+                    sender_name = customer.full_name
                 asyncio.create_task(
                     emit_message_received(
                         ticket_id=ticket.id,
@@ -265,7 +265,7 @@ async def whatsapp_webhook(
                         ts=message.created_at.isoformat(),
                         administrative_id=ward_id,
                         ticket_number=ticket.ticket_number,
-                        customer_name=customer_name,
+                        sender_name=sender_name,
                         sender_user_id=None,
                         customer_id=customer.id,
                     )
@@ -375,9 +375,9 @@ async def whatsapp_webhook(
             ):
                 ward_id = customer.customer_administrative[0].administrative_id
 
-            customer_name = customer.phone_number
+            sender_name = customer.phone_number
             if customer.full_name:
-                customer_name = customer.full_name
+                sender_name = customer.full_name
             asyncio.create_task(
                 emit_message_received(
                     ticket_id=existing_ticket.id,
@@ -388,7 +388,7 @@ async def whatsapp_webhook(
                     ts=message.created_at.isoformat(),
                     administrative_id=ward_id,
                     ticket_number=existing_ticket.ticket_number,
-                    customer_name=customer_name,
+                    sender_name=sender_name,
                     sender_user_id=None,
                     customer_id=customer.id,
                 )

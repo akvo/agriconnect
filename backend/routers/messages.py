@@ -282,9 +282,16 @@ async def create_message(
         if message_data.from_source == MessageFrom.USER
         else None
     )
-    customer_name = ticket.customer.phone_number
-    if ticket.customer.full_name:
-        customer_name = ticket.customer.full_name
+
+    # Set sender_name based on message source
+    if message_data.from_source == MessageFrom.USER:
+        # For admin/EO messages, use sender's full name
+        sender_name = current_user.full_name
+    else:
+        # For customer messages, use customer's name or phone
+        sender_name = ticket.customer.phone_number
+        if ticket.customer.full_name:
+            sender_name = ticket.customer.full_name
     await emit_message_received(
         ticket_id=ticket.id,
         message_id=new_message.id,
@@ -294,7 +301,7 @@ async def create_message(
         ts=new_message.created_at.isoformat(),
         administrative_id=ticket.administrative_id,
         ticket_number=ticket.ticket_number,
-        customer_name=customer_name,
+        sender_name=sender_name,
         sender_user_id=sender_id,
         customer_id=ticket.customer_id,
     )

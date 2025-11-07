@@ -383,6 +383,83 @@ class TestEventEmissions:
                 )
 
     @pytest.mark.asyncio
+    async def test_emit_message_received_with_user_id(self):
+        """Test message_received event includes user_id for admin messages"""
+        mock_sio = MagicMock()
+        emitted_events = []
+
+        async def mock_emit(event, data, room):
+            emitted_events.append({"event": event, "data": data, "room": room})
+
+        mock_sio.emit = mock_emit
+
+        with patch("services.socketio_service.get_db") as mock_get_db:
+            mock_db = MagicMock()
+            mock_db.close = MagicMock()
+            mock_get_db.return_value = iter([mock_db])
+
+            with patch("services.socketio_service.sio_server", mock_sio):
+                await emit_message_received(
+                    ticket_id=1,
+                    message_id=100,
+                    phone_number="+1234567890",
+                    body="Admin reply",
+                    from_source=MessageFrom.USER,  # Admin/EO message
+                    ts="2024-01-01T12:00:00",
+                    administrative_id=10,
+                    sender_user_id=5,  # User ID provided
+                    sender_name="John Doe",
+                )
+
+                # Verify user_id is in payload, customer_id is not
+                assert len(emitted_events) >= 2
+                for event in emitted_events:
+                    assert "user_id" in event["data"]
+                    assert event["data"]["user_id"] == 5
+                    assert "customer_id" not in event["data"]
+                    assert event["data"]["sender_name"] == "John Doe"
+
+    @pytest.mark.asyncio
+    async def test_emit_message_received_with_customer_id(self):
+        """
+        Test message_received event includes customer_id for customer messages
+        """
+        mock_sio = MagicMock()
+        emitted_events = []
+
+        async def mock_emit(event, data, room):
+            emitted_events.append({"event": event, "data": data, "room": room})
+
+        mock_sio.emit = mock_emit
+
+        with patch("services.socketio_service.get_db") as mock_get_db:
+            mock_db = MagicMock()
+            mock_db.close = MagicMock()
+            mock_get_db.return_value = iter([mock_db])
+
+            with patch("services.socketio_service.sio_server", mock_sio):
+                await emit_message_received(
+                    ticket_id=1,
+                    message_id=100,
+                    phone_number="+1234567890",
+                    body="Customer message",
+                    from_source=MessageFrom.CUSTOMER,  # Customer message
+                    ts="2024-01-01T12:00:00",
+                    administrative_id=10,
+                    sender_user_id=None,  # No user ID
+                    customer_id=50,  # Customer ID provided
+                    sender_name="Jane Smith",
+                )
+
+                # Verify customer_id is in payload, user_id is not
+                assert len(emitted_events) >= 2
+                for event in emitted_events:
+                    assert "customer_id" in event["data"]
+                    assert event["data"]["customer_id"] == 50
+                    assert "user_id" not in event["data"]
+                    assert event["data"]["sender_name"] == "Jane Smith"
+
+    @pytest.mark.asyncio
     async def test_emit_ticket_resolved(self):
         """Test ticket_resolved event emission"""
         mock_sio = MagicMock()

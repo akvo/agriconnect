@@ -245,7 +245,7 @@ async def emit_message_received(
     ts: str,  # timestamp as ISO string
     administrative_id: Optional[int] = None,
     ticket_number: str = None,
-    customer_name: str = None,
+    sender_name: str = None,
     sender_user_id: Optional[int] = None,
     customer_id: Optional[int] = None,
 ):
@@ -258,9 +258,14 @@ async def emit_message_received(
         "from_source": from_source,
         "ts": ts,
         "ticket_number": ticket_number,
-        "customer_name": customer_name,
-        "customer_id": customer_id,
+        "sender_name": sender_name,
     }
+
+    # Conditional field based on sender type
+    if sender_user_id:
+        event_data["user_id"] = sender_user_id
+    else:
+        event_data["customer_id"] = customer_id
 
     # Emit to ward room
     if administrative_id:
@@ -288,7 +293,7 @@ async def emit_message_received(
         push_service.notify_new_message(
             ticket_id=ticket_id,
             ticket_number=ticket_number,
-            customer_name=customer_name,
+            customer_name=sender_name,
             administrative_id=administrative_id,
             message_id=message_id,
             message_body=body,
