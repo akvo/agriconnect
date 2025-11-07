@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User, UserType
 from models.administrative import UserAdministrative
-from models.message import MessageFrom
 from services.push_notification_service import PushNotificationService
 from services.user_service import UserService
 from utils.auth import verify_token
@@ -332,7 +331,6 @@ async def emit_whisper_created(
     message_id: int,
     suggestion: str,
     customer_id: int,
-    message_sid: str,
     created_at: str,
     administrative_id: Optional[int] = None,
 ):
@@ -342,9 +340,6 @@ async def emit_whisper_created(
         "message_id": message_id,
         "suggestion": suggestion,
         "customer_id": customer_id,
-        "message_sid": message_sid,
-        "from_source": MessageFrom.LLM,
-        "message_type": "WHISPER",
         "ts": created_at,
     }
 

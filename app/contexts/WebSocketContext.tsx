@@ -34,9 +34,9 @@ export interface MessageCreatedEvent {
   ts: string;
   // Ticket metadata for optimistic display
   ticket_number?: string;
-  sender_name?: string;  // Renamed from customer_name for semantic clarity
-  user_id?: number;      // Present for admin/EO messages (from_source=2)
-  customer_id?: number;  // Present for customer messages (from_source=1)
+  sender_name?: string; // Renamed from customer_name for semantic clarity
+  user_id?: number; // Present for admin/EO messages (from_source=2)
+  customer_id?: number; // Present for customer messages (from_source=1)
 }
 
 export interface TicketResolvedEvent {
@@ -49,9 +49,6 @@ export interface WhisperCreatedEvent {
   ticket_id: number;
   suggestion: string;
   customer_id: number;
-  message_sid: string;
-  from_source: number;
-  message_type: string;
   ts: string;
 }
 
