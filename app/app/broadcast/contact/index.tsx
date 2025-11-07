@@ -22,7 +22,7 @@ import { useBroadcast } from "@/contexts/BroadcastContext";
 import { AGE_GROUPS } from "@/constants/customer";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
-import { initialsFromName } from "@/utils/string";
+import { capitalizeFirstLetter, initialsFromName } from "@/utils/string";
 
 // Constants
 const PAGE_SIZE = 10;
@@ -54,18 +54,14 @@ interface CustomerListResponse {
   size: number;
 }
 
-// Helper functions
-const capitalizeFirstLetter = (str: string | null): string => {
-  if (!str) {
-    return "";
-  }
-  return str.charAt(0).toUpperCase() + str.slice(1).replace("_", " ");
-};
-
 const BroadcastFarmerListTab = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const { setSelectedMembers } = useBroadcast();
+  const {
+    setSelectedMembers,
+    setSelectedCropTypes: setContextCropTypes,
+    setSelectedAgeGroups: setContextAgeGroups,
+  } = useBroadcast();
   const isAdmin = user?.userType === "admin";
 
   // State
@@ -230,9 +226,13 @@ const BroadcastFarmerListTab = () => {
         }
 
         /**
-         * Set single crop type selection
+         * Toggle multiple crop type selection
          */
-        return cropTypeIds.includes(cropTypeID) ? [] : [cropTypeID];
+        if (cropTypeIds.includes(cropTypeID)) {
+          return cropTypeIds.filter((id) => id !== cropTypeID);
+        } else {
+          return [...cropTypeIds, cropTypeID];
+        }
       });
     },
     [cropTypes],
@@ -267,11 +267,22 @@ const BroadcastFarmerListTab = () => {
     // Get selected customers from the full list
     const selectedCustomers = customers.filter((c) => selectedIds.has(c.id));
 
-    // Update context with selected members and navigate after state is committed
+    // Update context with selected members, crop types, and age groups
+    setContextCropTypes(selectedCropTypes);
+    setContextAgeGroups(selectedAgeGroups);
     setSelectedMembers(selectedCustomers, () => {
       router.push("/broadcast/create");
     });
-  }, [selectedIds, customers, setSelectedMembers, router]);
+  }, [
+    selectedIds,
+    customers,
+    selectedCropTypes,
+    selectedAgeGroups,
+    setSelectedMembers,
+    setContextCropTypes,
+    setContextAgeGroups,
+    router,
+  ]);
 
   // Render item
   const renderItem = useCallback(

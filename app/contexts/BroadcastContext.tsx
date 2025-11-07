@@ -33,6 +33,10 @@ interface BroadcastContextType {
   addMember: (member: Customer) => void;
   removeMember: (memberId: number) => void;
   clearMembers: () => void;
+  selectedCropTypes: number[];
+  setSelectedCropTypes: (cropTypes: number[]) => void;
+  selectedAgeGroups: string[];
+  setSelectedAgeGroups: (ageGroups: string[]) => void;
 }
 
 const BroadcastContext = createContext<BroadcastContextType | undefined>(
@@ -41,6 +45,8 @@ const BroadcastContext = createContext<BroadcastContextType | undefined>(
 
 export const BroadcastProvider = ({ children }: { children: ReactNode }) => {
   const [selectedMembers, setSelectedMembersState] = useState<Customer[]>([]);
+  const [selectedCropTypes, setSelectedCropTypes] = useState<number[]>([]);
+  const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const callbackRef = useRef<(() => void) | null>(null);
 
   // Call the callback after state updates
@@ -85,6 +91,10 @@ export const BroadcastProvider = ({ children }: { children: ReactNode }) => {
         addMember,
         removeMember,
         clearMembers,
+        selectedCropTypes,
+        setSelectedCropTypes,
+        selectedAgeGroups,
+        setSelectedAgeGroups,
       }}
     >
       {children}

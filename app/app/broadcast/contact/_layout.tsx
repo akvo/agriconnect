@@ -94,6 +94,7 @@ const BroadcastLayout = () => {
 
 const styles = StyleSheet.create({
   tabsContainer: {
+    marginTop: 16,
     paddingHorizontal: 16,
     paddingBottom: 16,
     backgroundColor: themeColors.background,
