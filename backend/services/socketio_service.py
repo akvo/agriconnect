@@ -257,7 +257,6 @@ async def emit_message_received(
         "body": body,
         "from_source": from_source,
         "ts": ts,
-        # Ticket metadata for optimistic display (not administrative_id - used for routing only)
         "ticket_number": ticket_number,
         "customer_name": customer_name,
         "customer_id": customer_id,

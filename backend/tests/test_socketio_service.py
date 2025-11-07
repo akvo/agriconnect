@@ -366,7 +366,7 @@ class TestEventEmissions:
                 await emit_message_received(
                     ticket_id=1,
                     message_id=100,
-                    message_sid="SM123456",
+                    phone_number="+1234567890",
                     customer_id=50,
                     body="Test message",
                     from_source=1,
