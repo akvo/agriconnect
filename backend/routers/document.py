@@ -20,6 +20,8 @@ from schemas import (
     DocumentListResponse,
 )
 from services.document_service import DocumentService
+from services.external_ai_service import ExternalAIService
+from services.knowledge_base_service import KnowledgeBaseService
 from utils.auth_dependencies import get_current_user
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -57,7 +59,25 @@ async def create_document(
             detail="Unsupported file, only PDF, TXT, and DOCX are allowed.",
         )
 
+    if not KnowledgeBaseService.get_knowledge_base_by_id(db, kb_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Knowledge Base not found.",
+        )
+
     try:
+        ai_service = ExternalAIService(db=db)
+        if not ai_service.is_configured():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No active AI service configured",
+            )
+
+        extra_data = {
+            "title": title,
+            "description": description,
+        }
+
         document = DocumentService.create_document(
             db=db,
             user_id=current_user.id,
@@ -65,11 +85,29 @@ async def create_document(
             filename=file.filename,
             content_type=file.content_type,
             file_size=getattr(file, "size", None),
-            extra_data={
-                "title": title,
-                "description": description,
-            },
+            extra_data=extra_data,
         )
+
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to save document record.",
+            )
+
+        rag_doc_response = await ai_service.create_upload_job(
+            upload_file=file,
+            kb_id=kb_id,
+            document_id=document.id,
+            user_id=current_user.id,
+            metadata=extra_data,
+        )
+
+        if not rag_doc_response:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to upload document to external AI service.",
+            )
+
         return document
 
     except Exception as e:
@@ -111,7 +149,7 @@ async def list_documents(
     )
 
     return DocumentListResponse(
-        documents=documents,
+        data=documents,
         total=total,
         page=page,
         size=size,

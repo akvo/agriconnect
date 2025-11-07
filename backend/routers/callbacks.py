@@ -1,3 +1,4 @@
+import json
 import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,11 +14,13 @@ from schemas.callback import (
     TwilioStatusCallback,
     MessageType,
     CallbackStage,
+    KBCallbackParams,
 )
 from services.message_service import MessageService
 from services.whatsapp_service import WhatsAppService
 from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
+from services.document_service import DocumentService
 from routers.ws import emit_whisper_created
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
@@ -356,58 +359,63 @@ async def kb_callback(
         # Log the callback for debugging
         print("KB Callback received:")
         print(f"Job ID: {payload.job_id}")
-        print(f"Stage: {payload.stage}")
-        print(f"Job Type: {payload.job}")
+        print(f"Status: {payload.status}")
+        print(f"Callback params: {payload.callback_params}")
+
+        callback_params = (
+            json.loads(payload.callback_params)
+            if isinstance(payload.callback_params, str)
+            else payload.callback_params
+        )
+        callback_params = KBCallbackParams(
+            kb_id=callback_params.get("kb_id"),
+            document_id=callback_params.get("document_id"),
+            user_id=callback_params.get("user_id"),
+        )
 
         # Process the callback based on stage
-        if payload.stage.value == "done":
+        if payload.status == CallbackStage.COMPLETED:
             # Handle successful KB upload/processing
-            print(f"KB processing completed for job: {payload.job_id}")
+            print(f"KB DOC processing completed for job: {payload.job_id}")
 
             # Update KB status in database if kb_id is provided
-            if payload.callback_params and payload.callback_params.kb_id:
-                from services.knowledge_base_service import (
-                    KnowledgeBaseService,
+            if payload.callback_params and callback_params.document_id:
+                updated_doc = DocumentService.update_document_status(
+                    db=db,
+                    document_id=callback_params.document_id,
+                    status=CallbackStage.COMPLETED,
                 )
-
-                kb_service = KnowledgeBaseService(db)
-                updated_kb = kb_service.update_status(
-                    payload.callback_params.kb_id, payload.stage
-                )
-                if updated_kb:
+                if updated_doc:
                     print(
-                        f"KB status updated to DONE for KB ID: {updated_kb.id}"
+                        f"KB DOC status updated to DONE for KB ID: {updated_doc.id}"
                     )
                 else:
                     print(
-                        f"Failed to update KB status for KB ID: {payload.callback_params.kb_id}"
+                        f"Failed to update KB DOC status for KB ID: {payload.callback_params.kb_id}"
                     )
 
             # Here you would typically also:
             # 1. Notify users that KB is ready
             # 2. Enable KB for queries
 
-        elif payload.stage.value in ["failed", "timeout"]:
+        elif payload.status in ["failed", "timeout"]:
             # Handle error cases
-            print(f"KB processing failed: {payload.stage}")
+            print(f"KB DOC processing failed: {payload.status}")
 
             # Update KB status in database if kb_id is provided
-            if payload.callback_params and payload.callback_params.kb_id:
-                from services.knowledge_base_service import (
-                    KnowledgeBaseService,
+            if payload.callback_params and callback_params.document_id:
+                updated_doc = DocumentService.update_document_status(
+                    db=db,
+                    document_id=callback_params.document_id,
+                    status=payload.status,
                 )
-
-                kb_service = KnowledgeBaseService(db)
-                updated_kb = kb_service.update_status(
-                    payload.callback_params.kb_id, payload.stage
-                )
-                if updated_kb:
+                if updated_doc:
                     print(
-                        f"KB status updated to {payload.stage.value.upper()} for KB ID: {updated_kb.id}"
+                        f"KB DOC status updated to {payload.status} for DOC ID: {updated_doc.id}"
                     )
                 else:
                     print(
-                        f"Failed to update KB status for KB ID: {payload.callback_params.kb_id}"
+                        f"Failed to update KB DOC status for DOC ID: {payload.callback_params.get('document_id')}"
                     )
 
             # Notify users of failure

@@ -193,16 +193,19 @@ class ExternalAIService:
 
     async def create_upload_job(
         self,
-        file_path: str,
-        kb_id: int,
+        upload_file,
+        kb_id: str,
+        document_id: int,
+        user_id: int,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Create an upload job with external AI service.
 
         Args:
-            file_path: Path to file to upload
+            upload_file: File to upload to external service
             kb_id: Knowledge base ID
+            document_id: Document ID as a callback to update document status
             metadata: Optional metadata for the upload
 
         Returns:
@@ -215,14 +218,56 @@ class ExternalAIService:
             )
             return None
 
-        # TODO: Implement file upload logic
-        # This depends on how external service expects files
+        url = self.token.upload_url
+        headers = {"Authorization": f"Bearer {self.token.access_token}"}
 
-        logger.info(
-            f"Upload job creation for KB {kb_id} "
-            f"to {self.token.service_name}"
-        )
-        return None  # Placeholder
+        # Payload RAG expects
+        payload = {
+            "job": "upload",
+            "metadata": metadata or {},
+            "callback_params": {
+                "kb_id": kb_id,
+                "document_id": document_id,
+                "user_id": user_id,
+            },
+            "knowledge_base_id": kb_id,
+        }
+        form_data = {"payload": json.dumps(payload)}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                files = {
+                    "files": (
+                        upload_file.filename,
+                        await upload_file.read(),
+                        upload_file.content_type,
+                    )
+                }
+                response = await client.post(
+                    url,
+                    headers=headers,
+                    data=form_data,
+                    files=files,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+
+                data = response.json()
+                logger.info(
+                    f"✓ File '{upload_file.filename}' uploaded successfully."
+                    f"with URL: {url}"
+                )
+                return data
+
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "✗ RAG upload failed:",
+                f"HTTP {e.response.status_code} - {e.response.text}",
+            )
+            return None
+        except Exception as e:
+            logger.exception(f"✗ Unexpected error during RAG upload: {e}")
+            return None
 
     async def manage_knowledge_base(
         self,
@@ -242,7 +287,7 @@ class ExternalAIService:
         Returns:
             Operation response, or None if not configured
         """
-        if not self.is_configured():
+        if not self.is_configured() or not self.token.kb_url:
             logger.error(
                 "[ExternalAIService] Cannot perform KB operation - "
                 "not configured or kb_url missing"

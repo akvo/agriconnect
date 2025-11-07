@@ -31,7 +31,7 @@ class DocumentUpdate(BaseModel):
 class DocumentListResponse(BaseModel):
     """Paginated list of documents."""
 
-    documents: List[DocumentResponse]
+    data: List[DocumentResponse]
     total: int
     page: int
     size: int
