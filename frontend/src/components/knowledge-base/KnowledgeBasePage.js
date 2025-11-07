@@ -2,23 +2,20 @@
 
 import { useState, useEffect } from "react";
 import {
-  PlusIcon,
   MagnifyingGlassIcon,
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../contexts/AuthContext";
+import { useRouter } from "next/navigation";
 import HeaderNav from "../HeaderNav";
 import EditUserModal from "../users/EditUserModal";
 import KnowledgeBaseList from "./KnowledgeBaseList";
-import KnowledgeBaseUploadModal from "./KnowledgeBaseUploadModal";
 import knowledgeBaseApi from "../../lib/knowledgeBaseApi";
 
 export default function KnowledgeBasePage() {
   const { user, refreshUser, loading: authLoading } = useAuth();
   const [knowledgeBases, setKnowledgeBases] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,6 +23,7 @@ export default function KnowledgeBasePage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const ITEMS_PER_PAGE = 10;
+  const router = useRouter();
 
   const fetchKnowledgeBases = async (page = 1, search = null) => {
     try {
@@ -36,8 +34,7 @@ export default function KnowledgeBasePage() {
         ITEMS_PER_PAGE,
         search
       );
-
-      setKnowledgeBases(response.knowledge_bases || []);
+      setKnowledgeBases(response.data || []);
       setTotalCount(response.total || 0);
       setCurrentPage(page);
     } catch (err) {
@@ -63,28 +60,8 @@ export default function KnowledgeBasePage() {
     }
   }, [user, authLoading]);
 
-  const handleUpload = async (formData) => {
-    setUploading(true);
-    try {
-      await knowledgeBaseApi.create(formData);
-      // Refresh the list after successful upload
-      await fetchKnowledgeBases(1, searchQuery || null);
-      setUploadModalOpen(false);
-    } catch (err) {
-      throw err; // Re-throw to be handled by the modal
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleViewKnowledgeBase = (kb) => {
-    // TODO: Implement view modal or navigate to detail page
-    console.log("View KB:", kb);
-  };
-
-  const handleEditKnowledgeBase = async (kb) => {
-    // TODO: Implement edit modal
-    console.log("Edit KB:", kb);
+  const handleEditKnowledgeBase = async (kb_id) => {
+    router.push(`/knowledge-base/${kb_id}`);
   };
 
   const handleDeleteKnowledgeBase = async (kb) => {
@@ -112,9 +89,6 @@ export default function KnowledgeBasePage() {
     fetchKnowledgeBases(1, newSearchQuery || null);
   };
 
-  const handleRefresh = () => {
-    fetchKnowledgeBases(currentPage, searchQuery || null);
-  };
 
   const handleProfileClick = () => {
     setShowProfileModal(true);
@@ -148,7 +122,7 @@ export default function KnowledgeBasePage() {
             Loading Knowledge Base...
           </p>
           <p className="text-secondary-500 text-sm mt-2">
-            Please wait while we prepare your document library
+            Please wait while we prepare your knowledge base management dashboard
           </p>
         </div>
       </div>
@@ -174,184 +148,99 @@ export default function KnowledgeBasePage() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Header */}
-        <div className="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-secondary-900">
-              Knowledge Base
-            </h1>
-            <p className="mt-2 text-sm text-secondary-600">
-              Manage your document library for AI-powered assistance
-            </p>
-          </div>
-          <div className="mt-4 sm:mt-0">
-            <button
-              onClick={() => setUploadModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-              Upload Document
-            </button>
-          </div>
-        </div>
-
-        {/* Search and Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-4">
-          <div className="flex-1 max-w-lg">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={handleSearch}
-                placeholder="Search documents..."
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              <ArrowPathIcon
-                className={`-ml-1 mr-2 h-5 w-5 ${loading ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
-          </div>
-        </div>
-
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Error Message */}
         {error && (
-          <div
-            className="bg-red-50 border border-red-200 p-4"
-            style={{ borderRadius: "5px" }}
-          >
-            <div className="text-red-700">{error}</div>
-          </div>
-        )}
-
-        {/* Knowledge Base List */}
-        <div className="bg-white shadow-lg" style={{ borderRadius: "5px" }}>
-          <KnowledgeBaseList
-            knowledgeBases={filteredKnowledgeBases}
-            loading={loading}
-            onViewKnowledgeBase={handleViewKnowledgeBase}
-            onEditKnowledgeBase={handleEditKnowledgeBase}
-            onDeleteKnowledgeBase={handleDeleteKnowledgeBase}
-          />
-        </div>
-
-        {/* Pagination */}
-        {!loading && totalPages > 1 && (
-          <div
-            className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 shadow-lg"
-            style={{ borderRadius: "5px" }}
-          >
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() =>
-                  fetchKnowledgeBases(currentPage - 1, searchQuery || null)
-                }
-                disabled={currentPage <= 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() =>
-                  fetchKnowledgeBases(currentPage + 1, searchQuery || null)
-                }
-                disabled={currentPage >= totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
+            <div
+              className="bg-red-50 border border-red-200 p-4 mb-6"
+              style={{ borderRadius: "5px" }}
+            >
+              <div className="text-red-700">{error}</div>
             </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+          )}
+
+        <div className="bg-white shadow-lg" style={{ borderRadius: "5px" }}>
+          {/* Header with search and create button */}
+          <div className="px-6 py-4 border-b border-gray-600">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-700">
-                  Showing{" "}
-                  <span className="font-medium">
-                    {(currentPage - 1) * ITEMS_PER_PAGE + 1}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-medium">
-                    {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)}
-                  </span>{" "}
-                  of <span className="font-medium">{totalCount}</span> documents
+                <h2 className="text-lg font-medium text-gray-900">
+                  Knowledge Bases ({totalCount})
+                </h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  Manage Knowledge Base documents for AI-powered assistance
                 </p>
               </div>
-              <div>
-                <nav
-                  className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                  aria-label="Pagination"
+              <div className="mt-4 sm:mt-0">
+                <button
+                  // onClick={handleCreateUser}
+                  className="bg-green-600 text-white px-4 py-2 text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"
+                  style={{ borderRadius: "5px" }}
                 >
+                  Create Knowledge Base
+                </button>
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="mt-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search knowledge bases by title..."
+                  // value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 bg-gray-50 leading-5 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:bg-white cursor-text"
+                  style={{ borderRadius: "5px" }}
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Knowledge Base List */}
+        <KnowledgeBaseList
+          knowledgeBases={filteredKnowledgeBases}
+          loading={loading}
+          onEditKnowledgeBase={handleEditKnowledgeBase}
+          onDeleteKnowledgeBase={handleDeleteKnowledgeBase}
+        />
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-600">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing page {currentPage} of {totalPages}
+                </div>
+                <div className="flex space-x-2">
                   <button
                     onClick={() =>
-                      fetchKnowledgeBases(currentPage - 1, searchQuery || null)
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
                     }
-                    disabled={currentPage <= 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+                    style={{ borderRadius: "5px" }}
                   >
                     Previous
                   </button>
-                  {/* Page numbers */}
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() =>
-                          fetchKnowledgeBases(pageNum, searchQuery || null)
-                        }
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          pageNum === currentPage
-                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
                   <button
                     onClick={() =>
-                      fetchKnowledgeBases(currentPage + 1, searchQuery || null)
+                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                     }
-                    disabled={currentPage >= totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+                    style={{ borderRadius: "5px" }}
                   >
                     Next
                   </button>
-                </nav>
+                </div>
               </div>
             </div>
-          </div>
         )}
-
-        {/* Upload Modal */}
-        <KnowledgeBaseUploadModal
-          isOpen={uploadModalOpen}
-          onClose={() => setUploadModalOpen(false)}
-          onUpload={handleUpload}
-          uploading={uploading}
-        />
 
         {/* Profile Modal */}
         {showProfileModal && (
