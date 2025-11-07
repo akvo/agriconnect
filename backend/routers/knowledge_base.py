@@ -18,9 +18,6 @@ from utils.auth_dependencies import get_current_user
 
 router = APIRouter(prefix="/kb", tags=["knowledge_base"])
 
-# TODO :: Add PATCH/PUT endpoints to update KB in RAG
-# (currently only have to set default)
-
 
 @router.post(
     "",

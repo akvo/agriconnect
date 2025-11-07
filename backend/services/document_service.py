@@ -108,7 +108,11 @@ class DocumentService:
 
     @staticmethod
     def update_document_status(
-        db: Session, document_id: int, status: CallbackStage
+        db: Session,
+        document_id: int,
+        status: CallbackStage,
+        external_id: str,
+        job_id: str,
     ) -> Optional[Document]:
         """Update a document’s status."""
         doc = DocumentService.get_document_by_id(db, document_id)
@@ -116,6 +120,9 @@ class DocumentService:
             return None
 
         doc.status = status
+        doc.external_id = external_id
+        doc.job_id = job_id
+
         db.commit()
         db.refresh(doc)
         return doc

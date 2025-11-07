@@ -43,6 +43,17 @@ def upgrade() -> None:
     op.drop_column("knowledge_bases", "filename")
     op.drop_column("knowledge_bases", "status")
 
+    # --- Enum for document status ---
+    callback_stage_enum = postgresql.ENUM(
+        "QUEUED",
+        "COMPLETED",
+        "FAILED",
+        "TIMEOUT",
+        name="callbackstage",
+        create_type=False,
+    )
+    callback_stage_enum.create(op.get_bind(), checkfirst=True)
+
     # --- Create documents table ---
     op.create_table(
         "documents",
@@ -65,8 +76,23 @@ def upgrade() -> None:
         sa.Column("file_path", sa.String(), nullable=True),
         sa.Column("content_type", sa.String(), nullable=True),
         sa.Column("file_size", sa.BigInteger(), nullable=True),
-        sa.Column("status", sa.String(), default="queued", index=True),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "QUEUED",
+                "COMPLETED",
+                "FAILED",
+                "TIMEOUT",
+                name="callbackstage",
+                native_enum=False,
+            ),
+            nullable=False,
+            server_default="QUEUED",
+            index=True,
+        ),
         sa.Column("extra_data", postgresql.JSONB(), nullable=True),
+        sa.Column("external_id", sa.String(), nullable=True),
+        sa.Column("job_id", sa.String(), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -82,17 +108,28 @@ def downgrade() -> None:
     # --- Drop documents table ---
     op.drop_table("documents")
 
+    # --- Recreate ENUM type before re-adding status column ---
+    callback_stage_enum = postgresql.ENUM(
+        "QUEUED", "COMPLETED", "FAILED", "TIMEOUT", name="callbackstage"
+    )
+    callback_stage_enum.create(op.get_bind(), checkfirst=True)
+
     # --- Revert knowledge_bases table ---
     op.add_column(
         "knowledge_bases",
-        sa.Column("filename", sa.VARCHAR(), nullable=False),
+        sa.Column("filename", sa.VARCHAR(), nullable=True),
     )
     op.add_column(
         "knowledge_bases",
         sa.Column(
             "status",
-            postgresql.ENUM(
-                "QUEUED", "DONE", "FAILED", "TIMEOUT", name="callbackstage"
+            sa.Enum(
+                "QUEUED",
+                "COMPLETED",
+                "FAILED",
+                "TIMEOUT",
+                name="callbackstage",
+                native_enum=False,
             ),
             nullable=True,
         ),
@@ -109,3 +146,6 @@ def downgrade() -> None:
     op.execute(
         "ALTER TABLE knowledge_bases ALTER COLUMN id TYPE INTEGER USING id::integer"  # noqa
     )
+
+    # --- Drop ENUM type after reverting ---
+    op.execute("DROP TYPE IF EXISTS callbackstage CASCADE")

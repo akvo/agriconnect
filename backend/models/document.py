@@ -27,13 +27,22 @@ class Document(Base):
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
 
     filename = Column(String, nullable=False)
-    file_path = Column(String, nullable=True)
+    file_path = Column(
+        String, nullable=True
+    )  # From External Service (after callback)
     content_type = Column(String, nullable=True)
     file_size = Column(BigInteger, nullable=True)
     status = Column(
         Enum(CallbackStage), default=CallbackStage.QUEUED, nullable=False
     )
     extra_data = Column(JSONB, nullable=True)
+
+    external_id = Column(
+        String, nullable=True
+    )  # External Service Document ID document_id
+    job_id = Column(
+        String, nullable=True
+    )  # To track async job from External Service
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

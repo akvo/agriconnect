@@ -361,6 +361,8 @@ async def kb_callback(
         print(f"Job ID: {payload.job_id}")
         print(f"Status: {payload.status}")
         print(f"Callback params: {payload.callback_params}")
+        print(f"Error: {payload.error}")
+        print(f"Output: {payload.output}")
 
         callback_params = (
             json.loads(payload.callback_params)
@@ -373,6 +375,15 @@ async def kb_callback(
             user_id=callback_params.get("user_id"),
         )
 
+        # get document external_id
+        output = (
+            json.loads(payload.output)
+            if isinstance(payload.output, str)
+            else payload.output
+        )
+        task = output.get("tasks", [])[0] or {}
+        document_upload_id = task.get("upload_id")
+
         # Process the callback based on stage
         if payload.status == CallbackStage.COMPLETED:
             # Handle successful KB upload/processing
@@ -384,6 +395,8 @@ async def kb_callback(
                     db=db,
                     document_id=callback_params.document_id,
                     status=CallbackStage.COMPLETED,
+                    external_id=str(document_upload_id),
+                    job_id=payload.job_id,
                 )
                 if updated_doc:
                     print(
@@ -408,6 +421,8 @@ async def kb_callback(
                     db=db,
                     document_id=callback_params.document_id,
                     status=payload.status,
+                    external_id=str(document_upload_id),
+                    job_id=payload.job_id,
                 )
                 if updated_doc:
                     print(
