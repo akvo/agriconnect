@@ -3,12 +3,48 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models.customer import Customer, CustomerLanguage
+from models.customer import Customer, CustomerLanguage, OnboardingStatus
 from models.message import Message, MessageFrom
+from models.administrative import CustomerAdministrative
 from seeder.administrative import seed_administrative_data
 
 
 class TestWhatsAppWebhook:
+    def _create_admin_data_and_link_customer(
+        self, db_session: Session, customer: Customer
+    ):
+        """Helper to create administrative data and link to customer"""
+        rows = [
+            {
+                "code": "NATIONAL",
+                "name": "National",
+                "level": "National",
+                "parent_code": "",
+            }
+        ]
+        seed_administrative_data(db_session, rows)
+
+        # Get the created administrative area
+        from models.administrative import Administrative
+        admin = (
+            db_session.query(Administrative)
+            .filter(Administrative.code == "NATIONAL")
+            .first()
+        )
+
+        # Link customer to administrative area
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=admin.id,
+        )
+        db_session.add(customer_admin)
+
+        # Mark onboarding as completed
+        customer.onboarding_status = OnboardingStatus.COMPLETED
+        db_session.commit()
+
+        return admin
+
     def test_webhook_new_customer_english(
         self, client: TestClient, db_session: Session
     ):
@@ -23,9 +59,17 @@ class TestWhatsAppWebhook:
         ]
         seed_administrative_data(db_session, rows)
 
-        with patch("routers.whatsapp.WhatsAppService") as mock_whatsapp:
+        with (
+            patch("routers.whatsapp.WhatsAppService") as mock_whatsapp,
+            patch("routers.whatsapp.get_onboarding_service") as mock_onb_svc,
+        ):
             mock_service = Mock()
             mock_whatsapp.return_value = mock_service
+
+            # Mock onboarding service to skip onboarding
+            mock_onb_instance = Mock()
+            mock_onb_instance.needs_onboarding.return_value = False
+            mock_onb_svc.return_value = mock_onb_instance
 
             response = client.post(
                 "/api/whatsapp/webhook",
@@ -67,9 +111,17 @@ class TestWhatsAppWebhook:
     def test_webhook_new_customer_swahili(
         self, client: TestClient, db_session: Session
     ):
-        with patch("routers.whatsapp.WhatsAppService") as mock_whatsapp:
+        with (
+            patch("routers.whatsapp.WhatsAppService") as mock_whatsapp,
+            patch("routers.whatsapp.get_onboarding_service") as mock_onb_svc,
+        ):
             mock_service = Mock()
             mock_whatsapp.return_value = mock_service
+
+            # Mock onboarding service to skip onboarding
+            mock_onb_instance = Mock()
+            mock_onb_instance.needs_onboarding.return_value = False
+            mock_onb_svc.return_value = mock_onb_instance
 
             response = client.post(
                 "/api/whatsapp/webhook",
@@ -102,6 +154,11 @@ class TestWhatsAppWebhook:
         )
         db_session.add(existing_customer)
         db_session.commit()
+
+        # Link to administrative data to skip onboarding
+        self._create_admin_data_and_link_customer(
+            db_session, existing_customer
+        )
 
         # Add a previous message to make them not new
         previous_message = Message(
@@ -182,12 +239,20 @@ class TestWhatsAppWebhook:
     def test_webhook_welcome_message_failure(
         self, client: TestClient, db_session: Session
     ):
-        with patch("routers.whatsapp.WhatsAppService") as mock_whatsapp:
+        with (
+            patch("routers.whatsapp.WhatsAppService") as mock_whatsapp,
+            patch("routers.whatsapp.get_onboarding_service") as mock_onb_svc,
+        ):
             mock_service = Mock()
             mock_service.send_welcome_message.side_effect = Exception(
                 "Twilio error"
             )
             mock_whatsapp.return_value = mock_service
+
+            # Mock onboarding service to skip onboarding
+            mock_onb_instance = Mock()
+            mock_onb_instance.needs_onboarding.return_value = False
+            mock_onb_svc.return_value = mock_onb_instance
 
             response = client.post(
                 "/api/whatsapp/webhook",
@@ -211,9 +276,17 @@ class TestWhatsAppWebhook:
     def test_webhook_phone_number_normalization(
         self, client: TestClient, db_session: Session
     ):
-        with patch("routers.whatsapp.WhatsAppService") as mock_whatsapp:
+        with (
+            patch("routers.whatsapp.WhatsAppService") as mock_whatsapp,
+            patch("routers.whatsapp.get_onboarding_service") as mock_onb_svc,
+        ):
             mock_service = Mock()
             mock_whatsapp.return_value = mock_service
+
+            # Mock onboarding service to skip onboarding
+            mock_onb_instance = Mock()
+            mock_onb_instance.needs_onboarding.return_value = False
+            mock_onb_svc.return_value = mock_onb_instance
 
             response = client.post(
                 "/api/whatsapp/webhook",
