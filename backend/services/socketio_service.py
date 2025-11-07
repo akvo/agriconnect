@@ -358,12 +358,16 @@ async def emit_whisper_created(
 
 
 async def emit_ticket_resolved(
-    ticket_id: int, resolved_at: str, administrative_id: Optional[int] = None
+    ticket_id: int,
+    resolved_at: str,
+    resolved_by: Optional[str] = None,
+    administrative_id: Optional[int] = None
 ):
     """Emit ticket resolved"""
     event_data = {
         "ticket_id": ticket_id,
         "resolved_at": resolved_at,
+        "resolved_by": resolved_by,
     }
 
     if administrative_id:

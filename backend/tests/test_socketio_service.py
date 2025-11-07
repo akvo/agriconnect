@@ -474,6 +474,7 @@ class TestEventEmissions:
             await emit_ticket_resolved(
                 ticket_id=1,
                 resolved_at="2024-01-01T12:00:00",
+                resolved_by="Admin User",
                 administrative_id=10,
             )
 

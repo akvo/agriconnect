@@ -179,6 +179,10 @@ export const useChatWebSocket = ({
         setTicket((prev: TicketData) => ({
           ...prev,
           resolvedAt: event.resolved_at,
+          resolver: {
+            id: 0,
+            name: event.resolved_by,
+          }
         }));
       } catch (error) {
         console.error("[Chat] Error handling ticket resolved:", error);

@@ -74,6 +74,10 @@ const HeaderOptions = ({ ticketID }: Props) => {
     ]);
   };
 
+  if (!ticket?.id) {
+    return null;
+  }
+
   return (
     <View style={{ paddingHorizontal: 8, paddingVertical: 6 }}>
       {!ticket?.resolvedAt && (

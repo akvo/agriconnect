@@ -42,6 +42,7 @@ export interface MessageCreatedEvent {
 export interface TicketResolvedEvent {
   ticket_id: number;
   resolved_at: string;
+  resolved_by: string;
 }
 
 export interface WhisperCreatedEvent {

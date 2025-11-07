@@ -145,6 +145,7 @@ async def update_message_status(
                 ticket_id=ticket.id,
                 resolved_at=ticket.resolved_at.isoformat(),
                 administrative_id=ticket.administrative_id,
+                resolved_by=current_user.full_name,
             )
 
     return MessageResponse(
