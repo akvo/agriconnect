@@ -123,12 +123,27 @@ def db_session(test_db):
         # Import PlaygroundMessage model
         from models.playground_message import PlaygroundMessage
 
+        # Import Broadcast models
+        from models.broadcast import (
+            BroadcastRecipient,
+            BroadcastMessageGroup,
+            BroadcastMessage,
+            BroadcastGroupContact,
+            BroadcastGroup,
+        )
+
         # Delete in correct order to respect foreign key constraints
         db.query(UserAdministrative).delete()
         db.query(CustomerAdministrative).delete()
         db.query(Ticket).delete()
         db.query(Message).delete()
         db.query(PlaygroundMessage).delete()  # Playground messages
+        # Broadcast tables must be deleted before Customer and Administrative
+        db.query(BroadcastRecipient).delete()
+        db.query(BroadcastMessageGroup).delete()
+        db.query(BroadcastMessage).delete()
+        db.query(BroadcastGroupContact).delete()
+        db.query(BroadcastGroup).delete()
         db.query(Customer).delete()
         db.query(KnowledgeBase).delete()
         # Device must be deleted before Administrative (foreign key)

@@ -21,6 +21,7 @@ class JobType(str, Enum):
 class MessageType(int, Enum):
     REPLY = 1  # Send directly to customer via WhatsApp
     WHISPER = 2  # Store as suggestion for EO review
+    BROADCAST = 3  # Broadcast message
 
 
 class Citation(BaseModel):
