@@ -182,7 +182,6 @@ const Inbox: React.FC = () => {
   // Handle real-time message_created events
   useEffect(() => {
     const unsubscribe = onMessageCreated(async (event: MessageCreatedEvent) => {
-
       // Find the ticket in current state
       const ticketIndex = tickets.findIndex(
         (t: Ticket) => t.id === event.ticket_id,
@@ -225,19 +224,6 @@ const Inbox: React.FC = () => {
             if (lastMessage) {
               await daoManager.ticket.update(db, ticket.id, {
                 lastMessageId: lastMessage.id,
-              });
-            } else {
-              await daoManager.message.upsert(db, {
-                id: event.message_id,
-                from_source: event.from_source,
-                message_sid: `MSG_${event.message_id}`,
-                customer_id: event.customer_id || ticket.customer?.id || 0,
-                user_id: null,
-                body: event.body,
-                createdAt: event.ts,
-              });
-              await daoManager.ticket.update(db, ticket.id, {
-                lastMessageId: event.message_id,
               });
             }
           } catch (error) {
@@ -289,40 +275,6 @@ const Inbox: React.FC = () => {
         } else {
           console.log("[Inbox] Ticket belongs to different tab, skipping");
         }
-
-        // Also update DB asynchronously
-        (async () => {
-          try {
-            // Upsert message
-            await daoManager.message.upsert(db, {
-              id: event.message_id,
-              from_source: event.from_source,
-              message_sid: `MSG_${event.message_id}`,
-              customer_id: event.customer_id || 0,
-              user_id: null,
-              body: event.body,
-              createdAt: event.ts,
-            });
-
-            // Create ticket entry
-            await daoManager.ticket.upsert(db, {
-              id: event.ticket_id,
-              ticketNumber: event.ticket_number || `TICKET-${event.ticket_id}`,
-              customerId: event.customer_id || 0,
-              messageId: event.message_id,
-              lastMessageId: event.message_id,
-              status: "open",
-              createdAt: event.ts,
-              updatedAt: event.ts,
-              unreadCount: 1,
-            });
-          } catch (error) {
-            console.error(
-              "[Inbox] Error creating optimistic ticket/message in DB:",
-              error,
-            );
-          }
-        })();
       }
     });
 
