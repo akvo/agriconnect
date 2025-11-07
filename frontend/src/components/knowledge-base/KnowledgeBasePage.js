@@ -11,6 +11,7 @@ import HeaderNav from "../HeaderNav";
 import EditUserModal from "../users/EditUserModal";
 import KnowledgeBaseList from "./KnowledgeBaseList";
 import knowledgeBaseApi from "../../lib/knowledgeBaseApi";
+import KnowledgeBaseModal from "./KnowledgeBaseModal";
 
 export default function KnowledgeBasePage() {
   const { user, refreshUser, loading: authLoading } = useAuth();
@@ -21,6 +22,7 @@ export default function KnowledgeBasePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState("");
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState(false);
 
   const ITEMS_PER_PAGE = 10;
   const router = useRouter();
@@ -173,7 +175,7 @@ export default function KnowledgeBasePage() {
               </div>
               <div className="mt-4 sm:mt-0">
                 <button
-                  // onClick={handleCreateUser}
+                  onClick={() => setShowKnowledgeBaseModal(true)}
                   className="bg-green-600 text-white px-4 py-2 text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"
                   style={{ borderRadius: "5px" }}
                 >
@@ -241,6 +243,19 @@ export default function KnowledgeBasePage() {
               </div>
             </div>
         )}
+
+        {/* KnowledgeBaseModal */}
+        {
+          showKnowledgeBaseModal && (
+          <KnowledgeBaseModal
+            onClose={() => setShowKnowledgeBaseModal(false)}
+            onKnowledgeBaseUpdated={() => {
+              setShowKnowledgeBaseModal(false);
+              fetchKnowledgeBases(currentPage, searchQuery || null);
+            }}
+          />
+        )
+        }
 
         {/* Profile Modal */}
         {showProfileModal && (
