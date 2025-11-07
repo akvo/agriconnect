@@ -182,92 +182,104 @@ const Inbox: React.FC = () => {
   // Handle real-time message_created events
   useEffect(() => {
     const unsubscribe = onMessageCreated(async (event: MessageCreatedEvent) => {
-      console.log("[Inbox] Received message_created event:", event);
+      // Find the ticket in current state
+      const ticketIndex = tickets.findIndex(
+        (t: Ticket) => t.id === event.ticket_id,
+      );
 
-      try {
-        // Find the ticket in local state
-        const ticketIndex = tickets.findIndex(
-          (t: Ticket) => t.id === event.ticket_id,
-        );
-
-        if (ticketIndex !== -1) {
-          const ticket = tickets[ticketIndex];
-
-          // Update ticket in SQLite database
-          // Increment unread count and update last message
+      if (ticketIndex !== -1) {
+        setTickets((prevTickets: Ticket[]) => {
+          const ticket = prevTickets[ticketIndex];
           const newUnreadCount = (ticket.unreadCount || 0) + 1;
-          await daoManager.ticket.update(db, ticket.id, {
-            unreadCount: newUnreadCount,
-          });
 
-          // find message id before adding to lastMessage
-          const lastMessage = await daoManager.message.findById(
-            db,
-            event.message_id,
+          // Update database asynchronously (don't block UI)
+          return prevTickets.map((t: Ticket) =>
+            t.id === event.ticket_id
+              ? {
+                  ...t,
+                  unreadCount: newUnreadCount,
+                  lastMessageId: event.message_id,
+                  lastMessage: {
+                    body: event.body,
+                    timestamp: event.ts,
+                  },
+                  updatedAt: event.ts,
+                }
+              : t,
           );
-          if (lastMessage) {
+        });
+
+        (async () => {
+          try {
+            const ticket = tickets[ticketIndex];
             await daoManager.ticket.update(db, ticket.id, {
-              lastMessageId: lastMessage.id,
+              unreadCount: (ticket.unreadCount || 0) + 1,
             });
-          } else {
-            daoManager.message.upsert(db, {
-              id: event.message_id,
-              from_source: event.from_source,
-              message_sid: event.message_sid,
-              customer_id: event.customer_id,
-              user_id: null,
-              body: event.body,
-              createdAt: event.ts,
-            });
-            await daoManager.ticket.update(db, ticket.id, {
-              lastMessageId: event.message_id,
-            });
+
+            // Upsert message and update lastMessageId
+            const lastMessage = await daoManager.message.findById(
+              db,
+              event.message_id,
+            );
+            if (lastMessage) {
+              await daoManager.ticket.update(db, ticket.id, {
+                lastMessageId: lastMessage.id,
+              });
+            }
+          } catch (error) {
+            console.error(
+              "[Inbox] Error updating ticket/message in DB:",
+              error,
+            );
           }
+        })();
+        return;
+      } else {
+        // Ticket not found in current list - create optimistic ticket
+        // Only add if it belongs to the current tab
+        const isNewTicket = true; // New tickets are always "open"
+        const shouldAdd = activeTab === Tabs.PENDING && isNewTicket;
 
-          // Update local state immediately for instant UI update
-          setTickets((prev: Ticket[]) =>
-            prev.map((t: Ticket) =>
-              t.id === event.ticket_id
-                ? {
-                    ...t,
-                    unreadCount: newUnreadCount,
-                    lastMessageId: event.message_id,
-                    lastMessage: {
-                      body: event.body,
-                      timestamp: event.ts,
-                    },
-                    updatedAt: event.ts,
-                  }
-                : t,
-            ),
-          );
-
-          console.log(
-            `[Inbox] Updated ticket ${event.ticket_id} with new message`,
-          );
+        if (shouldAdd) {
+          console.log("[Inbox] Creating optimistic ticket for new ticket");
+          setTickets((prevTickets) => [
+            {
+              id: event.ticket_id,
+              ticketNumber: event.ticket_number || `TICKET-${event.ticket_id}`,
+              customerId: event.customer_id || 0,
+              messageId: event.message_id,
+              status: "open",
+              resolvedAt: null,
+              resolvedBy: null,
+              resolver: null, // No resolver yet for new tickets
+              customer: {
+                id: event.customer_id || 0,
+                name: event.customer_name || event.phone_number,
+                phoneNumber: event.phone_number,
+              },
+              message: {
+                id: event.message_id,
+                body: event.body,
+                timestamp: event.ts,
+              },
+              lastMessage: {
+                body: event.body,
+                timestamp: event.ts,
+              },
+              unreadCount: 1,
+              createdAt: event.ts,
+              updatedAt: event.ts,
+            } as Ticket,
+            ...prevTickets,
+          ]);
         } else {
-          // Ticket not in current list, might need to refresh
-          console.log(
-            `[Inbox] Ticket ${event.ticket_id} not found in current list`,
-          );
-          // Refresh first page to include new ticket
-          fetchTickets(activeTab, 1, false, false);
+          console.log("[Inbox] Ticket belongs to different tab, skipping");
         }
-      } catch (error) {
-        console.error("[Inbox] Error handling message_created event:", error);
       }
     });
 
     return unsubscribe;
-  }, [
-    onMessageCreated,
-    tickets,
-    db,
-    daoManager,
-    activeTab,
-    page,
-    fetchTickets,
-  ]);
+  }, [onMessageCreated, db, daoManager, activeTab, user, tickets]);
 
   // Handle real-time ticket_resolved events
   useEffect(() => {

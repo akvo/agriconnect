@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User, UserType
 from models.administrative import UserAdministrative
-from models.message import MessageFrom
 from services.push_notification_service import PushNotificationService
 from services.user_service import UserService
 from utils.auth import verify_token
@@ -239,26 +238,33 @@ async def join_playground(sid: str, data: dict):
 async def emit_message_received(
     ticket_id: int,
     message_id: int,
-    message_sid: str,
-    customer_id: int,
+    phone_number: str,
     body: str,
     from_source: int,
     ts: str,  # timestamp as ISO string
     administrative_id: Optional[int] = None,
     ticket_number: str = None,
-    customer_name: str = None,
+    sender_name: str = None,
     sender_user_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
 ):
-    """Emit message"""
+    """Emit message with ticket metadata for optimistic UI display"""
     event_data = {
         "ticket_id": ticket_id,
         "message_id": message_id,
-        "message_sid": message_sid,
-        "customer_id": customer_id,
+        "phone_number": phone_number,
         "body": body,
         "from_source": from_source,
         "ts": ts,
+        "ticket_number": ticket_number,
+        "sender_name": sender_name,
     }
+
+    # Conditional field based on sender type
+    if sender_user_id:
+        event_data["user_id"] = sender_user_id
+    else:
+        event_data["customer_id"] = customer_id
 
     # Emit to ward room
     if administrative_id:
@@ -286,7 +292,7 @@ async def emit_message_received(
         push_service.notify_new_message(
             ticket_id=ticket_id,
             ticket_number=ticket_number,
-            customer_name=customer_name,
+            customer_name=sender_name,
             administrative_id=administrative_id,
             message_id=message_id,
             message_body=body,
@@ -325,7 +331,6 @@ async def emit_whisper_created(
     message_id: int,
     suggestion: str,
     customer_id: int,
-    message_sid: str,
     created_at: str,
     administrative_id: Optional[int] = None,
 ):
@@ -335,9 +340,6 @@ async def emit_whisper_created(
         "message_id": message_id,
         "suggestion": suggestion,
         "customer_id": customer_id,
-        "message_sid": message_sid,
-        "from_source": MessageFrom.LLM,
-        "message_type": "WHISPER",
         "ts": created_at,
     }
 
@@ -356,12 +358,16 @@ async def emit_whisper_created(
 
 
 async def emit_ticket_resolved(
-    ticket_id: int, resolved_at: str, administrative_id: Optional[int] = None
+    ticket_id: int,
+    resolved_at: str,
+    resolved_by: Optional[str] = None,
+    administrative_id: Optional[int] = None
 ):
     """Emit ticket resolved"""
     event_data = {
         "ticket_id": ticket_id,
         "resolved_at": resolved_at,
+        "resolved_by": resolved_by,
     }
 
     if administrative_id:

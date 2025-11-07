@@ -75,13 +75,13 @@ export const useChatWebSocket = ({
           setAISuggestion(null);
         }
 
+        // Save message to SQLite
         const savedMessage = daoManager.message.upsert(db, {
           id: event.message_id,
           from_source: event.from_source,
-          message_sid: event.message_sid,
-          customer_id: event.customer_id,
-          user_id:
-            event.from_source === MessageFrom.CUSTOMER ? null : userId || null,
+          message_sid: `MSG_${Date.now()}`, // Generate a unique message_sid
+          customer_id: event.customer_id || ticket.customer?.id, // Use event or fallback
+          user_id: event.user_id || null, // Use user_id from event for admin messages
           body: event.body,
           createdAt: event.ts,
         });
@@ -149,7 +149,7 @@ export const useChatWebSocket = ({
     return unsubscribe;
   }, [
     onMessageCreated,
-    ticket?.id,
+    ticket.id,
     scrollToBottom,
     db,
     daoManager,
@@ -158,6 +158,7 @@ export const useChatWebSocket = ({
     setAISuggestionLoading,
     setAISuggestionUsed,
     setAISuggestion,
+    ticket.customer?.id,
   ]);
 
   // Handle real-time ticket_resolved events
@@ -178,6 +179,10 @@ export const useChatWebSocket = ({
         setTicket((prev: TicketData) => ({
           ...prev,
           resolvedAt: event.resolved_at,
+          resolver: {
+            id: 0,
+            name: event.resolved_by,
+          }
         }));
       } catch (error) {
         console.error("[Chat] Error handling ticket resolved:", error);
@@ -199,12 +204,12 @@ export const useChatWebSocket = ({
       try {
         daoManager.message.upsert(db, {
           id: event.message_id,
-          from_source: event.from_source,
-          message_sid: event.message_sid,
+          from_source: MessageFrom.LLM,
+          message_sid: `WHISPER_${Date.now()}`, // Generate a unique message_sid
           customer_id: event.customer_id,
           user_id: null,
           body: event.suggestion,
-          message_type: event.message_type,
+          message_type: "WHISPER",
           is_used: 0, // Initially not used
           createdAt: event.ts,
         });

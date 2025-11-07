@@ -312,7 +312,6 @@ async def ai_callback(
                                     message_id=ai_message.id,
                                     suggestion=ai_message.body,
                                     customer_id=ai_message.customer_id,
-                                    message_sid=ai_message.message_sid,
                                     created_at=ai_message.created_at.isoformat(),
                                     administrative_id=administrative_id,
                                 )

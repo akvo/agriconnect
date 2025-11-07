@@ -374,6 +374,53 @@ class TicketSyncService {
       throw error;
     }
   }
+
+  /**
+   * Get a single ticket by ID with hybrid approach
+   * 1. Check local database first (instant)
+   * 2. If not found, fetch from API and save to database
+   * 3. Return the ticket object or null
+   */
+  static async getTicketById(
+    db: SQLiteDatabase,
+    accessToken: string,
+    ticketId: number,
+    userId?: number,
+  ): Promise<Ticket | null> {
+    try {
+      const dao = new DAOManager(db);
+
+      // Step 1: Check local database first
+      const localTicket = dao.ticket.findById(db, ticketId);
+      if (localTicket) {
+        console.log(`[TicketSync] Found ticket ${ticketId} in local database`);
+        return localTicket;
+      }
+
+      // Step 2: Not in local DB, fetch from API
+      console.log(
+        `[TicketSync] Ticket ${ticketId} not in local DB, fetching from API...`,
+      );
+      const synced = await this.syncTicketById(
+        db,
+        accessToken,
+        ticketId,
+        userId,
+      );
+
+      if (!synced) {
+        console.warn(`[TicketSync] Failed to sync ticket ${ticketId}`);
+        return null;
+      }
+
+      // Step 3: Return the synced ticket from local DB
+      const syncedTicket = dao.ticket.findById(db, ticketId);
+      return syncedTicket;
+    } catch (error) {
+      console.error(`[TicketSync] Error getting ticket ${ticketId}:`, error);
+      return null;
+    }
+  }
 }
 
 export default TicketSyncService;

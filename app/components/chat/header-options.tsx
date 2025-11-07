@@ -6,6 +6,7 @@ import Feathericons from "@expo/vector-icons/Feather";
 import { api } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { DAOManager } from "@/database/dao";
+import { Ticket } from "@/database/dao/types/ticket";
 import { DropdownMenu, MenuItem } from "../dropdown-menu";
 import { useTicket } from "@/contexts/TicketContext";
 
@@ -14,7 +15,7 @@ type Props = {
 };
 
 const HeaderOptions = ({ ticketID }: Props) => {
-  const [ticket, setTicket] = useState(null);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
   const { user } = useAuth();
   const { updateTicket } = useTicket();
   const db = useDatabase();
@@ -42,6 +43,9 @@ const HeaderOptions = ({ ticketID }: Props) => {
       if (!ticket?.id) {
         throw new Error("Ticket not found");
       }
+      if (!user?.accessToken) {
+        throw new Error("User not authenticated");
+      }
       const { ticket: resData } = await api.closeTicket(
         user?.accessToken,
         ticket.id,
@@ -51,6 +55,10 @@ const HeaderOptions = ({ ticketID }: Props) => {
         resolvedBy: user.id,
         unreadCount: 0,
       });
+      // Set whisper as used
+      if (ticket.customer?.id) {
+        await dao.message.markWhisperAsUsed(db, ticket.customer.id);
+      }
       // Redirect to inbox after closing with active tab as 'resolved'
       router.replace("/inbox?initTab=resolved");
     } catch (error) {
@@ -65,6 +73,10 @@ const HeaderOptions = ({ ticketID }: Props) => {
       { text: "No", style: "cancel" },
     ]);
   };
+
+  if (!ticket?.id) {
+    return null;
+  }
 
   return (
     <View style={{ paddingHorizontal: 8, paddingVertical: 6 }}>

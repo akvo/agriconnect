@@ -201,7 +201,6 @@ class MessageSyncService {
         accessToken,
         ticketId,
         undefined,
-        50, // Fetch more to catch up
       );
 
       // Sync all messages to SQLite (upsert will skip duplicates)

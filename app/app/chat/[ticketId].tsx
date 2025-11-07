@@ -210,7 +210,7 @@ const ChatScreen = () => {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior="height"
+        behavior={undefined}
         keyboardVerticalOffset={48}
       >
         <View style={styles.messagesContainer}>

@@ -19,6 +19,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     data: CreateMessageData & { id?: number },
   ): Message {
     const hasId = data.id !== undefined;
+    const messageSID = data.message_sid || `MSG_${Date.now()}`;
 
     console.log(
       `[MessageDAO.create] Attempting to create message - id=${
@@ -56,11 +57,11 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         );
 
     try {
-      const params = hasId
+      const rawParams = hasId
         ? [
             data.id,
             data.from_source,
-            data.message_sid,
+            messageSID,
             data.customer_id,
             data.user_id,
             data.body,
@@ -72,7 +73,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
           ]
         : [
             data.from_source,
-            data.message_sid,
+            messageSID,
             data.customer_id,
             data.user_id,
             data.body,
@@ -83,7 +84,10 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.createdAt,
           ];
 
-      const result = stmt.executeSync(params);
+      // SQLite bind params do not accept `undefined` — convert any undefined entries to `null`
+      const params = rawParams.map((p) => (p === undefined ? null : p));
+
+      const result = stmt.executeSync(params as any);
       const messageId = hasId ? data.id! : result.lastInsertRowId;
 
       console.log(
