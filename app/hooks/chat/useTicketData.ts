@@ -21,7 +21,8 @@ const convertToUIMessage = (
       ? "AI reply"
       : msg.user_id === currentUserId
         ? "You"
-        : msg?.user_name || "You";
+        : msg?.user_name || msg.customer_name || "Unknown User";
+  console.log("[Chat] Converting message:", msg)
 
   return {
     id: msg.id,

@@ -75,13 +75,13 @@ export const useChatWebSocket = ({
           setAISuggestion(null);
         }
 
+        // Save message to SQLite
         const savedMessage = daoManager.message.upsert(db, {
           id: event.message_id,
           from_source: event.from_source,
           message_sid: event.message_sid,
-          customer_id: event.customer_id,
-          user_id:
-            event.from_source === MessageFrom.CUSTOMER ? null : userId || null,
+          customer_id: event.customer_id || ticket.customer?.id,  // Use event or fallback
+          user_id: event.user_id || null,  // Use user_id from event for admin messages
           body: event.body,
           createdAt: event.ts,
         });
