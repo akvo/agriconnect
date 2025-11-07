@@ -195,7 +195,8 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 32,
     paddingHorizontal: 16,
     borderTopWidth: 1,
     borderColor: themeColors.mutedBorder,
@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 48,
     maxHeight: 120,
     padding: 8,
     backgroundColor: themeColors.white,
@@ -213,7 +214,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     backgroundColor: themeColors["green-500"],
     borderRadius: 24,
-    padding: 10,
+    padding: 12,
     justifyContent: "center",
     alignItems: "center",
   },
