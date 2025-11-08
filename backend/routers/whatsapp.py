@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import uuid
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException
@@ -13,6 +14,7 @@ from models.message import (
     MessageFrom,
     MessageStatus,
     MessageType,
+    MediaType,
 )
 from models.ticket import Ticket
 from models.administrative import Administrative
@@ -24,6 +26,7 @@ from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
 from services.socketio_service import emit_message_received
 from services.onboarding_service import get_onboarding_service
+from services.openai_service import get_openai_service
 from schemas.callback import TwilioStatusCallback, TwilioMessageStatus
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
@@ -33,19 +36,108 @@ logger = logging.getLogger(__name__)
 @router.post("/webhook")
 async def whatsapp_webhook(
     From: Annotated[str, Form()],
-    Body: Annotated[str, Form()],
     MessageSid: Annotated[str, Form()],
+    Body: Annotated[str, Form()] = "",
     ButtonPayload: Annotated[Optional[str], Form()] = None,
+    NumMedia: Annotated[Optional[int], Form()] = 0,
+    MediaUrl0: Annotated[Optional[str], Form()] = None,
+    MediaContentType0: Annotated[Optional[str], Form()] = None,
     db: Session = Depends(get_db),
 ):
     """
     Handle incoming WhatsApp messages and button responses.
 
-    Flow 1: Regular message → Create REPLY job (AI answers farmer)
-    Flow 2: Button "escalate" → Create ticket + WHISPER job (AI suggests to EO)
+    Flow 1: Voice message → Transcribe → Process as text
+    Flow 2: Regular message → Process normally
+    Flow 3: Button "escalate" → Create ticket + WHISPER job (AI suggests to EO)
     """
     try:
         phone_number = From.replace("whatsapp:", "")
+        media_url = None
+        media_type = MediaType.TEXT
+
+        # ========================================
+        # VOICE MESSAGE TRANSCRIPTION
+        # ========================================
+        is_voice = (
+            NumMedia and NumMedia > 0
+            and MediaContentType0 and "audio" in MediaContentType0
+        )
+        if is_voice:
+            logger.info(
+                f"Voice message received from {phone_number}: "
+                f"{MediaContentType0} at {MediaUrl0}"
+            )
+
+            media_url = MediaUrl0
+            media_type = MediaType.VOICE
+
+            # Generate unique temp file path
+            temp_file = f"/tmp/voice_{uuid.uuid4().hex}.ogg"
+
+            try:
+                # Download audio to /tmp
+                whatsapp_service = WhatsAppService()
+                downloaded_path = whatsapp_service.download_twilio_media(
+                    media_url=MediaUrl0,
+                    save_path=temp_file
+                )
+
+                if downloaded_path:
+                    # Transcribe with OpenAI
+                    openai_service = get_openai_service()
+
+                    # Read audio file as bytes
+                    with open(downloaded_path, 'rb') as f:
+                        audio_bytes = f.read()
+
+                    transcription = await openai_service.transcribe_audio(
+                        audio_file=audio_bytes
+                    )
+
+                    # Check if transcription succeeded
+                    if transcription and transcription.text.strip():
+                        Body = transcription.text.strip()
+                        logger.info(
+                            f"✓ Transcribed voice message "
+                            f"from {phone_number}: {Body[:50]}..."
+                        )
+                    else:
+                        # Transcription failed or empty
+                        Body = "[Voice message - transcription unavailable]"
+                        logger.warning(
+                            f"⚠ Voice transcription failed or empty "
+                            f"for {phone_number}"
+                        )
+                else:
+                    # Download failed
+                    Body = "[Voice message - download failed]"
+                    logger.error(
+                        f"✗ Failed to download voice message "
+                        f"from {phone_number}"
+                    )
+
+            except Exception as e:
+                # Any error in transcription flow
+                Body = "[Voice message - transcription error]"
+                logger.error(f"✗ Error transcribing voice message: {e}")
+
+            finally:
+                # ALWAYS delete temp file
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                        logger.debug(f"Deleted temp file: {temp_file}")
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to delete temp file "
+                            f"{temp_file}: {e}"
+                        )
+
+        # ========================================
+        # CONTINUE WITH EXISTING MESSAGE FLOW
+        # (Body is now either original text or transcribed text)
+        # ========================================
 
         # Check if message already processed
         existing_message = (
@@ -160,6 +252,8 @@ async def whatsapp_webhook(
                 body=original_message.body if original_message else Body,
                 from_source=MessageFrom.CUSTOMER,
                 status=MessageStatus.ESCALATED,
+                media_url=media_url,
+                media_type=media_type,
             )
             db.add(message)
             db.commit()
@@ -297,6 +391,8 @@ async def whatsapp_webhook(
             body=Body,
             from_source=MessageFrom.CUSTOMER,
             status=MessageStatus.PENDING,
+            media_url=media_url,
+            media_type=media_type,
         )
         db.add(message)
         db.commit()

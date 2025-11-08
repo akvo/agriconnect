@@ -42,6 +42,17 @@ class DeliveryStatus(enum.Enum):
     UNDELIVERED = "UNDELIVERED"  # Temporary failure/expired
 
 
+class MediaType(enum.Enum):
+    """Type of media in message"""
+    TEXT = "TEXT"              # Regular text message (default)
+    VOICE = "VOICE"            # Voice/audio message
+    IMAGE = "IMAGE"            # Image (future)
+    VIDEO = "VIDEO"            # Video (future)
+    DOCUMENT = "DOCUMENT"      # PDF/document (future)
+    LOCATION = "LOCATION"      # Geolocation (future)
+    OTHER = "OTHER"            # Unknown media type
+
+
 class Message(Base):
     __tablename__ = "messages"
 
@@ -73,6 +84,14 @@ class Message(Base):
     retry_count = Column(Integer, nullable=False, server_default="0")
     last_retry_at = Column(DateTime(timezone=True), nullable=True)
     delivered_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Media tracking (for voice, images, etc.)
+    media_url = Column(String, nullable=True)
+    media_type = Column(
+        Enum(MediaType),
+        nullable=False,
+        server_default=MediaType.TEXT.value,
+    )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
