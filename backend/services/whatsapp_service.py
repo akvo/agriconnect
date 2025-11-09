@@ -4,6 +4,7 @@ import os
 import re
 import uuid
 import phonenumbers
+import httpx
 from typing import Any, Dict, Optional
 from models.message import Message, DeliveryStatus
 from twilio.rest import Client
@@ -295,6 +296,86 @@ class WhatsAppService:
             logger.error(f"✗ Error sending confirmation template: {e}")
             # If template fails but answer was sent, return answer response
             return answer_response
+
+    def download_twilio_media(
+        self,
+        media_url: str,
+        save_path: str
+    ) -> Optional[str]:
+        """
+        Download media file from Twilio.
+
+        Twilio media URLs are PUBLIC by default (no auth required).
+        However, if HTTP auth is enabled in Twilio Console, we'll try
+        with Basic Auth as fallback.
+
+        Args:
+            media_url: Twilio media URL
+                (e.g., https://api.twilio.com/.../Media/...)
+            save_path: Local path to save file
+                (e.g., /tmp/audio_12345.ogg)
+
+        Returns:
+            Path to downloaded file, or None if download failed
+        """
+        if self.testing_mode:
+            logger.info(
+                f"[TESTING MODE] Mocking media download from {media_url}"
+            )
+            # Create empty file for testing
+            with open(save_path, 'wb') as f:
+                f.write(b'fake audio data for testing')
+            return save_path
+
+        try:
+            # Try without auth first (media URLs are public by default)
+            try:
+                response = httpx.get(
+                    media_url,
+                    timeout=30.0,
+                    follow_redirects=True
+                )
+                response.raise_for_status()
+
+                logger.info(
+                    f"✓ Downloaded media from Twilio (no auth): "
+                    f"{len(response.content)} bytes → {save_path}"
+                )
+
+            except httpx.HTTPStatusError as e:
+                # If 401/403, try with Basic Auth (in case auth is enabled)
+                if e.response.status_code in [401, 403]:
+                    logger.info(
+                        "Media URL requires auth, retrying with credentials"
+                    )
+                    auth = (self.account_sid, self.auth_token)
+                    response = httpx.get(
+                        media_url,
+                        auth=auth,
+                        timeout=30.0,
+                        follow_redirects=True
+                    )
+                    response.raise_for_status()
+
+                    logger.info(
+                        f"✓ Downloaded media from Twilio (with auth): "
+                        f"{len(response.content)} bytes → {save_path}"
+                    )
+                else:
+                    raise  # Re-raise other HTTP errors
+
+            # Save to file
+            with open(save_path, 'wb') as f:
+                f.write(response.content)
+
+            return save_path
+
+        except httpx.HTTPError as e:
+            logger.error(f"✗ Failed to download Twilio media: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"✗ Unexpected error downloading media: {e}")
+            return None
 
     @staticmethod
     def validate_and_format_phone_number(phone: str) -> str:

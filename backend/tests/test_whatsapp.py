@@ -310,12 +310,8 @@ class TestWhatsAppWebhook:
         )
         assert response.status_code == 422  # Validation error
 
-        # Test missing Body field
-        response = client.post(
-            "/api/whatsapp/webhook",
-            data={"From": "whatsapp:+255123456789", "MessageSid": "SM_TEST"},
-        )
-        assert response.status_code == 422
+        # Note: Body is now optional (empty string default) to support
+        # voice messages that don't have text body
 
         # Test missing MessageSid field
         response = client.post(
