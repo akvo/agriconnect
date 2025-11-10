@@ -100,7 +100,7 @@ async def list_knowledge_bases(
     )
 
     return KnowledgeBaseListResponse(
-        data=knowledge_bases,
+        data=knowledge_bases or [],
         total=total,
         page=page,
         size=size,

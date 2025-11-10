@@ -26,7 +26,7 @@ class KnowledgeBaseResponse(BaseModel):
     title: str
     description: Optional[str]
     extra_data: Optional[Dict[str, Any]]
-    active: bool
+    active: Optional[bool] = False
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -35,7 +35,7 @@ class KnowledgeBaseResponse(BaseModel):
 
 
 class KnowledgeBaseListResponse(BaseModel):
-    data: List[KnowledgeBaseResponse]
+    data: Optional[List[KnowledgeBaseResponse]] = []
     total: int
     page: int
     size: int

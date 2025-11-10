@@ -24,8 +24,11 @@ export default function DocumentPage({ kbId }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState("");
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshCount, setRefreshCount] = useState(0);
 
   const ITEMS_PER_PAGE = 10;
+  const MAX_AUTO_REFRESHES = 3;
 
   const fetchDocuments = async (page = 1, search = null) => {
     try {
@@ -56,6 +59,31 @@ export default function DocumentPage({ kbId }) {
     }
   }, [user, authLoading]);
 
+  // Auto-refresh every 30 seconds with current state
+  useEffect(() => {
+    if (!user || authLoading || !autoRefresh) return;
+
+    const intervalId = setInterval(() => {
+      setRefreshCount((prev) => {
+        const newCount = prev + 1;
+
+        // Disable auto-refresh after 3 times
+        if (newCount >= MAX_AUTO_REFRESHES) {
+          setAutoRefresh(false);
+          console.log("Auto-refresh disabled after 3 refreshes");
+        }
+
+        return newCount;
+      });
+
+      // Fetch with current page and search query
+      fetchDocuments(currentPage, searchQuery || null);
+    }, 30000); // 30 seconds
+
+    // Cleanup on unmount or when dependencies change
+    return () => clearInterval(intervalId);
+  }, [user, authLoading, currentPage, searchQuery, autoRefresh]);
+
   const handleUpload = async (formData) => {
     setUploading(true);
     try {
@@ -63,6 +91,13 @@ export default function DocumentPage({ kbId }) {
       await knowledgeBaseApi.uploadDocument(formData);
       // Refresh the list after successful upload
       await fetchDocuments(1, searchQuery || null);
+
+      // Reset refresh count when auto-refresh is manually toggled on
+      if (!autoRefresh) {
+        setRefreshCount(0); // Reset counter when turning it back on
+      }
+      setAutoRefresh(!autoRefresh);
+
       setUploadModalOpen(false);
     } catch (err) {
       throw err; // Re-throw to be handled by the modal
