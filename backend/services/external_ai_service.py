@@ -272,7 +272,7 @@ class ExternalAIService:
     async def manage_knowledge_base(
         self,
         operation: str,
-        name: str,
+        name: Optional[str] = None,
         description: Optional[str] = None,
         kb_id: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
@@ -296,6 +296,7 @@ class ExternalAIService:
 
         url = self.token.kb_url
         headers = {"Authorization": f"Bearer {self.token.access_token}"}
+        name = name or "Agriconnect Untitled KB"
 
         payload = {
             "name": name,
@@ -310,7 +311,7 @@ class ExternalAIService:
                         url, json=payload, headers=headers, timeout=30.0
                     )
                 elif operation == "update":
-                    response = await client.put(
+                    response = await client.patch(
                         f"{url}/{kb_id}",
                         json=payload,
                         headers=headers,
@@ -332,7 +333,21 @@ class ExternalAIService:
                     f"[ExternalAIService] Response body: {response.text}"
                 )
                 response.raise_for_status()
-                data = response.json()
+
+                # Handle empty body safely
+                if not response.text.strip():
+                    data = {
+                        "status": "success",
+                        "message": f"{operation} completed with no content",
+                    }
+                else:
+                    try:
+                        data = response.json()
+                    except json.JSONDecodeError:
+                        data = {
+                            "status": "success",
+                            "message": f"{operation} completed with non-JSON response",  # noqa
+                        }
 
                 logger.info(
                     f"✓ KB operation '{operation}' successful for '{name}' "
@@ -341,13 +356,13 @@ class ExternalAIService:
                 return data
         except httpx.HTTPStatusError as e:
             logger.error(
-                f"✗ Failed KB operation '{operation}': "
+                f"✗ HTTPStatusError Failed KB operation '{operation}': "
                 f"HTTP {e.response.status_code} - {e.response.text}"
                 f"URL: {url}"
             )
             return None
         except Exception as e:
-            logger.error(f"✗ Failed KB operation '{operation}': {e}")
+            logger.error(f"✗ EXCEPTION Failed KB operation '{operation}': {e}")
             return None
 
 

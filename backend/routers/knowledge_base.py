@@ -168,6 +168,21 @@ async def update_knowledge_base(
             detail="Not authorized to update this KB.",
         )
 
+    # Get active service
+    ai_service = ExternalAIService(db)
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="update",
+        name=kb_update.title,
+        description=kb_update.description,
+        kb_id=kb_id,
+    )
+
+    if not rag_kb_response:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to update knowledge base on external AI service.",
+        )
+
     updated_kb = KnowledgeBaseService.update_knowledge_base(
         db=db,
         kb_id=kb_id,
@@ -203,6 +218,19 @@ async def delete_knowledge_base(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this KB.",
+        )
+
+    # Get active service
+    ai_service = ExternalAIService(db)
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="delete",
+        kb_id=kb_id,
+    )
+
+    if not rag_kb_response:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to delete knowledge base on external AI service.",
         )
 
     deleted = KnowledgeBaseService.delete_knowledge_base(db, kb_id)
