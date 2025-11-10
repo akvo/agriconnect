@@ -1,9 +1,11 @@
 export const initialsFromName = (name: string) =>
-  name
-    .split(" ")
-    .map((n) => n.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join("");
+  /^\+\d{10,}$/.test(name)
+    ? ""
+    : name
+        .split(" ")
+        .map((n) => n.charAt(0).toUpperCase())
+        .slice(0, 2)
+        .join("");
 
 export const capitalizeFirstLetter = (str: string | null): string => {
   if (!str) {

@@ -577,6 +577,60 @@ class ApiClient {
   }
 
   /**
+   * Update a broadcast group
+   *
+   */
+  async updateBroadcastGroup(
+    token: string,
+    groupId: number,
+    data: {
+      name?: string;
+      customer_ids?: number[];
+    },
+  ): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/broadcast/groups/${groupId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      },
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorBody.detail ||
+        errorBody.message ||
+        "Failed to update broadcast group";
+
+      const error = new Error(errorMessage) as Error & {
+        status: number;
+        statusText: string;
+        body: any;
+      };
+      error.status = response.status;
+      error.statusText = response.statusText;
+      error.body = errorBody;
+
+      console.error("[API] updateBroadcastGroup failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorMessage,
+        errorBody,
+        requestData: data,
+      });
+
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
    * Get broadcast groups list
    */
   async getBroadcastGroups(
