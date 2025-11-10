@@ -91,7 +91,6 @@ export default function KnowledgeBasePage() {
     fetchKnowledgeBases(1, newSearchQuery || null);
   };
 
-
   const handleProfileClick = () => {
     setShowProfileModal(true);
   };
@@ -124,7 +123,8 @@ export default function KnowledgeBasePage() {
             Loading Knowledge Base...
           </p>
           <p className="text-secondary-500 text-sm mt-2">
-            Please wait while we prepare your knowledge base management dashboard
+            Please wait while we prepare your knowledge base management
+            dashboard
           </p>
         </div>
       </div>
@@ -153,13 +153,13 @@ export default function KnowledgeBasePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Error Message */}
         {error && (
-            <div
-              className="bg-red-50 border border-red-200 p-4 mb-6"
-              style={{ borderRadius: "5px" }}
-            >
-              <div className="text-red-700">{error}</div>
-            </div>
-          )}
+          <div
+            className="bg-red-50 border border-red-200 p-4 mb-6"
+            style={{ borderRadius: "5px" }}
+          >
+            <div className="text-red-700">{error}</div>
+          </div>
+        )}
 
         <div className="bg-white shadow-lg" style={{ borderRadius: "5px" }}>
           {/* Header with search and create button */}
@@ -214,39 +214,38 @@ export default function KnowledgeBasePage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-600">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-700">
-                  Showing page {currentPage} of {totalPages}
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
-                    style={{ borderRadius: "5px" }}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
-                    style={{ borderRadius: "5px" }}
-                  >
-                    Next
-                  </button>
-                </div>
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing page {currentPage} of {totalPages}
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+                  style={{ borderRadius: "5px" }}
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-200"
+                  style={{ borderRadius: "5px" }}
+                >
+                  Next
+                </button>
               </div>
             </div>
+          </div>
         )}
 
         {/* KnowledgeBaseModal */}
-        {
-          showKnowledgeBaseModal && (
+        {showKnowledgeBaseModal && (
           <KnowledgeBaseModal
             onClose={() => setShowKnowledgeBaseModal(false)}
             onKnowledgeBaseUpdated={() => {
@@ -254,8 +253,7 @@ export default function KnowledgeBasePage() {
               fetchKnowledgeBases(currentPage, searchQuery || null);
             }}
           />
-        )
-        }
+        )}
 
         {/* Profile Modal */}
         {showProfileModal && (

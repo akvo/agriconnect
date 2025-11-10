@@ -6,7 +6,7 @@ import {
   TrashIcon,
   EllipsisVerticalIcon,
   CircleStackIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 
 export default function KnowledgeBaseList({
@@ -33,7 +33,9 @@ export default function KnowledgeBaseList({
           <ArrowPathIcon className="animate-spin h-12 w-12 text-primary-600 mx-auto" />
           <div className="absolute inset-0 rounded-[5px] bg-gradient-primary opacity-20 blur-lg animate-pulse"></div>
         </div>
-        <p className="text-secondary-700 font-medium">Loading knowledge base...</p>
+        <p className="text-secondary-700 font-medium">
+          Loading knowledge base...
+        </p>
         <p className="text-secondary-500 text-sm mt-1">
           Please wait while we fetch the knowledge base data
         </p>
@@ -45,7 +47,9 @@ export default function KnowledgeBaseList({
     return (
       <div className="p-8 text-center">
         <CircleStackIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900">No knowledge bases found</h3>
+        <h3 className="text-lg font-medium text-gray-900">
+          No knowledge bases found
+        </h3>
         <p className="mt-1 text-gray-500">
           Try adjusting your search criteria or create a new knowledge base.
         </p>

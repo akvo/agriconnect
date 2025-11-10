@@ -2,7 +2,8 @@ import DocumentPage from "../../../components/document/DocumentPage";
 
 export const metadata = {
   title: "Document - AgriConnect",
-  description: "Manage your document library of a knowledge base for AI-powered assistance",
+  description:
+    "Manage your document library of a knowledge base for AI-powered assistance",
 };
 
 export default function DocumentPageRoute({ params }) {

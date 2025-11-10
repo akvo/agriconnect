@@ -39,7 +39,9 @@ export default function KnowledgeBaseModal({
       }
       onKnowledgeBaseUpdated();
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to update knowledge base.");
+      setError(
+        err.response?.data?.detail || "Failed to update knowledge base."
+      );
     } finally {
       setLoading(false);
     }
@@ -132,13 +134,10 @@ export default function KnowledgeBaseModal({
               className="flex-1 bg-green-600 py-2 px-4 border border-transparent text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ borderRadius: "5px" }}
             >
-              {loading
-                ? "Saving..."
-                : "Save Knowledge Base"}
+              {loading ? "Saving..." : "Save Knowledge Base"}
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );

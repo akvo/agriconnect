@@ -149,7 +149,7 @@ export default function DocumentUploadModal({
           "Failed to save changes. Please try again."
       );
     }
-  }
+  };
 
   const handleClose = () => {
     if (!uploading) {
@@ -186,9 +186,12 @@ export default function DocumentUploadModal({
           </button>
         </div>
 
-        <form onSubmit={selectedDocument ? handleEdit : handleSubmit} className="p-6 space-y-6">
+        <form
+          onSubmit={selectedDocument ? handleEdit : handleSubmit}
+          className="p-6 space-y-6"
+        >
           {/* File Drop Zone */}
-          {!selectedDocument ?
+          {!selectedDocument ? (
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700">
                 Document File *
@@ -254,8 +257,10 @@ export default function DocumentUploadModal({
                 className="hidden"
                 disabled={uploading}
               />
-            </div> : ""
-          }
+            </div>
+          ) : (
+            ""
+          )}
 
           {/* Title Input */}
           <div className="space-y-2">
@@ -316,13 +321,23 @@ export default function DocumentUploadModal({
             </button>
             <button
               type="submit"
-              disabled={selectedDocument ? false : !selectedFile || !title.trim() || uploading}
+              disabled={
+                selectedDocument
+                  ? false
+                  : !selectedFile || !title.trim() || uploading
+              }
               className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {uploading && (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
               )}
-              {uploading ? selectedDocument ? "Saving" :"Uploading..." : selectedDocument ? "Save" : "Upload Document"}
+              {uploading
+                ? selectedDocument
+                  ? "Saving"
+                  : "Uploading..."
+                : selectedDocument
+                  ? "Save"
+                  : "Upload Document"}
             </button>
           </div>
         </form>

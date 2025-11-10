@@ -6,7 +6,7 @@ import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
   PencilSquareIcon,
-  XMarkIcon
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../contexts/AuthContext";
 import HeaderNav from "../HeaderNav";
@@ -139,7 +139,7 @@ export default function DocumentPage({ kbId }) {
       setSelectedDocument(null);
       setUploadModalOpen(false);
     }
-  }
+  };
 
   const handleEditDocumentRequest = async (formData, documentId) => {
     setUploading(true);
@@ -154,7 +154,7 @@ export default function DocumentPage({ kbId }) {
     } finally {
       setUploading(false);
     }
-  }
+  };
 
   const handleUpdateKBDetails = async (e) => {
     e.preventDefault();
@@ -257,7 +257,11 @@ export default function DocumentPage({ kbId }) {
         breadcrumbs={[
           { label: "Dashboard", path: "/" },
           { label: "Knowledge Base Management", path: "/knowledge-base" },
-          { label: knowledgeBaseDetails ? knowledgeBaseDetails.title : "Loading..." },
+          {
+            label: knowledgeBaseDetails
+              ? knowledgeBaseDetails.title
+              : "Loading...",
+          },
         ]}
         onProfileClick={handleProfileClick}
       />
@@ -282,7 +286,9 @@ export default function DocumentPage({ kbId }) {
                 />
                 <textarea
                   className="w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                  value={knowledgeBaseDetails ? knowledgeBaseDetails.description : ""}
+                  value={
+                    knowledgeBaseDetails ? knowledgeBaseDetails.description : ""
+                  }
                   onChange={(e) =>
                     setKnowledgeBaseDetails({
                       ...knowledgeBaseDetails,
@@ -299,32 +305,36 @@ export default function DocumentPage({ kbId }) {
                 </button>
               </form>
             </div>
-          ): (
+          ) : (
             <div>
               <h1 className="text-2xl font-bold text-secondary-900">
-                {
-                  loadingKnowledgeBase ? "Loading knowledge base..." :
-                  knowledgeBaseDetails ? knowledgeBaseDetails.title : "Knowledge Base"
-                }
+                {loadingKnowledgeBase
+                  ? "Loading knowledge base..."
+                  : knowledgeBaseDetails
+                    ? knowledgeBaseDetails.title
+                    : "Knowledge Base"}
               </h1>
               <p className="mt-2 text-sm text-secondary-600">
-                {
-                  loadingKnowledgeBase? "Loading description..." :
-                  knowledgeBaseDetails ? knowledgeBaseDetails.description : "Manage your document library to power AI-driven assistance"
-                }
+                {loadingKnowledgeBase
+                  ? "Loading description..."
+                  : knowledgeBaseDetails
+                    ? knowledgeBaseDetails.description
+                    : "Manage your document library to power AI-driven assistance"}
               </p>
             </div>
           )}
           <div className="mt-4 sm:mt-0 space-x-4">
-              <button
-                onClick={() => setIsEdit(!isEdit)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-              >
-                {
-                  isEdit ? <XMarkIcon className="-ml-1 mr-2 h-5 w-5" /> : <PencilSquareIcon className="-ml-1 mr-2 h-5 w-5" />
-                }
-                {isEdit? "Cancel Update" : "Update"} Knowledge Base
-              </button>
+            <button
+              onClick={() => setIsEdit(!isEdit)}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+            >
+              {isEdit ? (
+                <XMarkIcon className="-ml-1 mr-2 h-5 w-5" />
+              ) : (
+                <PencilSquareIcon className="-ml-1 mr-2 h-5 w-5" />
+              )}
+              {isEdit ? "Cancel Update" : "Update"} Knowledge Base
+            </button>
             <button
               onClick={() => setUploadModalOpen(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
