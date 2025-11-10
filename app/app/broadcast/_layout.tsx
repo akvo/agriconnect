@@ -39,7 +39,22 @@ const BroadcastLayout = () => {
           options={({ route }: { route: any }) => ({
             headerShown: true,
             headerTitleAlign: "center",
-            headerTitle: () => <HeaderTitle name={route?.params?.name} />,
+            headerTitle: () => (
+              <HeaderTitle
+                name={route?.params?.name}
+                contactCount={route?.params?.contactCount}
+                onClick={() =>
+                  router.push({
+                    pathname: "/broadcast/group/members",
+                    params: {
+                      groupId: route?.params?.chatId,
+                      name: route?.params?.name,
+                      contactCount: route?.params?.contactCount,
+                    },
+                  })
+                }
+              />
+            ),
             headerLeft: () => (
               <TouchableOpacity
                 onPress={() => router.push("/broadcast/contact/groups")}
@@ -48,6 +63,13 @@ const BroadcastLayout = () => {
                 <Feathericons name="arrow-left" size={24} color="black" />
               </TouchableOpacity>
             ),
+          })}
+        />
+        <Stack.Screen
+          name="group/members"
+          options={({ route }: { route: any }) => ({
+            headerShown: true,
+            headerTitle: "Info",
           })}
         />
       </Stack>

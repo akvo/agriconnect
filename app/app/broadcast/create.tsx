@@ -14,21 +14,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Feather from "@expo/vector-icons/Feather";
 
-import { useBroadcast, Customer } from "@/contexts/BroadcastContext";
+import { useBroadcast, GroupMember } from "@/contexts/BroadcastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/services/api";
 import Avatar from "@/components/avatar";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
-import { initialsFromName } from "@/utils/string";
-
-// Helper function to capitalize first letter
-const capitalizeFirstLetter = (str: string | null): string => {
-  if (!str) {
-    return "";
-  }
-  return str.charAt(0).toUpperCase() + str.slice(1).replace("_", " ");
-};
+import { initialsFromName, capitalizeFirstLetter } from "@/utils/string";
 
 const CreateGroupScreen = () => {
   const router = useRouter();
@@ -39,10 +31,12 @@ const CreateGroupScreen = () => {
     selectedAgeGroups,
     clearMembers,
   } = useBroadcast();
-  const [groupName, setGroupName] = useState("");
+  const { activeGroup, setActiveGroup } = useBroadcast();
+  const [groupName, setGroupName] = useState(activeGroup?.name || "");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+
   const inputRef = useRef<TextInput>(null);
 
   // Auto-focus on mount
@@ -95,7 +89,7 @@ const CreateGroupScreen = () => {
       return;
     }
 
-    const memberIds = selectedMembers.map((m) => m.id);
+    const memberIds = selectedMembers.map((m) => m.customer_id);
 
     // Create broadcast group with filters and selected members
     const payload = {
@@ -113,22 +107,27 @@ const CreateGroupScreen = () => {
       setIsCreating(true);
       setError(null);
 
-      const response = await api.createBroadcastGroup(
-        user?.accessToken || "",
-        payload,
-      );
+      const response = activeGroup?.id
+        ? await api.updateBroadcastGroup(
+            user?.accessToken || "",
+            activeGroup.id,
+            payload,
+          )
+        : await api.createBroadcastGroup(user?.accessToken || "", payload);
 
       console.log(`[CreateGroup] Group created successfully:`, response);
 
       // Clear context after successful creation
       clearMembers();
+      setActiveGroup(null);
 
       // Navigate to group chat page
-      router.navigate({
+      router.replace({
         pathname: "/broadcast/group/[chatId]",
         params: {
           chatId: response.id.toString(),
           name: groupName.trim(),
+          contactCount: selectedMembers.length.toString(),
         },
       });
     } catch (err: any) {
@@ -144,7 +143,7 @@ const CreateGroupScreen = () => {
   };
 
   // Render member item (read-only, no checkbox)
-  const renderMemberItem = useCallback(({ item }: { item: Customer }) => {
+  const renderMemberItem = useCallback(({ item }: { item: GroupMember }) => {
     const displayName = item.full_name || item.phone_number;
     const initials = initialsFromName(displayName);
 
@@ -174,7 +173,10 @@ const CreateGroupScreen = () => {
     );
   }, []);
 
-  const keyExtractor = useCallback((item: Customer) => item.id.toString(), []);
+  const keyExtractor = useCallback(
+    (item: GroupMember) => item.customer_id.toString(),
+    [],
+  );
 
   // Empty state
   const ListEmptyComponent = useCallback(
@@ -282,7 +284,7 @@ const CreateGroupScreen = () => {
             ) : (
               <>
                 <Text style={[typography.label1, { color: themeColors.white }]}>
-                  Create Group
+                  {activeGroup?.id ? "Update Group" : "Create Group"}
                 </Text>
                 <Feather name="check" size={20} color={themeColors.white} />
               </>

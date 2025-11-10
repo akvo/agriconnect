@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -43,6 +44,63 @@ interface DateSection {
   messages: BroadcastMessage[];
 }
 
+// Message validation and sanitization
+const WHATSAPP_MAX_LENGTH = 1500;
+const MESSAGE_MIN_LENGTH = 5;
+
+interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+  sanitizedMessage?: string;
+}
+
+const sanitizeAndValidateMessage = (message: string): ValidationResult => {
+  if (!message || !message.trim()) {
+    return {
+      isValid: false,
+      error: "Message cannot be empty",
+    };
+  }
+
+  // Remove control characters except newlines and tabs
+  let sanitized = message.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, "");
+
+  // Replace tabs with spaces
+  sanitized = sanitized.replace(/\t/g, " ");
+
+  // Replace more than 4 consecutive spaces with 3 spaces
+  sanitized = sanitized.replace(/ {4,}/g, "   ");
+
+  // Replace more than 2 consecutive newlines with 2 newlines
+  sanitized = sanitized.replace(/\n{3,}/g, "\n\n");
+
+  // Fix punctuation followed by multiple spaces
+  sanitized = sanitized.replace(/([.!?,;:])\s{2,}/g, "$1 ");
+
+  // Trim whitespace
+  sanitized = sanitized.trim();
+
+  // Validate length after sanitization
+  if (sanitized.length < MESSAGE_MIN_LENGTH) {
+    return {
+      isValid: false,
+      error: `Message is too short (minimum ${MESSAGE_MIN_LENGTH} characters)`,
+    };
+  }
+
+  if (sanitized.length > WHATSAPP_MAX_LENGTH) {
+    return {
+      isValid: false,
+      error: `Message is too long (${sanitized.length}/${WHATSAPP_MAX_LENGTH} characters)`,
+    };
+  }
+
+  return {
+    isValid: true,
+    sanitizedMessage: sanitized,
+  };
+};
+
 const BroadcastGroupChatScreen = () => {
   const params = useLocalSearchParams();
   const chatId = params.chatId as string | undefined;
@@ -53,6 +111,11 @@ const BroadcastGroupChatScreen = () => {
   const [text, setText] = useState<string>("");
   const [sending, setSending] = useState<boolean>(false);
   const flatListRef = useRef<FlatList | null>(null);
+
+  // Calculate character count for the input
+  const charCount = text.length;
+  const isOverLimit = charCount > WHATSAPP_MAX_LENGTH;
+  const isNearLimit = charCount > WHATSAPP_MAX_LENGTH * 0.9; // 90% of limit
 
   // Fetch broadcast messages for this group
   const fetchGroupChatData = useCallback(async () => {
@@ -156,8 +219,20 @@ const BroadcastGroupChatScreen = () => {
       return;
     }
 
-    const messageText = text.trim();
-    const tempId = Date.now(); // Move outside try block for error handling
+    // Validate and sanitize message
+    const validation = sanitizeAndValidateMessage(text);
+
+    if (!validation.isValid) {
+      Alert.alert(
+        "Invalid Message",
+        validation.error || "Please check your message",
+        [{ text: "OK" }],
+      );
+      return;
+    }
+
+    const messageText = validation.sanitizedMessage!;
+    const tempId = Date.now();
     setText("");
 
     try {
@@ -210,13 +285,20 @@ const BroadcastGroupChatScreen = () => {
             : msg,
         ),
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error("[BroadcastGroupChat] Error sending message:", err);
 
       // Remove optimistic message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
 
-      // Show error in console with details
+      // Show error alert with details
+      const errorMessage =
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Failed to send broadcast message";
+
+      Alert.alert("Send Failed", errorMessage, [{ text: "OK" }]);
+
       console.error("[BroadcastGroupChat] Error details:", {
         error: err,
         chatId,
@@ -277,35 +359,54 @@ const BroadcastGroupChatScreen = () => {
           />
         </View>
         {/* Message Input */}
-        <View style={styles.inputRow}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            style={[
-              typography.body3,
-              styles.textInput,
-              { color: themeColors.dark1 },
-            ]}
-            placeholder="Type a broadcast message..."
-            placeholderTextColor={themeColors.dark3}
-            multiline
-            editable={!sending}
-          />
-          <TouchableOpacity
-            onPress={handleSendMessage}
-            style={[
-              styles.sendButton,
-              (sending || text.trim().length === 0) &&
-                styles.sendButtonDisabled,
-            ]}
-            disabled={sending || text.trim().length === 0}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={themeColors.white} />
-            ) : (
-              <Feather name="send" size={20} color={themeColors.white} />
-            )}
-          </TouchableOpacity>
+        <View style={styles.inputContainer}>
+          {/* Character Counter */}
+          {text.length > 0 && (
+            <View style={styles.charCounterContainer}>
+              <Text
+                style={[
+                  typography.caption2,
+                  styles.charCounter,
+                  isOverLimit && styles.charCounterError,
+                  isNearLimit && !isOverLimit && styles.charCounterWarning,
+                ]}
+              >
+                {charCount}/{WHATSAPP_MAX_LENGTH}
+              </Text>
+            </View>
+          )}
+          <View style={styles.inputRow}>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              style={[
+                typography.body3,
+                styles.textInput,
+                { color: themeColors.dark1 },
+                isOverLimit && styles.textInputError,
+              ]}
+              placeholder="Type a broadcast message..."
+              placeholderTextColor={themeColors.dark3}
+              multiline
+              editable={!sending}
+              maxLength={WHATSAPP_MAX_LENGTH + 100} // Allow slightly over for warning
+            />
+            <TouchableOpacity
+              onPress={handleSendMessage}
+              style={[
+                styles.sendButton,
+                (sending || text.trim().length === 0 || isOverLimit) &&
+                  styles.sendButtonDisabled,
+              ]}
+              disabled={sending || text.trim().length === 0 || isOverLimit}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={themeColors.white} />
+              ) : (
+                <Feather name="send" size={20} color={themeColors.white} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -334,13 +435,32 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: 10,
   },
+  inputContainer: {
+    borderTopWidth: 1,
+    borderColor: themeColors.mutedBorder,
+    backgroundColor: themeColors.background,
+  },
+  charCounterContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    alignItems: "flex-end",
+  },
+  charCounter: {
+    color: themeColors.dark3,
+    fontSize: 12,
+  },
+  charCounterWarning: {
+    color: "#FF9800", // Orange
+  },
+  charCounterError: {
+    color: themeColors.error,
+    fontWeight: "600",
+  },
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderColor: themeColors.mutedBorder,
     backgroundColor: themeColors.background,
   },
   textInput: {
@@ -350,6 +470,10 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: themeColors.white,
     borderRadius: 8,
+  },
+  textInputError: {
+    borderWidth: 1,
+    borderColor: themeColors.error,
   },
   sendButton: {
     marginLeft: 8,
