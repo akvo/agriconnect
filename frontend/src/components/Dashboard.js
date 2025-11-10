@@ -14,6 +14,7 @@ import {
   DocumentIcon,
   BeakerIcon,
 } from "@heroicons/react/24/outline";
+import Link from "next/link";
 
 export default function Dashboard() {
   const { user, refreshUser } = useAuth();
@@ -106,7 +107,7 @@ export default function Dashboard() {
               </div>
             </a>
 
-            <a
+            <Link
               href="/knowledge-base"
               className="group bg-gradient-to-br from-blue-50 to-blue-100 p-6 text-left hover:from-blue-100 hover:to-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
               style={{ borderRadius: "5px" }}
@@ -130,7 +131,7 @@ export default function Dashboard() {
                 <span>Manage Knowledge Bases</span>
                 <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
               </div>
-            </a>
+            </Link>
 
             {user?.user_type === "admin" && (
               <>
