@@ -45,6 +45,7 @@ def load_message_templates():
 
 # Load WhatsApp messages from template
 WHATSAPP_MESSAGES = load_message_templates()
+MAX_WHATSAPP_MESSAGE_LENGTH = 1500
 
 
 class WhatsAppService:

@@ -1,8 +1,7 @@
 """
 Broadcast service for managing broadcast groups and messages.
 
-NOTE: This is Part 1 - Core operations only.
-Celery queue integration will be added in Part 2.
+Part 2: Integrated with Celery for async message processing.
 """
 import logging
 from typing import List, Optional
@@ -18,6 +17,7 @@ from models.broadcast import (
 )
 from models.message import DeliveryStatus
 from models.customer import Customer
+from tasks.broadcast_tasks import process_broadcast
 
 logger = logging.getLogger(__name__)
 
@@ -208,9 +208,9 @@ class BroadcastService:
         is_admin: bool = False
     ) -> Optional[BroadcastMessage]:
         """
-        Create broadcast message record (stub for Part 1).
+        Create broadcast message and queue Celery task for async processing.
 
-        NOTE: Does not send messages. Celery integration in Part 2.
+        Part 2: Integrated with Celery - broadcasts are queued for processing.
         """
         # Validate access to all groups
         for group_id in group_ids:
@@ -240,11 +240,11 @@ class BroadcastService:
             logger.error(f"No recipients found for groups {group_ids}")
             return None
 
-        # Create BroadcastMessage
+        # Create BroadcastMessage with 'queued' status
         broadcast = BroadcastMessage(
             message=message,
             created_by=created_by,
-            status='pending'
+            status='queued'
         )
         self.db.add(broadcast)
         self.db.flush()
@@ -269,10 +269,21 @@ class BroadcastService:
         self.db.commit()
         self.db.refresh(broadcast)
 
-        logger.info(
-            f"Created broadcast {broadcast.id} with "
-            f"{len(recipients)} recipients (not sent yet)"
-        )
+        # Queue Celery task for async processing
+        try:
+            task = process_broadcast.delay(broadcast.id)
+            logger.info(
+                f"Broadcast {broadcast.id} queued with "
+                f"{len(recipients)} recipients (task_id={task.id})"
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to queue broadcast {broadcast.id}: {e}"
+            )
+            # Update status to failed if queuing fails
+            broadcast.status = 'failed'
+            self.db.commit()
+            return None
 
         return broadcast
 
