@@ -5,6 +5,8 @@ import {
   PlusIcon,
   MagnifyingGlassIcon,
   ArrowPathIcon,
+  PencilSquareIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../contexts/AuthContext";
 import HeaderNav from "../HeaderNav";
@@ -28,8 +30,30 @@ export default function DocumentPage({ kbId }) {
   const [refreshCount, setRefreshCount] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState(null);
 
+  const [isEdit, setIsEdit] = useState(false);
+  const [loadingKnowledgeBase, setLoadingKnowledgeBase] = useState(false);
+  const [knowledgeBaseDetails, setKnowledgeBaseDetails] = useState(null);
+
   const ITEMS_PER_PAGE = 10;
   const MAX_AUTO_REFRESHES = 2; // After 2 auto-refreshes, disable
+
+  const fetchKnowledgeBaseDetails = async () => {
+    setLoadingKnowledgeBase(true);
+    try {
+      const kbDetails = await knowledgeBaseApi.getById(kbId);
+      setKnowledgeBaseDetails(kbDetails);
+      setLoadingKnowledgeBase(false);
+    } catch (err) {
+      console.error("Error fetching knowledge base details:", err);
+      setLoadingKnowledgeBase(false);
+    }
+  };
+
+  useEffect(() => {
+    if (kbId) {
+      fetchKnowledgeBaseDetails();
+    }
+  }, [kbId]);
 
   const fetchDocuments = async (page = 1, search = null) => {
     try {
@@ -129,6 +153,24 @@ export default function DocumentPage({ kbId }) {
     }
   }
 
+  const handleUpdateKBDetails = async (e) => {
+    e.preventDefault();
+    if (!knowledgeBaseDetails) return;
+
+    try {
+      setLoadingKnowledgeBase(true);
+      await knowledgeBaseApi.update(knowledgeBaseDetails.id, {
+        title: knowledgeBaseDetails.title,
+        description: knowledgeBaseDetails.description,
+      });
+      setIsEdit(false);
+      setLoadingKnowledgeBase(false);
+    } catch (err) {
+      console.error("Error updating knowledge base details:", err);
+      setLoadingKnowledgeBase(false);
+    }
+  };
+
   const handleViewDocument = (doc) => {
     // TODO: ImpleDocument}l or navigate to detail page
     console.log("View doc:", doc);
@@ -211,7 +253,8 @@ export default function DocumentPage({ kbId }) {
       <HeaderNav
         breadcrumbs={[
           { label: "Dashboard", path: "/" },
-          { label: "Knowledge Base Management" },
+          { label: "Knowledge Base Management", path: "/knowledge-base" },
+          { label: knowledgeBaseDetails ? knowledgeBaseDetails.title : "Loading..." },
         ]}
         onProfileClick={handleProfileClick}
       />
@@ -219,16 +262,65 @@ export default function DocumentPage({ kbId }) {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Header */}
-        <div className="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-secondary-900">
-              Documents
-            </h1>
-            <p className="mt-2 text-sm text-secondary-600">
-              Manage your document library to power AI-driven assistance
-            </p>
-          </div>
-          <div className="mt-4 sm:mt-0">
+        <div className="sm:flex sm:items-top sm:justify-between">
+          {isEdit ? (
+            <div>
+              <form className="space-y-2" onSubmit={handleUpdateKBDetails}>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={knowledgeBaseDetails ? knowledgeBaseDetails.title : ""}
+                  onChange={(e) =>
+                    setKnowledgeBaseDetails({
+                      ...knowledgeBaseDetails,
+                      title: e.target.value,
+                    })
+                  }
+                />
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  value={knowledgeBaseDetails ? knowledgeBaseDetails.description : ""}
+                  onChange={(e) =>
+                    setKnowledgeBaseDetails({
+                      ...knowledgeBaseDetails,
+                      description: e.target.value,
+                    })
+                  }
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  Save Changes
+                </button>
+              </form>
+            </div>
+          ): (
+            <div>
+              <h1 className="text-2xl font-bold text-secondary-900">
+                {
+                  loadingKnowledgeBase ? "Loading knowledge base..." :
+                  knowledgeBaseDetails ? knowledgeBaseDetails.title : "Knowledge Base"
+                }
+              </h1>
+              <p className="mt-2 text-sm text-secondary-600">
+                {
+                  loadingKnowledgeBase? "Loading description..." :
+                  knowledgeBaseDetails ? knowledgeBaseDetails.description : "Manage your document library to power AI-driven assistance"
+                }
+              </p>
+            </div>
+          )}
+          <div className="mt-4 sm:mt-0 space-x-4">
+              <button
+                onClick={() => setIsEdit(!isEdit)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+              >
+                {
+                  isEdit ? <XMarkIcon className="-ml-1 mr-2 h-5 w-5" /> : <PencilSquareIcon className="-ml-1 mr-2 h-5 w-5" />
+                }
+                {isEdit? "Cancel Update" : "Update"} Knowledge Base
+              </button>
             <button
               onClick={() => setUploadModalOpen(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
