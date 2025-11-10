@@ -1,7 +1,7 @@
 """restructure knowledge base and add documents table
 
 Revision ID: 3a89e7a30c6c
-Revises: c8d4e9f2g3h6
+Revises: be8cf7df4bef
 Create Date: 2025-11-06 04:58:43.915446
 """
 
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "3a89e7a30c6c"
-down_revision: Union[str, None] = "c8d4e9f2g3h6"
+down_revision: Union[str, None] = "be8cf7df4bef"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
