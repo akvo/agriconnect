@@ -6,6 +6,7 @@ services:
       - 3000:3000
       - 8000:8000
       - 5050:5050
+      - 5555:5555
       - 8081:8081
       - 19000:19000
   pgadmin:
@@ -23,10 +24,61 @@ services:
   frontend:
     network_mode: service:mainnetwork
   backend:
+    depends_on:
+      - redis
     command: ["./dev.sh"]
     network_mode: service:mainnetwork
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
     volumes:
       - storage-data:/app/storage
+  celery-worker:
+    depends_on:
+      - db
+      - redis
+      - backend
+    environment:
+      - DATABASE_URL=postgresql://akvo:password@db:5432/agriconnect
+      - SECRET_KEY=${SECRET_KEY:-09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER:-whatsapp:+14155238886}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+    restart: on-failure
+  celery-beat:
+    depends_on:
+      - db
+      - redis
+      - backend
+    environment:
+      - DATABASE_URL=postgresql://akvo:password@db:5432/agriconnect
+      - SECRET_KEY=${SECRET_KEY:-09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+    restart: on-failure
+  flower:
+    depends_on:
+      - redis
+      - celery-worker
+    network_mode: service:mainnetwork
+    image: mher/flower
+    environment:
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+    command: >
+      celery
+        --broker=redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/${REDIS_DB:-0}
+        flower
+        --port=5555
+        --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin123}
+    restart: unless-stopped
   mobileapp:
     network_mode: service:mainnetwork
 volumes:

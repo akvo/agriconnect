@@ -12,11 +12,16 @@
 			"reconnection": {
 				"sid": "HXaa72aabfd2f732d3102f1f545f6a4cc2",
 				"description": "Template sent to reconnect with farmer after escalation"
+			},
+			"broadcast": {
+				"sid": "HX8658667a944883b1ceab9205b83d407b",
+				"description": "Template send to confirm incoming broadcast message"
 			}
 		},
 		"button_payloads": {
 			"escalate": "escalate",
-			"none": "none"
+			"none": "none",
+			"read_broadcast": "read_broadcast"
 		}
 	},
 	"escalation": {

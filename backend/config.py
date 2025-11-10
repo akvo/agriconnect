@@ -184,6 +184,30 @@ class Settings(BaseSettings):
         .get("enabled", False)
     )
 
+    # Redis Configuration (for Celery broker)
+    redis_host: str = os.getenv("REDIS_HOST", "redis")
+    redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
+    redis_db: int = int(os.getenv("REDIS_DB", "0"))
+
+    # Broadcast settings
+    broadcast_confirmation_button_payload: str = (
+        _config.get("whatsapp", {})
+        .get("button_payloads", {})
+        .get("read_broadcast", "read_broadcast")
+    )
+    broadcast_batch_size: int = 50
+    broadcast_retry_intervals: list = [5, 15, 60]
+
+    @property
+    def celery_broker_url(self) -> str:
+        """Auto-construct Celery broker URL (like Akvo RAG)"""
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    @property
+    def celery_result_backend(self) -> str:
+        """Auto-construct Celery result backend URL (like Akvo RAG)"""
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
 
 # Global settings instance
 settings = Settings()

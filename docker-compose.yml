@@ -13,6 +13,51 @@ services:
       - ./database/script:/script:ro
     environment:
       - POSTGRES_PASSWORD=password
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
+    depends_on:
+      - db
+      - redis
+    network_mode: service:mainnetwork
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://akvo:password@db:5432/agriconnect
+    command: ["worker"]
+    volumes:
+      - ./backend:/app:delegated
+    restart: unless-stopped
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
+    depends_on:
+      - db
+      - redis
+      - celery-worker
+    network_mode: service:mainnetwork
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://akvo:password@db:5432/agriconnect
+    command: ["beat"]
+    volumes:
+      - ./backend:/app:delegated
+    restart: unless-stopped
   backend:
     depends_on:
       - db
@@ -57,3 +102,4 @@ services:
       - EXPO_TOKEN=${EXPO_TOKEN}
 volumes:
   pg-data:
+  redis-data:
