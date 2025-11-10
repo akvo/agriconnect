@@ -8,6 +8,7 @@ Tests cover:
 - Owner-only updates/deletes
 """
 import pytest
+from unittest.mock import patch
 from sqlalchemy.orm import Session
 
 from models.broadcast import (
@@ -405,7 +406,7 @@ class TestBroadcastMessageCreation:
 
         assert broadcast is not None
         assert broadcast.message == "Test broadcast message"
-        assert broadcast.status == "pending"
+        assert broadcast.status == "queued"  # Celery task queued
         # Should have 5 unique recipients (1, 2, 3, 4, 5)
         assert len(broadcast.broadcast_recipients) == 5
 
@@ -553,3 +554,126 @@ class TestBroadcastMessageCreation:
             broadcast_id=broadcast.id, created_by=test_users["eo2"].id
         )
         assert not_found is None
+
+
+def test_get_groups_for_eo_without_administrative_id(
+    db_session: Session, test_users, test_customers, test_administrative
+):
+    """Test Line 96: get_groups_for_eo without administrative_id."""
+    service = BroadcastService(db_session)
+
+    # EO1 creates a group
+    service.create_group(
+        name="EO1 Group",
+        customer_ids=[1, 2],
+        created_by=test_users["eo1"].id,
+        administrative_id=test_administrative["ward1"].id,
+    )
+
+    # Query without administrative_id should show only groups created by EO
+    eo1_groups = service.get_groups_for_eo(
+        eo_id=test_users["eo1"].id,
+        administrative_id=None  # No ward filter
+    )
+    assert len(eo1_groups) == 1
+    assert eo1_groups[0].created_by == test_users["eo1"].id
+
+    # EO2 should not see EO1's groups
+    eo2_groups = service.get_groups_for_eo(
+        eo_id=test_users["eo2"].id,
+        administrative_id=None
+    )
+    assert len(eo2_groups) == 0
+
+
+def test_update_group_non_owner_warning(
+    db_session: Session, test_users, test_customers, test_administrative
+):
+    """Test Line 138: update_group logs warning when non-owner tries
+    to update.
+    """
+    service = BroadcastService(db_session)
+
+    # EO1 creates a group
+    group = service.create_group(
+        name="EO1 Group",
+        customer_ids=[1, 2],
+        created_by=test_users["eo1"].id,
+        administrative_id=test_administrative["ward1"].id,
+    )
+
+    # EO2 tries to update EO1's group (should log warning and return None)
+    result = service.update_group(
+        group_id=group.id,
+        eo_id=test_users["eo2"].id,
+        name="Hacked Name",
+        administrative_id=test_administrative["ward1"].id
+    )
+
+    assert result is None
+    # Verify group was not updated
+    db_session.refresh(group)
+    assert group.name == "EO1 Group"
+
+
+def test_delete_group_non_owner_warning(
+    db_session: Session, test_users, test_customers, test_administrative
+):
+    """Test Line 184: delete_group logs warning when non-owner tries
+    to delete.
+    """
+    service = BroadcastService(db_session)
+
+    # EO1 creates a group
+    group = service.create_group(
+        name="EO1 Group",
+        customer_ids=[1, 2],
+        created_by=test_users["eo1"].id,
+        administrative_id=test_administrative["ward1"].id,
+    )
+
+    # EO2 tries to delete EO1's group (should log warning and return False)
+    result = service.delete_group(
+        group_id=group.id,
+        eo_id=test_users["eo2"].id,
+        administrative_id=test_administrative["ward1"].id
+    )
+
+    assert result is False
+    # Verify group still exists
+    db_session.refresh(group)
+    assert group.id is not None
+
+
+@patch('services.broadcast_service.process_broadcast')
+def test_create_broadcast_celery_exception(
+    mock_process_broadcast,
+    db_session: Session,
+    test_users,
+    test_customers,
+    test_administrative
+):
+    """Test Lines 279-286: Exception when queuing Celery task."""
+    service = BroadcastService(db_session)
+
+    # Create a group
+    group = service.create_group(
+        name="Test Group",
+        customer_ids=[1, 2],
+        created_by=test_users["eo1"].id,
+        administrative_id=test_administrative["ward1"].id,
+    )
+
+    # Mock Celery task to raise exception
+    mock_process_broadcast.delay.side_effect = Exception("Celery error")
+
+    # Try to create broadcast (should handle exception gracefully)
+    broadcast = service.create_broadcast(
+        message="Test broadcast",
+        group_ids=[group.id],
+        created_by=test_users["eo1"].id,
+        administrative_id=test_administrative["ward1"].id,
+    )
+
+    # Should return None due to Celery failure
+    assert broadcast is None

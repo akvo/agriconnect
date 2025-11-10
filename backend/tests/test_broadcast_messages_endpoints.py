@@ -269,7 +269,7 @@ class TestBroadcastMessagesEndpoint:
 
         # Verify response structure
         assert data["message"] == payload["message"]
-        assert data["status"] == "pending"
+        assert data["status"] == "queued"  # Celery task queued
         assert data["total_recipients"] == 1  # 1 customer in group1
         assert "id" in data
         assert "created_at" in data
@@ -445,7 +445,7 @@ class TestBroadcastMessagesEndpoint:
         # Verify structure
         assert data["id"] == broadcast_id
         assert data["message"] == payload["message"]
-        assert data["status"] == "pending"
+        assert data["status"] == "queued"  # Celery task queued
         assert data["total_recipients"] == 2
         assert data["sent_count"] == 0  # Not sent yet
         assert data["delivered_count"] == 0
@@ -836,3 +836,80 @@ class TestBroadcastMessagesEndpoint:
         assert "total_recipients" in broadcast
         assert "queued_at" in broadcast
         assert "created_at" in broadcast
+
+    def test_create_broadcast_with_empty_message(
+        self, client, setup_broadcast_groups
+    ):
+        """Test that empty messages are rejected by Pydantic validation"""
+        groups = setup_broadcast_groups
+
+        # Test with empty string - Pydantic validation rejects this
+        payload = {"group_ids": [groups["group1_id"]], "message": ""}
+        response = client.post(
+            "/api/broadcast/messages",
+            json=payload,
+            headers=groups["headers_eo1"],
+        )
+        # Pydantic returns 422 for validation errors
+        assert response.status_code == 422
+
+    def test_create_broadcast_with_whitespace_only_message(
+        self, client, setup_broadcast_groups
+    ):
+        """
+        Test that whitespace-only messages become empty
+        after sanitization (line 47 coverage)
+        """
+        groups = setup_broadcast_groups
+
+        # Test with whitespace only - passes Pydantic but fails sanitization
+        payload = {"group_ids": [groups["group1_id"]], "message": "   \n\t  "}
+        response = client.post(
+            "/api/broadcast/messages",
+            json=payload,
+            headers=groups["headers_eo1"],
+        )
+        assert response.status_code == 400
+        assert "Message cannot be empty" in response.json()["detail"]
+
+    def test_create_broadcast_with_message_too_long(
+        self, client, setup_broadcast_groups
+    ):
+        """
+        Test that messages over 1500 characters are rejected (line 72 coverage)
+        """
+        groups = setup_broadcast_groups
+
+        # Create a message that exceeds MAX_WHATSAPP_MESSAGE_LENGTH (1500)
+        long_message = "a" * 1501
+        payload = {"group_ids": [groups["group1_id"]], "message": long_message}
+        response = client.post(
+            "/api/broadcast/messages",
+            json=payload,
+            headers=groups["headers_eo1"],
+        )
+        assert response.status_code == 400
+        assert "too long" in response.json()["detail"]
+        assert "1500 characters" in response.json()["detail"]
+
+    def test_create_broadcast_with_exactly_max_length_message(
+        self, client, setup_broadcast_groups
+    ):
+        """Test that messages exactly at 1500 characters are accepted"""
+        groups = setup_broadcast_groups
+
+        # Create a message that is exactly MAX_WHATSAPP_MESSAGE_LENGTH (1500)
+        max_length_message = "a" * 1500
+        payload = {
+            "group_ids": [groups["group1_id"]],
+            "message": max_length_message,
+        }
+        response = client.post(
+            "/api/broadcast/messages",
+            json=payload,
+            headers=groups["headers_eo1"],
+        )
+        assert response.status_code == 201
+        data = response.json()
+        # Message should be accepted and sanitized
+        assert len(data["message"]) <= 1500

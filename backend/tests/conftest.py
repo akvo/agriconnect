@@ -282,6 +282,9 @@ def mock_websocket_emitters(monkeypatch):
         def send_message(self, *args, **kwargs):
             return {"sid": self._generate_unique_sid(), "status": "sent"}
 
+        def send_message_with_tracking(self, *args, **kwargs):
+            return {"sid": self._generate_unique_sid(), "status": "sent"}
+
         def send_template_message(self, *args, **kwargs):
             return {"sid": self._generate_unique_sid(), "status": "sent"}
 

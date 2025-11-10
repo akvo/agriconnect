@@ -6,6 +6,13 @@ from models.customer import Customer, CustomerLanguage
 from models.message import Message, MessageFrom
 from models.ticket import Ticket
 from models.administrative import Administrative, AdministrativeLevel
+from models.playground_message import (
+    PlaygroundMessage,
+    PlaygroundMessageRole,
+    PlaygroundMessageStatus,
+)
+from datetime import datetime, timezone
+from models.user import User, UserType
 
 
 @pytest.fixture
@@ -542,3 +549,322 @@ def test_ai_callback_whisper_type_no_open_ticket(
 
     # emit_whisper_created should NOT be called (no open ticket)
     # This is handled by the global mock in conftest.py
+
+
+def test_ai_callback_playground_with_failed_status(
+    client: TestClient, db_session: Session
+):
+    """Test successful AI callback with failed status (lines 33-56 coverage)"""
+
+    # Create a test user first (required for foreign key)
+    user = User(
+        email="playground_test@test.com",
+        phone_number="+1234567890",
+        hashed_password="test_hash",
+        user_type=UserType.ADMIN,
+        full_name="Playground Test User"
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    # Create a playground message
+    pg_message = PlaygroundMessage(
+        session_id="test_session_123",
+        role=PlaygroundMessageRole.ASSISTANT,
+        content="",
+        status=PlaygroundMessageStatus.PENDING,
+        job_id="failed_job_123",
+        admin_user_id=user.id,  # Use actual user ID
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(pg_message)
+    db_session.commit()
+
+    # Send failed callback
+    payload = {
+        "job_id": "failed_job_123",
+        "status": "failed",
+        "output": None,
+        "error": "AI processing failed",
+        "callback_params": (
+            '{"source": "playground", "session_id": "test_session_123"}'
+        ),
+        "trace_id": "trace_failed_001",
+        "job": "chat",
+    }
+
+    response = client.post("/api/callback/ai", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "error"
+
+    # Verify message status was updated to FAILED
+    db_session.refresh(pg_message)
+    assert pg_message.status == PlaygroundMessageStatus.FAILED
+
+
+def test_ai_callback_playground_message_not_found(
+    client: TestClient, db_session: Session
+):
+    """
+    Test playground callback when message not found (lines 71-75 coverage)
+    """
+    payload = {
+        "job_id": "nonexistent_job_999",
+        "status": "completed",
+        "output": {"answer": "Test answer", "citations": []},
+        "error": None,
+        "callback_params": (
+            '{"source": "playground", "session_id": "test_session_456"}'
+        ),
+        "trace_id": "trace_notfound_001",
+        "job": "chat",
+    }
+
+    response = client.post("/api/callback/ai", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "received"
+    assert data["job_id"] == "nonexistent_job_999"
+
+
+def test_ai_callback_playground_exception_handling(
+    client: TestClient, db_session: Session, monkeypatch
+):
+    """Test playground callback exception handling
+    (lines 107-109 coverage)
+    """
+    from models.playground_message import (
+        PlaygroundMessage,
+        PlaygroundMessageRole,
+        PlaygroundMessageStatus,
+    )
+    from models.user import User, UserType
+    from datetime import datetime, timezone
+
+    # Create a test user first (required for foreign key)
+    user = User(
+        email="playground_exception@test.com",
+        phone_number="+1234567891",
+        hashed_password="test_hash",
+        user_type=UserType.ADMIN,
+        full_name="Playground Exception User"
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    # Create a playground message
+    pg_message = PlaygroundMessage(
+        session_id="test_session_789",
+        role=PlaygroundMessageRole.ASSISTANT,
+        content="",
+        status=PlaygroundMessageStatus.PENDING,
+        job_id="error_job_789",
+        admin_user_id=user.id,  # Use actual user ID
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(pg_message)
+    db_session.commit()
+
+    # Mock the emit_playground_response to raise an exception
+    async def mock_emit_error(*args, **kwargs):
+        raise Exception("WebSocket emit failed")
+
+    monkeypatch.setattr(
+        "routers.callbacks.emit_playground_response",
+        mock_emit_error
+    )
+
+    payload = {
+        "job_id": "error_job_789",
+        "status": "completed",
+        "output": {"answer": "Test answer", "citations": []},
+        "error": None,
+        "callback_params": (
+            '{"source": "playground", '
+            '"session_id": "test_session_789"}'
+        ),
+        "trace_id": "trace_error_001",
+        "job": "chat",
+    }
+
+    response = client.post("/api/callback/ai", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "error"
+    assert "error" in data
+
+
+def test_ai_callback_reply_with_original_message_not_found(
+    client: TestClient, db_session: Session
+):
+    """Test AI callback REPLY when original message not found
+    (lines 176-183 coverage)
+    """
+    payload = {
+        "job_id": "reply_job_404",
+        "status": "completed",
+        "output": {"answer": "Test answer", "citations": []},
+        "error": None,
+        "callback_params": (
+            '{"message_id": 99999, "message_type": 1, '
+            '"customer_id": 1}'
+        ),
+        "trace_id": "trace_404_001",
+        "job": "chat",
+    }
+
+    response = client.post("/api/callback/ai", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "received"
+
+
+def test_ai_callback_failed_stage(
+    client: TestClient, test_customer_with_ticket, db_session: Session
+):
+    """Test AI callback with FAILED stage (lines 319-325 coverage)"""
+    customer, ticket, message = test_customer_with_ticket
+
+    payload = {
+        "job_id": "failed_stage_job",
+        "status": "failed",
+        "output": None,
+        "error": "Processing timeout",
+        "callback_params": (
+            f'{{"message_id": {message.id}, "message_type": 1, '
+            f'"customer_id": {customer.id}}}'
+        ),
+        "trace_id": "trace_failed_stage",
+        "job": "chat",
+    }
+
+    response = client.post("/api/callback/ai", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "received"
+
+
+def test_ai_callback_exception_raises_http_exception(
+    client: TestClient, db_session: Session, monkeypatch
+):
+    """Test AI callback raises HTTPException on unexpected error
+    (lines 327-331 coverage)
+    """
+
+    # Mock MessageService to raise an exception
+    def mock_message_service_error(*args, **kwargs):
+        raise Exception("Database connection failed")
+
+    monkeypatch.setattr(
+        "routers.callbacks.MessageService",
+        mock_message_service_error
+    )
+
+    payload = {
+        "job_id": "exception_job",
+        "status": "completed",
+        "output": {"answer": "Test", "citations": []},
+        "error": None,
+        "callback_params": '{"message_id": 1, "message_type": 1}',
+        "trace_id": "trace_exception",
+        "job": "chat",
+    }
+
+    response = client.post("/api/callback/ai", json=payload)
+
+    assert response.status_code == 500
+
+
+def test_kb_callback_done_stage(client: TestClient, db_session: Session):
+    """Test KB callback with done stage (lines 366-369 coverage)"""
+    payload = {
+        "job_id": "kb_job_001",
+        "status": "done",
+        "trace_id": "trace_kb_001",
+        "job": "upload",
+    }
+
+    response = client.post("/api/callback/kb", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "received"
+
+
+def test_kb_callback_with_error(client: TestClient, db_session: Session):
+    """Test KB callback error handling (lines 372-385 coverage)"""
+    payload = {
+        "job_id": "kb_job_error",
+        "status": "failed",
+        "trace_id": "trace_kb_error",
+        "job": "upload",
+    }
+
+    response = client.post("/api/callback/kb", json=payload)
+
+    assert response.status_code == 200
+
+
+def test_kb_callback_exception_raises_http_exception(
+    client: TestClient, db_session: Session, monkeypatch
+):
+    """Test KB callback raises HTTPException on error
+    (lines 393-421 coverage)
+    """
+
+    # Create a payload with callback_params that will trigger the service
+    from models.knowledge_base import KnowledgeBase
+    from models.user import User, UserType
+
+    # Create a test user first
+    user = User(
+        email="kb_test@test.com",
+        phone_number="+1234567892",
+        hashed_password="test_hash",
+        user_type=UserType.ADMIN,
+        full_name="KB Test User"
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    # Create a test KB
+    kb = KnowledgeBase(
+        user_id=user.id,
+        title="Test KB",
+        filename="test.pdf",
+        description="Test",
+    )
+    db_session.add(kb)
+    db_session.commit()
+    db_session.refresh(kb)
+
+    # Mock KnowledgeBaseService to raise exception
+    class MockKnowledgeBaseServiceError:
+        def __init__(self, *args, **kwargs):
+            raise Exception("Database error in KB callback")
+
+    monkeypatch.setattr(
+        "services.knowledge_base_service.KnowledgeBaseService",
+        MockKnowledgeBaseServiceError
+    )
+
+    payload = {
+        "job_id": "kb_exception_job",
+        "status": "done",
+        "callback_params": {"kb_id": kb.id},
+        "trace_id": "trace_kb_exception",
+        "job": "upload",
+    }
+
+    response = client.post("/api/callback/kb", json=payload)
+
+    assert response.status_code == 500
