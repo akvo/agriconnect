@@ -10,16 +10,33 @@
  */
 
 import { SafeAreaView } from "react-native-safe-area-context";
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
+import { useBroadcast } from "@/contexts/BroadcastContext";
+import { api } from "@/services/api";
 
 const BroadcastLayout = () => {
   const pathname = usePathname();
   const router = useRouter();
+  const { setCropTypes } = useBroadcast();
+
+  const fetchCropTypes = useCallback(async () => {
+    try {
+      const response = await api.getCropTypes();
+      setCropTypes(response);
+    } catch (err) {
+      console.error("[BroadcastLayout] Error fetching crop types:", err);
+    }
+  }, [setCropTypes]);
+
+  // Fetch crop types once when layout mounts
+  useEffect(() => {
+    fetchCropTypes();
+  }, [fetchCropTypes]);
 
   // Determine active tab based on pathname
   const activeTab = pathname.includes("/broadcast/contact/groups")

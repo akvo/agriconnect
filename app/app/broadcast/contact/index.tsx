@@ -6,46 +6,28 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Modal,
-  Pressable,
-  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import Feather from "@expo/vector-icons/Feather";
-import { Checkbox } from "expo-checkbox";
 
-import Search from "@/components/search";
-import Avatar from "@/components/avatar";
 import { api } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { useBroadcast } from "@/contexts/BroadcastContext";
-import { AGE_GROUPS } from "@/constants/customer";
+import { Customer, useBroadcast } from "@/contexts/BroadcastContext";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
-import { capitalizeFirstLetter, initialsFromName } from "@/utils/string";
+
+// Import broadcast components
+import {
+  CustomerCard,
+  FilterModal,
+  FilterPills,
+  SearchFilterHeader,
+  SelectAllHeader,
+} from "@/components/broadcast";
 
 // Constants
 const PAGE_SIZE = 10;
 const DEBOUNCE_DELAY = 300;
-
-// Types
-interface CropType {
-  id: number;
-  name: string;
-}
-interface Customer {
-  id: number;
-  full_name: string | null;
-  phone_number: string;
-  language: string;
-  age_group: string | null;
-  administrative: {
-    id: number | null;
-    name: string | null;
-    path: string | null;
-  };
-  crop_type: CropType | null;
-}
 
 interface CustomerListResponse {
   customers: Customer[];
@@ -58,6 +40,8 @@ const BroadcastFarmerListTab = () => {
   const router = useRouter();
   const { user } = useAuth();
   const {
+    cropTypes,
+    selectedMembers,
     setSelectedMembers,
     setSelectedCropTypes: setContextCropTypes,
     setSelectedAgeGroups: setContextAgeGroups,
@@ -76,26 +60,10 @@ const BroadcastFarmerListTab = () => {
   const [hasMore, setHasMore] = useState(true);
 
   // Filter state
-  const [cropTypes, setCropTypes] = useState<CropType[]>([]);
   const [selectedCropTypes, setSelectedCropTypes] = useState<number[]>([]);
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const [selectedAdminIds, setSelectedAdminIds] = useState<number[]>([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
-
-  // Fetch crop types on mount
-  const fetchCropTypes = useCallback(async () => {
-    try {
-      const response = await api.getCropTypes();
-      // API returns array directly, not wrapped in object
-      setCropTypes(response);
-    } catch (err) {
-      console.error("Error fetching crop types:", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCropTypes();
-  }, [fetchCropTypes]);
 
   // Debounce search input
   useEffect(() => {
@@ -145,12 +113,23 @@ const BroadcastFarmerListTab = () => {
         );
 
         if (isLoadingMore) {
-          setCustomers((prev) => [...prev, ...response.customers]);
+          // use the current customers array from context instead of an updater function
+          setCustomers([...customers, ...response.customers]);
         } else {
           setCustomers(response.customers);
         }
 
         setHasMore(response.customers.length === PAGE_SIZE);
+
+        if (selectedMembers.length) {
+          setSelectedIds((prev) => {
+            const newSet = new Set(prev);
+            selectedMembers.forEach((member) => {
+              newSet.add(member.customer_id);
+            });
+            return newSet;
+          });
+        }
       } catch (err) {
         console.error("Error fetching customers:", err);
         setError(
@@ -162,12 +141,15 @@ const BroadcastFarmerListTab = () => {
       }
     },
     [
+      isAdmin,
       debouncedSearch,
       selectedCropTypes,
       selectedAgeGroups,
       selectedAdminIds,
       user?.accessToken,
-      isAdmin,
+      selectedMembers,
+      customers,
+      setCustomers,
     ],
   );
 
@@ -265,7 +247,14 @@ const BroadcastFarmerListTab = () => {
   // Navigation handler
   const handleNext = useCallback(() => {
     // Get selected customers from the full list
-    const selectedCustomers = customers.filter((c) => selectedIds.has(c.id));
+    const selectedCustomers = customers
+      .map((c) => ({
+        customer_id: c.id,
+        phone_number: c.phone_number,
+        full_name: c.full_name,
+        crop_type: c.crop_type,
+      }))
+      .filter((c) => selectedIds.has(c.customer_id));
 
     // Update context with selected members, crop types, and age groups
     setContextCropTypes(selectedCropTypes);
@@ -287,62 +276,19 @@ const BroadcastFarmerListTab = () => {
   // Render item
   const renderItem = useCallback(
     ({ item }: { item: Customer }) => {
-      const isSelected = selectedIds.has(item.id);
-      const displayName = item.full_name || item.phone_number;
-      const initials = initialsFromName(displayName);
-
+      const isSelected =
+        selectedIds.has(item.id) ||
+        selectedMembers.some((m) => m.customer_id === item.id);
       return (
-        <TouchableOpacity
-          style={[
-            styles.customerCard,
-            isSelected && styles.customerCardSelected,
-          ]}
-          onPress={() => toggleSelection(item.id)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.customerBody}>
-            <Checkbox
-              value={isSelected}
-              onValueChange={() => toggleSelection(item.id)}
-              color={isSelected ? themeColors["green-500"] : undefined}
-              style={styles.checkbox}
-            />
-            <View style={styles.avatarContainer}>
-              <Avatar initials={initials} size={48} />
-            </View>
-            <View style={styles.customerInfo}>
-              <Text
-                style={[
-                  typography.label1,
-                  typography.bold,
-                  { color: themeColors.textPrimary },
-                ]}
-                numberOfLines={1}
-              >
-                {displayName}
-              </Text>
-              {item.administrative?.path && isAdmin && (
-                <Text
-                  style={[
-                    typography.body3,
-                    { color: themeColors.textSecondary, marginBottom: 8 },
-                  ]}
-                >
-                  {item.administrative.path}
-                </Text>
-              )}
-
-              <Text style={[typography.body4, { color: themeColors.dark4 }]}>
-                {item?.crop_type?.name
-                  ? capitalizeFirstLetter(item.crop_type.name)
-                  : item.phone_number}
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+        <CustomerCard
+          customer={item}
+          isSelected={isSelected}
+          isAdmin={isAdmin}
+          onToggle={toggleSelection}
+        />
       );
     },
-    [selectedIds, isAdmin, toggleSelection],
+    [selectedIds, isAdmin, selectedMembers, toggleSelection],
   );
 
   const keyExtractor = useCallback((item: Customer) => item.id.toString(), []);
@@ -350,34 +296,12 @@ const BroadcastFarmerListTab = () => {
   // List header with Select All
   const ListHeaderComponent = useMemo(
     () => (
-      <View style={styles.listHeader}>
-        <TouchableOpacity style={styles.selectAllRow} onPress={toggleSelectAll}>
-          <Checkbox
-            value={isAllSelected}
-            onValueChange={toggleSelectAll}
-            color={isAllSelected ? themeColors["green-500"] : undefined}
-            style={styles.checkbox}
-          />
-          <Text
-            style={[
-              typography.label2,
-              { color: themeColors.textPrimary, marginLeft: 8 },
-            ]}
-          >
-            Select All ({customers.length} visible)
-          </Text>
-        </TouchableOpacity>
-        {selectedIds.size > 0 && (
-          <Text
-            style={[
-              typography.body3,
-              { color: themeColors["green-500"], marginTop: 8 },
-            ]}
-          >
-            {selectedIds.size} customer(s) selected
-          </Text>
-        )}
-      </View>
+      <SelectAllHeader
+        isAllSelected={isAllSelected}
+        onToggleAll={toggleSelectAll}
+        totalCount={customers.length}
+        selectedCount={selectedIds.size}
+      />
     ),
     [isAllSelected, toggleSelectAll, selectedIds.size, customers.length],
   );
@@ -454,142 +378,39 @@ const BroadcastFarmerListTab = () => {
     );
   }, [loading, error, fetchCustomers]);
 
-  const ListSelectedCropTypes = useMemo(() => {
-    return cropTypes.filter((cropType) =>
-      selectedCropTypes.includes(cropType.id),
-    );
-  }, [selectedCropTypes, cropTypes]);
+  const activeFiltersCount =
+    selectedCropTypes.length +
+    selectedAgeGroups.length +
+    selectedAdminIds.length;
 
   return (
     <View style={styles.container}>
       {/* Search and Filter */}
       <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View style={styles.searchWrapper}>
-            <Search value={searchQuery} onChange={setSearchQuery} />
-          </View>
-          <View style={styles.filterWrapper}>
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                hasActiveFilters && styles.filterButtonActive,
-              ]}
-              onPress={() => setShowFilterModal(true)}
-            >
-              <Feather
-                name="sliders"
-                size={24}
-                color={
-                  hasActiveFilters
-                    ? themeColors.white
-                    : themeColors["green-500"]
-                }
-              />
-              {hasActiveFilters && (
-                <Text style={[styles.filterBadge]}>
-                  {selectedCropTypes.length +
-                    selectedAgeGroups.length +
-                    selectedAdminIds.length}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+        <SearchFilterHeader
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onFilterPress={() => setShowFilterModal(true)}
+          hasActiveFilters={hasActiveFilters}
+          activeFiltersCount={activeFiltersCount}
+        />
 
         {/* Selected Filter Pills */}
         {hasActiveFilters && (
-          <View style={styles.filterPillsContainer}>
-            <View style={styles.filterPillsRow}>
-              {/* Crop Type Pills */}
-              {ListSelectedCropTypes.map((cropType) => (
-                <TouchableOpacity
-                  key={`crop-${cropType.id}`}
-                  style={styles.filterPill}
-                  onPress={() => toggleCropType(cropType.id)}
-                  testID={`selected-filter-pill-crop-${cropType.id}`}
-                  accessibilityLabel={`Remove ${cropType.name} filter`}
-                  accessibilityRole="button"
-                >
-                  <Text
-                    style={[typography.body4, { color: themeColors.dark4 }]}
-                  >
-                    {capitalizeFirstLetter(cropType.name)}
-                  </Text>
-                  <Feather
-                    name="x"
-                    size={14}
-                    color={themeColors.dark4}
-                    style={{ marginLeft: 4 }}
-                  />
-                </TouchableOpacity>
-              ))}
-
-              {/* Age Group Pills */}
-              {selectedAgeGroups.map((ageGroup) => (
-                <TouchableOpacity
-                  key={`age-${ageGroup}`}
-                  style={styles.filterPill}
-                  onPress={() => toggleAgeGroup(ageGroup)}
-                  testID={`selected-filter-pill-age-${ageGroup}`}
-                  accessibilityLabel={`Remove ${ageGroup} filter`}
-                  accessibilityRole="button"
-                >
-                  <Text
-                    style={[typography.body4, { color: themeColors.dark4 }]}
-                  >
-                    {ageGroup}
-                  </Text>
-                  <Feather
-                    name="x"
-                    size={14}
-                    color={themeColors.dark4}
-                    style={{ marginLeft: 4 }}
-                  />
-                </TouchableOpacity>
-              ))}
-
-              {/* Administrative Area Pills */}
-              {selectedAdminIds.map((adminId) => (
-                <TouchableOpacity
-                  key={`admin-${adminId}`}
-                  style={styles.filterPill}
-                  onPress={() =>
-                    setSelectedAdminIds((prev) =>
-                      prev.filter((id) => id !== adminId),
-                    )
-                  }
-                  testID={`selected-filter-pill-admin-${adminId}`}
-                  accessibilityLabel={`Remove Area ${adminId} filter`}
-                  accessibilityRole="button"
-                >
-                  <Text
-                    style={[typography.body4, { color: themeColors.dark4 }]}
-                  >
-                    Area {adminId}
-                  </Text>
-                  <Feather
-                    name="x"
-                    size={14}
-                    color={themeColors.dark4}
-                    style={{ marginLeft: 4 }}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Clear All Button */}
-            <TouchableOpacity
-              style={styles.clearAllButton}
-              onPress={clearFilters}
-              testID="clear-filters-button"
-              accessibilityLabel="Clear all filters"
-              accessibilityRole="button"
-            >
-              <Text style={[typography.label3, { color: themeColors.error }]}>
-                Clear
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <FilterPills
+            selectedCropTypes={selectedCropTypes}
+            selectedAgeGroups={selectedAgeGroups}
+            selectedAdminIds={selectedAdminIds}
+            cropTypes={cropTypes}
+            onRemoveCropType={toggleCropType}
+            onRemoveAgeGroup={toggleAgeGroup}
+            onRemoveAdminId={(id) =>
+              setSelectedAdminIds((prev) =>
+                prev.filter((adminId) => adminId !== id),
+              )
+            }
+            onClearAll={clearFilters}
+          />
         )}
       </View>
 
@@ -626,144 +447,17 @@ const BroadcastFarmerListTab = () => {
       </View>
 
       {/* Filter Modal */}
-      <Modal
+      <FilterModal
         visible={showFilterModal}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowFilterModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowFilterModal(false)}
-        >
-          <Pressable
-            style={styles.modalContent}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.modalHeader}>
-              <Text
-                style={[
-                  typography.heading5,
-                  { color: themeColors.textPrimary },
-                ]}
-              >
-                Filter Customers
-              </Text>
-              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <Feather name="x" size={24} color={themeColors.dark4} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {/* Crop Types */}
-              <View style={styles.filterSection}>
-                <Text
-                  style={[
-                    typography.label1,
-                    { color: themeColors.textPrimary, marginBottom: 12 },
-                  ]}
-                >
-                  Crop Types
-                </Text>
-                <View style={styles.filterPillsRow}>
-                  {cropTypes.map((cropType) => (
-                    <TouchableOpacity
-                      key={cropType.id}
-                      style={[
-                        styles.filterPill,
-                        selectedCropTypes.includes(cropType.id) &&
-                          styles.filterPillActive,
-                      ]}
-                      onPress={() => toggleCropType(cropType.id)}
-                    >
-                      <Text
-                        style={[
-                          typography.body2,
-                          {
-                            color: selectedCropTypes.includes(cropType.id)
-                              ? themeColors.white
-                              : themeColors.textPrimary,
-                          },
-                        ]}
-                      >
-                        {capitalizeFirstLetter(cropType.name)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Age Groups */}
-              <View style={styles.filterSection}>
-                <Text
-                  style={[
-                    typography.label1,
-                    { color: themeColors.textPrimary, marginBottom: 12 },
-                  ]}
-                >
-                  Age Groups
-                </Text>
-                {AGE_GROUPS.map((ageGroup) => (
-                  <TouchableOpacity
-                    key={ageGroup}
-                    style={styles.checkboxRow}
-                    onPress={() => toggleAgeGroup(ageGroup)}
-                  >
-                    <Checkbox
-                      value={selectedAgeGroups.includes(ageGroup)}
-                      onValueChange={() => toggleAgeGroup(ageGroup)}
-                      color={
-                        selectedAgeGroups.includes(ageGroup)
-                          ? themeColors["green-500"]
-                          : undefined
-                      }
-                    />
-                    <Text
-                      style={[
-                        typography.body2,
-                        { color: themeColors.textPrimary, marginLeft: 8 },
-                      ]}
-                    >
-                      {ageGroup}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Admin-only: Administrative Areas - Placeholder for future implementation */}
-              {/*isAdmin && (
-                <View style={styles.filterSection}>
-                  <Text
-                    style={[
-                      typography.label1,
-                      { color: themeColors.textPrimary, marginBottom: 12 },
-                    ]}
-                  >
-                    Administrative Areas
-                  </Text>
-                  <Text
-                    style={[typography.body3, { color: themeColors.dark4 }]}
-                  >
-                    Administrative area filtering will be implemented in a
-                    future update.
-                  </Text>
-                </View>
-              )*/}
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.applyButton}
-                onPress={applyFilters}
-              >
-                <Text style={[typography.label1, { color: themeColors.white }]}>
-                  Show Results
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        onClose={() => setShowFilterModal(false)}
+        cropTypes={cropTypes}
+        selectedCropTypes={selectedCropTypes}
+        selectedAgeGroups={selectedAgeGroups}
+        onToggleCropType={toggleCropType}
+        onToggleAgeGroup={toggleAgeGroup}
+        onApply={applyFilters}
+        isAdmin={isAdmin}
+      />
     </View>
   );
 };
@@ -780,83 +474,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: themeColors.mutedBorder,
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8, // Add gap between search and filter
-  },
-  searchWrapper: {
-    width: "100%",
-    flex: 11, // Takes 11/12 of the space
-    paddingRight: 16,
-  },
-  filterWrapper: {
-    flex: 1, // Takes 1/12 of the space
-    alignItems: "flex-end",
-  },
-  filterButton: {
-    position: "relative",
-    minWidth: 42,
-    height: 42,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    borderRadius: 40,
-    borderWidth: 1,
-    borderColor: themeColors["green-500"],
-    backgroundColor: themeColors.white,
-  },
-  filterButtonActive: {
-    backgroundColor: themeColors["green-500"],
-    borderColor: themeColors["green-500"],
-  },
-  filterPillsContainer: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  filterPillsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    flex: 1,
-  },
-  filterPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: themeColors.background,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  filterPillActive: {
-    backgroundColor: themeColors["green-500"],
-    color: themeColors.white,
-  },
-  clearAllButton: {
-    marginLeft: "auto",
-    paddingVertical: 6,
-  },
-  filterBadge: {
-    ...typography.label3,
-    position: "absolute",
-    top: -4,
-    right: -4,
-    backgroundColor: themeColors.error,
-    borderRadius: 40,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    color: themeColors.white,
-    marginLeft: 4,
-  },
-  clearFiltersButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
+
   list: {
     flex: 1,
   },
@@ -866,39 +484,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 100,
   },
-  listHeader: {
-    marginBottom: 16,
-    paddingLeft: 12,
-  },
-  selectAllRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  customerCard: {
-    backgroundColor: themeColors.white,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: themeColors.cardBorder,
-  },
-  customerCardSelected: {
-    borderColor: themeColors["green-500"],
-    backgroundColor: themeColors["green-50"],
-  },
-  customerBody: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatarContainer: {
-    marginHorizontal: 12,
-  },
-  customerInfo: {
-    flex: 1,
-  },
-  checkbox: {
-    borderRadius: 4,
-  },
+
   footerLoader: {
     paddingVertical: 20,
     alignItems: "center",
@@ -944,48 +530,6 @@ const styles = StyleSheet.create({
   nextButtonDisabled: {
     backgroundColor: themeColors.dark4,
     opacity: 0.5,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: themeColors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "80%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: themeColors.mutedBorder,
-  },
-  modalBody: {
-    padding: 20,
-  },
-  filterSection: {
-    marginBottom: 24,
-  },
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  modalFooter: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: themeColors.mutedBorder,
-    marginBottom: 36,
-  },
-  applyButton: {
-    backgroundColor: themeColors["green-500"],
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
   },
 });
 

@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 import Feather from "@expo/vector-icons/Feather";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { SavedGroup, useBroadcast } from "@/contexts/BroadcastContext";
 import { api } from "@/services/api";
 import Search from "@/components/search";
 import themeColors from "@/styles/colors";
@@ -19,62 +20,25 @@ import typography from "@/styles/typography";
 // Constants
 const DEBOUNCE_DELAY = 300;
 
-interface SavedGroup {
-  id: number;
-  name: string;
-  contact_count: number;
-  crop_types: number[] | null;
-  age_groups: string[] | null;
-  created_at: string;
-}
-
-interface CropType {
-  id: number;
-  name: string;
-}
-
-// Helper to format age group display
-const formatAgeGroup = (ageGroup: string): string => {
-  const ageGroupMap: Record<string, string> = {
-    "20-35": "20-35 years",
-    "36-50": "36-50 years",
-    "51+": "51+ years",
-  };
-  return ageGroupMap[ageGroup] || ageGroup;
-};
-
 const SavedGroups = () => {
   const { user } = useAuth();
+  const { cropTypes: cropTypesList } = useBroadcast();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [groups, setGroups] = useState<SavedGroup[]>([]);
-  const [cropTypes, setCropTypes] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
 
-  // Fetch crop types on mount
-  const fetchCropTypes = useCallback(async () => {
-    try {
-      const response = await api.getCropTypes();
-      // convert as an Object {id:name}
-      const cropTypesObject = response.reduce(
-        (acc: Record<number, string>, cropType: CropType) => {
-          acc[cropType.id] = cropType.name;
-          return acc;
-        },
-        {},
-      );
-      setCropTypes(cropTypesObject);
-    } catch (err) {
-      console.error("Error fetching crop types:", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCropTypes();
-  }, [fetchCropTypes]);
+  // Convert crop types to object for quick lookup
+  const cropTypes = useMemo(() => {
+    return cropTypesList.reduce((acc: Record<number, string>, cropType) => {
+      acc[cropType.id] = cropType.name;
+      return acc;
+    }, {});
+  }, [cropTypesList]);
 
   // Debounce search input
   useEffect(() => {
@@ -89,35 +53,24 @@ const SavedGroups = () => {
   const fetchGroups = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
+      setGroups([]);
 
-      const params: any = {};
-
-      if (debouncedSearch) {
-        params.search = debouncedSearch;
-      }
-
-      const response = await api.getBroadcastGroups(
-        user?.accessToken || "",
-        params,
-      );
-
-      // Response is an array of groups
+      const response = await api.getBroadcastGroups(user?.accessToken || "", {
+        search: debouncedSearch,
+      });
       setGroups(response);
     } catch (err) {
-      console.error("Error fetching groups:", err);
+      console.error("[SavedGroups] Error fetching groups:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch groups");
     } finally {
       setLoading(false);
     }
   }, [debouncedSearch, user?.accessToken]);
 
-  // Reset and fetch on search change
+  // Fetch on mount and when search changes
   useEffect(() => {
-    setGroups([]);
     fetchGroups();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
+  }, [fetchGroups]);
 
   // Render group card
   const renderItem = useCallback(
@@ -132,6 +85,7 @@ const SavedGroups = () => {
               params: {
                 chatId: item.id.toString(),
                 name: item.name,
+                contactCount: item.contact_count.toString(),
               },
             });
           }}
@@ -180,7 +134,7 @@ const SavedGroups = () => {
                   <Text
                     style={[typography.caption1, { color: themeColors.dark4 }]}
                   >
-                    {formatAgeGroup(age)}
+                    {`${age} years`}
                   </Text>
                 </View>
               ))}
