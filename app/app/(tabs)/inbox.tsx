@@ -20,7 +20,6 @@ import {
   useWebSocket,
   MessageCreatedEvent,
   TicketResolvedEvent,
-  TicketCreatedEvent,
 } from "@/contexts/WebSocketContext";
 import { DAOManager } from "@/database/dao";
 
@@ -49,8 +48,7 @@ const Inbox: React.FC = () => {
   const isFetchingRef = React.useRef(false); // prevent duplicate fetches
   const isInitialMount = React.useRef(true); // track initial mount
   const db = useDatabase();
-  const { isConnected, onMessageCreated, onTicketResolved, onTicketCreated } =
-    useWebSocket();
+  const { isConnected, onMessageCreated, onTicketResolved } = useWebSocket();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
   const filtered = useMemo(() => {
@@ -78,14 +76,14 @@ const Inbox: React.FC = () => {
         if ((b.unreadCount || 0) !== (a.unreadCount || 0)) {
           return (b.unreadCount || 0) - (a.unreadCount || 0);
         }
-        // Sort by updatedAt desc if available, else createdAt desc
+        // Then by updatedAt or createdAt desc
         const aTime = a.updatedAt
           ? new Date(a.updatedAt).getTime()
           : new Date(a.createdAt).getTime();
         const bTime = b.updatedAt
           ? new Date(b.updatedAt).getTime()
           : new Date(b.createdAt).getTime();
-        return bTime - aTime;
+        return aTime - bTime;
       });
   }, [tickets, activeTab, query]);
   const { user } = useAuth();
@@ -109,8 +107,9 @@ const Inbox: React.FC = () => {
         ? ticket.customer?.phoneNumber
         : ticket.customer?.name || "Chat";
     router.push({
-      pathname: "/chat",
+      pathname: "/chat/[ticketId]",
       params: {
+        ticketId: ticket.id,
         ticketNumber: ticket.ticketNumber,
         name: chatName,
         messageId: ticket.message?.id || undefined,
@@ -183,70 +182,104 @@ const Inbox: React.FC = () => {
   // Handle real-time message_created events
   useEffect(() => {
     const unsubscribe = onMessageCreated(async (event: MessageCreatedEvent) => {
-      console.log("[Inbox] Received message_created event:", event);
+      // Find the ticket in current state
+      const ticketIndex = tickets.findIndex(
+        (t: Ticket) => t.id === event.ticket_id,
+      );
 
-      try {
-        // Find the ticket in local state
-        const ticketIndex = tickets.findIndex(
-          (t: Ticket) => t.id === event.ticket_id,
-        );
-
-        if (ticketIndex !== -1) {
-          const ticket = tickets[ticketIndex];
-
-          // Update ticket in SQLite database
-          // Increment unread count and update last message
+      if (ticketIndex !== -1) {
+        setTickets((prevTickets: Ticket[]) => {
+          const ticket = prevTickets[ticketIndex];
           const newUnreadCount = (ticket.unreadCount || 0) + 1;
-          await daoManager.ticket.update(db, ticket.id, {
-            unreadCount: newUnreadCount,
-          });
 
-          // Update local state immediately for instant UI update
-          setTickets((prev: Ticket[]) =>
-            prev.map((t: Ticket) =>
-              t.id === event.ticket_id
-                ? {
-                    ...t,
-                    unreadCount: newUnreadCount,
-                    lastMessage: {
-                      content: event.body,
-                      timestamp: event.ts,
-                    },
-                    updatedAt: event.ts,
-                  }
-                : t,
-            ),
+          // Update database asynchronously (don't block UI)
+          return prevTickets.map((t: Ticket) =>
+            t.id === event.ticket_id
+              ? {
+                  ...t,
+                  unreadCount: newUnreadCount,
+                  lastMessageId: event.message_id,
+                  lastMessage: {
+                    body: event.body,
+                    timestamp: event.ts,
+                  },
+                  updatedAt: event.ts,
+                }
+              : t,
           );
+        });
 
-          console.log(
-            `[Inbox] Updated ticket ${event.ticket_id} with new message`,
-          );
-        } else {
-          // Ticket not in current list, might need to refresh
-          console.log(
-            `[Inbox] Ticket ${event.ticket_id} not found in current list`,
-          );
-          // Optionally fetch the ticket if it's a new one
-          if (activeTab === Tabs.PENDING && page === 1) {
-            // Refresh first page to include new ticket
-            fetchTickets(activeTab, 1, false, false);
+        (async () => {
+          try {
+            const ticket = tickets[ticketIndex];
+            await daoManager.ticket.update(db, ticket.id, {
+              unreadCount: (ticket.unreadCount || 0) + 1,
+            });
+
+            // Upsert message and update lastMessageId
+            const lastMessage = await daoManager.message.findById(
+              db,
+              event.message_id,
+            );
+            if (lastMessage) {
+              await daoManager.ticket.update(db, ticket.id, {
+                lastMessageId: lastMessage.id,
+              });
+            }
+          } catch (error) {
+            console.error(
+              "[Inbox] Error updating ticket/message in DB:",
+              error,
+            );
           }
+        })();
+        return;
+      } else {
+        // Ticket not found in current list - create optimistic ticket
+        // Only add if it belongs to the current tab
+        const isNewTicket = true; // New tickets are always "open"
+        const shouldAdd = activeTab === Tabs.PENDING && isNewTicket;
+
+        if (shouldAdd) {
+          console.log("[Inbox] Creating optimistic ticket for new ticket");
+          setTickets((prevTickets) => [
+            {
+              id: event.ticket_id,
+              ticketNumber: event.ticket_number || `TICKET-${event.ticket_id}`,
+              customerId: event.customer_id || 0,
+              messageId: event.message_id,
+              status: "open",
+              resolvedAt: null,
+              resolvedBy: null,
+              resolver: null, // No resolver yet for new tickets
+              customer: {
+                id: event.customer_id || 0,
+                name: event.customer_name || event.phone_number,
+                phoneNumber: event.phone_number,
+              },
+              message: {
+                id: event.message_id,
+                body: event.body,
+                timestamp: event.ts,
+              },
+              lastMessage: {
+                body: event.body,
+                timestamp: event.ts,
+              },
+              unreadCount: 1,
+              createdAt: event.ts,
+              updatedAt: event.ts,
+            } as Ticket,
+            ...prevTickets,
+          ]);
+        } else {
+          console.log("[Inbox] Ticket belongs to different tab, skipping");
         }
-      } catch (error) {
-        console.error("[Inbox] Error handling message_created event:", error);
       }
     });
 
     return unsubscribe;
-  }, [
-    onMessageCreated,
-    tickets,
-    db,
-    daoManager,
-    activeTab,
-    page,
-    fetchTickets,
-  ]);
+  }, [onMessageCreated, db, daoManager, activeTab, user, tickets]);
 
   // Handle real-time ticket_resolved events
   useEffect(() => {
@@ -303,27 +336,6 @@ const Inbox: React.FC = () => {
 
     return unsubscribe;
   }, [onTicketResolved, tickets, db, daoManager, activeTab]);
-
-  // Handle real-time ticket_created events
-  useEffect(() => {
-    const unsubscribe = onTicketCreated(async (event: TicketCreatedEvent) => {
-      console.log("[Inbox] Received ticket_created event:", event);
-
-      try {
-        // Only refresh if we're on the first page of pending tickets
-        // to avoid disrupting pagination
-        if (activeTab === Tabs.PENDING && page === 1) {
-          console.log("[Inbox] Refreshing ticket list for new ticket");
-          // Refetch tickets to include the new one
-          await fetchTickets(activeTab, 1, false, false);
-        }
-      } catch (error) {
-        console.error("[Inbox] Error handling ticket_created event:", error);
-      }
-    });
-
-    return unsubscribe;
-  }, [onTicketCreated, activeTab, page, fetchTickets]);
 
   // Reset list when tab changes
   useEffect(() => {

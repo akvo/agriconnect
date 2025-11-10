@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import uuid
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException
@@ -13,15 +14,19 @@ from models.message import (
     MessageFrom,
     MessageStatus,
     MessageType,
+    MediaType,
 )
 from models.ticket import Ticket
 from models.administrative import Administrative
+from models.customer import OnboardingStatus
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
 from services.external_ai_service import get_external_ai_service
 from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
-from routers.ws import emit_message_created, emit_ticket_created
+from services.socketio_service import emit_message_received
+from services.onboarding_service import get_onboarding_service
+from services.openai_service import get_openai_service
 from schemas.callback import TwilioStatusCallback, TwilioMessageStatus
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
@@ -31,19 +36,108 @@ logger = logging.getLogger(__name__)
 @router.post("/webhook")
 async def whatsapp_webhook(
     From: Annotated[str, Form()],
-    Body: Annotated[str, Form()],
     MessageSid: Annotated[str, Form()],
+    Body: Annotated[str, Form()] = "",
     ButtonPayload: Annotated[Optional[str], Form()] = None,
+    NumMedia: Annotated[Optional[int], Form()] = 0,
+    MediaUrl0: Annotated[Optional[str], Form()] = None,
+    MediaContentType0: Annotated[Optional[str], Form()] = None,
     db: Session = Depends(get_db),
 ):
     """
     Handle incoming WhatsApp messages and button responses.
 
-    Flow 1: Regular message → Create REPLY job (AI answers farmer)
-    Flow 2: Button "escalate" → Create ticket + WHISPER job (AI suggests to EO)
+    Flow 1: Voice message → Transcribe → Process as text
+    Flow 2: Regular message → Process normally
+    Flow 3: Button "escalate" → Create ticket + WHISPER job (AI suggests to EO)
     """
     try:
         phone_number = From.replace("whatsapp:", "")
+        media_url = None
+        media_type = MediaType.TEXT
+
+        # ========================================
+        # VOICE MESSAGE TRANSCRIPTION
+        # ========================================
+        is_voice = (
+            NumMedia and NumMedia > 0
+            and MediaContentType0 and "audio" in MediaContentType0
+        )
+        if is_voice:
+            logger.info(
+                f"Voice message received from {phone_number}: "
+                f"{MediaContentType0} at {MediaUrl0}"
+            )
+
+            media_url = MediaUrl0
+            media_type = MediaType.VOICE
+
+            # Generate unique temp file path
+            temp_file = f"/tmp/voice_{uuid.uuid4().hex}.ogg"
+
+            try:
+                # Download audio to /tmp
+                whatsapp_service = WhatsAppService()
+                downloaded_path = whatsapp_service.download_twilio_media(
+                    media_url=MediaUrl0,
+                    save_path=temp_file
+                )
+
+                if downloaded_path:
+                    # Transcribe with OpenAI
+                    openai_service = get_openai_service()
+
+                    # Read audio file as bytes
+                    with open(downloaded_path, 'rb') as f:
+                        audio_bytes = f.read()
+
+                    transcription = await openai_service.transcribe_audio(
+                        audio_file=audio_bytes
+                    )
+
+                    # Check if transcription succeeded
+                    if transcription and transcription.text.strip():
+                        Body = transcription.text.strip()
+                        logger.info(
+                            f"✓ Transcribed voice message "
+                            f"from {phone_number}: {Body[:50]}..."
+                        )
+                    else:
+                        # Transcription failed or empty
+                        Body = "[Voice message - transcription unavailable]"
+                        logger.warning(
+                            f"⚠ Voice transcription failed or empty "
+                            f"for {phone_number}"
+                        )
+                else:
+                    # Download failed
+                    Body = "[Voice message - download failed]"
+                    logger.error(
+                        f"✗ Failed to download voice message "
+                        f"from {phone_number}"
+                    )
+
+            except Exception as e:
+                # Any error in transcription flow
+                Body = "[Voice message - transcription error]"
+                logger.error(f"✗ Error transcribing voice message: {e}")
+
+            finally:
+                # ALWAYS delete temp file
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                        logger.debug(f"Deleted temp file: {temp_file}")
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to delete temp file "
+                            f"{temp_file}: {e}"
+                        )
+
+        # ========================================
+        # CONTINUE WITH EXISTING MESSAGE FLOW
+        # (Body is now either original text or transcribed text)
+        # ========================================
 
         # Check if message already processed
         existing_message = (
@@ -78,6 +172,61 @@ async def whatsapp_webhook(
                 )
                 # Continue processing message normally after reconnection
 
+        # ========================================
+        # AI ONBOARDING: Check if location onboarding needed
+        # ========================================
+        onboarding_service = get_onboarding_service(db)
+
+        if onboarding_service.needs_onboarding(customer):
+            logger.info(
+                f"Customer {phone_number} needs onboarding "
+                f"(status: {customer.onboarding_status.value})"
+            )
+
+            # Check if awaiting selection (from previous ambiguous match)
+            if (
+                customer.onboarding_status == OnboardingStatus.IN_PROGRESS
+                and customer.onboarding_candidates
+            ):
+                # Process selection
+                onboarding_response = (
+                    await onboarding_service.process_selection(customer, Body)
+                )
+            else:
+                # Process location message
+                onboarding_response = (
+                    await onboarding_service.process_location_message(
+                        customer, Body
+                    )
+                )
+
+            # Send onboarding response to farmer
+            whatsapp_service = WhatsAppService()
+            whatsapp_service.send_message(
+                phone_number, onboarding_response.message
+            )
+
+            logger.info(
+                f"Onboarding response sent to {phone_number} "
+                f"(status: {onboarding_response.status})"
+            )
+
+            # If onboarding still in progress, don't process message further
+            if onboarding_response.status in [
+                "in_progress",
+                "awaiting_selection",
+            ]:
+                return {
+                    "status": "success",
+                    "message": "Onboarding in progress",
+                }
+
+            # If onboarding completed or failed, continue to regular flow
+            logger.info(
+                f"Onboarding {onboarding_response.status} for {phone_number}, "
+                f"continuing to regular flow"
+            )
+
         escalate_payload = settings.whatsapp_escalate_button_payload
 
         # ========================================
@@ -103,6 +252,8 @@ async def whatsapp_webhook(
                 body=original_message.body if original_message else Body,
                 from_source=MessageFrom.CUSTOMER,
                 status=MessageStatus.ESCALATED,
+                media_url=media_url,
+                media_type=media_type,
             )
             db.add(message)
             db.commit()
@@ -123,19 +274,6 @@ async def whatsapp_webhook(
                 ticket = customer_service.create_ticket_for_customer(
                     customer=customer, message_id=message.id
                 )
-                if ticket:
-                    asyncio.create_task(
-                        emit_ticket_created(
-                            ticket_id=ticket.id,
-                            customer_id=customer.id,
-                            administrative_id=ticket.administrative_id,
-                            created_at=ticket.created_at.isoformat(),
-                            ticket_number=ticket.ticket_number,
-                            customer_name=customer.full_name,
-                            message_id=message.id,
-                            message_preview=message.body,
-                        )
-                    )
 
             if ticket:
                 # Get chat history for AI context
@@ -208,22 +346,22 @@ async def whatsapp_webhook(
                         0
                     ].administrative_id
 
-                customer_name = customer.phone_number
+                sender_name = customer.phone_number
                 if customer.full_name:
-                    customer_name = customer.full_name
+                    sender_name = customer.full_name
                 asyncio.create_task(
-                    emit_message_created(
+                    emit_message_received(
                         ticket_id=ticket.id,
                         message_id=message.id,
-                        message_sid=MessageSid,
-                        customer_id=customer.id,
+                        phone_number=customer.phone_number,
                         body=original_message.body,
                         from_source=MessageFrom.CUSTOMER,
                         ts=message.created_at.isoformat(),
                         administrative_id=ward_id,
                         ticket_number=ticket.ticket_number,
-                        customer_name=customer_name,
+                        sender_name=sender_name,
                         sender_user_id=None,
+                        customer_id=customer.id,
                     )
                 )
 
@@ -253,6 +391,8 @@ async def whatsapp_webhook(
             body=Body,
             from_source=MessageFrom.CUSTOMER,
             status=MessageStatus.PENDING,
+            media_url=media_url,
+            media_type=media_type,
         )
         db.add(message)
         db.commit()
@@ -303,9 +443,7 @@ async def whatsapp_webhook(
             # Create WHISPER job (AI suggests to EO) if not testing
             if not os.getenv("TESTING"):
                 ai_service = get_external_ai_service(db)
-                trace_id = (
-                    f"whisper_t{existing_ticket.id}_m{message.id}"
-                )
+                trace_id = f"whisper_t{existing_ticket.id}_m{message.id}"
                 asyncio.create_task(
                     ai_service.create_chat_job(
                         message_id=message.id,
@@ -331,26 +469,24 @@ async def whatsapp_webhook(
                 hasattr(customer, "customer_administrative")
                 and len(customer.customer_administrative) > 0
             ):
-                ward_id = customer.customer_administrative[
-                    0
-                ].administrative_id
+                ward_id = customer.customer_administrative[0].administrative_id
 
-            customer_name = customer.phone_number
+            sender_name = customer.phone_number
             if customer.full_name:
-                customer_name = customer.full_name
+                sender_name = customer.full_name
             asyncio.create_task(
-                emit_message_created(
+                emit_message_received(
                     ticket_id=existing_ticket.id,
                     message_id=message.id,
-                    message_sid=MessageSid,
-                    customer_id=customer.id,
+                    phone_number=customer.phone_number,
                     body=Body,
                     from_source=MessageFrom.CUSTOMER,
                     ts=message.created_at.isoformat(),
                     administrative_id=ward_id,
                     ticket_number=existing_ticket.ticket_number,
-                    customer_name=customer_name,
+                    sender_name=sender_name,
                     sender_user_id=None,
+                    customer_id=customer.id,
                 )
             )
 
@@ -418,8 +554,7 @@ async def whatsapp_webhook(
         if not is_new_customer:
             reconnection_service = ReconnectionService(db)
             reconnection_service.update_customer_last_message(
-                customer_id=customer.id,
-                from_source=MessageFrom.CUSTOMER
+                customer_id=customer.id, from_source=MessageFrom.CUSTOMER
             )
 
         return {"status": "success", "message": "Message processed"}

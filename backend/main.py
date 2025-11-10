@@ -16,7 +16,6 @@ from routers import (
     service_tokens,
     whatsapp,
     tickets,
-    ws,
     storage,
     crop_types,
     openai_demo,
@@ -24,6 +23,7 @@ from routers import (
 )
 from fastapi.staticfiles import StaticFiles
 from services.external_ai_service import ExternalAIService
+from services.socketio_service import sio_app
 from database import SessionLocal
 
 # from tasks.retry_scheduler import start_retry_scheduler, stop_retry_scheduler
@@ -120,4 +120,4 @@ def read_root():
 # Mount Socket.IO at /ws/socket.io path
 # Socket.IO will handle /ws/socket.io/* requests
 # Must be mounted AFTER all FastAPI routes are defined
-app.mount("/ws/socket.io", ws.sio_app)
+app.mount("/ws/socket.io", sio_app)

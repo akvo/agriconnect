@@ -259,7 +259,6 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
 
         // Type guard for notification data
         const ticketNumber = data?.ticketNumber ? `${data.ticketNumber}` : null;
-        const ticketId = data?.ticketId ? `${data.ticketId}` : null;
         const name = typeof data?.name === "string" ? data.name : "Chat";
         const messageId =
           typeof data?.messageId === "string" ||
@@ -270,10 +269,10 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         // Deep link to chat screen with ticket details
         if (ticketNumber) {
           router.navigate({
-            pathname: "/chat",
+            pathname: "/chat/[ticketId]",
             params: {
+              ticketId: `${data.ticketId}`,
               ticketNumber,
-              ticketId,
               name,
               messageId,
               refresh: "true",

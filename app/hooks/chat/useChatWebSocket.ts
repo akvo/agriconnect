@@ -2,7 +2,6 @@ import { useEffect, useMemo } from "react";
 import { SQLiteDatabase } from "expo-sqlite";
 import {
   MessageCreatedEvent,
-  MessageStatusUpdatedEvent,
   TicketResolvedEvent,
   WhisperCreatedEvent,
 } from "@/contexts/WebSocketContext";
@@ -24,40 +23,36 @@ interface UseChatWebSocketParams {
   db: SQLiteDatabase;
   ticket: TicketData;
   userId: number | undefined;
-  isConnected: boolean;
-  onMessageCreated: (callback: (event: MessageCreatedEvent) => void) => () => void;
-  onMessageStatusUpdated: (callback: (event: MessageStatusUpdatedEvent) => void) => () => void;
-  onTicketResolved: (callback: (event: TicketResolvedEvent) => void) => () => void;
-  onWhisperCreated: (callback: (event: WhisperCreatedEvent) => void) => () => void;
-  joinTicket: (ticketId: number) => void;
-  leaveTicket: (ticketId: number) => void;
+  onMessageCreated: (
+    callback: (event: MessageCreatedEvent) => void,
+  ) => () => void;
+  onTicketResolved: (
+    callback: (event: TicketResolvedEvent) => void,
+  ) => () => void;
+  onWhisperCreated: (
+    callback: (event: WhisperCreatedEvent) => void,
+  ) => () => void;
   scrollToBottom: (animated?: boolean) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setTicket: React.Dispatch<React.SetStateAction<TicketData>>;
   setAISuggestion: React.Dispatch<React.SetStateAction<string | null>>;
   setAISuggestionLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setAISuggestionUsed: React.Dispatch<React.SetStateAction<boolean>>;
-  setActiveTicket?: (ticketId: number | null) => void;
 }
 
 export const useChatWebSocket = ({
   db,
   ticket,
   userId,
-  isConnected,
   onMessageCreated,
-  onMessageStatusUpdated,
   onTicketResolved,
   onWhisperCreated,
-  joinTicket,
-  leaveTicket,
   scrollToBottom,
   setMessages,
   setTicket,
   setAISuggestion,
   setAISuggestionLoading,
   setAISuggestionUsed,
-  setActiveTicket,
 }: UseChatWebSocketParams) => {
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
@@ -80,15 +75,13 @@ export const useChatWebSocket = ({
           setAISuggestion(null);
         }
 
+        // Save message to SQLite
         const savedMessage = daoManager.message.upsert(db, {
           id: event.message_id,
           from_source: event.from_source,
-          message_sid: event.message_sid,
-          customer_id: event.customer_id,
-          user_id:
-            event.from_source === MessageFrom.CUSTOMER
-              ? null
-              : userId || null,
+          message_sid: `MSG_${Date.now()}`, // Generate a unique message_sid
+          customer_id: event.customer_id || ticket.customer?.id, // Use event or fallback
+          user_id: event.user_id || null, // Use user_id from event for admin messages
           body: event.body,
           createdAt: event.ts,
         });
@@ -98,6 +91,11 @@ export const useChatWebSocket = ({
             db,
             savedMessage.id,
           );
+
+          // Update last message info in ticket
+          await daoManager.ticket.update(db, ticket.id, {
+            lastMessageId: event.message_id,
+          });
 
           if (dbMessage) {
             const uiMessage = convertToUIMessage(dbMessage, userId);
@@ -151,7 +149,7 @@ export const useChatWebSocket = ({
     return unsubscribe;
   }, [
     onMessageCreated,
-    ticket?.id,
+    ticket.id,
     scrollToBottom,
     db,
     daoManager,
@@ -160,47 +158,8 @@ export const useChatWebSocket = ({
     setAISuggestionLoading,
     setAISuggestionUsed,
     setAISuggestion,
+    ticket.customer?.id,
   ]);
-
-  // Handle real-time message_status_updated events
-  useEffect(() => {
-    const unsubscribe = onMessageStatusUpdated(
-      async (event: MessageStatusUpdatedEvent) => {
-        if (!ticket?.id || event.ticket_id !== ticket?.id) {
-          return;
-        }
-
-        console.log("[Chat] Message status updated:", event);
-
-        try {
-          const updated = daoManager.message.update(db, event.message_id, {
-            status: event.status,
-          });
-
-          if (updated) {
-            console.log(
-              `[Chat] Updated message ${event.message_id} status to ${event.status}`,
-            );
-
-            setMessages((prev: Message[]) => {
-              return prev.map((msg) => {
-                if (msg.id === event.message_id) {
-                  console.log(
-                    `[Chat] Message ${msg.id} status updated in UI state`,
-                  );
-                }
-                return msg;
-              });
-            });
-          }
-        } catch (error) {
-          console.error("[Chat] Error handling message status update:", error);
-        }
-      },
-    );
-
-    return unsubscribe;
-  }, [onMessageStatusUpdated, ticket?.id, daoManager.message, db, setMessages]);
 
   // Handle real-time ticket_resolved events
   useEffect(() => {
@@ -220,6 +179,10 @@ export const useChatWebSocket = ({
         setTicket((prev: TicketData) => ({
           ...prev,
           resolvedAt: event.resolved_at,
+          resolver: {
+            id: 0,
+            name: event.resolved_by,
+          }
         }));
       } catch (error) {
         console.error("[Chat] Error handling ticket resolved:", error);
@@ -236,45 +199,40 @@ export const useChatWebSocket = ({
         return;
       }
       console.log("[Chat] AI suggestion created:", event);
+
+      // Save WHISPER message to SQLite
+      try {
+        daoManager.message.upsert(db, {
+          id: event.message_id,
+          from_source: MessageFrom.LLM,
+          message_sid: `WHISPER_${Date.now()}`, // Generate a unique message_sid
+          customer_id: event.customer_id,
+          user_id: null,
+          body: event.suggestion,
+          message_type: "WHISPER",
+          is_used: 0, // Initially not used
+          createdAt: event.ts,
+        });
+        console.log(
+          `[Chat] WHISPER message ${event.message_id} saved to SQLite`,
+        );
+      } catch (error) {
+        console.error("[Chat] Error saving WHISPER message:", error);
+      }
+
       setAISuggestion(event.suggestion);
       setAISuggestionLoading(false);
       setAISuggestionUsed(false);
     });
 
     return unsubscribe;
-  }, [onWhisperCreated, ticket?.id, setAISuggestion, setAISuggestionLoading, setAISuggestionUsed]);
-
-  // Join/leave ticket room when screen mounts/unmounts
-  // Skip joining for resolved tickets since they are read-only
-  // Skip if user is not authenticated (e.g., during logout)
-  // Skip if WebSocket is not connected
-  useEffect(() => {
-    if (!userId) {
-      console.log(`[Chat] Skipping join/leave - user not authenticated`);
-      return;
-    }
-
-    if (!isConnected) {
-      console.log(`[Chat] Skipping join/leave - WebSocket not connected`);
-      return;
-    }
-
-    if (!ticket?.id || ticket?.resolvedAt) {
-      if (ticket?.resolvedAt) {
-        console.log(`[Chat] Skipping join for resolved ticket: ${ticket.id}`);
-      }
-      return;
-    }
-
-    console.log(`[Chat] Joining ticket room: ${ticket.id}`);
-    joinTicket(ticket.id);
-
-    return () => {
-      if (!ticket?.id || !userId || !isConnected) {
-        return;
-      }
-      console.log(`[Chat] Leaving ticket room: ${ticket.id}`);
-      leaveTicket(ticket.id);
-    };
-  }, [ticket?.id, ticket?.resolvedAt, userId, isConnected, joinTicket, leaveTicket, setActiveTicket]);
+  }, [
+    onWhisperCreated,
+    ticket?.id,
+    db,
+    daoManager,
+    setAISuggestion,
+    setAISuggestionLoading,
+    setAISuggestionUsed,
+  ]);
 };

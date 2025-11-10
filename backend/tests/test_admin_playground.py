@@ -651,7 +651,7 @@ class TestPlaygroundCallbackHandler:
     """Test playground callback handler"""
 
     @pytest.mark.asyncio
-    @patch('routers.ws.emit_playground_response')
+    @patch('services.socketio_service.emit_playground_response')
     async def test_handle_playground_callback_success(
         self, mock_emit, db_session, admin_user
     ):
@@ -756,17 +756,17 @@ class TestWebSocketPlaygroundEvents:
 
     def test_join_playground_event_exists(self):
         """Test that join_playground event handler exists"""
-        from routers.ws import sio
+        from services.socketio_service import sio_server
 
         # Check event is registered
-        handlers = sio.handlers
+        handlers = sio_server.handlers
         assert "/" in handlers  # Default namespace
         assert "join_playground" in handlers["/"]
 
     @pytest.mark.asyncio
     async def test_join_playground_authentication_required(self):
         """Test that join_playground requires authentication"""
-        from routers.ws import join_playground
+        from services.socketio_service import join_playground
 
         # Unknown SID should fail
         result = await join_playground("unknown_sid", {"session_id": "test"})

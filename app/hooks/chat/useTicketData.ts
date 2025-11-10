@@ -21,7 +21,8 @@ const convertToUIMessage = (
       ? "AI reply"
       : msg.user_id === currentUserId
         ? "You"
-        : msg?.user_name || "You";
+        : msg?.user_name || msg.customer_name || "Unknown User";
+  console.log("[Chat] Converting message:", msg);
 
   return {
     id: msg.id,
@@ -40,6 +41,7 @@ interface TicketData {
   resolver?: { id: number; name: string } | null;
   resolvedAt?: string | null;
   createdAt?: string | null;
+  messageId?: number;
 }
 
 interface UseTicketDataReturn {
@@ -103,6 +105,7 @@ export const useTicketData = (
             resolver: ticketData.resolver,
             resolvedAt: ticketData.resolvedAt,
             createdAt: ticketData.createdAt,
+            messageId: ticketData.message?.id,
           });
 
           console.log(

@@ -93,6 +93,10 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         updates.push("unreadCount = ?");
         values.push(data.unreadCount);
       }
+      if (data.lastMessageId !== undefined) {
+        updates.push("lastMessageId = ?");
+        values.push(data.lastMessageId);
+      }
       if (updates.length === 0) {
         return false;
       }
@@ -139,6 +143,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         : null,
       ticketNumber: row.ticketNumber,
       unreadCount: row.unreadCount,
+      lastMessageId: row.lastMessageId || null,
+      lastMessage: row.last_message_body
+        ? {
+            body: row.last_message_body,
+            timestamp: row.last_message_createdAt,
+          }
+        : undefined,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt || null,
     } as Ticket;
@@ -147,15 +158,17 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
   // Find ticket with joins to include customer, message and user info
   findById(db: SQLiteDatabase, id: number): Ticket | null {
     const stmt = db.prepareSync(
-      `SELECT t.*, 
+      `SELECT t.*,
         cu.fullName as customer_name,
         cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
-        r.id as resolver_id, r.fullName as resolver_name
+        r.id as resolver_id, r.fullName as resolver_name,
+        lm.body as last_message_body, lm.createdAt as last_message_createdAt
       FROM tickets t
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
+      LEFT JOIN messages lm ON t.lastMessageId = lm.id
       WHERE t.id = ?`,
     );
     try {
@@ -176,15 +189,17 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
   // Return all tickets with joined data
   findAll(db: SQLiteDatabase): Ticket[] {
     const stmt = db.prepareSync(
-      `SELECT t.*, 
+      `SELECT t.*,
         cu.fullName as customer_name,
         cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
-        r.id as resolver_id, r.fullName as resolver_name
+        r.id as resolver_id, r.fullName as resolver_name,
+        lm.body as last_message_body, lm.createdAt as last_message_createdAt
       FROM tickets t
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
+      LEFT JOIN messages lm ON t.lastMessageId = lm.id
       ORDER BY t.createdAt DESC`,
     );
     try {
@@ -239,11 +254,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           cu.fullName as customer_name,
           cu.phoneNumber as customer_phone,
           m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
-          r.id as resolver_id, r.fullName as resolver_name
+          r.id as resolver_id, r.fullName as resolver_name,
+          lm.body as last_message_body, lm.createdAt as last_message_createdAt
         FROM tickets t
         LEFT JOIN customer_users cu ON t.customerId = cu.id
         LEFT JOIN messages m ON t.messageId = m.id
         LEFT JOIN users r ON t.resolvedBy = r.id
+        LEFT JOIN messages lm ON t.lastMessageId = lm.id
         WHERE ${whereClause}
         ORDER BY t.resolvedAt DESC
         LIMIT ? OFFSET ?`,
@@ -296,7 +313,8 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           cu.fullName as customer_name,
           cu.phoneNumber as customer_phone,
           m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
-          r.id as resolver_id, r.fullName as resolver_name
+          r.id as resolver_id, r.fullName as resolver_name,
+          lm.body as last_message_body, lm.createdAt as last_message_createdAt
         FROM tickets t
         INNER JOIN (
           SELECT customerId, MIN(id) as selected_ticket_id
@@ -307,6 +325,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         LEFT JOIN customer_users cu ON t.customerId = cu.id
         LEFT JOIN messages m ON t.messageId = m.id
         LEFT JOIN users r ON t.resolvedBy = r.id
+        LEFT JOIN messages lm ON t.lastMessageId = lm.id
         ORDER BY t.updatedAt DESC, t.createdAt DESC
         LIMIT ? OFFSET ?`,
       );
@@ -332,15 +351,17 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
   } // Find ticket by ticketNumber
   findByTicketNumber(db: SQLiteDatabase, ticketNumber: string): Ticket | null {
     const stmt = db.prepareSync(
-      `SELECT t.*, 
+      `SELECT t.*,
         cu.fullName as customer_name,
         cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
-        r.id as resolver_id, r.fullName as resolver_name
+        r.id as resolver_id, r.fullName as resolver_name,
+        lm.body as last_message_body, lm.createdAt as last_message_createdAt
       FROM tickets t
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
       LEFT JOIN users r ON t.resolvedBy = r.id
+      LEFT JOIN messages lm ON t.lastMessageId = lm.id
       WHERE t.ticketNumber = ?`,
     );
 
@@ -442,11 +463,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           cu.fullName as customer_name,
           cu.phoneNumber as customer_phone,
           m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
-          r.id as resolver_id, r.fullName as resolver_name
+          r.id as resolver_id, r.fullName as resolver_name,
+          lm.body as last_message_body, lm.createdAt as last_message_createdAt
         FROM tickets t
         LEFT JOIN customer_users cu ON t.customerId = cu.id
         LEFT JOIN messages m ON t.messageId = m.id
         LEFT JOIN users r ON t.resolvedBy = r.id
+        LEFT JOIN messages lm ON t.lastMessageId = lm.id
         WHERE t.customerId = ? AND t.id > ?
         ORDER BY t.id ASC
         LIMIT 1`,
@@ -489,11 +512,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           cu.fullName as customer_name,
           cu.phoneNumber as customer_phone,
           m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
-          r.id as resolver_id, r.fullName as resolver_name
+          r.id as resolver_id, r.fullName as resolver_name,
+          lm.body as last_message_body, lm.createdAt as last_message_createdAt
         FROM tickets t
         LEFT JOIN customer_users cu ON t.customerId = cu.id
         LEFT JOIN messages m ON t.messageId = m.id
         LEFT JOIN users r ON t.resolvedBy = r.id
+        LEFT JOIN messages lm ON t.lastMessageId = lm.id
         WHERE t.customerId = ? AND t.id < ?
         ORDER BY t.id DESC
         LIMIT 1`,

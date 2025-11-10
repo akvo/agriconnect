@@ -1,16 +1,12 @@
-import React from "react";
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import React, { useMemo } from "react";
+import { View, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
-import { SQLiteDatabase } from "expo-sqlite";
 import { api } from "@/services/api";
 import { DAOManager } from "@/database/dao";
 import { Message } from "@/utils/chat";
 import { MessageFrom } from "@/constants/messageSource";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDatabase } from "@/database/context";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 
@@ -27,10 +23,6 @@ interface ChatInputProps {
   text: string;
   setText: React.Dispatch<React.SetStateAction<string>>;
   ticket: TicketData;
-  userId: number | undefined;
-  accessToken: string | undefined;
-  db: SQLiteDatabase;
-  daoManager: DAOManager;
   aiSuggestionUsed: boolean;
   scrollToBottom: (animated?: boolean) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -40,20 +32,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   text,
   setText,
   ticket,
-  userId,
-  accessToken,
-  db,
-  daoManager,
   aiSuggestionUsed,
   scrollToBottom,
   setMessages,
 }) => {
+  const { user } = useAuth();
+  const db = useDatabase();
+  const daoManager = useMemo(() => new DAOManager(db), [db]);
+
   const handleSend = async () => {
     if (
       text.trim().length === 0 ||
       !ticket?.id ||
       !ticket?.customer?.id ||
-      !userId
+      !user?.id
     ) {
       return;
     }
@@ -87,7 +79,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       );
       try {
         const response = await api.sendMessage(
-          accessToken || "",
+          user?.accessToken || "",
           ticket.id,
           messageText,
           MessageFrom.USER,
@@ -104,7 +96,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           from_source: MessageFrom.USER,
           message_sid: response.message_sid,
           customer_id: ticket.customer.id,
-          user_id: userId || null,
+          user_id: user?.id || null,
           body: messageText,
           createdAt: response.created_at,
         });
@@ -115,8 +107,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           // Check if backend message already exists (added by WebSocket)
           const backendMessageExists = prev.some(
             (m) =>
-              m.id === response.id ||
-              m.message_sid === response.message_sid,
+              m.id === response.id || m.message_sid === response.message_sid,
           );
 
           if (backendMessageExists) {
@@ -158,17 +149,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           }
         }
       } catch (apiError) {
-        console.error(
-          "❌ [Chat] Failed to send message to backend:",
-          apiError,
-        );
+        console.error("❌ [Chat] Failed to send message to backend:", apiError);
         console.error("[Chat] Error details:", {
           message:
-            apiError instanceof Error
-              ? apiError.message
-              : String(apiError),
-          stack:
-            apiError instanceof Error ? apiError.stack : undefined,
+            apiError instanceof Error ? apiError.message : String(apiError),
+          stack: apiError instanceof Error ? apiError.stack : undefined,
         });
 
         // Remove optimistic message from UI on failure
@@ -177,9 +162,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         );
 
         // TODO: Show error to user and implement retry mechanism
-        console.log(
-          "[Chat] Removed optimistic message due to send failure",
-        );
+        console.log("[Chat] Removed optimistic message due to send failure");
       }
     } catch (error) {
       console.error("[Chat] Error sending message:", error);
@@ -201,10 +184,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         placeholderTextColor={themeColors.dark3}
         multiline
       />
-      <TouchableOpacity
-        onPress={handleSend}
-        style={styles.sendButton}
-      >
+      <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
         <Feathericons name="send" size={20} color={themeColors.white} />
       </TouchableOpacity>
     </View>

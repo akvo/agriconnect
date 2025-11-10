@@ -20,7 +20,7 @@ from schemas.ticket import (
     TicketStatus,
 )
 from utils.auth_dependencies import get_current_user
-from routers.ws import emit_ticket_resolved, emit_ticket_created
+from services.socketio_service import emit_ticket_resolved
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -157,20 +157,6 @@ async def create_ticket(payload: TicketCreate, db: Session = Depends(get_db)):
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
-
-    # Emit WebSocket event for new ticket
-    asyncio.create_task(
-        emit_ticket_created(
-            ticket_id=ticket.id,
-            customer_id=customer.id,
-            administrative_id=ticket.administrative_id,
-            created_at=ticket.created_at.isoformat(),
-            ticket_number=ticket.ticket_number,
-            customer_name=customer.full_name,
-            message_id=message.id,
-            message_preview=message.body,
-        )
-    )
 
     return {"ticket": _serialize_ticket(ticket, db)}
 
@@ -475,6 +461,7 @@ async def mark_ticket_resolved(
         emit_ticket_resolved(
             ticket_id=ticket.id,
             resolved_at=resolved_dt.isoformat(),
+            resolved_by=current_user.full_name,
             administrative_id=ticket.administrative_id,
         )
     )

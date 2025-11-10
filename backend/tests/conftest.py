@@ -54,7 +54,7 @@ from sqlalchemy.orm import sessionmaker
 
 from database import Base, get_db
 from main import app
-from models.customer import AgeGroup
+from models.customer import AgeGroup, OnboardingStatus
 from models.message import DeliveryStatus
 
 # CRITICAL: Set testing environment to prevent real API calls
@@ -78,9 +78,11 @@ def test_db():
     # Create enum types before creating tables
     age_group_enum = sa.Enum(AgeGroup, name="agegroup")
     delivery_status_enum = sa.Enum(DeliveryStatus, name="deliverystatus")
+    onboarding_status_enum = sa.Enum(OnboardingStatus, name="onboardingstatus")
 
     age_group_enum.create(engine, checkfirst=True)
     delivery_status_enum.create(engine, checkfirst=True)
+    onboarding_status_enum.create(engine, checkfirst=True)
 
     # Create tables
     Base.metadata.create_all(bind=engine)
@@ -89,6 +91,7 @@ def test_db():
     Base.metadata.drop_all(bind=engine)
 
     # Drop enum types
+    onboarding_status_enum.drop(engine, checkfirst=True)
     delivery_status_enum.drop(engine, checkfirst=True)
     age_group_enum.drop(engine, checkfirst=True)
 
@@ -235,6 +238,9 @@ def mock_websocket_emitters(monkeypatch):
         def notify_new_ticket(self, *args, **kwargs):
             pass
 
+        def notify_new_message(self, *args, **kwargs):
+            pass
+
         def notify_ticket_resolved(self, *args, **kwargs):
             pass
 
@@ -278,15 +284,22 @@ def mock_websocket_emitters(monkeypatch):
         async def send_password_reset_email(self, *args, **kwargs):
             return True
 
-    monkeypatch.setattr("routers.messages.emit_message_created", mock_emit)
+    # Mock emit functions from services.socketio_service (new location)
     monkeypatch.setattr(
-        "routers.messages.emit_message_status_updated", mock_emit
+        "services.socketio_service.emit_message_received", mock_emit
     )
-    monkeypatch.setattr("routers.messages.emit_ticket_resolved", mock_emit)
-    monkeypatch.setattr("routers.tickets.emit_ticket_created", mock_emit)
-    monkeypatch.setattr("routers.callbacks.emit_whisper_created", mock_emit)
     monkeypatch.setattr(
-        "routers.ws.PushNotificationService", MockPushNotificationService
+        "services.socketio_service.emit_playground_response", mock_emit
+    )
+    monkeypatch.setattr(
+        "services.socketio_service.emit_whisper_created", mock_emit
+    )
+    monkeypatch.setattr(
+        "services.socketio_service.emit_ticket_resolved", mock_emit
+    )
+    monkeypatch.setattr(
+        "services.socketio_service.PushNotificationService",
+        MockPushNotificationService
     )
 
     # CRITICAL: Patch WhatsAppService in ALL routers to prevent real API calls
