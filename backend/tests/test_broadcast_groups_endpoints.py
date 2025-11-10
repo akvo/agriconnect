@@ -1,5 +1,5 @@
 import pytest
-
+from unittest.mock import patch
 from models import (
     Administrative,
     AdministrativeLevel,
@@ -11,7 +11,16 @@ from seeder.crop_type import seed_crop_types
 
 
 class TestBroadcastGroupsEndpoint:
-    """ """
+    """
+    Test suite for broadcast group management endpoints
+    """
+
+    @pytest.fixture(autouse=True)
+    def mock_celery_task(self):
+        """Mock the Celery task to prevent Redis connections during tests."""
+        with patch('services.broadcast_service.process_broadcast') as mock:
+            mock.delay.return_value.id = 'mock-task-id'
+            yield mock
 
     @pytest.fixture
     def setup_administrative_hierarchy(self, db_session):

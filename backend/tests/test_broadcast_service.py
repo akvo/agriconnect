@@ -376,6 +376,13 @@ class TestBroadcastGroupManagement:
 class TestBroadcastMessageCreation:
     """Test broadcast message creation."""
 
+    @pytest.fixture(autouse=True)
+    def mock_celery_task(self):
+        """Mock the Celery task to prevent Redis connections during tests."""
+        with patch('services.broadcast_service.process_broadcast') as mock:
+            mock.delay.return_value.id = 'mock-task-id'
+            yield mock
+
     def test_create_broadcast(
         self, db_session: Session, test_users, test_customers
     ):
@@ -645,35 +652,36 @@ def test_delete_group_non_owner_warning(
     assert group.id is not None
 
 
-@patch('services.broadcast_service.process_broadcast')
 def test_create_broadcast_celery_exception(
-    mock_process_broadcast,
     db_session: Session,
     test_users,
     test_customers,
     test_administrative
 ):
     """Test Lines 279-286: Exception when queuing Celery task."""
-    service = BroadcastService(db_session)
+    with patch(
+        'services.broadcast_service.process_broadcast'
+    ) as mock_process_broadcast:
+        service = BroadcastService(db_session)
 
-    # Create a group
-    group = service.create_group(
-        name="Test Group",
-        customer_ids=[1, 2],
-        created_by=test_users["eo1"].id,
-        administrative_id=test_administrative["ward1"].id,
-    )
+        # Create a group
+        group = service.create_group(
+            name="Test Group",
+            customer_ids=[1, 2],
+            created_by=test_users["eo1"].id,
+            administrative_id=test_administrative["ward1"].id,
+        )
 
-    # Mock Celery task to raise exception
-    mock_process_broadcast.delay.side_effect = Exception("Celery error")
+        # Mock Celery task to raise exception
+        mock_process_broadcast.delay.side_effect = Exception("Celery error")
 
-    # Try to create broadcast (should handle exception gracefully)
-    broadcast = service.create_broadcast(
-        message="Test broadcast",
-        group_ids=[group.id],
-        created_by=test_users["eo1"].id,
-        administrative_id=test_administrative["ward1"].id,
-    )
+        # Try to create broadcast (should handle exception gracefully)
+        broadcast = service.create_broadcast(
+            message="Test broadcast",
+            group_ids=[group.id],
+            created_by=test_users["eo1"].id,
+            administrative_id=test_administrative["ward1"].id,
+        )
 
-    # Should return None due to Celery failure
-    assert broadcast is None
+        # Should return None due to Celery failure
+        assert broadcast is None

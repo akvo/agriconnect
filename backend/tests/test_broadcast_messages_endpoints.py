@@ -1,5 +1,5 @@
 import pytest
-
+from unittest.mock import patch
 from models import (
     Administrative,
     AdministrativeLevel,
@@ -13,6 +13,13 @@ from seeder.crop_type import seed_crop_types
 
 class TestBroadcastMessagesEndpoint:
     """Test suite for broadcast message creation and status endpoints"""
+
+    @pytest.fixture(autouse=True)
+    def mock_celery_task(self):
+        """Mock the Celery task to prevent Redis connections during tests."""
+        with patch('services.broadcast_service.process_broadcast') as mock:
+            mock.delay.return_value.id = 'mock-task-id'
+            yield mock
 
     @pytest.fixture
     def setup_administrative_hierarchy(self, db_session):
@@ -88,7 +95,11 @@ class TestBroadcastMessagesEndpoint:
         }
 
     @pytest.fixture
-    def setup_customers(self, db_session, setup_administrative_hierarchy):
+    def setup_customers(
+        self,
+        db_session,
+        setup_administrative_hierarchy
+    ):
         """Create test customers with various attributes"""
         # Seed crop types
         seed_crop_types(db_session)
@@ -838,7 +849,8 @@ class TestBroadcastMessagesEndpoint:
         assert "created_at" in broadcast
 
     def test_create_broadcast_with_empty_message(
-        self, client, setup_broadcast_groups
+        self,
+        client, setup_broadcast_groups
     ):
         """Test that empty messages are rejected by Pydantic validation"""
         groups = setup_broadcast_groups
@@ -854,7 +866,8 @@ class TestBroadcastMessagesEndpoint:
         assert response.status_code == 422
 
     def test_create_broadcast_with_whitespace_only_message(
-        self, client, setup_broadcast_groups
+        self,
+        client, setup_broadcast_groups
     ):
         """
         Test that whitespace-only messages become empty
@@ -873,7 +886,8 @@ class TestBroadcastMessagesEndpoint:
         assert "Message cannot be empty" in response.json()["detail"]
 
     def test_create_broadcast_with_message_too_long(
-        self, client, setup_broadcast_groups
+        self,
+        client, setup_broadcast_groups
     ):
         """
         Test that messages over 1500 characters are rejected (line 72 coverage)
@@ -893,7 +907,8 @@ class TestBroadcastMessagesEndpoint:
         assert "1500 characters" in response.json()["detail"]
 
     def test_create_broadcast_with_exactly_max_length_message(
-        self, client, setup_broadcast_groups
+        self,
+        client, setup_broadcast_groups
     ):
         """Test that messages exactly at 1500 characters are accepted"""
         groups = setup_broadcast_groups
