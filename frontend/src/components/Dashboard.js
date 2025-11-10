@@ -123,11 +123,11 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="text-secondary-600 text-sm leading-relaxed">
-                Upload and manage documents for AI-powered assistance and
+                Upload and manage knowledge bases for AI-powered assistance and
                 knowledge sharing
               </div>
               <div className="mt-4 flex items-center text-blue-600 text-sm font-semibold group-hover:text-blue-700">
-                <span>Manage Documents</span>
+                <span>Manage Knowledge Bases</span>
                 <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
               </div>
             </a>

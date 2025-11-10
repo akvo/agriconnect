@@ -16,11 +16,10 @@ import DataTable from "../common/DataTable";
 export default function DocumentList({
   documents,
   loading,
-  onViewKnowledgeBase,
-  onEditKnowledgeBase,
-  onDeleteKnowledgeBase,
+  onViewDocument,
+  onEditDocument,
+  onDeleteDocument,
 }) {
-  console.log("DocumentList documents:", documents);
   const columns = [
     {
       title: "Document",
@@ -146,7 +145,7 @@ export default function DocumentList({
           <div className="flex items-center justify-end space-x-2">
             {/* HIDE FOR NOW UNTIL VIEW FEATURE ENABLED
             <button
-              onClick={() => onViewKnowledgeBase(kb)}
+              onClick={() => onViewKnowledgeBase(doc)}
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
             >
               <EyeIcon className="w-4 h-4 mr-1" />
@@ -154,15 +153,15 @@ export default function DocumentList({
             </button>
             */}
             <button
-              onClick={() => onEditKnowledgeBase(kb)}
-              className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
+              onClick={() => onEditDocument(doc)}
+              className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-onDeleteDocument"
             >
               <PencilIcon className="w-4 h-4 mr-1" />
               Edit
             </button>
             {/* HIDE FOR NOW UNTIL DELETE FEATURE ENABLED
             <button
-              onClick={() => onDeleteKnowledgeBase(kb)}
+              onClick={() => onDeleteKnowledgeBase(doc)}
               className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
             >
               <TrashIcon className="w-4 h-4 mr-1" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   XMarkIcon,
   CloudArrowUpIcon,
@@ -12,6 +12,8 @@ export default function DocumentUploadModal({
   isOpen,
   onClose,
   onUpload,
+  onEdit,
+  selectedDocument,
   uploading = false,
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -28,6 +30,19 @@ export default function DocumentUploadModal({
   ];
 
   const supportedExtensions = [".pdf", ".txt", ".docx"];
+
+  useEffect(() => {
+    if (selectedDocument) {
+      setTitle(selectedDocument?.extra_data?.title || "");
+      setDescription(selectedDocument?.extra_data?.description || "");
+      setSelectedFile(null); // Clear selected file when editing
+    } else {
+      setTitle("");
+      setDescription("");
+      setSelectedFile(null);
+    }
+    setError("");
+  }, [selectedDocument, isOpen]);
 
   const handleFileSelect = (file) => {
     setError("");
@@ -110,6 +125,32 @@ export default function DocumentUploadModal({
     }
   };
 
+  const handleEdit = async (e) => {
+    e.preventDefault();
+
+    if (!title.trim()) {
+      setError("Please enter a title for this document.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("title", title.trim());
+    if (description.trim()) {
+      formData.append("description", description.trim());
+    }
+
+    try {
+      await onEdit(formData, selectedDocument.id);
+      handleClose();
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          err.message ||
+          "Failed to save changes. Please try again."
+      );
+    }
+  }
+
   const handleClose = () => {
     if (!uploading) {
       setSelectedFile(null);
@@ -134,7 +175,7 @@ export default function DocumentUploadModal({
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">
-            Upload Document
+            {selectedDocument ? "Edit" : "Upload"} Document
           </h2>
           <button
             onClick={handleClose}
@@ -145,74 +186,76 @@ export default function DocumentUploadModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={selectedDocument ? handleEdit : handleSubmit} className="p-6 space-y-6">
           {/* File Drop Zone */}
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">
-              Document File *
-            </label>
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragActive
-                  ? "border-blue-400 bg-blue-50"
-                  : selectedFile
-                    ? "border-green-400 bg-green-50"
-                    : "border-gray-300 hover:border-gray-400"
-              }`}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              {selectedFile ? (
-                <div className="space-y-2">
-                  <DocumentIcon className="w-12 h-12 text-green-600 mx-auto" />
-                  <div className="text-sm font-semibold text-gray-900">
-                    {selectedFile.name}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {formatFileSize(selectedFile.size)}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFile(null)}
-                    className="text-sm text-red-600 hover:text-red-800 underline"
-                  >
-                    Remove file
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <CloudArrowUpIcon className="w-12 h-12 text-gray-400 mx-auto" />
+          {!selectedDocument ?
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Document File *
+              </label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  dragActive
+                    ? "border-blue-400 bg-blue-50"
+                    : selectedFile
+                      ? "border-green-400 bg-green-50"
+                      : "border-gray-300 hover:border-gray-400"
+                }`}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+              >
+                {selectedFile ? (
                   <div className="space-y-2">
-                    <div className="text-lg font-semibold text-gray-900">
-                      Drop your file here, or{" "}
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
-                      >
-                        browse
-                      </button>
+                    <DocumentIcon className="w-12 h-12 text-green-600 mx-auto" />
+                    <div className="text-sm font-semibold text-gray-900">
+                      {selectedFile.name}
                     </div>
-                    <div className="text-sm text-gray-500">
-                      Supports: {supportedExtensions.join(", ")}
+                    <div className="text-xs text-gray-500">
+                      {formatFileSize(selectedFile.size)}
                     </div>
-                    <div className="text-xs text-gray-400">
-                      Maximum file size: 50MB
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFile(null)}
+                      className="text-sm text-red-600 hover:text-red-800 underline"
+                    >
+                      Remove file
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <CloudArrowUpIcon className="w-12 h-12 text-gray-400 mx-auto" />
+                    <div className="space-y-2">
+                      <div className="text-lg font-semibold text-gray-900">
+                        Drop your file here, or{" "}
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                        >
+                          browse
+                        </button>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Supports: {supportedExtensions.join(", ")}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        Maximum file size: 50MB
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={supportedExtensions.join(",")}
-              onChange={handleFileInputChange}
-              className="hidden"
-              disabled={uploading}
-            />
-          </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={supportedExtensions.join(",")}
+                onChange={handleFileInputChange}
+                className="hidden"
+                disabled={uploading}
+              />
+            </div> : ""
+          }
 
           {/* Title Input */}
           <div className="space-y-2">
@@ -273,13 +316,13 @@ export default function DocumentUploadModal({
             </button>
             <button
               type="submit"
-              disabled={!selectedFile || !title.trim() || uploading}
+              disabled={selectedDocument ? false : !selectedFile || !title.trim() || uploading}
               className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {uploading && (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
               )}
-              {uploading ? "Uploading..." : "Upload Document"}
+              {uploading ? selectedDocument ? "Saving" :"Uploading..." : selectedDocument ? "Save" : "Upload Document"}
             </button>
           </div>
         </form>

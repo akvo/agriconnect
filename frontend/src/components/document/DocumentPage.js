@@ -26,9 +26,10 @@ export default function DocumentPage({ kbId }) {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshCount, setRefreshCount] = useState(0);
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   const ITEMS_PER_PAGE = 10;
-  const MAX_AUTO_REFRESHES = 3;
+  const MAX_AUTO_REFRESHES = 2; // After 2 auto-refreshes, disable
 
   const fetchDocuments = async (page = 1, search = null) => {
     try {
@@ -106,19 +107,43 @@ export default function DocumentPage({ kbId }) {
     }
   };
 
-  const handleViewDocument = (kb) => {
+  const handleClose = () => {
+    if (!uploading) {
+      setSelectedDocument(null);
+      setUploadModalOpen(false);
+    }
+  }
+
+  const handleEditDocumentRequest = async (formData, documentId) => {
+    setUploading(true);
+    try {
+      await knowledgeBaseApi.updateDocument(documentId, formData);
+      // Refresh the list after successful edit
+      await fetchDocuments(currentPage, searchQuery || null);
+      setSelectedDocument(null);
+      setUploadModalOpen(false);
+    } catch (err) {
+      throw err; // Re-throw to be handled by the modal
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const handleViewDocument = (doc) => {
     // TODO: ImpleDocument}l or navigate to detail page
-    console.log("View KB:", kb);
+    console.log("View doc:", doc);
   };
 
-  const handleEditDocument = async (kb) => {
-    // TODO: Implement edit modal
-    console.log("Edit KB:", kb);
+  const handleEditDocument = async (doc) => {
+    if (!doc) return;
+    setSelectedDocument(doc);
+    // show edit modal
+    setUploadModalOpen(true);
   };
 
-  const handleDeleteDocument = async (kb) => {
+  const handleDeleteDocument = async (doc) => {
     // TODO: Implement delete
-    console.log("Delete KB:", kb);
+    console.log("Delete doc:", doc);
   };
 
   const handleSearch = (e) => {
@@ -366,9 +391,11 @@ export default function DocumentPage({ kbId }) {
         {/* Upload Modal */}
         <DocumentUploadModal
           isOpen={uploadModalOpen}
-          onClose={() => setUploadModalOpen(false)}
+          onClose={handleClose}
           onUpload={handleUpload}
+          onEdit={handleEditDocumentRequest}
           uploading={uploading}
+          selectedDocument={selectedDocument}
         />
 
         {/* Profile Modal */}

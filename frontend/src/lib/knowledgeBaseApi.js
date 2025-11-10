@@ -85,6 +85,16 @@ const knowledgeBaseApi = {
       throw error;
     }
   },
+
+  // update document metadata
+  updateDocument: async (id, data) => {
+    try {
+      const response = await api.put(`/documents/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 };
 
 export default knowledgeBaseApi;
