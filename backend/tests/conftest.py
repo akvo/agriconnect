@@ -56,6 +56,7 @@ from database import Base, get_db
 from main import app
 from models.customer import AgeGroup, OnboardingStatus
 from models.message import DeliveryStatus
+from services.external_ai_service import ExternalAIService
 
 # CRITICAL: Set testing environment to prevent real API calls
 # This is the PRIMARY defense against real Twilio/WhatsApp/Email API calls
@@ -299,7 +300,7 @@ def mock_websocket_emitters(monkeypatch):
     )
     monkeypatch.setattr(
         "services.socketio_service.PushNotificationService",
-        MockPushNotificationService
+        MockPushNotificationService,
     )
 
     # CRITICAL: Patch WhatsAppService in ALL routers to prevent real API calls
@@ -319,3 +320,11 @@ def mock_websocket_emitters(monkeypatch):
     monkeypatch.setattr(
         "services.user_service.email_service", MockEmailService()
     )
+
+
+@pytest.fixture(autouse=True)
+def reset_external_ai_cache():
+    """Reset cached external AI service token between tests."""
+    ExternalAIService.invalidate_cache()
+    yield
+    ExternalAIService.invalidate_cache()
