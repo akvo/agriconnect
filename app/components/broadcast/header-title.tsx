@@ -1,15 +1,17 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 
 type Props = {
   name: string;
+  contactCount?: number;
+  onClick?: () => void;
 };
 
-const HeaderTitle = ({ name }: Props) => {
+const HeaderTitle = ({ name, contactCount = 0, onClick = () => {} }: Props) => {
   return (
-    <View style={styles.container}>
+    <TouchableOpacity style={styles.container} onPress={onClick}>
       <View style={styles.iconContainer}>
         <View style={[styles.icon]}>
           <Feather
@@ -23,8 +25,11 @@ const HeaderTitle = ({ name }: Props) => {
         <Text style={[typography.body2, styles.groupName]} numberOfLines={1}>
           {name}
         </Text>
+        <Text style={[typography.label2, { color: themeColors.dark3 }]}>
+          {contactCount ? `${contactCount} members` : "No members"}
+        </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
