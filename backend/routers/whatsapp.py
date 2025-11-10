@@ -18,7 +18,10 @@ from models.message import (
 )
 from models.ticket import Ticket
 from models.administrative import Administrative
-from models.customer import OnboardingStatus
+from models.customer import (
+    OnboardingStatus,
+    Customer,
+)
 from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
 from services.external_ai_service import get_external_ai_service
@@ -28,6 +31,8 @@ from services.socketio_service import emit_message_received
 from services.onboarding_service import get_onboarding_service
 from services.openai_service import get_openai_service
 from schemas.callback import TwilioStatusCallback, TwilioMessageStatus
+from models.broadcast import BroadcastRecipient
+from tasks.broadcast_tasks import send_actual_message
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 logger = logging.getLogger(__name__)
@@ -230,7 +235,59 @@ async def whatsapp_webhook(
         escalate_payload = settings.whatsapp_escalate_button_payload
 
         # ========================================
-        # FLOW 2: Handle "escalate" button response
+        # FLOW 2A: Handle broadcast confirmation button
+        # ========================================
+        if (
+            ButtonPayload == settings.broadcast_confirmation_button_payload
+        ):
+            logger.info(
+                f"Customer {phone_number} confirmed broadcast message read"
+            )
+
+            # Find the broadcast recipient for this customer
+            recipient = (
+                db.query(BroadcastRecipient)
+                .join(Customer, Customer.id == BroadcastRecipient.customer_id)
+                .filter(Customer.phone_number == phone_number)
+                .order_by(BroadcastRecipient.created_at.desc())
+                .first()
+            )
+
+            if recipient:
+                # Get the broadcast message content
+                from models.broadcast import BroadcastMessage
+                broadcast = (
+                    db.query(BroadcastMessage)
+                    .filter(
+                        BroadcastMessage.id == recipient.broadcast_message_id
+                    )
+                    .first()
+                )
+
+                if broadcast:
+                    # Queue Celery task to send actual message
+                    try:
+                        task = send_actual_message.delay(
+                            recipient_id=recipient.id,
+                            phone_number=phone_number,
+                            message_content=broadcast.message,
+                        )
+                        logger.info(
+                            f"Queued broadcast to: {phone_number}"
+                            f"(task_id={task.id})"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to queue broadcast message delivery: {e}"
+                        )
+
+            return {
+                "status": "success",
+                "message": "Broadcast confirmation processed",
+            }
+
+        # ========================================
+        # FLOW 2B: Handle "escalate" button response
         # ========================================
         if ButtonPayload == escalate_payload:
             logger.info(f"Customer {phone_number} clicked 'escalate' button")
