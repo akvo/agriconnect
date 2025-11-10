@@ -147,7 +147,8 @@ def get_broadcast_group(
         BroadcastGroupContact(
             customer_id=c.customer.id,
             phone_number=c.customer.phone_number,
-            full_name=c.customer.full_name
+            full_name=c.customer.full_name,
+            crop_type=c.customer.crop_type,
         )
         for c in group.group_contacts
     ]

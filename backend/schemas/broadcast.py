@@ -6,6 +6,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, validator
 
 from models.customer import AgeGroup
+from schemas.customer import CropTypeInfo
 
 
 # ========== Broadcast Group Schemas ==========
@@ -81,6 +82,7 @@ class BroadcastGroupContact(BaseModel):
     customer_id: int
     phone_number: str
     full_name: Optional[str] = None
+    crop_type: Optional[CropTypeInfo] = None
 
     class Config:
         from_attributes = True
