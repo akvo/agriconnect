@@ -8,7 +8,7 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 
-export default function KnowledgeBaseUploadModal({
+export default function DocumentUploadModal({
   isOpen,
   onClose,
   onUpload,
@@ -134,7 +134,7 @@ export default function KnowledgeBaseUploadModal({
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">
-            Upload Knowledge Base Document
+            Upload Document
           </h2>
           <button
             onClick={handleClose}

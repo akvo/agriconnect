@@ -56,6 +56,35 @@ const knowledgeBaseApi = {
     const response = await api.patch(`/kb/${id}/status`, { status });
     return response.data;
   },
+
+  // Get list of documents by kbId with pagination and search
+  getDocumentList: async (kbId = null, page = 1, size = 10, search = null) => {
+    let url = `/documents?kb_id=${kbId}&page=${page}&size=${size}`;
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+    try {
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Upload a document to a specific knowledge base
+  uploadDocument: async (formData) => {
+    const config = {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    };
+    try {
+      const response = await api.post(`/documents`, formData, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 };
 
 export default knowledgeBaseApi;

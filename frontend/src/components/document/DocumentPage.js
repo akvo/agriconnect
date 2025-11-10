@@ -9,13 +9,13 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import HeaderNav from "../HeaderNav";
 import EditUserModal from "../users/EditUserModal";
-import KnowledgeBaseList from "./KnowledgeBaseList";
-import KnowledgeBaseUploadModal from "./KnowledgeBaseUploadModal";
+import DocumentList from "./DocumentList";
+import DocumentUploadModal from "./DocumentUploadModal";
 import knowledgeBaseApi from "../../lib/knowledgeBaseApi";
 
-export default function KnowledgeBaseItemPage() {
+export default function DocumentPage({ kbId }) {
   const { user, refreshUser, loading: authLoading } = useAuth();
-  const [knowledgeBases, setKnowledgeBases] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -27,23 +27,23 @@ export default function KnowledgeBaseItemPage() {
 
   const ITEMS_PER_PAGE = 10;
 
-  const fetchKnowledgeBases = async (page = 1, search = null) => {
+  const fetchDocuments = async (page = 1, search = null) => {
     try {
       setLoading(true);
       setError("");
-      const response = await knowledgeBaseApi.getList(
+      const response = await knowledgeBaseApi.getDocumentList(
+        kbId,
         page,
         ITEMS_PER_PAGE,
         search
       );
-
-      setKnowledgeBases(response.knowledge_bases || []);
+      setDocuments(response.data || []);
       setTotalCount(response.total || 0);
       setCurrentPage(page);
     } catch (err) {
-      console.error("Error fetching knowledge bases:", err);
-      setError("Failed to load knowledge bases. Please try again.");
-      setKnowledgeBases([]);
+      console.error("Error fetching documents:", err);
+      setError("Failed to load documents. Please try again.");
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
@@ -51,24 +51,18 @@ export default function KnowledgeBaseItemPage() {
 
   useEffect(() => {
     // Only fetch if user is authenticated and auth is not loading
-    console.log(
-      "KB Page: Auth state - user:",
-      !!user,
-      "authLoading:",
-      authLoading
-    );
     if (user && !authLoading) {
-      console.log("KB Page: Fetching knowledge bases");
-      fetchKnowledgeBases(1, null);
+      fetchDocuments(1, null);
     }
   }, [user, authLoading]);
 
   const handleUpload = async (formData) => {
     setUploading(true);
     try {
-      await knowledgeBaseApi.create(formData);
+      formData.append("kb_id", kbId);
+      await knowledgeBaseApi.uploadDocument(formData);
       // Refresh the list after successful upload
-      await fetchKnowledgeBases(1, searchQuery || null);
+      await fetchDocuments(1, searchQuery || null);
       setUploadModalOpen(false);
     } catch (err) {
       throw err; // Re-throw to be handled by the modal
@@ -77,30 +71,19 @@ export default function KnowledgeBaseItemPage() {
     }
   };
 
-  const handleViewKnowledgeBase = (kb) => {
-    // TODO: Implement view modal or navigate to detail page
+  const handleViewDocument = (kb) => {
+    // TODO: ImpleDocument}l or navigate to detail page
     console.log("View KB:", kb);
   };
 
-  const handleEditKnowledgeBase = async (kb) => {
+  const handleEditDocument = async (kb) => {
     // TODO: Implement edit modal
     console.log("Edit KB:", kb);
   };
 
-  const handleDeleteKnowledgeBase = async (kb) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${kb.title}"? This action cannot be undone.`
-      )
-    ) {
-      try {
-        await knowledgeBaseApi.delete(kb.id);
-        await fetchKnowledgeBases(currentPage, searchQuery || null);
-      } catch (err) {
-        console.error("Error deleting knowledge base:", err);
-        alert("Failed to delete knowledge base. Please try again.");
-      }
-    }
+  const handleDeleteDocument = async (kb) => {
+    // TODO: Implement delete
+    console.log("Delete KB:", kb);
   };
 
   const handleSearch = (e) => {
@@ -109,11 +92,11 @@ export default function KnowledgeBaseItemPage() {
 
     // Debounce the search - reset to page 1 and search
     setCurrentPage(1);
-    fetchKnowledgeBases(1, newSearchQuery || null);
+    fetchDocuments(1, newSearchQuery || null);
   };
 
   const handleRefresh = () => {
-    fetchKnowledgeBases(currentPage, searchQuery || null);
+    fetchDocuments(currentPage, searchQuery || null);
   };
 
   const handleProfileClick = () => {
@@ -127,8 +110,8 @@ export default function KnowledgeBaseItemPage() {
     }
   };
 
-  // Server-side search is now handled, so we use knowledgeBases directly
-  const filteredKnowledgeBases = knowledgeBases;
+  // Server-side search is now handled, so we use documents directly
+  const filteredDocuments = documents;
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
@@ -145,7 +128,7 @@ export default function KnowledgeBaseItemPage() {
             ></div>
           </div>
           <p className="text-secondary-700 font-medium text-lg">
-            Loading Knowledge Base...
+            Loading Documents...
           </p>
           <p className="text-secondary-500 text-sm mt-2">
             Please wait while we prepare your document library
@@ -179,10 +162,10 @@ export default function KnowledgeBaseItemPage() {
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-secondary-900">
-              Knowledge Base
+              Documents
             </h1>
             <p className="mt-2 text-sm text-secondary-600">
-              Manage your document library for AI-powered assistance
+              Manage your document library to power AI-driven assistance
             </p>
           </div>
           <div className="mt-4 sm:mt-0">
@@ -238,12 +221,12 @@ export default function KnowledgeBaseItemPage() {
 
         {/* Knowledge Base List */}
         <div className="bg-white shadow-lg" style={{ borderRadius: "5px" }}>
-          <KnowledgeBaseList
-            knowledgeBases={filteredKnowledgeBases}
+          <DocumentList
+            documents={filteredDocuments}
             loading={loading}
-            onViewKnowledgeBase={handleViewKnowledgeBase}
-            onEditKnowledgeBase={handleEditKnowledgeBase}
-            onDeleteKnowledgeBase={handleDeleteKnowledgeBase}
+            onViewDocument={handleViewDocument}
+            onEditDocument={handleEditDocument}
+            onDeleteDocument={handleDeleteDocument}
           />
         </div>
 
@@ -256,7 +239,7 @@ export default function KnowledgeBaseItemPage() {
             <div className="flex-1 flex justify-between sm:hidden">
               <button
                 onClick={() =>
-                  fetchKnowledgeBases(currentPage - 1, searchQuery || null)
+                  fetchDocuments(currentPage - 1, searchQuery || null)
                 }
                 disabled={currentPage <= 1}
                 className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -265,7 +248,7 @@ export default function KnowledgeBaseItemPage() {
               </button>
               <button
                 onClick={() =>
-                  fetchKnowledgeBases(currentPage + 1, searchQuery || null)
+                  fetchDocuments(currentPage + 1, searchQuery || null)
                 }
                 disabled={currentPage >= totalPages}
                 className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -294,7 +277,7 @@ export default function KnowledgeBaseItemPage() {
                 >
                   <button
                     onClick={() =>
-                      fetchKnowledgeBases(currentPage - 1, searchQuery || null)
+                      fetchDocuments(currentPage - 1, searchQuery || null)
                     }
                     disabled={currentPage <= 1}
                     className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -318,7 +301,7 @@ export default function KnowledgeBaseItemPage() {
                       <button
                         key={pageNum}
                         onClick={() =>
-                          fetchKnowledgeBases(pageNum, searchQuery || null)
+                          fetchDocuments(pageNum, searchQuery || null)
                         }
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                           pageNum === currentPage
@@ -332,7 +315,7 @@ export default function KnowledgeBaseItemPage() {
                   })}
                   <button
                     onClick={() =>
-                      fetchKnowledgeBases(currentPage + 1, searchQuery || null)
+                      fetchDocuments(currentPage + 1, searchQuery || null)
                     }
                     disabled={currentPage >= totalPages}
                     className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -346,7 +329,7 @@ export default function KnowledgeBaseItemPage() {
         )}
 
         {/* Upload Modal */}
-        <KnowledgeBaseUploadModal
+        <DocumentUploadModal
           isOpen={uploadModalOpen}
           onClose={() => setUploadModalOpen(false)}
           onUpload={handleUpload}

@@ -1,3 +1,5 @@
+import DocumentPage from "../../../components/document/DocumentPage";
+
 export const metadata = {
   title: "Document - AgriConnect",
   description: "Manage your document library of a knowledge base for AI-powered assistance",
@@ -6,10 +8,5 @@ export const metadata = {
 export default function DocumentPageRoute({ params }) {
   const { id } = params;
 
-  return (
-    <div>
-      <h1>DOCUMENT</h1>
-      <p>Document ID: {id}</p>
-    </div>
-  );
+  return <DocumentPage kbId={id} />;
 }

@@ -13,13 +13,14 @@ import {
 } from "@heroicons/react/24/outline";
 import DataTable from "../common/DataTable";
 
-export default function KnowledgeBaseList({
-  knowledgeBases,
+export default function DocumentList({
+  documents,
   loading,
   onViewKnowledgeBase,
   onEditKnowledgeBase,
   onDeleteKnowledgeBase,
 }) {
+  console.log("DocumentList documents:", documents);
   const columns = [
     {
       title: "Document",
@@ -41,7 +42,7 @@ export default function KnowledgeBaseList({
 
   const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
-      case "done":
+      case "completed":
         return {
           color: "bg-green-100 text-green-800",
           icon: CheckCircleIcon,
@@ -94,8 +95,8 @@ export default function KnowledgeBaseList({
     return "📄";
   };
 
-  const renderRow = (kb, index) => {
-    const statusInfo = getStatusBadge(kb.status);
+  const renderRow = (doc, index) => {
+    const statusInfo = getStatusBadge(doc.status);
     const StatusIcon = statusInfo.icon;
 
     return (
@@ -103,21 +104,21 @@ export default function KnowledgeBaseList({
         <td className="px-8 py-6 whitespace-nowrap">
           <div className="flex items-center">
             <div className="text-2xl mr-3">
-              {getFileTypeIcon(kb.extra_data?.content_type)}
+              {getFileTypeIcon(doc.content_type)}
             </div>
             <div className="ml-2">
               <div className="text-base font-bold text-secondary-900">
-                {kb.title}
+                {doc.filename}
               </div>
-              <div className="text-sm text-secondary-600">{kb.filename}</div>
-              {kb.description && (
+              <div className="text-sm text-secondary-600">{doc.filename}</div>
+              {/* {doc.description && (
                 <div className="text-xs text-secondary-500 mt-1 max-w-xs truncate">
-                  {kb.description}
+                  {doc.description}
                 </div>
-              )}
-              {kb.extra_data?.size && (
+              )} */}
+              {doc.extra_data?.size && (
                 <div className="text-xs text-secondary-400 mt-1">
-                  {formatFileSize(kb.extra_data.size)}
+                  {formatFileSize(doc.file_size)}
                 </div>
               )}
             </div>
@@ -133,16 +134,17 @@ export default function KnowledgeBaseList({
         </td>
         <td className="px-8 py-6 whitespace-nowrap">
           <div className="text-sm text-secondary-600">
-            {formatDate(kb.created_at)}
+            {formatDate(doc.created_at)}
           </div>
-          {kb.updated_at && kb.updated_at !== kb.created_at && (
+          {doc.updated_at && doc.updated_at !== doc.created_at && (
             <div className="text-xs text-secondary-500">
-              Updated: {formatDate(kb.updated_at)}
+              Updated: {formatDate(doc.updated_at)}
             </div>
           )}
         </td>
         <td className="px-8 py-6 whitespace-nowrap text-right">
           <div className="flex items-center justify-end space-x-2">
+            {/* HIDE FOR NOW UNTIL VIEW FEATURE ENABLED
             <button
               onClick={() => onViewKnowledgeBase(kb)}
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
@@ -150,6 +152,7 @@ export default function KnowledgeBaseList({
               <EyeIcon className="w-4 h-4 mr-1" />
               View
             </button>
+            */}
             <button
               onClick={() => onEditKnowledgeBase(kb)}
               className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
@@ -157,6 +160,7 @@ export default function KnowledgeBaseList({
               <PencilIcon className="w-4 h-4 mr-1" />
               Edit
             </button>
+            {/* HIDE FOR NOW UNTIL DELETE FEATURE ENABLED
             <button
               onClick={() => onDeleteKnowledgeBase(kb)}
               className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
@@ -164,6 +168,7 @@ export default function KnowledgeBaseList({
               <TrashIcon className="w-4 h-4 mr-1" />
               Delete
             </button>
+            */}
           </div>
         </td>
       </>
@@ -173,10 +178,10 @@ export default function KnowledgeBaseList({
   return (
     <DataTable
       columns={columns}
-      data={knowledgeBases}
+      data={documents}
       loading={loading}
       emptyStateIcon={CloudArrowUpIcon}
-      emptyStateTitle="No knowledge base documents found"
+      emptyStateTitle="No documents found"
       emptyStateMessage="Upload your first document to get started with AI-powered assistance."
       renderRow={renderRow}
     />
