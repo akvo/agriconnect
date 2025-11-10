@@ -53,6 +53,7 @@ export default function DocumentPage({ kbId }) {
     if (kbId) {
       fetchKnowledgeBaseDetails();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kbId]);
 
   const fetchDocuments = async (page = 1, search = null) => {
@@ -82,6 +83,7 @@ export default function DocumentPage({ kbId }) {
     if (user && !authLoading) {
       fetchDocuments(1, null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
 
   // Auto-refresh every 30 seconds with current state
@@ -107,6 +109,7 @@ export default function DocumentPage({ kbId }) {
 
     // Cleanup on unmount or when dependencies change
     return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, currentPage, searchQuery, autoRefresh]);
 
   const handleUpload = async (formData) => {
