@@ -158,6 +158,7 @@ const BroadcastFarmerListTab = () => {
     setPage(1);
     setCustomers([]);
     setSelectedIds(new Set()); // Clear selections when filters change
+    // setSelectedMembers([]); // Clear selected members in context
     fetchCustomers(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, selectedCropTypes, selectedAgeGroups, selectedAdminIds]);
@@ -172,17 +173,19 @@ const BroadcastFarmerListTab = () => {
   }, [loadingMore, loading, hasMore, page, fetchCustomers]);
 
   // Selection handlers
-  const toggleSelection = useCallback((id: number) => {
-    setSelectedIds((prev) => {
-      const newSet = new Set(prev);
+  const toggleSelection = useCallback(
+    (id: number) => {
+      const newSet = new Set(selectedIds);
       if (newSet.has(id)) {
         newSet.delete(id);
       } else {
         newSet.add(id);
       }
-      return newSet;
-    });
-  }, []);
+      setSelectedIds(newSet);
+      setSelectedMembers(selectedMembers.filter((m) => m.customer_id !== id));
+    },
+    [selectedIds, selectedMembers, setSelectedMembers],
+  );
 
   const toggleSelectAll = useCallback(() => {
     if (selectedIds.size === customers.length && customers.length > 0) {
@@ -259,8 +262,9 @@ const BroadcastFarmerListTab = () => {
     // Update context with selected members, crop types, and age groups
     setContextCropTypes(selectedCropTypes);
     setContextAgeGroups(selectedAgeGroups);
+    setSelectedIds(new Set()); // Clear local selections
     setSelectedMembers(selectedCustomers, () => {
-      router.push("/broadcast/create");
+      router.navigate("/broadcast/create");
     });
   }, [
     selectedIds,
@@ -276,9 +280,7 @@ const BroadcastFarmerListTab = () => {
   // Render item
   const renderItem = useCallback(
     ({ item }: { item: Customer }) => {
-      const isSelected =
-        selectedIds.has(item.id) ||
-        selectedMembers.some((m) => m.customer_id === item.id);
+      const isSelected = selectedIds.has(item.id);
       return (
         <CustomerCard
           customer={item}
@@ -288,7 +290,7 @@ const BroadcastFarmerListTab = () => {
         />
       );
     },
-    [selectedIds, isAdmin, selectedMembers, toggleSelection],
+    [selectedIds, isAdmin, toggleSelection],
   );
 
   const keyExtractor = useCallback((item: Customer) => item.id.toString(), []);

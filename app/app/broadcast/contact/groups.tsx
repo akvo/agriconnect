@@ -80,7 +80,7 @@ const SavedGroups = () => {
           style={styles.groupCard}
           activeOpacity={0.7}
           onPress={() => {
-            router.push({
+            router.navigate({
               pathname: "/broadcast/group/[chatId]",
               params: {
                 chatId: item.id.toString(),
