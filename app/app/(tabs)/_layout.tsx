@@ -1,19 +1,24 @@
 import Feathericons from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs, usePathname, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import React from "react";
-import { TouchableOpacity } from "react-native";
+import { TouchableOpacity, StatusBar } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { useNetwork } from "@/contexts/NetworkContext";
 
 export default function TabLayout() {
   const router = useRouter();
+  const pathname = usePathname();
   const { isOnline } = useNetwork();
 
   return (
     <SafeAreaView edges={["left", "right", "bottom"]} style={{ flex: 1 }}>
+      <StatusBar
+        barStyle={pathname !== "/home" ? "dark-content" : null}
+        backgroundColor="#FFFFFF"
+      />
       <Tabs
         screenOptions={{
           tabBarHideOnKeyboard: true,
@@ -24,7 +29,7 @@ export default function TabLayout() {
             borderRadius: 40,
             borderWidth: 1,
             borderColor: "#E7E8E8",
-            backgroundColor: "#FFF",
+            // backgroundColor: "#FFF",
             shadowColor: "#141414",
             shadowOffset: {
               width: 0,
@@ -71,13 +76,6 @@ export default function TabLayout() {
           options={{
             title: "Inbox",
             headerShown: true,
-            headerStyle: {
-              backgroundColor: "#FFF",
-            },
-            headerTitleStyle: {
-              fontWeight: "bold",
-              fontFamily: "Inter",
-            },
             headerTitleAlign: "center",
             headerRight: () => (
               <TouchableOpacity
