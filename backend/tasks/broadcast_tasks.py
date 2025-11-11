@@ -14,18 +14,17 @@ from typing import Dict, Any
 from celery_app import celery_app
 from database import SessionLocal
 from models.broadcast import BroadcastMessage, BroadcastRecipient
-from models.message import DeliveryStatus, Message, MessageType
+from models.message import (
+    DeliveryStatus,
+    Message,
+    MessageType,
+    MessageFrom,
+)
 from models.customer import Customer
 from services.whatsapp_service import WhatsAppService
 from config import _config, settings
 
 logger = logging.getLogger(__name__)
-whatsapp_broadcast_template_sid = (
-    _config.get("whatsapp", {})
-    .get("templates", {})
-    .get("broadcast", {})
-    .get("sid", "")
-)
 
 
 @celery_app.task(name="tasks.broadcast_tasks.process_broadcast")
@@ -49,11 +48,15 @@ def process_broadcast(broadcast_id: int) -> Dict[str, Any]:
     try:
         logger.info(f"Processing broadcast {broadcast_id}")
 
-        # Verify template SID is configured and not empty
-        if not whatsapp_broadcast_template_sid:
-            error_msg = "Broadcast template SID is not configured"
-            logger.error(error_msg)
-            return {"error": error_msg}
+        # Get content SID from settings or config
+        content_sid = settings.whatsapp_broadcast_template_sid
+        if not content_sid:
+            content_sid = (
+                _config.get("whatsapp", {})
+                .get("templates", {})
+                .get("broadcast", {})
+                .get("sid", "")
+            )
         # Get broadcast
         broadcast = db.query(BroadcastMessage).filter(
             BroadcastMessage.id == broadcast_id
@@ -128,7 +131,7 @@ def process_broadcast(broadcast_id: int) -> Dict[str, Any]:
                     else:
                         result = whatsapp_service.send_template_message(
                             to=customer.phone_number,
-                            content_sid=whatsapp_broadcast_template_sid,
+                            content_sid=content_sid,
                             content_variables={},
                         )
                         logger.info(
@@ -236,7 +239,7 @@ def send_actual_message(
         message = Message(
             customer_id=recipient.customer_id,
             message_type=MessageType.BROADCAST,
-            sender_role="broadcast",
+            from_source=MessageFrom.USER,
             body=message_content,
             twilio_sid=result.get("sid"),
             delivery_status=DeliveryStatus.SENT,
@@ -284,6 +287,15 @@ def retry_failed_broadcasts() -> Dict[str, Any]:
     try:
         logger.info("Starting broadcast retry task")
 
+        # Get content SID from settings or config
+        content_sid = settings.whatsapp_broadcast_template_sid
+        if not content_sid:
+            content_sid = (
+                _config.get("whatsapp", {})
+                .get("templates", {})
+                .get("broadcast", {})
+                .get("sid", "")
+            )
         # [5, 15, 60] minutes
         retry_intervals = settings.broadcast_retry_intervals
         now = datetime.utcnow()
@@ -341,7 +353,7 @@ def retry_failed_broadcasts() -> Dict[str, Any]:
                     else:
                         result = whatsapp_service.send_template_message(
                             to=customer.phone_number,
-                            content_sid=whatsapp_broadcast_template_sid,
+                            content_sid=content_sid,
                             content_variables={},
                         )
                         logger.info(

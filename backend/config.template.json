@@ -4,10 +4,7 @@
 		"templates": {
 			"confirmation": {
 				"sid": "HX30987fb04aa06c8f06d80818455ba018",
-				"description": "Template sent after AI response asking if farmer needs human help",
-				"variables": {
-					"ai_answer": "ai_answer"
-				}
+				"description": "Template sent after AI response asking if farmer needs human help"
 			},
 			"reconnection": {
 				"sid": "HXaa72aabfd2f732d3102f1f545f6a4cc2",

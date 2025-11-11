@@ -190,13 +190,26 @@ class Settings(BaseSettings):
     redis_db: int = int(os.getenv("REDIS_DB", "0"))
 
     # Broadcast settings
+    whatsapp_broadcast_template_sid: str = os.getenv(
+        "WHATSAPP_BROADCAST_TEMPLATE_SID",
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("broadcast", {})
+        .get("sid", ""),
+    )
     broadcast_confirmation_button_payload: str = (
         _config.get("whatsapp", {})
         .get("button_payloads", {})
         .get("read_broadcast", "read_broadcast")
     )
-    broadcast_batch_size: int = 50
-    broadcast_retry_intervals: list = [5, 15, 60]
+    broadcast_batch_size: int = os.getenv(
+        "BROADCAST_BATCH_SIZE",
+        50,
+    )
+    broadcast_retry_intervals: list = os.getenv(
+        "BROADCAST_RETRY_INTERVALS",
+        [5, 15, 60],
+    )
 
     @property
     def celery_broker_url(self) -> str:

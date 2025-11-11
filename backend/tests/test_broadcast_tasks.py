@@ -136,23 +136,12 @@ def test_broadcast_setup(db_session, test_user, test_customers):
 class TestBroadcastTasksBasic:
     """Basic tests for broadcast Celery tasks"""
 
-    def test_process_broadcast_missing_template_sid(self):
-        """Test that missing template SID returns error"""
-        os.environ["TESTING"] = "1"
-
-        template_path = "tasks.broadcast_tasks.whatsapp_broadcast_template_sid"
-        with patch(template_path, ""):
-            result = process_broadcast(broadcast_id=999)
-
-        assert "error" in result
-        assert "template SID is not configured" in result["error"]
-
     def test_process_broadcast_nonexistent_broadcast(self):
         """Test that nonexistent broadcast ID returns error"""
         os.environ["TESTING"] = "1"
 
-        template_path = "tasks.broadcast_tasks.whatsapp_broadcast_template_sid"
-        with patch(template_path, "HX123"):
+        patch_path = "tasks.broadcast_tasks.settings"
+        with patch(f"{patch_path}.whatsapp_broadcast_template_sid", "HX123"):
             result = process_broadcast(broadcast_id=99999)
 
         assert "error" in result
@@ -188,8 +177,11 @@ class TestBroadcastTasksBasic:
 class TestProcessBroadcastComprehensive:
     """Comprehensive tests for process_broadcast task"""
 
-    @patch("tasks.broadcast_tasks.whatsapp_broadcast_template_sid", "HX123")
     @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
     def test_process_broadcast_success(
         self, mock_session_local, db_session, test_broadcast_setup
     ):
@@ -219,8 +211,11 @@ class TestProcessBroadcastComprehensive:
             assert recipient.template_message_sid is not None
             assert recipient.sent_at is not None
 
-    @patch("tasks.broadcast_tasks.whatsapp_broadcast_template_sid", "HX123")
     @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
     def test_process_broadcast_no_pending_recipients(
         self, mock_session_local, db_session, test_broadcast_setup
     ):
@@ -244,8 +239,11 @@ class TestProcessBroadcastComprehensive:
         broadcast = db_session.query(BroadcastMessage).get(broadcast_id)
         assert broadcast.status == "completed"
 
-    @patch("tasks.broadcast_tasks.whatsapp_broadcast_template_sid", "HX123")
     @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
     def test_process_broadcast_customer_not_found(
         self, mock_session_local, db_session, test_broadcast_setup
     ):
@@ -283,8 +281,11 @@ class TestProcessBroadcastComprehensive:
         assert result["sent"] == 2
         assert result["failed"] == 1
 
-    @patch("tasks.broadcast_tasks.whatsapp_broadcast_template_sid", "HX123")
     @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
     def test_process_broadcast_exception_handling(
         self, mock_session_local, db_session, test_broadcast_setup
     ):
@@ -378,8 +379,11 @@ class TestSendActualMessageComprehensive:
 class TestRetryFailedBroadcastsComprehensive:
     """Comprehensive tests for retry_failed_broadcasts task"""
 
-    @patch("tasks.broadcast_tasks.whatsapp_broadcast_template_sid", "HX123")
     @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
     def test_retry_failed_broadcasts_first_retry(
         self, mock_session_local, db_session, test_broadcast_setup
     ):
@@ -413,7 +417,10 @@ class TestRetryFailedBroadcastsComprehensive:
         assert updated_recipient.status == DeliveryStatus.SENT
         assert updated_recipient.error_message is None
 
-    @patch("tasks.broadcast_tasks.whatsapp_broadcast_template_sid", "HX123")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
     def test_retry_failed_broadcasts_max_retries(
         self, db_session, test_broadcast_setup
     ):
@@ -446,8 +453,11 @@ class TestRetryFailedBroadcastsComprehensive:
         ).first()
         assert updated_recipient.retry_count == 3
 
-    @patch("tasks.broadcast_tasks.whatsapp_broadcast_template_sid", "HX123")
     @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
     def test_retry_failed_broadcasts_customer_lookup(
         self, mock_session_local, db_session, test_broadcast_setup
     ):
