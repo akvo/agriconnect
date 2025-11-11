@@ -134,7 +134,8 @@ def get_broadcast_group(
     group = service.get_group_by_id(
         group_id=group_id,
         eo_id=current_user.id,
-        administrative_id=ward_id
+        administrative_id=ward_id,
+        is_admin=(current_user.user_type == UserType.ADMIN)
     )
 
     if not group:
