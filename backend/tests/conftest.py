@@ -136,10 +136,11 @@ def db_session(test_db):
         db.query(UserAdministrative).delete()
         db.query(CustomerAdministrative).delete()
         db.query(Ticket).delete()
+        # Broadcast recipients must be deleted BEFORE messages (FK: message_id)
+        db.query(BroadcastRecipient).delete()
         db.query(Message).delete()
         db.query(PlaygroundMessage).delete()  # Playground messages
         # Broadcast tables must be deleted before Customer and Administrative
-        db.query(BroadcastRecipient).delete()
         db.query(BroadcastMessageGroup).delete()
         db.query(BroadcastMessage).delete()
         db.query(BroadcastGroupContact).delete()

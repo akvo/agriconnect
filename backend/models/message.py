@@ -60,9 +60,6 @@ class Message(Base):
     message_sid = Column(String, unique=True, index=True, nullable=False)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    broadcast_message_id = Column(
-        Integer, ForeignKey("broadcast_messages.id"), nullable=True, index=True
-    )
     body = Column(Text, nullable=False)
     from_source = Column(Integer, nullable=False)
     message_type = Column(Enum(MessageType), nullable=True)

@@ -21,6 +21,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # 0. Add BROADCAST value to messagetype enum
+    op.execute(
+        "ALTER TYPE messagetype ADD VALUE IF NOT EXISTS 'BROADCAST'"
+    )
+
     # 1. Create broadcast_groups table with filter columns
     op.create_table(
         "broadcast_groups",
@@ -236,31 +241,8 @@ def upgrade() -> None:
         "idx_broadcast_recipients_status", "broadcast_recipients", ["status"]
     )
 
-    # 6. Add broadcast_message_id to messages table
-    op.add_column(
-        "messages",
-        sa.Column("broadcast_message_id", sa.Integer(), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_messages_broadcast_message",
-        "messages",
-        "broadcast_messages",
-        ["broadcast_message_id"],
-        ["id"],
-    )
-    op.create_index(
-        "idx_messages_broadcast_message", "messages", ["broadcast_message_id"]
-    )
-
 
 def downgrade() -> None:
-    # Drop in reverse order
-    op.drop_index("idx_messages_broadcast_message", "messages")
-    op.drop_constraint(
-        "fk_messages_broadcast_message", "messages", type_="foreignkey"
-    )
-    op.drop_column("messages", "broadcast_message_id")
-
     op.drop_index("idx_broadcast_recipients_status", "broadcast_recipients")
     op.drop_index("idx_broadcast_recipients_customer", "broadcast_recipients")
     op.drop_index("idx_broadcast_recipients_message", "broadcast_recipients")

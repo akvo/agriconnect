@@ -238,19 +238,19 @@ def send_actual_message(
         # Create Message record
         message = Message(
             customer_id=recipient.customer_id,
-            message_type=MessageType.BROADCAST,
+            message_type=MessageType.BROADCAST.value,
             from_source=MessageFrom.USER,
             body=message_content,
-            twilio_sid=result.get("sid"),
+            message_sid=result.get("sid"),
             delivery_status=DeliveryStatus.SENT,
-            broadcast_message_id=recipient.broadcast_message_id
         )
         db.add(message)
         db.flush()
 
-        # Update recipient
+        # Update recipient to link message
         recipient.actual_message_sid = result.get("sid")
         recipient.message_id = message.id
+        # message -> recipient.message_id -> recipient.broadcast_message_id
         # Status remains SENT, no status change after confirmation
 
         db.commit()
