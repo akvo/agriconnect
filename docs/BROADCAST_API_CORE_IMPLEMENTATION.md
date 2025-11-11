@@ -94,38 +94,63 @@ For detailed rationale, see implementation notes in Phase 1.2.
 
 ## 📐 Database Schema
 
-### Architecture Overview
+### Architecture Overview - Hybrid Design
+
+AgriConnect uses a **hybrid approach** for broadcast groups:
+- **Filter metadata** (`crop_types`, `age_groups`) stored for mobile app UI display
+- **Static contact lists** (`broadcast_group_contacts`) for actual message delivery
+- Recipients are **NOT** dynamically resolved - they're stored at group creation time
+
+**Why Hybrid?**
+- Mobile app displays filter tags ("Maize farmers, 20-35 years") to help EOs understand group composition
+- Static contact lists ensure consistent delivery (snapshot of recipients when group created)
+- Separates UI concerns (what filters were used) from delivery concerns (who receives messages)
 
 ```
-broadcast_groups (filter-based segments: "Maize Farmers 20-35", "All Dairy Farmers")
+broadcast_groups (segment metadata: "Maize Farmers 20-35")
   ↓
-  Contains: crop_types JSON [1, 3] and age_groups JSON ["20-35", "36-50"]
+  Contains:
+  - crop_types JSON [1, 3] (UI metadata for mobile app tags)
+  - age_groups JSON ["20-35", "36-50"] (UI metadata for mobile app tags)
+  ↓
+broadcast_group_contacts (actual recipients - static snapshot via junction table)
+  ↓
+  References customers.id (with FK constraints and CASCADE DELETE)
   ↓
 broadcast_messages (campaign: "New subsidy available!")
   ↓ (many-to-many)
 broadcast_message_groups (which groups received this broadcast)
   ↓
-broadcast_recipients (delivery tracking per recipient - resolved dynamically)
-  ↓
+broadcast_recipients (delivery tracking per recipient - from static contact lists)
+  ↓ (via message_id FK)
 messages (individual message records for history, type=BROADCAST)
 ```
 
 ### Tables to Create
 
 ```sql
--- 1. Broadcast Groups (Filter-Based Segments)
+-- 1. Broadcast Groups (Segment Metadata)
 CREATE TABLE broadcast_groups (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    crop_types JSON,  -- Array of crop_type IDs: [1, 3, 5]
-    age_groups JSON,  -- Array of age group strings: ["20-35", "36-50"]
+    crop_types JSON,  -- UI metadata: crop_type IDs [1, 3, 5] (for mobile app display)
+    age_groups JSON,  -- UI metadata: age groups ["20-35", "36-50"] (for mobile app display)
     administrative_id INTEGER REFERENCES administrative(id),
     created_by INTEGER NOT NULL REFERENCES admin_users(id),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 2. Broadcast Messages (Campaign Metadata)
+-- 2. Broadcast Group Contacts (Static Contact Lists - Junction Table)
+CREATE TABLE broadcast_group_contacts (
+    id SERIAL PRIMARY KEY,
+    broadcast_group_id INTEGER NOT NULL REFERENCES broadcast_groups(id) ON DELETE CASCADE,
+    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(broadcast_group_id, customer_id)
+);
+
+-- 3. Broadcast Messages (Campaign Metadata)
 CREATE TABLE broadcast_messages (
     id SERIAL PRIMARY KEY,
     message TEXT NOT NULL,
@@ -136,7 +161,7 @@ CREATE TABLE broadcast_messages (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 3. Broadcast Message Groups (Many-to-Many: Broadcast → Groups)
+-- 4. Broadcast Message Groups (Many-to-Many: Broadcast → Groups)
 CREATE TABLE broadcast_message_groups (
     id SERIAL PRIMARY KEY,
     broadcast_message_id INTEGER NOT NULL REFERENCES broadcast_messages(id) ON DELETE CASCADE,
@@ -145,7 +170,9 @@ CREATE TABLE broadcast_message_groups (
     UNIQUE(broadcast_message_id, broadcast_group_id)
 );
 
--- 4. Broadcast Recipients (Delivery Tracking per Recipient)
+-- 5. Broadcast Recipients (Delivery Tracking per Recipient)
+-- NOTE: Recipients are created from static contact lists (broadcast_group_contacts)
+--       NOT dynamically resolved from filters
 CREATE TABLE broadcast_recipients (
     id SERIAL PRIMARY KEY,
     broadcast_message_id INTEGER NOT NULL REFERENCES broadcast_messages(id) ON DELETE CASCADE,
@@ -167,13 +194,11 @@ CREATE TABLE broadcast_recipients (
 -- 5. Extend MessageType Enum
 ALTER TYPE message_type ADD VALUE IF NOT EXISTS 'BROADCAST';
 
--- 6. Add broadcast_message_id to messages table (link Message → BroadcastMessage)
-ALTER TABLE messages ADD COLUMN broadcast_message_id INTEGER REFERENCES broadcast_messages(id);
-CREATE INDEX idx_messages_broadcast_message ON messages(broadcast_message_id);
-
 -- Indexes
 CREATE INDEX idx_broadcast_groups_administrative ON broadcast_groups(administrative_id);
 CREATE INDEX idx_broadcast_groups_created_by ON broadcast_groups(created_by);
+CREATE INDEX idx_broadcast_group_contacts_group ON broadcast_group_contacts(broadcast_group_id);
+CREATE INDEX idx_broadcast_group_contacts_customer ON broadcast_group_contacts(customer_id);
 CREATE INDEX idx_broadcast_messages_created_by ON broadcast_messages(created_by);
 CREATE INDEX idx_broadcast_message_groups_message ON broadcast_message_groups(broadcast_message_id);
 CREATE INDEX idx_broadcast_message_groups_group ON broadcast_message_groups(broadcast_group_id);
@@ -222,33 +247,78 @@ from models.message import DeliveryStatus
 
 
 class BroadcastGroup(Base):
-    """Broadcast Group - Filter-based segment for targeting broadcasts"""
+    """Broadcast Group - Hybrid design with filter metadata + static contact lists"""
     __tablename__ = "broadcast_groups"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    crop_types = Column(JSON)  # Array of crop_type IDs: [1, 3, 5]
-    age_groups = Column(JSON)  # Array of age group strings: ["20-35", "36-50"]
+    crop_types = Column(JSON)  # UI metadata: crop_type IDs [1, 3, 5] (for mobile app display)
+    age_groups = Column(JSON)  # UI metadata: age groups ["20-35", "36-50"] (for mobile app display)
     administrative_id = Column(
         Integer,
+        ForeignKey("administrative.id"),
+        nullable=True,
         index=True
     )
     created_by = Column(
         Integer,
+        ForeignKey("users.id"),
+        nullable=False,
         index=True
     )
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(
         DateTime,
+        default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
 
     # Relationships
     administrative = relationship("Administrative", backref="broadcast_groups")
-    creator = relationship("AdminUser", backref="broadcast_groups")
+    creator = relationship("User", backref="broadcast_groups")
+    group_contacts = relationship(
+        "BroadcastGroupContact",
+        back_populates="broadcast_group",
+        cascade="all, delete-orphan"
+    )
     broadcast_groups = relationship(
         "BroadcastMessageGroup",
         back_populates="broadcast_group"
+    )
+
+
+class BroadcastGroupContact(Base):
+    """Junction table for static group membership"""
+    __tablename__ = "broadcast_group_contacts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    broadcast_group_id = Column(
+        Integer,
+        ForeignKey("broadcast_groups.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    customer_id = Column(
+        Integer,
+        ForeignKey("customers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    broadcast_group = relationship(
+        "BroadcastGroup", back_populates="group_contacts"
+    )
+    customer = relationship("Customer")
+
+    # Constraint
+    __table_args__ = (
+        UniqueConstraint(
+            'broadcast_group_id',
+            'customer_id',
+            name='unique_broadcast_group_contact'
+        ),
     )
 
 
@@ -324,7 +394,7 @@ class BroadcastMessageGroup(Base):
 
 
 class BroadcastRecipient(Base):
-    """Delivery tracking for individual recipients"""
+    """Delivery tracking for individual recipients (created from static contact lists)"""
     __tablename__ = "broadcast_recipients"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -412,7 +482,7 @@ def upgrade():
     op.create_index('idx_broadcast_groups_administrative', 'broadcast_groups', ['administrative_id'])
     op.create_index('idx_broadcast_groups_created_by', 'broadcast_groups', ['created_by'])
 
-    # 2. Create broadcast_group_contacts
+    # 2. Create broadcast_group_contacts (junction table for static contact lists)
     op.create_table(
         'broadcast_group_contacts',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -441,11 +511,6 @@ def upgrade():
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index('idx_broadcast_messages_created_by', 'broadcast_messages', ['created_by'])
-
-    # 6. Add broadcast_message_id to messages table
-    op.add_column('messages', sa.Column('broadcast_message_id', sa.Integer(), nullable=True))
-    op.create_foreign_key('fk_messages_broadcast_message', 'messages', 'broadcast_messages', ['broadcast_message_id'], ['id'])
-    op.create_index('idx_messages_broadcast_message', 'messages', ['broadcast_message_id'])
 
     # 4. Create broadcast_message_groups
     op.create_table(
@@ -496,6 +561,10 @@ def upgrade():
 
 
 def downgrade():
+    # Note: PostgreSQL does not support removing enum values directly.
+    # The BROADCAST value will remain in the messagetype enum.
+
+    # Drop in reverse order
     op.drop_index('idx_broadcast_recipients_status', 'broadcast_recipients')
     op.drop_index('idx_broadcast_recipients_customer', 'broadcast_recipients')
     op.drop_index('idx_broadcast_recipients_message', 'broadcast_recipients')
@@ -504,11 +573,6 @@ def downgrade():
     op.drop_index('idx_broadcast_message_groups_group', 'broadcast_message_groups')
     op.drop_index('idx_broadcast_message_groups_message', 'broadcast_message_groups')
     op.drop_table('broadcast_message_groups')
-
-    # Drop messages.broadcast_message_id
-    op.drop_index('idx_messages_broadcast_message', 'messages')
-    op.drop_constraint('fk_messages_broadcast_message', 'messages', type_='foreignkey')
-    op.drop_column('messages', 'broadcast_message_id')
 
     op.drop_index('idx_broadcast_messages_created_by', 'broadcast_messages')
     op.drop_table('broadcast_messages')
@@ -547,10 +611,11 @@ from pydantic import BaseModel, Field, validator
 # ========== Broadcast Group Schemas ==========
 
 class BroadcastGroupCreate(BaseModel):
-    """Request schema for creating a broadcast group with filters"""
+    """Request schema for creating a broadcast group with static contact list"""
     name: str = Field(..., min_length=1, max_length=255)
-    crop_types: Optional[List[int]] = Field(None, description="Filter by crop type IDs")
-    age_groups: Optional[List[str]] = Field(None, description="Filter by age groups: ['20-35', '36-50', '51+']")
+    customer_ids: List[int] = Field(..., min_items=1, description="Selected customer IDs")
+    crop_types: Optional[List[int]] = Field(None, description="UI metadata: filter tags for mobile app display")
+    age_groups: Optional[List[str]] = Field(None, description="UI metadata: age group tags for mobile app display")
 
     @validator('age_groups')
     def validate_age_groups(cls, v):
@@ -561,12 +626,19 @@ class BroadcastGroupCreate(BaseModel):
                     raise ValueError(f"Invalid age group: {group}. Must be one of {valid_groups}")
         return v
 
+    @validator('customer_ids')
+    def validate_customer_ids(cls, v):
+        if len(v) != len(set(v)):
+            raise ValueError('Duplicate customer IDs not allowed')
+        return v
+
 
 class BroadcastGroupUpdate(BaseModel):
     """Request schema for updating a broadcast group"""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    crop_types: Optional[List[int]] = Field(None, description="Filter by crop type IDs")
-    age_groups: Optional[List[str]] = Field(None, description="Filter by age groups")
+    customer_ids: Optional[List[int]] = Field(None, description="Updated customer IDs")
+    crop_types: Optional[List[int]] = Field(None, description="UI metadata: filter tags")
+    age_groups: Optional[List[str]] = Field(None, description="UI metadata: age group tags")
 
     @validator('age_groups')
     def validate_age_groups(cls, v):
@@ -577,16 +649,22 @@ class BroadcastGroupUpdate(BaseModel):
                     raise ValueError(f"Invalid age group: {group}")
         return v
 
+    @validator('customer_ids')
+    def validate_customer_ids(cls, v):
+        if v and len(v) != len(set(v)):
+            raise ValueError('Duplicate customer IDs not allowed')
+        return v
+
 
 class BroadcastGroupResponse(BaseModel):
     """Response schema for broadcast group"""
     id: int
     name: str
-    crop_types: Optional[List[int]]
-    age_groups: Optional[List[str]]
+    crop_types: Optional[List[int]]  # UI metadata (for mobile app display)
+    age_groups: Optional[List[str]]  # UI metadata (for mobile app display)
     administrative_id: Optional[int]
     created_by: int
-    estimated_recipients: int  # Dynamic count based on filters
+    contact_count: int  # Static count from broadcast_group_contacts
     created_at: datetime
     updated_at: datetime
 
@@ -595,14 +673,14 @@ class BroadcastGroupResponse(BaseModel):
 
 
 class BroadcastGroupDetail(BaseModel):
-    """Detailed broadcast group response with filter details"""
+    """Detailed broadcast group response"""
     id: int
     name: str
-    crop_types: Optional[List[int]]
-    age_groups: Optional[List[str]]
+    crop_types: Optional[List[int]]  # UI metadata
+    age_groups: Optional[List[str]]  # UI metadata
     administrative_id: Optional[int]
     created_by: int
-    estimated_recipients: int  # Dynamic count based on filters
+    contact_count: int  # Static count from broadcast_group_contacts
     created_at: datetime
     updated_at: datetime
 
@@ -690,7 +768,7 @@ from sqlalchemy import and_, distinct
 
 from models.broadcast import (
     BroadcastGroup,
-    BroadcastGroupContact,
+    BroadcastGroupContact,  # Junction table for static contact lists
     BroadcastMessage,
     BroadcastMessageGroup,
     BroadcastRecipient,
@@ -711,12 +789,18 @@ class BroadcastService:
     def create_group(
         self,
         name: str,
+        customer_ids: List[int],
         created_by: int,
         crop_types: Optional[List[int]] = None,
         age_groups: Optional[List[str]] = None,
         administrative_id: Optional[int] = None
     ) -> BroadcastGroup:
-        """Create a new broadcast group with filter criteria."""
+        """
+        Create a new broadcast group with static contact list.
+        Hybrid approach:
+        - Stores filter criteria (crop_types, age_groups) for mobile app UI display
+        - Stores selected customer IDs in broadcast_group_contacts junction table
+        """
         group = BroadcastGroup(
             name=name,
             crop_types=crop_types,
@@ -725,15 +809,23 @@ class BroadcastService:
             created_by=created_by
         )
         self.db.add(group)
+        self.db.flush()
+
+        # Add selected contacts to junction table
+        for customer_id in customer_ids:
+            contact = BroadcastGroupContact(
+                broadcast_group_id=group.id,
+                customer_id=customer_id
+            )
+            self.db.add(contact)
+
         self.db.commit()
         self.db.refresh(group)
 
-        # Get estimated recipients
-        recipient_count = self.get_group_recipients_count(group)
-
         logger.info(
             f"Created broadcast group '{name}' (id={group.id}) "
-            f"with ~{recipient_count} potential recipients"
+            f"with {len(customer_ids)} contacts, "
+            f"filters: crop_types={crop_types}, age_groups={age_groups}"
         )
 
         return group
@@ -782,6 +874,7 @@ class BroadcastService:
         group_id: int,
         eo_id: int,
         name: Optional[str] = None,
+        customer_ids: Optional[List[int]] = None,
         crop_types: Optional[List[int]] = None,
         age_groups: Optional[List[str]] = None,
         administrative_id: Optional[int] = None
@@ -806,6 +899,21 @@ class BroadcastService:
             group.crop_types = crop_types
         if age_groups is not None:
             group.age_groups = age_groups
+
+        # Update contacts if provided
+        if customer_ids is not None:
+            # Delete existing contacts
+            self.db.query(BroadcastGroupContact).filter(
+                BroadcastGroupContact.broadcast_group_id == group_id
+            ).delete()
+
+            # Add new contacts
+            for customer_id in customer_ids:
+                contact = BroadcastGroupContact(
+                    broadcast_group_id=group_id,
+                    customer_id=customer_id
+                )
+                self.db.add(contact)
 
         self.db.commit()
         self.db.refresh(group)
@@ -838,26 +946,16 @@ class BroadcastService:
         logger.info(f"Deleted broadcast group {group_id}")
         return True
 
-    def get_group_recipients_count(
+    def get_group_contact_count(
         self,
         group: BroadcastGroup
     ) -> int:
-        """Get estimated recipient count based on group filters."""
-        query = self.db.query(Customer)
-        
-        # Apply ward filter
-        if group.administrative_id:
-            query = query.filter(Customer.administrative_id == group.administrative_id)
-        
-        # Apply crop type filter
-        if group.crop_types:
-            query = query.filter(Customer.crop_type_id.in_(group.crop_types))
-        
-        # Apply age group filter
-        if group.age_groups:
-            query = query.filter(Customer.age_group.in_(group.age_groups))
-        
-        return query.count()
+        """Get static contact count from junction table."""
+        return (
+            self.db.query(BroadcastGroupContact)
+            .filter(BroadcastGroupContact.broadcast_group_id == group.id)
+            .count()
+        )
 
     # ========== Broadcast Message Creation ==========
 
@@ -870,6 +968,7 @@ class BroadcastService:
     ) -> Optional[BroadcastMessage]:
         """
         Create broadcast message record (stub for Part 1).
+        Recipients resolved from static contact lists (broadcast_group_contacts).
 
         NOTE: Does not send messages. Celery integration in Part 2.
         """
@@ -880,31 +979,22 @@ class BroadcastService:
                 logger.error(f"Group {group_id} not accessible")
                 return None
 
-        # Get all unique recipients by resolving filters from all groups
-        all_recipients = set()
-        groups = self.db.query(BroadcastGroup).filter(
-            BroadcastGroup.id.in_(group_ids)
-        ).all()
+        # Get all unique recipients from static contact lists
+        recipients = (
+            self.db.query(
+                distinct(BroadcastGroupContact.customer_id),
+                Customer.phone_number,
+                Customer.full_name
+            )
+            .join(
+                Customer,
+                Customer.id == BroadcastGroupContact.customer_id
+            )
+            .filter(BroadcastGroupContact.broadcast_group_id.in_(group_ids))
+            .all()
+        )
 
-        for group in groups:
-            query = self.db.query(Customer.id)
-            
-            # Apply ward filter
-            if group.administrative_id:
-                query = query.filter(Customer.administrative_id == group.administrative_id)
-            
-            # Apply crop type filter
-            if group.crop_types:
-                query = query.filter(Customer.crop_type_id.in_(group.crop_types))
-            
-            # Apply age group filter
-            if group.age_groups:
-                query = query.filter(Customer.age_group.in_(group.age_groups))
-            
-            recipients = query.all()
-            all_recipients.update([r.id for r in recipients])
-
-        if not all_recipients:
+        if not recipients:
             logger.error(f"No recipients found for groups {group_ids}")
             return None
 
@@ -926,7 +1016,7 @@ class BroadcastService:
             self.db.add(link)
 
         # Create BroadcastRecipient entries for delivery tracking
-        for customer_id in all_recipients:
+        for customer_id, phone, name in recipients:
             recipient = BroadcastRecipient(
                 broadcast_message_id=broadcast.id,
                 customer_id=customer_id,
@@ -939,7 +1029,7 @@ class BroadcastService:
 
         logger.info(
             f"Created broadcast {broadcast.id} with "
-            f"{len(all_recipients)} recipients (not sent yet)"
+            f"{len(recipients)} recipients (not sent yet)"
         )
 
         return broadcast
@@ -1011,26 +1101,28 @@ def create_broadcast_group(
     current_user: AdminUser = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """Create a new broadcast group with filter criteria."""
+    """Create a new broadcast group with static contact list."""
     service = get_broadcast_service(db)
     group = service.create_group(
         name=group_data.name,
+        customer_ids=group_data.customer_ids,
         crop_types=group_data.crop_types,
         age_groups=group_data.age_groups,
         created_by=current_user.id,
         administrative_id=current_user.administrative_id
     )
 
-    # Get estimated recipient count
-    estimated_recipients = service.get_group_recipients_count(group)
+    # Get contact count from junction table
+    contact_count = service.get_group_contact_count(group)
 
     return BroadcastGroupResponse(
         id=group.id,
         name=group.name,
-        description=group.description,
+        crop_types=group.crop_types,
+        age_groups=group.age_groups,
         administrative_id=group.administrative_id,
         created_by=group.created_by,
-        contact_count=len(group_data.customer_ids),
+        contact_count=contact_count,
         created_at=group.created_at,
         updated_at=group.updated_at
     )
@@ -1050,13 +1142,15 @@ def list_broadcast_groups(
 
     result = []
     for group in groups:
+        contact_count = service.get_group_contact_count(group)
         result.append(BroadcastGroupResponse(
             id=group.id,
             name=group.name,
-            description=group.description,
+            crop_types=group.crop_types,
+            age_groups=group.age_groups,
             administrative_id=group.administrative_id,
             created_by=group.created_by,
-            contact_count=len(group.group_contacts),
+            contact_count=contact_count,
             created_at=group.created_at,
             updated_at=group.updated_at
         ))
@@ -1084,7 +1178,7 @@ def get_broadcast_group(
             detail="Broadcast group not found"
         )
 
-    estimated_recipients = service.get_group_recipients_count(group)
+    contact_count = service.get_group_contact_count(group)
 
     return BroadcastGroupDetail(
         id=group.id,
@@ -1093,6 +1187,7 @@ def get_broadcast_group(
         age_groups=group.age_groups,
         administrative_id=group.administrative_id,
         created_by=group.created_by,
+        contact_count=contact_count,
         created_at=group.created_at,
         updated_at=group.updated_at
     )
@@ -1111,6 +1206,7 @@ def update_broadcast_group(
         group_id=group_id,
         eo_id=current_user.id,
         name=group_data.name,
+        customer_ids=group_data.customer_ids,
         crop_types=group_data.crop_types,
         age_groups=group_data.age_groups,
         administrative_id=current_user.administrative_id
@@ -1122,7 +1218,7 @@ def update_broadcast_group(
             detail="Broadcast group not found or not owner"
         )
 
-    estimated_recipients = service.get_group_recipients_count(group)
+    contact_count = service.get_group_contact_count(group)
 
     return BroadcastGroupResponse(
         id=group.id,
@@ -1131,7 +1227,7 @@ def update_broadcast_group(
         age_groups=group.age_groups,
         administrative_id=group.administrative_id,
         created_by=group.created_by,
-        estimated_recipients=estimated_recipients,
+        contact_count=contact_count,
         created_at=group.created_at,
         updated_at=group.updated_at
     )
@@ -1151,7 +1247,7 @@ def list_broadcast_groups(
 
     result = []
     for group in groups:
-        estimated_recipients = service.get_group_recipients_count(group)
+        contact_count = service.get_group_contact_count(group)
         result.append(BroadcastGroupResponse(
             id=group.id,
             name=group.name,
@@ -1159,7 +1255,7 @@ def list_broadcast_groups(
             age_groups=group.age_groups,
             administrative_id=group.administrative_id,
             created_by=group.created_by,
-            estimated_recipients=estimated_recipients,
+            contact_count=contact_count,
             created_at=group.created_at,
             updated_at=group.updated_at
         ))
@@ -1385,19 +1481,23 @@ def test_customers(db: Session, test_ward):
 
 
 def test_create_group(db, test_eo, test_customers):
-    """Test creating a broadcast group"""
+    """Test creating a broadcast group with static contact list"""
     service = get_broadcast_service(db)
     customer_ids = [c.id for c in test_customers]
 
     group = service.create_group(
         name="Test Group",
         customer_ids=customer_ids,
+        crop_types=[1, 2],  # UI metadata
+        age_groups=["20-35"],  # UI metadata
         created_by=test_eo.id,
         administrative_id=test_eo.administrative_id
     )
 
     assert group is not None
     assert group.name == "Test Group"
+    assert group.crop_types == [1, 2]
+    assert group.age_groups == ["20-35"]
     assert len(group.group_contacts) == 5
 
 
@@ -1500,12 +1600,19 @@ AgriConnect includes a broadcast messaging system for Extension Officers.
 ## 📊 Database Schema Summary
 
 ```
-4 Tables:
-1. broadcast_groups               - Filter-based segments (crop_types, age_groups JSON)
-2. broadcast_messages             - Campaign metadata
-3. broadcast_message_groups       - Broadcast → Groups link (many-to-many)
-4. broadcast_recipients           - Delivery tracking (resolved dynamically from filters)
+5 Tables (Hybrid Design):
+1. broadcast_groups               - Segment metadata (crop_types, age_groups for UI)
+2. broadcast_group_contacts       - Static contact lists (junction table with FK constraints)
+3. broadcast_messages             - Campaign metadata
+4. broadcast_message_groups       - Broadcast → Groups link (many-to-many)
+5. broadcast_recipients           - Delivery tracking (from static contact lists)
 ```
+
+**Key Design Decisions:**
+- Filter fields (`crop_types`, `age_groups`) are UI metadata for mobile app display
+- Actual recipients stored in `broadcast_group_contacts` junction table
+- Junction table provides FK constraints, CASCADE DELETE, and data integrity
+- Recipients resolved from static lists, not dynamically from filters
 
 ---
 
