@@ -15,11 +15,12 @@ const BroadcastLayout = () => {
           options={{
             headerShown: true,
             title: "Broadcast",
-            headerTitleStyle: {
-              fontWeight: "bold",
-              fontFamily: "Inter",
-            },
             headerTitleAlign: "center",
+            headerLeft: () => (
+              <TouchableOpacity onPress={() => router.push("/(tabs)/inbox")}>
+                <Feathericons name="arrow-left" size={24} color="black" />
+              </TouchableOpacity>
+            ),
           }}
         />
         <Stack.Screen
@@ -44,7 +45,7 @@ const BroadcastLayout = () => {
                 name={route?.params?.name}
                 contactCount={route?.params?.contactCount}
                 onClick={() =>
-                  router.push({
+                  router.navigate({
                     pathname: "/broadcast/group/members",
                     params: {
                       groupId: route?.params?.chatId,
@@ -57,7 +58,7 @@ const BroadcastLayout = () => {
             ),
             headerLeft: () => (
               <TouchableOpacity
-                onPress={() => router.push("/broadcast/contact/groups")}
+                onPress={() => router.navigate("/broadcast/contact/groups")}
                 style={{ marginRight: 16 }}
               >
                 <Feathericons name="arrow-left" size={24} color="black" />

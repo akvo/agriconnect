@@ -79,7 +79,9 @@ export default function TabLayout() {
             headerTitleAlign: "center",
             headerRight: () => (
               <TouchableOpacity
-                onPress={() => isOnline && router.push("/broadcast/contact")}
+                onPress={() =>
+                  isOnline && router.navigate("/broadcast/contact")
+                }
                 style={{ marginRight: 16, opacity: isOnline ? 1 : 0.5 }}
                 disabled={!isOnline}
                 testID="send-bulk-message-button"
