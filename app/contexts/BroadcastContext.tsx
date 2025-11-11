@@ -49,6 +49,8 @@ export interface GroupDetail {
   contacts: GroupMember[];
   crop_types: number[] | null;
   age_groups: string[] | null;
+  created_at?: string | null;
+  contact_count?: number | null;
 }
 
 interface BroadcastContextType {

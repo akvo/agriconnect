@@ -24,6 +24,7 @@ import {
   SearchFilterHeader,
   SelectAllHeader,
 } from "@/components/broadcast";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 // Constants
 const PAGE_SIZE = 10;
@@ -46,6 +47,7 @@ const BroadcastFarmerListTab = () => {
     setSelectedCropTypes: setContextCropTypes,
     setSelectedAgeGroups: setContextAgeGroups,
   } = useBroadcast();
+  const { isOnline } = useNetwork();
   const isAdmin = user?.userType === "admin";
 
   // State
@@ -78,6 +80,12 @@ const BroadcastFarmerListTab = () => {
   const fetchCustomers = useCallback(
     async (currentPage: number, isLoadingMore: boolean = false) => {
       try {
+        /**
+         * Early return if offline
+         */
+        if (!isOnline) {
+          return;
+        }
         if (isLoadingMore) {
           setLoadingMore(true);
         } else {
@@ -141,6 +149,7 @@ const BroadcastFarmerListTab = () => {
       }
     },
     [
+      isOnline,
       isAdmin,
       debouncedSearch,
       selectedCropTypes,
@@ -438,7 +447,7 @@ const BroadcastFarmerListTab = () => {
             selectedIds.size === 0 && styles.nextButtonDisabled,
           ]}
           onPress={handleNext}
-          disabled={selectedIds.size === 0}
+          disabled={selectedIds.size === 0 || !isOnline}
           activeOpacity={0.8}
         >
           <Text style={[typography.label1, { color: themeColors.white }]}>

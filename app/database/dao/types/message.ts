@@ -39,7 +39,7 @@ export interface UpdateMessageData {
   customer_id?: number;
   user_id?: number | null;
   body?: string;
-  message_type?: number;
+  message_type?: number | string;
   status?: number; // Use MessageStatus constants
   is_used?: number; // 0=not used, 1=used
   delivery_status?: string; // Twilio delivery status

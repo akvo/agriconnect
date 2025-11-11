@@ -27,7 +27,7 @@ const convertToUIMessage = (
   return {
     id: msg.id,
     message_sid: msg.message_sid,
-    name: userName,
+    name: `${msg.message_type}` === "BROADCAST" ? "Broadcast" : userName,
     text: msg.body,
     sender: isCustomerMessage ? "customer" : "user",
     timestamp: msg.createdAt,

@@ -16,13 +16,15 @@ import { api } from "@/services/api";
 import Search from "@/components/search";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 // Constants
 const DEBOUNCE_DELAY = 300;
 
 const SavedGroups = () => {
   const { user } = useAuth();
-  const { cropTypes: cropTypesList } = useBroadcast();
+  const { cropTypes: cropTypesList, activeGroup } = useBroadcast();
+  const { isOnline } = useNetwork();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -52,8 +54,37 @@ const SavedGroups = () => {
   // Fetch groups
   const fetchGroups = useCallback(async () => {
     try {
+      if (activeGroup?.id) {
+        // append to groups list if activeGroup is set
+        setGroups((prevGroups: SavedGroup[]) => {
+          // check if activeGroup already exists in the list
+          const exists = prevGroups.some(
+            (group) => group.id === activeGroup.id,
+          );
+          if (exists) {
+            return prevGroups;
+          }
+
+          // Normalize activeGroup to SavedGroup shape to satisfy typing
+          const groupToAdd: SavedGroup = {
+            id: activeGroup.id,
+            name: activeGroup.name,
+            contact_count: activeGroup?.contact_count,
+            created_at: activeGroup?.created_at,
+            crop_types: activeGroup.crop_types,
+            age_groups: activeGroup.age_groups,
+          };
+
+          return [groupToAdd, ...prevGroups];
+        });
+      }
+      /**
+       * Early return if offline
+       */
+      if (!isOnline) {
+        return;
+      }
       setLoading(true);
-      setGroups([]);
 
       const response = await api.getBroadcastGroups(user?.accessToken || "", {
         search: debouncedSearch,
@@ -65,7 +96,7 @@ const SavedGroups = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, user?.accessToken]);
+  }, [debouncedSearch, user?.accessToken, isOnline, activeGroup]);
 
   // Fetch on mount and when search changes
   useEffect(() => {
@@ -91,28 +122,27 @@ const SavedGroups = () => {
           }}
         >
           <View style={styles.groupHeader}>
-            <Text
-              style={[
-                typography.label1,
-                typography.bold,
-                { color: themeColors.textPrimary },
-              ]}
-            >
-              {item.name}
-            </Text>
             <View style={styles.memberBadge}>
               <Feather
                 name="users"
-                size={14}
-                color={themeColors["green-500"]}
+                size={16}
+                color={themeColors.groupIconForeground}
               />
+            </View>
+            <View>
               <Text
                 style={[
-                  typography.body4,
-                  { color: themeColors["green-500"], marginLeft: 4 },
+                  typography.label1,
+                  typography.bold,
+                  { color: themeColors.textPrimary },
                 ]}
               >
-                {item.contact_count}
+                {item.name}
+              </Text>
+              <Text
+                style={[typography.body4, { color: themeColors["green-500"] }]}
+              >
+                {item.contact_count ? `${item.contact_count} member(s)` : ""}
               </Text>
             </View>
           </View>
@@ -259,25 +289,27 @@ const styles = StyleSheet.create({
   },
   groupCard: {
     backgroundColor: themeColors.white,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: themeColors.cardBorder,
+    borderColor: themeColors.mutedBorder,
   },
   groupHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
     marginBottom: 12,
+    gap: 16,
   },
   memberBadge: {
-    flexDirection: "row",
+    height: 32,
+    width: 32,
+    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: themeColors["green-50"],
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    flexDirection: "row",
+    backgroundColor: themeColors.groupIconBackground,
+    borderRadius: 16,
   },
   tagsContainer: {
     flexDirection: "row",

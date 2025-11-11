@@ -18,20 +18,28 @@ import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
 import { useBroadcast } from "@/contexts/BroadcastContext";
 import { api } from "@/services/api";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 const BroadcastLayout = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { setCropTypes } = useBroadcast();
+  const { isOnline } = useNetwork();
 
   const fetchCropTypes = useCallback(async () => {
     try {
+      /**
+       * Early return if offline
+       */
+      if (!isOnline) {
+        return;
+      }
       const response = await api.getCropTypes();
       setCropTypes(response);
     } catch (err) {
       console.error("[BroadcastLayout] Error fetching crop types:", err);
     }
-  }, [setCropTypes]);
+  }, [setCropTypes, isOnline]);
 
   // Fetch crop types once when layout mounts
   useEffect(() => {
@@ -49,6 +57,12 @@ const BroadcastLayout = () => {
       edges={["left", "right", "bottom"]}
     >
       {/* Custom Tabs at Top */}
+      {/* Show banner offline */}
+      {!isOnline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>You are offline</Text>
+        </View>
+      )}
       <View style={styles.tabsContainer}>
         <View style={styles.tabList}>
           <TouchableOpacity
@@ -138,6 +152,15 @@ const styles = StyleSheet.create({
   },
   tabInactive: {
     backgroundColor: themeColors["green-50"],
+  },
+  offlineBanner: {
+    backgroundColor: "#6B7280",
+    paddingVertical: 6,
+    alignItems: "center",
+  },
+  offlineText: {
+    ...typography.body3,
+    color: themeColors.light1,
   },
 });
 
