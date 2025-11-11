@@ -119,7 +119,15 @@ const CreateGroupScreen = () => {
 
       // Clear context after successful creation
       clearMembers();
-      setActiveGroup(null);
+
+      /**
+       * Toggle active group in context
+       */
+      if (activeGroup?.id) {
+        setActiveGroup(null);
+      } else {
+        setActiveGroup(response);
+      }
 
       // Navigate to group chat page
       router.replace({

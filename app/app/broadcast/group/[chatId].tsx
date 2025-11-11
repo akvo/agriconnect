@@ -340,7 +340,7 @@ const BroadcastGroupChatScreen = () => {
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior="height"
+        behavior={undefined}
         keyboardVerticalOffset={48}
       >
         {/* Messages List */}
