@@ -24,6 +24,6 @@ openai
 tiktoken
 httpx>=0.27.0
 rapidfuzz>=3.0.0
-celery==5.3.4
-redis==5.0.1
+celery==5.5.3
+redis==7.0.1
 flower==2.0.1

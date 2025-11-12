@@ -37,5 +37,5 @@ celery_app.conf.beat_schedule = {
     },
 }
 
-# Auto-discover tasks in tasks/ folder (like Akvo RAG)
-celery_app.autodiscover_tasks(["tasks"])
+# Auto-discover tasks - Celery will import them when needed
+celery_app.autodiscover_tasks(lambda: ["tasks"])

@@ -6,6 +6,18 @@ set -e
 
 CELERY_MODE=${1:-worker}
 
+# Install system dependencies if needed
+if ! command -v nc >/dev/null 2>&1; then
+    echo "📦 Installing system dependencies..."
+    apt-get update && apt-get install -y build-essential netcat-traditional && rm -rf /var/lib/apt/lists/*
+fi
+
+# Install Python dependencies if needed
+if ! pip show celery >/dev/null 2>&1; then
+    echo "📦 Installing Python dependencies..."
+    pip install --no-cache-dir -r requirements.txt
+fi
+
 echo "⏳ Waiting for PostgreSQL..."
 while ! nc -z db 5432; do
     sleep 1
