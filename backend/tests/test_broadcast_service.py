@@ -152,16 +152,13 @@ class TestBroadcastGroupManagement:
             customer_ids=[1, 2, 3],
             created_by=test_users["eo1"].id,
             administrative_id=test_users["eo1"].administrative_id,
-            crop_types=[1, 2],  # Example crop type IDs
-            age_groups=["20-35", "36-50"]  # Example age groups
         )
 
         assert group.id is not None
         assert group.name == "Test Group"
-        assert group.crop_types == [1, 2]
-        assert group.age_groups == ["20-35", "36-50"]
         assert group.created_by == test_users["eo1"].id
         assert len(group.group_contacts) == 3
+        # crop_types and age_groups are no longer stored on the group
 
     def test_get_groups_for_eo_ward_filtered(
         self, db_session: Session, test_users, test_customers

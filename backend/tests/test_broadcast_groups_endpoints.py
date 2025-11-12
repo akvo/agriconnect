@@ -202,15 +202,9 @@ class TestBroadcastGroupsEndpoint:
         setup_administrative_hierarchy,
         db_session,
     ):
-        """Test that EO can create broadcast group with filters"""
+        """Test that EO can create broadcast group with selected customers"""
         wards = setup_administrative_hierarchy
         customers = setup_customers
-
-        # Get crop type ID for Rice from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        rice_id = rice.id
 
         # EO from Ward 1
         headers, _ = auth_headers_factory(
@@ -220,11 +214,9 @@ class TestBroadcastGroupsEndpoint:
             administrative_ids=[wards["ward1"].id]
         )
 
-        # Create broadcast group with filters and selected customers
+        # Create broadcast group with selected customers
         payload = {
             "name": "Young Rice Farmers",
-            "crop_types": [rice_id],
-            "age_groups": ["20-35"],
             "customer_ids": [customers["customer1"].id],
         }
 
@@ -237,8 +229,9 @@ class TestBroadcastGroupsEndpoint:
 
         # Verify response structure
         assert data["name"] == "Young Rice Farmers"
-        assert data["crop_types"] == [rice_id]
-        assert data["age_groups"] == ["20-35"]
+        # crop_types and age_groups are derived from members
+        assert data["crop_types"] == ["Rice"]  # Derived from customer1
+        assert data["age_groups"] == ["20-35"]  # Derived from customer1
         assert data["contact_count"] == 1
         assert data["administrative_id"] == wards["ward1"].id
         assert "id" in data
@@ -256,16 +249,6 @@ class TestBroadcastGroupsEndpoint:
         """Test that Admin can create group with customers from any ward"""
         customers = setup_customers
 
-        # Get crop type IDs from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        coffee = db_session.query(CropType).filter(
-            CropType.name == "Coffee"
-        ).first()
-        rice_id = rice.id
-        coffee_id = coffee.id
-
         # Admin user
         headers, _ = auth_headers_factory(
             user_type="admin",
@@ -276,8 +259,6 @@ class TestBroadcastGroupsEndpoint:
         # Create group with customers from different wards
         payload = {
             "name": "All Coffee & Rice Farmers",
-            "crop_types": [rice_id, coffee_id],
-            "age_groups": ["20-35", "36-50"],
             "customer_ids": [
                 customers["customer1"].id,
                 customers["customer2"].id,
@@ -292,7 +273,8 @@ class TestBroadcastGroupsEndpoint:
         data = response.json()
 
         assert data["name"] == "All Coffee & Rice Farmers"
-        assert set(data["crop_types"]) == {rice_id, coffee_id}
+        # crop_types and age_groups are derived from members
+        assert set(data["crop_types"]) == {"Rice", "Coffee"}
         assert set(data["age_groups"]) == {"20-35", "36-50"}
         assert data["contact_count"] == 2
         assert data["administrative_id"] is None  # Admin has no ward
@@ -309,12 +291,6 @@ class TestBroadcastGroupsEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop types from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        rice_id = rice.id
-
         # EO from Ward 1
         headers, _ = auth_headers_factory(
             user_type="eo",
@@ -326,8 +302,6 @@ class TestBroadcastGroupsEndpoint:
         # Create a group
         payload = {
             "name": "Ward 1 Group",
-            "crop_types": [rice_id],
-            "age_groups": ["20-35"],
             "customer_ids": [customers["customer1"].id],
         }
         client.post("/api/broadcast/groups", json=payload, headers=headers)
@@ -344,7 +318,8 @@ class TestBroadcastGroupsEndpoint:
         # Verify group structure
         group = data[0]
         assert group["name"] == "Ward 1 Group"
-        assert group["crop_types"] == [rice_id]
+        # crop_types and age_groups are derived from members
+        assert group["crop_types"] == ["Rice"]
         assert group["age_groups"] == ["20-35"]
         assert group["contact_count"] == 1
         assert group["administrative_id"] == wards["ward1"].id
@@ -361,16 +336,6 @@ class TestBroadcastGroupsEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop types from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        chilli = db_session.query(CropType).filter(
-            CropType.name == "Chilli"
-        ).first()
-        rice_id = rice.id
-        chilli_id = chilli.id
-
         # Create group in Ward 1
         headers_eo1, _ = auth_headers_factory(
             user_type="eo",
@@ -380,7 +345,6 @@ class TestBroadcastGroupsEndpoint:
         )
         payload1 = {
             "name": "Ward 1 Group",
-            "crop_types": [rice_id],
             "customer_ids": [customers["customer1"].id],
         }
         response1 = client.post(
@@ -400,7 +364,6 @@ class TestBroadcastGroupsEndpoint:
         )
         payload2 = {
             "name": "Ward 2 Group",
-            "crop_types": [chilli_id],
             "customer_ids": [customers["customer3"].id],
         }
         response2 = client.post(
@@ -442,16 +405,6 @@ class TestBroadcastGroupsEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop types from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        coffee = db_session.query(CropType).filter(
-            CropType.name == "Coffee"
-        ).first()
-        rice_id = rice.id
-        coffee_id = coffee.id
-
         # EO from Ward 1
         headers, _ = auth_headers_factory(
             user_type="eo",
@@ -463,8 +416,6 @@ class TestBroadcastGroupsEndpoint:
         # Create group with multiple customers
         payload = {
             "name": "Multi-Contact Group",
-            "crop_types": [rice_id, coffee_id],
-            "age_groups": ["20-35", "36-50"],
             "customer_ids": [
                 customers["customer1"].id,
                 customers["customer2"].id,
@@ -486,7 +437,8 @@ class TestBroadcastGroupsEndpoint:
 
         # Verify group details
         assert data["name"] == "Multi-Contact Group"
-        assert set(data["crop_types"]) == {rice_id, coffee_id}
+        # crop_types and age_groups are derived from members
+        assert set(data["crop_types"]) == {"Rice", "Coffee"}
         assert set(data["age_groups"]) == {"20-35", "36-50"}
 
         # Verify contacts list
@@ -516,16 +468,6 @@ class TestBroadcastGroupsEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop types from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        rice_id = rice.id
-        coffee = db_session.query(CropType).filter(
-            CropType.name == "Coffee"
-        ).first()
-        coffee_id = coffee.id
-
         # EO from Ward 1
         headers, _ = auth_headers_factory(
             user_type="eo",
@@ -537,8 +479,6 @@ class TestBroadcastGroupsEndpoint:
         # Create group
         payload = {
             "name": "Original Group",
-            "crop_types": [rice_id],
-            "age_groups": ["20-35"],
             "customer_ids": [customers["customer1"].id],
         }
 
@@ -547,11 +487,9 @@ class TestBroadcastGroupsEndpoint:
         )
         group_id = create_response.json()["id"]
 
-        # Update group - change name, filters, and add customer
+        # Update group - change name and add customer
         update_payload = {
             "name": "Updated Group",
-            "crop_types": [rice_id, coffee_id],
-            "age_groups": ["20-35", "36-50"],
             "customer_ids": [
                 customers["customer1"].id,
                 customers["customer2"].id,
@@ -569,7 +507,8 @@ class TestBroadcastGroupsEndpoint:
 
         # Verify updates
         assert data["name"] == "Updated Group"
-        assert set(data["crop_types"]) == {rice_id, coffee_id}
+        # crop_types and age_groups are derived from members
+        assert set(data["crop_types"]) == {"Rice", "Coffee"}
         assert set(data["age_groups"]) == {"20-35", "36-50"}
         assert data["contact_count"] == 2
 
@@ -584,12 +523,6 @@ class TestBroadcastGroupsEndpoint:
         """Test that Admin can update their own group"""
         customers = setup_customers
 
-        # Get crop types from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        rice_id = rice.id
-
         # Admin user
         headers, _ = auth_headers_factory(
             user_type="admin",
@@ -600,7 +533,6 @@ class TestBroadcastGroupsEndpoint:
         # Create group
         payload = {
             "name": "Admin Original Group",
-            "crop_types": [rice_id],
             "customer_ids": [customers["customer1"].id],
         }
 
@@ -612,7 +544,6 @@ class TestBroadcastGroupsEndpoint:
         # Update group
         update_payload = {
             "name": "Admin Updated Group",
-            "age_groups": ["51+"],
             "customer_ids": [
                 customers["customer1"].id,
                 customers["customer3"].id,
@@ -629,7 +560,8 @@ class TestBroadcastGroupsEndpoint:
         data = response.json()
 
         assert data["name"] == "Admin Updated Group"
-        assert data["age_groups"] == ["51+"]
+        # crop_types and age_groups are derived from members
+        assert set(data["age_groups"]) == {"20-35", "51+"}
         assert data["contact_count"] == 2
 
     def test_delete_broadcast_group_by_owner(
@@ -644,12 +576,6 @@ class TestBroadcastGroupsEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop types from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        rice_id = rice.id
-
         # EO from Ward 1
         headers, _ = auth_headers_factory(
             user_type="eo",
@@ -661,7 +587,6 @@ class TestBroadcastGroupsEndpoint:
         # Create group
         payload = {
             "name": "Group to Delete",
-            "crop_types": [rice_id],
             "customer_ids": [customers["customer1"].id],
         }
 
@@ -695,12 +620,6 @@ class TestBroadcastGroupsEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop types from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        rice_id = rice.id
-
         # EO1 from Ward 1 creates group
         headers_eo1, _ = auth_headers_factory(
             user_type="eo",
@@ -711,7 +630,6 @@ class TestBroadcastGroupsEndpoint:
 
         payload = {
             "name": "EO1 Group",
-            "crop_types": [rice_id],
             "customer_ids": [customers["customer1"].id],
         }
 
@@ -747,12 +665,6 @@ class TestBroadcastGroupsEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop type from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        rice_id = rice.id
-
         # EO from Ward 1
         headers, _ = auth_headers_factory(
             user_type="eo",
@@ -764,7 +676,6 @@ class TestBroadcastGroupsEndpoint:
         # Try to create group with non-existent customer ID
         payload = {
             "name": "Invalid Customer Group",
-            "crop_types": [rice_id],
             # 999999 doesn't exist
             "customer_ids": [customers["customer1"].id, 999999],
         }
@@ -789,12 +700,6 @@ class TestBroadcastGroupsEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop type from database
-        rice = db_session.query(CropType).filter(
-            CropType.name == "Rice"
-        ).first()
-        rice_id = rice.id
-
         # EO1 from Ward 1 creates a group
         headers_eo1, _ = auth_headers_factory(
             user_type="eo",
@@ -805,7 +710,6 @@ class TestBroadcastGroupsEndpoint:
 
         payload = {
             "name": "EO1 Original Group",
-            "crop_types": [rice_id],
             "customer_ids": [customers["customer1"].id],
         }
 

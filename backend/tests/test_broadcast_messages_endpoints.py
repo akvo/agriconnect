@@ -188,12 +188,6 @@ class TestBroadcastMessagesEndpoint:
         wards = setup_administrative_hierarchy
         customers = setup_customers
 
-        # Get crop types from database
-        rice = (
-            db_session.query(CropType).filter(CropType.name == "Rice").first()
-        )
-        rice_id = rice.id
-
         # EO from Ward 1 creates group
         headers_eo1, _ = auth_headers_factory(
             user_type="eo",
@@ -204,8 +198,6 @@ class TestBroadcastMessagesEndpoint:
 
         payload1 = {
             "name": "Ward 1 Rice Farmers",
-            "crop_types": [rice_id],
-            "age_groups": ["20-35"],
             "customer_ids": [customers["customer1"].id],
         }
 
@@ -238,7 +230,6 @@ class TestBroadcastMessagesEndpoint:
 
         payload3 = {
             "name": "Ward 2 Farmers",
-            "crop_types": [rice_id],
             "customer_ids": [customers["customer3"].id],
         }
 

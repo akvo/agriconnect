@@ -208,7 +208,7 @@ class TestProcessBroadcastComprehensive:
 
         for recipient in recipients:
             assert recipient.status == DeliveryStatus.SENT
-            assert recipient.template_message_sid is not None
+            assert recipient.confirm_message_sid is not None
             assert recipient.sent_at is not None
 
     @patch("tasks.broadcast_tasks.SessionLocal")
@@ -334,7 +334,7 @@ class TestSendActualMessageComprehensive:
         ).first()
 
         recipient.status = DeliveryStatus.SENT
-        recipient.template_message_sid = "SM123"
+        recipient.confirm_message_sid = "SM123"
         db_session.commit()
 
         customer = test_broadcast_setup["customers"][0]
@@ -510,3 +510,297 @@ class TestRetryFailedBroadcastsComprehensive:
 
         assert "error" in retry_result
         assert "Retry error" in retry_result["error"]
+
+
+class TestBroadcastTasksCoveragePaths:
+    """Tests to cover missing coverage paths"""
+
+    @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        None
+    )
+    @patch("tasks.broadcast_tasks._config")
+    def test_process_broadcast_config_fallback(
+        self, mock_config, mock_session_local, db_session,
+        test_broadcast_setup
+    ):
+        """Test content_sid fallback to _config (line 54)"""
+        mock_session_local.return_value = db_session
+
+        # Mock _config to return template SID
+        mock_config.get.return_value = {
+            "templates": {
+                "broadcast": {
+                    "sid": "HX_FROM_CONFIG"
+                }
+            }
+        }
+
+        broadcast_id = test_broadcast_setup["broadcast"].id
+        result = process_broadcast(broadcast_id)
+
+        assert "error" not in result
+        assert result["sent"] == 3
+
+    @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
+    @patch("tasks.broadcast_tasks.WhatsAppService")
+    def test_process_broadcast_non_test_mode(
+        self, mock_ws_class, mock_session_local, db_session,
+        test_broadcast_setup
+    ):
+        """Test actual WhatsApp send in non-test mode (line 137)"""
+        mock_session_local.return_value = db_session
+
+        # Mock WhatsApp service
+        mock_service = MagicMock()
+        mock_service.send_template_message.return_value = {
+            "sid": "SM_REAL_123"
+        }
+        mock_ws_class.return_value = mock_service
+
+        # Temporarily disable test mode
+        original_testing = os.environ.pop("TESTING", None)
+
+        try:
+            broadcast_id = test_broadcast_setup["broadcast"].id
+            result = process_broadcast(broadcast_id)
+
+            assert "error" not in result
+            assert result["sent"] == 3
+            assert mock_service.send_template_message.call_count == 3
+        finally:
+            # Restore test mode
+            if original_testing:
+                os.environ["TESTING"] = original_testing
+
+    @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch("tasks.broadcast_tasks.WhatsAppService")
+    def test_send_actual_message_non_test_mode(
+        self, mock_ws_class, mock_session_local, db_session,
+        test_broadcast_setup
+    ):
+        """Test actual WhatsApp send (lines 229-233)"""
+        mock_session_local.return_value = db_session
+
+        # Mock WhatsApp service
+        mock_service = MagicMock()
+        mock_service.send_message.return_value = {
+            "sid": "SM_ACTUAL_456"
+        }
+        mock_ws_class.return_value = mock_service
+
+        # Get recipient
+        recipient = db_session.query(BroadcastRecipient).filter(
+            BroadcastRecipient.broadcast_message_id ==
+            test_broadcast_setup["broadcast"].id
+        ).first()
+
+        recipient.status = DeliveryStatus.SENT
+        recipient.confirm_message_sid = "SM_CONFIRM_123"
+        db_session.commit()
+
+        customer = test_broadcast_setup["customers"][0]
+
+        # Temporarily disable test mode
+        original_testing = os.environ.pop("TESTING", None)
+
+        try:
+            result = send_actual_message(
+                recipient_id=recipient.id,
+                phone_number=customer.phone_number,
+                message_content="Actual broadcast message"
+            )
+
+            assert "status" in result
+            assert mock_service.send_message.called
+        finally:
+            # Restore test mode
+            if original_testing:
+                os.environ["TESTING"] = original_testing
+
+    @patch("tasks.broadcast_tasks.SessionLocal")
+    def test_send_actual_message_exception_with_recipient_update(
+        self, mock_session_local, db_session, test_broadcast_setup
+    ):
+        """Test exception path with recipient update (line 264->269)"""
+        # Get a real recipient
+        recipient = db_session.query(BroadcastRecipient).filter(
+            BroadcastRecipient.broadcast_message_id ==
+            test_broadcast_setup["broadcast"].id
+        ).first()
+
+        recipient_id = recipient.id
+        customer = test_broadcast_setup["customers"][0]
+
+        # Mock session to fail on Message creation
+        mock_db = MagicMock()
+        mock_session_local.return_value = mock_db
+
+        # Query returns recipient
+        mock_filter = mock_db.query.return_value.filter.return_value
+        mock_filter.first.return_value = recipient
+
+        # add() raises exception (simulating Message creation failure)
+        mock_db.add.side_effect = Exception("Message creation failed")
+
+        # Allow commit for error handling
+        mock_db.commit = MagicMock()
+        mock_db.close = MagicMock()
+
+        result = send_actual_message(
+            recipient_id=recipient_id,
+            phone_number=customer.phone_number,
+            message_content="Test message"
+        )
+
+        assert "error" in result
+        assert "Message creation failed" in result["error"]
+        # Verify recipient update was called
+        assert recipient.status == DeliveryStatus.FAILED
+        assert mock_db.commit.called
+
+    @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
+    @patch("tasks.broadcast_tasks.WhatsAppService")
+    def test_retry_failed_broadcasts_non_test_mode(
+        self, mock_ws_class, mock_session_local, db_session,
+        test_broadcast_setup
+    ):
+        """Test actual WhatsApp retry (lines 354-359)"""
+        mock_session_local.return_value = db_session
+
+        # Mock WhatsApp service
+        mock_service = MagicMock()
+        mock_service.send_template_message.return_value = {
+            "sid": "SM_RETRY_789"
+        }
+        mock_ws_class.return_value = mock_service
+
+        # Create a failed recipient eligible for retry
+        recipient = db_session.query(BroadcastRecipient).filter(
+            BroadcastRecipient.broadcast_message_id ==
+            test_broadcast_setup["broadcast"].id
+        ).first()
+
+        recipient.status = DeliveryStatus.FAILED
+        recipient.retry_count = 0
+        recipient.sent_at = datetime.utcnow() - timedelta(minutes=6)
+        recipient.error_message = "Initial failure"
+        db_session.commit()
+
+        # Temporarily disable test mode
+        original_testing = os.environ.pop("TESTING", None)
+
+        try:
+            result = retry_failed_broadcasts()
+
+            assert "error" not in result
+            assert mock_service.send_template_message.called
+        finally:
+            # Restore test mode
+            if original_testing:
+                os.environ["TESTING"] = original_testing
+
+    @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        "HX123"
+    )
+    @patch("tasks.broadcast_tasks.WhatsAppService")
+    def test_retry_failed_broadcasts_exception_with_max_retries(
+        self, mock_ws_class, mock_session_local, db_session,
+        test_broadcast_setup
+    ):
+        """Test retry exception with max retries (lines 372-387)"""
+        mock_session_local.return_value = db_session
+
+        # Mock WhatsApp service to fail
+        mock_service = MagicMock()
+        mock_service.send_template_message.side_effect = Exception(
+            "Retry API error"
+        )
+        mock_ws_class.return_value = mock_service
+
+        # Create a failed recipient at second-to-last retry attempt
+        recipient = db_session.query(BroadcastRecipient).filter(
+            BroadcastRecipient.broadcast_message_id ==
+            test_broadcast_setup["broadcast"].id
+        ).first()
+
+        recipient_id = recipient.id
+        recipient.status = DeliveryStatus.FAILED
+        # One before max (assuming 3 retry intervals)
+        recipient.retry_count = 2
+        recipient.sent_at = datetime.utcnow() - timedelta(minutes=61)
+        recipient.error_message = "Previous failure"
+        db_session.commit()
+
+        # Temporarily disable test mode
+        original_testing = os.environ.pop("TESTING", None)
+
+        try:
+            result = retry_failed_broadcasts()
+
+            # Check result
+            assert "error" not in result
+            assert result["failed"] >= 1
+
+            # Verify recipient status updated to UNDELIVERED
+            # (max retries reached)
+            db_session.expire_all()
+            updated_recipient = db_session.query(BroadcastRecipient).filter(
+                BroadcastRecipient.id == recipient_id
+            ).first()
+
+            assert updated_recipient.retry_count == 3
+            assert updated_recipient.status == DeliveryStatus.UNDELIVERED
+            assert "Retry API error" in updated_recipient.error_message
+        finally:
+            # Restore test mode
+            if original_testing:
+                os.environ["TESTING"] = original_testing
+
+    @patch("tasks.broadcast_tasks.SessionLocal")
+    @patch(
+        "tasks.broadcast_tasks.settings.whatsapp_broadcast_template_sid",
+        None
+    )
+    @patch("tasks.broadcast_tasks._config")
+    def test_retry_failed_broadcasts_config_fallback(
+        self, mock_config, mock_session_local, db_session,
+        test_broadcast_setup
+    ):
+        """Test content_sid fallback in retry task"""
+        mock_session_local.return_value = db_session
+
+        # Mock _config to return template SID
+        mock_config.get.return_value = {
+            "templates": {
+                "broadcast": {
+                    "sid": "HX_RETRY_CONFIG"
+                }
+            }
+        }
+
+        # Create a failed recipient
+        recipient = db_session.query(BroadcastRecipient).filter(
+            BroadcastRecipient.broadcast_message_id ==
+            test_broadcast_setup["broadcast"].id
+        ).first()
+
+        recipient.status = DeliveryStatus.FAILED
+        recipient.retry_count = 0
+        recipient.sent_at = datetime.utcnow() - timedelta(minutes=6)
+        db_session.commit()
+
+        result = retry_failed_broadcasts()
+
+        assert "error" not in result
