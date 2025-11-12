@@ -26,7 +26,8 @@ def upgrade() -> None:
         "ALTER TYPE messagetype ADD VALUE IF NOT EXISTS 'BROADCAST'"
     )
 
-    # 1. Create broadcast_groups table with filter columns
+    # 1. Create broadcast_groups table
+    # Note: crop_types and age_groups removed - derived from group members
     op.create_table(
         "broadcast_groups",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -194,7 +195,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column(
-            "template_message_sid", sa.String(length=255), nullable=True
+            "confirm_message_sid", sa.String(length=255), nullable=True
         ),
         sa.Column("actual_message_sid", sa.String(length=255), nullable=True),
         sa.Column("message_id", sa.Integer(), nullable=True),

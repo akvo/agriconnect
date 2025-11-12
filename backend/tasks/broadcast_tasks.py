@@ -141,7 +141,7 @@ def process_broadcast(broadcast_id: int) -> Dict[str, Any]:
 
                     # Update recipient status
                     recipient.status = DeliveryStatus.SENT
-                    recipient.template_message_sid = result.get("sid")
+                    recipient.confirm_message_sid = result.get("sid")
                     recipient.sent_at = datetime.utcnow()
                     sent_count += 1
 
@@ -363,7 +363,7 @@ def retry_failed_broadcasts() -> Dict[str, Any]:
 
                     # Update status
                     recipient.status = DeliveryStatus.SENT
-                    recipient.template_message_sid = result.get("sid")
+                    recipient.confirm_message_sid = result.get("sid")
                     recipient.sent_at = datetime.utcnow()
                     recipient.error_message = None
                     success_count += 1

@@ -21,7 +21,7 @@ from models.message import DeliveryStatus
 
 
 class BroadcastGroup(Base):
-    """Broadcast Group with filter criteria for targeting broadcasts"""
+    """Broadcast Group - crop_types and age_groups derived from members"""
     __tablename__ = "broadcast_groups"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -191,7 +191,7 @@ class BroadcastRecipient(Base):
         server_default=DeliveryStatus.PENDING.value,
         index=True
     )
-    template_message_sid = Column(String(255))
+    confirm_message_sid = Column(String(255))
     actual_message_sid = Column(String(255))
     message_id = Column(Integer, ForeignKey("messages.id"))
     retry_count = Column(Integer, default=0)
