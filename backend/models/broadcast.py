@@ -12,7 +12,6 @@ from sqlalchemy import (
     UniqueConstraint,
     Enum
 )
-from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -26,8 +25,6 @@ class BroadcastGroup(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    crop_types = Column(JSON)  # Filter: crop_type IDs [1, 3, 5]
-    age_groups = Column(JSON)  # Filter: age groups ["20-35", "36-50"]
     administrative_id = Column(
         Integer,
         ForeignKey("administrative.id"),

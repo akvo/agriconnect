@@ -5,37 +5,18 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field, validator
 
-from models.customer import AgeGroup
 from schemas.customer import CropTypeInfo
 
 
 # ========== Broadcast Group Schemas ==========
 
 class BroadcastGroupCreate(BaseModel):
-    """Request schema for creating a broadcast group with filters"""
+    """Request schema for creating a broadcast group"""
     name: str = Field(..., min_length=1, max_length=255)
-    crop_types: Optional[List[int]] = Field(
-        None, description="Filter by crop type IDs"
-    )
-    age_groups: Optional[List[str]] = Field(
-        None, description="Filter by age groups: ['20-35', '36-50', '51+']"
-    )
     customer_ids: List[int] = Field(
         ..., min_items=1, max_items=500,
-        description="Selected customer IDs after filtering"
+        description="Selected customer IDs"
     )
-
-    @validator('age_groups')
-    def validate_age_groups(cls, v):
-        if v:
-            valid_groups = [age.value for age in AgeGroup]
-            for group in v:
-                if group not in valid_groups:
-                    raise ValueError(
-                        f"Invalid age group: {group}. "
-                        f"Must be one of {valid_groups}"
-                    )
-        return v
 
     @validator('customer_ids')
     def validate_customer_ids(cls, v):
@@ -47,28 +28,10 @@ class BroadcastGroupCreate(BaseModel):
 class BroadcastGroupUpdate(BaseModel):
     """Request schema for updating a broadcast group"""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    crop_types: Optional[List[int]] = Field(
-        None, description="Filter by crop type IDs"
-    )
-    age_groups: Optional[List[str]] = Field(
-        None, description="Filter by age groups"
-    )
     customer_ids: Optional[List[int]] = Field(
         None, min_items=1, max_items=500,
-        description="Selected customer IDs after filtering"
+        description="Selected customer IDs"
     )
-
-    @validator('age_groups')
-    def validate_age_groups(cls, v):
-        if v:
-            valid_groups = [age.value for age in AgeGroup]
-            for group in v:
-                if group not in valid_groups:
-                    raise ValueError(
-                        f"Invalid age group: {group}. "
-                        f"Must be one of {valid_groups}"
-                    )
-        return v
 
     @validator('customer_ids')
     def validate_customer_ids(cls, v):
@@ -77,7 +40,7 @@ class BroadcastGroupUpdate(BaseModel):
         return v
 
 
-class BroadcastGroupContact(BaseModel):
+class BroadcastGroupContactResponse(BaseModel):
     """Schema for broadcast group contact info"""
     customer_id: int
     phone_number: str
@@ -92,8 +55,8 @@ class BroadcastGroupResponse(BaseModel):
     """Response schema for broadcast group"""
     id: int
     name: str
-    crop_types: Optional[List[int]] = None
-    age_groups: Optional[List[str]]
+    crop_types: Optional[List[str]] = None  # Crop names from members
+    age_groups: Optional[List[str]] = None  # Age groups from members
     administrative_id: Optional[int]
     created_by: int
     contact_count: int
@@ -108,11 +71,11 @@ class BroadcastGroupDetail(BaseModel):
     """Detailed broadcast group response with contacts"""
     id: int
     name: str
-    crop_types: Optional[List[int]] = None
-    age_groups: Optional[List[str]]
+    crop_types: Optional[List[str]] = None  # Crop names from members
+    age_groups: Optional[List[str]] = None  # Age groups from members
     administrative_id: Optional[int]
     created_by: int
-    contacts: List[BroadcastGroupContact]
+    contacts: List[BroadcastGroupContactResponse]
     created_at: datetime
     updated_at: datetime
 

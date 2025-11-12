@@ -33,20 +33,14 @@ class BroadcastService:
         name: str,
         customer_ids: List[int],
         created_by: int,
-        crop_types: Optional[List[int]] = None,
-        age_groups: Optional[List[str]] = None,
         administrative_id: Optional[int] = None
     ) -> BroadcastGroup:
         """
-        Create a new broadcast group with filter criteria.
-        Hybrid approach:
-        - Stores filter criteria (crop_types, age_groups) for reference
-        - Stores selected customer IDs in broadcast_group_contacts
+        Create a new broadcast group with selected customer IDs.
+        crop_types and age_groups are derived from group members.
         """
         group = BroadcastGroup(
             name=name,
-            crop_types=crop_types,
-            age_groups=age_groups,
             administrative_id=administrative_id,
             created_by=created_by
         )
@@ -66,8 +60,7 @@ class BroadcastService:
 
         logger.info(
             f"Created broadcast group '{name}' (id={group.id}) "
-            f"with {len(customer_ids)} contacts, "
-            f"filters: crop_types={crop_types}, age_groups={age_groups}"
+            f"with {len(customer_ids)} contacts"
         )
 
         return group
@@ -127,8 +120,6 @@ class BroadcastService:
         group_id: int,
         eo_id: int,
         name: Optional[str] = None,
-        crop_types: Optional[List[int]] = None,
-        age_groups: Optional[List[str]] = None,
         customer_ids: Optional[List[int]] = None,
         administrative_id: Optional[int] = None
     ) -> Optional[BroadcastGroup]:
@@ -145,13 +136,9 @@ class BroadcastService:
             )
             return None
 
-        # Update fields
+        # Update name if provided
         if name is not None:
             group.name = name
-        if crop_types is not None:
-            group.crop_types = crop_types
-        if age_groups is not None:
-            group.age_groups = age_groups
 
         # Update contacts if provided
         if customer_ids is not None:

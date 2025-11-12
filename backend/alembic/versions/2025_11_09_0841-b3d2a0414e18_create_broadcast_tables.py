@@ -32,8 +32,6 @@ def upgrade() -> None:
         "broadcast_groups",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
-        sa.Column("crop_types", postgresql.JSON(astext_type=sa.Text()), nullable=True),
-        sa.Column("age_groups", postgresql.JSON(astext_type=sa.Text()), nullable=True),
         sa.Column("administrative_id", sa.Integer(), nullable=True),
         sa.Column("created_by", sa.Integer(), nullable=False),
         sa.Column(
