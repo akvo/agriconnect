@@ -5,21 +5,17 @@ import React, {
   useEffect,
   useRef,
   ReactNode,
-  useCallback,
 } from "react";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { useRouter } from "expo-router";
-import { api } from "@/services/api";
-import { useAuth } from "@/contexts/AuthContext";
 import Constants from "expo-constants";
 
 interface NotificationContextType {
   expoPushToken: string | null;
   notification: Notifications.Notification | null;
   registerForPushNotificationsAsync: () => Promise<string | undefined>;
-  setActiveTicket: (ticketId: number | null) => void;
 }
 
 export const NotificationContext =
@@ -84,7 +80,6 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     undefined,
   );
   const router = useRouter();
-  const { user, setRegisterDeviceAt } = useAuth();
 
   // Register for push notifications
   const registerForPushNotificationsAsync = async (): Promise<
@@ -166,60 +161,6 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Register device with backend when user logs in and token is available
-  const registerDevice = useCallback(async () => {
-    if (!user?.accessToken || !expoPushToken || user?.deviceRegisterAt) {
-      console.log(
-        "[Device Registration] Skipping registration - missing data or already registered",
-      );
-      return;
-    }
-
-    // Check if user has administrative location
-    // Admin users may not have one, use a fallback
-    const administrativeId = user.administrativeLocation?.id;
-
-    try {
-      const appVersion = Constants.expoConfig?.version || "1.0.0";
-
-      console.log("[Device Registration] Attempting to register device...");
-      console.log(
-        "[Device Registration] Push token:",
-        expoPushToken.substring(0, 30) + "...",
-      );
-      console.log(
-        "[Device Registration] Administrative ID:",
-        administrativeId || "N/A (admin user)",
-      );
-      console.log("[Device Registration] App version:", appVersion);
-
-      await api.registerDevice(user.accessToken, {
-        push_token: expoPushToken,
-        administrative_id: administrativeId,
-        app_version: appVersion,
-      });
-
-      // Update profile with registration timestamp
-      setRegisterDeviceAt();
-
-      console.log("[Device Registration] ✅ Device registered successfully");
-    } catch (error) {
-      console.error(
-        "[Device Registration] ❌ Failed to register device:",
-        error,
-      );
-    }
-  }, [user, expoPushToken, setRegisterDeviceAt]);
-
-  useEffect(() => {
-    registerDevice();
-  }, [registerDevice]);
-
-  const setActiveTicket = (ticketId: number | null) => {
-    currentActiveTicket = ticketId;
-    console.log(`[Notifications] Active ticket set to: ${ticketId}`);
-  };
-
   // Request permission and get token on mount
   useEffect(() => {
     registerForPushNotificationsAsync()
@@ -294,7 +235,6 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         expoPushToken,
         notification,
         registerForPushNotificationsAsync,
-        setActiveTicket,
       }}
     >
       {children}

@@ -18,8 +18,8 @@ import React, {
   useCallback,
 } from "react";
 import { io, Socket } from "socket.io-client";
-import { useAuth } from "./AuthContext";
 import { useNetwork } from "./NetworkContext";
+import { useToken } from "@/hooks/useToken";
 
 const apiUrl = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
 const baseUrl = apiUrl.replace(/\/api\/?$/, "");
@@ -84,16 +84,22 @@ interface WebSocketProviderProps {
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   children,
 }) => {
-  const { user } = useAuth();
   const { isOnline } = useNetwork();
+  const { token, loading } = useToken();
 
   const [isConnected, setIsConnected] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
 
   // Manage connection based on auth and network status
   useEffect(() => {
-    if (!user?.accessToken || !user?.id) {
-      console.log("[WebSocketContext] No user, disconnecting");
+    // Wait for token to load
+    if (loading) {
+      console.log("[WebSocketContext] Token loading...");
+      return;
+    }
+
+    if (!token) {
+      console.log("[WebSocketContext] No token or user, disconnecting");
       setIsConnected(false);
       return;
     }
@@ -104,30 +110,37 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       return;
     }
 
+    console.log("[WebSocketContext] Connecting with token...");
     const newSocket = io(baseUrl, {
       path: "/ws/socket.io",
       auth: {
-        token: user.accessToken,
+        token: token,
       },
       transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 1000,
+      pingInterval: 130000, // 130 seconds
+      pingTimeout: 120000, // 120 seconds
     });
 
     newSocket.on("connect", () => {
       setIsConnected(true);
-      console.log("WebSocket connected:", newSocket.id);
+      console.log("[WebSocketContext] ✅ Connected:", newSocket.id);
     });
 
     newSocket.on("disconnect", () => {
       setIsConnected(false);
-      console.log("[Inbox] WebSocket disconnected");
+      console.log("[WebSocketContext] Disconnected");
     });
 
     setSocket(newSocket);
 
     return () => {
+      console.log("[WebSocketContext] Cleaning up socket connection");
       newSocket.close();
     };
-  }, [user?.accessToken, user?.id, isOnline]);
+  }, [token, isOnline, loading]);
 
   // Event handler registration functions
   const onMessageCreated = useCallback(

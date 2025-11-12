@@ -10,19 +10,19 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api, LoginCredentials } from "../services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import themeColors from "@/styles/colors";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
-  const { login } = useAuth();
+  const { signIn } = useAuth();
+  const { expoPushToken } = useNotifications();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -48,12 +48,14 @@ export default function LoginScreen() {
         administrativeLocation: response.user.administrative_location,
       };
 
-      // Call login with access token and user data
-      // This will save both user and profile to database
-      await login(response.access_token, userData);
-
-      // Navigate to home page
-      router.replace("/home");
+      // Call signIn with access token, refresh token, and user data
+      // This will save tokens in SecureStore and user/profile in database
+      await signIn(
+        expoPushToken,
+        response.access_token,
+        response.refresh_token || "",
+        userData,
+      );
     } catch (error) {
       Alert.alert(
         "Login Failed",

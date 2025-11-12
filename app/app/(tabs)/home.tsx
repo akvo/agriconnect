@@ -12,13 +12,12 @@ import Avatar from "@/components/avatar";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { logout, user } = useAuth();
+  const { signOut, user } = useAuth();
   const { isOnline } = useNetwork();
 
   const handleLogout = async () => {
     try {
-      await logout();
-      router.replace("/login");
+      await signOut();
     } catch (error) {
       console.error("Error during logout:", error);
     }
