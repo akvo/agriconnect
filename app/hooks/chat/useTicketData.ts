@@ -59,7 +59,6 @@ export const useTicketData = (
   ticketNumber: string | undefined,
   ticketId: string | undefined,
   userId: number | undefined,
-  accessToken: string | undefined,
   scrollToBottom: (animated?: boolean) => void,
   setAISuggestionLoading: React.Dispatch<React.SetStateAction<boolean>>,
   setAISuggestion: React.Dispatch<React.SetStateAction<string | null>>,
@@ -73,10 +72,8 @@ export const useTicketData = (
 
   const loadTicketAndMessages = useCallback(
     async (forceRefresh: boolean = false) => {
-      if (!ticketNumber || !accessToken) {
-        console.log(
-          `[Chat] Missing ticketNumber or accessToken, skipping load`,
-        );
+      if (!ticketNumber) {
+        console.log(`[Chat] Missing ticketNumber, skipping load`);
         setLoading(false);
         return;
       }
@@ -132,7 +129,6 @@ export const useTicketData = (
           );
           MessageSyncService.syncNewerMessages(
             db,
-            accessToken,
             ticketData.id,
             ticketData.customer?.id || 0,
             userId,
@@ -183,7 +179,6 @@ export const useTicketData = (
             try {
               const synced = await TicketSyncService.syncTicketById(
                 db,
-                accessToken,
                 Number(ticketId),
                 userId,
               );
@@ -253,7 +248,6 @@ export const useTicketData = (
     },
     [
       ticketNumber,
-      accessToken,
       userId,
       daoManager.ticket,
       daoManager.message,

@@ -143,10 +143,8 @@ const BroadcastFarmerListTab = () => {
           params.administrative_id = selectedAdminIds;
         }
 
-        const response: CustomerListResponse = await api.getCustomersList(
-          user?.accessToken || "",
-          params,
-        );
+        const response: CustomerListResponse =
+          await api.getCustomersList(params);
 
         if (isLoadingMore) {
           setCustomers((prev) => [...prev, ...response.customers]);
@@ -170,7 +168,6 @@ const BroadcastFarmerListTab = () => {
       selectedCropTypes,
       selectedAgeGroups,
       selectedAdminIds,
-      user?.accessToken,
       isAdmin,
     ],
   );

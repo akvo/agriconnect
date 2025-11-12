@@ -43,16 +43,10 @@ const HeaderOptions = ({ ticketID }: Props) => {
       if (!ticket?.id) {
         throw new Error("Ticket not found");
       }
-      if (!user?.accessToken) {
-        throw new Error("User not authenticated");
-      }
-      const { ticket: resData } = await api.closeTicket(
-        user?.accessToken,
-        ticket.id,
-      );
+      const { ticket: resData } = await api.closeTicket(ticket.id);
       updateTicket(ticket.id, {
         resolvedAt: resData.resolved_at,
-        resolvedBy: user.id,
+        resolvedBy: user?.id,
         unreadCount: 0,
       });
       // Set whisper as used

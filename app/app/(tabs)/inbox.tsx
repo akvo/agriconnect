@@ -129,10 +129,6 @@ const Inbox: React.FC = () => {
         return;
       }
 
-      if (!user?.accessToken) {
-        return;
-      }
-
       isFetchingRef.current = true;
 
       try {
@@ -148,11 +144,10 @@ const Inbox: React.FC = () => {
         // Use TicketSyncService to fetch tickets (local-first approach)
         const syncResult = await TicketSyncService.getTickets(
           db,
-          user.accessToken,
           tab,
           p,
           pageSize,
-          user.id,
+          user?.id,
         );
 
         const fetched: Ticket[] = syncResult.tickets || [];
@@ -176,7 +171,7 @@ const Inbox: React.FC = () => {
         isFetchingRef.current = false;
       }
     },
-    [user?.accessToken, pageSize, db, user?.id],
+    [pageSize, db, user?.id],
   );
 
   // Handle real-time message_created events

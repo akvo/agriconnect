@@ -79,7 +79,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       );
       try {
         const response = await api.sendMessage(
-          user?.accessToken || "",
           ticket.id,
           messageText,
           MessageFrom.USER,

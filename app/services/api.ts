@@ -1,7 +1,6 @@
-// import { EXPO_PUBLIC_AGRICONNECT_SERVER_URL } from "@env";
+import * as SecureStore from "expo-secure-store";
+import { tokenEmitter, TOKEN_CHANGED } from "@/utils/tokenEvents";
 
-// Simple solution - create a config file that imports from .env
-// This file will be processed by Expo's built-in environment variable support
 const API_BASE_URL = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
 
 interface LoginCredentials {
@@ -28,12 +27,14 @@ interface UserResponse {
 
 interface TokenResponse {
   access_token: string;
+  refresh_token?: string; // Optional for backward compatibility
   token_type: string;
   user: UserResponse;
 }
 
 class ApiClient {
   private baseUrl: string;
+  private cachedToken: string | null = null; // NEW: Token cache
   private unauthorizedHandler?: () => void;
   private refreshTokenHandler?: () => Promise<string>;
   private clearSessionHandler?: () => void;
@@ -42,6 +43,39 @@ class ApiClient {
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
+  }
+
+  // NEW: Set token and emit event
+  setAccessToken(token: string) {
+    const tokenChanged = this.cachedToken !== token;
+    this.cachedToken = token;
+
+    if (tokenChanged) {
+      console.log("[API] Token updated in cache");
+      tokenEmitter.emit(TOKEN_CHANGED, token);
+    }
+  }
+
+  // NEW: Clear token and emit event
+  clearToken() {
+    console.log("[API] Token cleared from cache");
+    this.cachedToken = null;
+    tokenEmitter.emit(TOKEN_CHANGED, null);
+  }
+
+  // NEW: Get token from cache or SecureStore
+  private async getAccessToken(): Promise<string> {
+    if (this.cachedToken) {
+      return this.cachedToken;
+    }
+
+    const token = await SecureStore.getItemAsync("accessToken");
+    if (!token) {
+      throw new Error("No access token available");
+    }
+
+    this.cachedToken = token;
+    return token;
   }
 
   setUnauthorizedHandler(handler?: () => void) {
@@ -73,6 +107,7 @@ class ApiClient {
         }
 
         const newAccessToken = await this.refreshTokenHandler();
+        this.setAccessToken(newAccessToken); // Emit token change event
         return newAccessToken;
       } finally {
         this.isRefreshing = false;
@@ -89,15 +124,33 @@ class ApiClient {
   private async fetchWithRetry(
     url: string,
     options: RequestInit & { _retry?: boolean } = {},
-    isAuthEndpoint: boolean = false,
+    isPublicEndpoint: boolean = false,
   ): Promise<Response> {
-    const response = await fetch(url, options);
+    // Auto-inject token for non-auth endpoints
+    let token: string | null = null;
+    if (!isPublicEndpoint) {
+      try {
+        token = await this.getAccessToken();
+      } catch (e) {
+        console.warn("[API] No token available:", e);
+      }
+    }
+
+    const finalOptions = {
+      ...options,
+      headers: {
+        ...options.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    };
+
+    const response = await fetch(url, finalOptions);
 
     // Only handle 401 errors for non-auth endpoints and if not already retried
     if (
       response.status === 401 &&
       !options._retry &&
-      !isAuthEndpoint &&
+      !isPublicEndpoint &&
       this.refreshTokenHandler
     ) {
       try {
@@ -153,7 +206,7 @@ class ApiClient {
         },
         body: JSON.stringify(credentials),
       },
-      true, // isAuthEndpoint = true (don't retry auth endpoints)
+      true, // isPublicEndpoint = true (don't retry auth endpoints)
     );
 
     if (!response.ok) {
@@ -178,12 +231,30 @@ class ApiClient {
     return response.json();
   }
 
-  async getProfile(token: string): Promise<UserResponse> {
-    const response = await this.fetchWithRetry(`${this.baseUrl}/auth/profile`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
+  // NEW: Mobile token refresh method
+  async refreshTokenMobile(refreshToken: string): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/auth/refresh`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile_refresh_token: refreshToken }),
       },
-    });
+      true, // isPublicEndpoint = true
+    );
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Token refresh failed" }));
+      throw new Error(error.detail || "Token refresh failed");
+    }
+
+    return response.json();
+  }
+
+  async getProfile(): Promise<UserResponse> {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/auth/profile`);
 
     if (!response.ok) {
       throw new Error("Failed to fetch profile");
@@ -193,7 +264,6 @@ class ApiClient {
   }
 
   async getTickets(
-    token: string,
     status: "open" | "resolved",
     page: number = 1,
     size?: number,
@@ -201,11 +271,6 @@ class ApiClient {
     const sizeQuery = size ? `&size=${size}` : "";
     const response = await this.fetchWithRetry(
       `${this.baseUrl}/tickets/?status=${status}&page=${page}${sizeQuery}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
     );
 
     if (!response.ok) {
@@ -229,14 +294,9 @@ class ApiClient {
     };
   }
 
-  async getTicketById(token: string, ticketId: number): Promise<any> {
+  async getTicketById(ticketId: number): Promise<any> {
     const response = await this.fetchWithRetry(
       `${this.baseUrl}/tickets/${ticketId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
     );
 
     if (!response.ok) {
@@ -255,13 +315,12 @@ class ApiClient {
     };
   }
 
-  async closeTicket(token: string, ticketID: number): Promise<any> {
+  async closeTicket(ticketID: number): Promise<any> {
     const response = await this.fetchWithRetry(
       `${this.baseUrl}/tickets/${ticketID}`,
       {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -282,7 +341,6 @@ class ApiClient {
   }
 
   async getMessages(
-    token: string,
     ticketId: number,
     beforeTs?: string,
     limit: number = 20,
@@ -294,11 +352,7 @@ class ApiClient {
 
     console.log("[API] Fetching messages:", { ticketId, beforeTs, limit });
 
-    const response = await this.fetchWithRetry(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await this.fetchWithRetry(url);
 
     if (!response.ok) {
       // Note: 401 errors are now handled by fetchWithRetry
@@ -324,7 +378,6 @@ class ApiClient {
   }
 
   async sendMessage(
-    token: string,
     ticketId: number,
     body: string,
     fromSource: number,
@@ -339,13 +392,11 @@ class ApiClient {
     console.log("[API] Sending message:", {
       url,
       payload,
-      hasToken: !!token,
     });
 
     const response = await this.fetchWithRetry(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
@@ -367,18 +418,14 @@ class ApiClient {
     return responseData;
   }
 
-  async registerDevice(
-    token: string,
-    deviceData: {
-      push_token: string;
-      administrative_id: number | undefined;
-      app_version: string;
-    },
-  ): Promise<any> {
+  async registerDevice(deviceData: {
+    push_token: string;
+    administrative_id: number | undefined;
+    app_version: string;
+  }): Promise<any> {
     const response = await this.fetchWithRetry(`${this.baseUrl}/devices`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(deviceData),
@@ -395,13 +442,12 @@ class ApiClient {
     return response.json();
   }
 
-  async logoutDevices(token: string): Promise<any> {
+  async logoutDevices(): Promise<any> {
     const response = await this.fetchWithRetry(
       `${this.baseUrl}/devices/logout`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       },
@@ -421,17 +467,14 @@ class ApiClient {
   /**
    * Fetch customers list with filters
    */
-  async getCustomersList(
-    token: string,
-    params: {
-      page?: number;
-      size?: number;
-      search?: string;
-      crop_types?: string[];
-      age_groups?: string[];
-      administrative_id?: number[];
-    },
-  ): Promise<any> {
+  async getCustomersList(params: {
+    page?: number;
+    size?: number;
+    search?: string;
+    crop_types?: string[];
+    age_groups?: string[];
+    administrative_id?: number[];
+  }): Promise<any> {
     const queryParams = new URLSearchParams();
 
     if (params.page) {
@@ -457,11 +500,7 @@ class ApiClient {
 
     const url = `${this.baseUrl}/customers/list?${queryParams.toString()}`;
 
-    const response = await this.fetchWithRetry(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await this.fetchWithRetry(url);
 
     if (!response.ok) {
       // Note: 401 errors are now handled by fetchWithRetry
@@ -476,21 +515,18 @@ class ApiClient {
 
   /**
    * Fetch administrative locations
-   * @param token
    * @param level "country" | "region" | "district" | "ward"
    * @returns
    */
-  async getAdministrativeLocations(
-    token: string,
-    level: string = "ward",
-  ): Promise<any> {
+  async getAdministrativeLocations(level: string = "ward"): Promise<any> {
     const response = await this.fetchWithRetry(
       `${this.baseUrl}/administrative/?level=${level}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       },
+      true, // isPublicEndpoint = true
     );
 
     if (!response.ok) {
@@ -510,7 +546,15 @@ class ApiClient {
    * Fetch crop types
    */
   async getCropTypes(): Promise<any> {
-    const response = await this.fetchWithRetry(`${this.baseUrl}/crop-types/`);
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/crop-types/`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+      true, // isPublicEndpoint = true
+    );
     if (!response.ok) {
       const error = await response
         .json()
