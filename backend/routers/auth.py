@@ -84,23 +84,32 @@ def login_user(
     user_response.administrative_location = admin_info
 
     return TokenResponse(
-        access_token=access_token, user=user_response
+        access_token=access_token,
+        refresh_token=refresh_token,  # Include refresh_token for mobile apps
+        user=user_response
     )
 
 
 @router.post("/refresh", response_model=dict)
 def refresh_token(
-    refresh_token: str = Cookie(None), db: Session = Depends(get_db)
+    refresh_token: str = Cookie(None),
+    mobile_refresh_token: str = None,
+    db: Session = Depends(get_db)
 ):
-    """Refresh access token using the httpOnly refresh token cookie"""
-    if not refresh_token:
+    """
+    Refresh access token using httpOnly cookie (web) or body parameter (mobile)
+    """
+    # Use mobile_refresh_token if provided, otherwise fall back to cookie
+    token = mobile_refresh_token if mobile_refresh_token else refresh_token
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token not found",
         )
 
     # Verify refresh token
-    payload = verify_refresh_token(refresh_token)
+    payload = verify_refresh_token(token)
     email = payload.get("sub")
     user_type = payload.get("user_type")
 
