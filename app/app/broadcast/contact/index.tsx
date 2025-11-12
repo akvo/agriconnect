@@ -40,13 +40,7 @@ interface CustomerListResponse {
 const BroadcastFarmerListTab = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const {
-    cropTypes,
-    selectedMembers,
-    setSelectedMembers,
-    setSelectedCropTypes: setContextCropTypes,
-    setSelectedAgeGroups: setContextAgeGroups,
-  } = useBroadcast();
+  const { cropTypes, selectedMembers, setSelectedMembers } = useBroadcast();
   const { isOnline } = useNetwork();
   const isAdmin = user?.userType === "admin";
 
@@ -268,23 +262,13 @@ const BroadcastFarmerListTab = () => {
       }))
       .filter((c) => selectedIds.has(c.customer_id));
 
-    // Update context with selected members, crop types, and age groups
-    setContextCropTypes(selectedCropTypes);
-    setContextAgeGroups(selectedAgeGroups);
+    // Update context with selected members
+    // Note: crop_types and age_groups are now derived from actual members, not saved to group
     setSelectedIds(new Set()); // Clear local selections
     setSelectedMembers(selectedCustomers, () => {
       router.navigate("/broadcast/create");
     });
-  }, [
-    selectedIds,
-    customers,
-    selectedCropTypes,
-    selectedAgeGroups,
-    setSelectedMembers,
-    setContextCropTypes,
-    setContextAgeGroups,
-    router,
-  ]);
+  }, [selectedIds, customers, setSelectedMembers, router]);
 
   // Render item
   const renderItem = useCallback(

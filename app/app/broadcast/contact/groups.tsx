@@ -23,7 +23,7 @@ const DEBOUNCE_DELAY = 300;
 
 const SavedGroups = () => {
   const { user } = useAuth();
-  const { cropTypes: cropTypesList, activeGroup } = useBroadcast();
+  const { activeGroup } = useBroadcast();
   const { isOnline } = useNetwork();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -33,14 +33,6 @@ const SavedGroups = () => {
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
-
-  // Convert crop types to object for quick lookup
-  const cropTypes = useMemo(() => {
-    return cropTypesList.reduce((acc: Record<number, string>, cropType) => {
-      acc[cropType.id] = cropType.name;
-      return acc;
-    }, {});
-  }, [cropTypesList]);
 
   // Debounce search input
   useEffect(() => {
@@ -149,12 +141,12 @@ const SavedGroups = () => {
 
           <View style={styles.tagsContainer}>
             {item.crop_types &&
-              item.crop_types.map((cropType) => (
-                <View key={`crop-${cropType}`} style={styles.tag}>
+              item.crop_types.map((cropName) => (
+                <View key={`crop-${cropName}`} style={styles.tag}>
                   <Text
                     style={[typography.caption1, { color: themeColors.dark4 }]}
                   >
-                    {cropTypes?.[cropType] ?? String(cropType)}
+                    {cropName}
                   </Text>
                 </View>
               ))}
@@ -172,7 +164,7 @@ const SavedGroups = () => {
         </TouchableOpacity>
       );
     },
-    [router, cropTypes],
+    [router],
   );
 
   const keyExtractor = useCallback(

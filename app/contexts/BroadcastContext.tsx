@@ -31,7 +31,7 @@ export interface SavedGroup {
   id: number;
   name: string;
   contact_count: number;
-  crop_types: number[] | null;
+  crop_types: string[] | null; // Changed from number[] to string[] (crop names)
   age_groups: string[] | null;
   created_at: string;
 }
@@ -47,7 +47,7 @@ export interface GroupDetail {
   id: number;
   name: string;
   contacts: GroupMember[];
-  crop_types: number[] | null;
+  crop_types: string[] | null; // Changed from number[] to string[] (crop names)
   age_groups: string[] | null;
   created_at?: string | null;
   contact_count?: number | null;
@@ -59,10 +59,6 @@ interface BroadcastContextType {
   addMember: (member: GroupMember) => void;
   removeMember: (memberId: number) => void;
   clearMembers: () => void;
-  selectedCropTypes: number[];
-  setSelectedCropTypes: (cropTypes: number[]) => void;
-  selectedAgeGroups: string[];
-  setSelectedAgeGroups: (ageGroups: string[]) => void;
   // Shared data
   cropTypes: CropType[];
   setCropTypes: (cropTypes: CropType[]) => void;
@@ -78,8 +74,6 @@ export const BroadcastProvider = ({ children }: { children: ReactNode }) => {
   const [selectedMembers, setSelectedMembersState] = useState<GroupMember[]>(
     [],
   );
-  const [selectedCropTypes, setSelectedCropTypes] = useState<number[]>([]);
-  const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const [cropTypes, setCropTypes] = useState<CropType[]>([]);
   const [activeGroup, setActiveGroup] = useState<GroupDetail | null>(null);
   const callbackRef = useRef<(() => void) | null>(null);
@@ -131,10 +125,6 @@ export const BroadcastProvider = ({ children }: { children: ReactNode }) => {
         addMember,
         removeMember,
         clearMembers,
-        selectedCropTypes,
-        setSelectedCropTypes,
-        selectedAgeGroups,
-        setSelectedAgeGroups,
         cropTypes,
         setCropTypes,
         activeGroup,

@@ -529,8 +529,6 @@ class ApiClient {
     token: string,
     data: {
       name: string;
-      crop_types?: number[];
-      age_groups?: string[];
       customer_ids: number[];
     },
   ): Promise<any> {

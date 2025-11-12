@@ -25,12 +25,7 @@ import { initialsFromName, capitalizeFirstLetter } from "@/utils/string";
 const CreateGroupScreen = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const {
-    selectedMembers,
-    selectedCropTypes,
-    selectedAgeGroups,
-    clearMembers,
-  } = useBroadcast();
+  const { selectedMembers, clearMembers } = useBroadcast();
   const { activeGroup, setActiveGroup } = useBroadcast();
   const [groupName, setGroupName] = useState(activeGroup?.name || "");
   const [isCreating, setIsCreating] = useState(false);
@@ -91,14 +86,11 @@ const CreateGroupScreen = () => {
 
     const memberIds = selectedMembers.map((m) => m.customer_id);
 
-    // Create broadcast group with filters and selected members
+    // Create broadcast group with selected members
+    // Note: crop_types and age_groups are now derived from actual members by the API
     const payload = {
       name: groupName.trim(),
       customer_ids: memberIds,
-      ...(selectedCropTypes.length > 0 && {
-        crop_types: selectedCropTypes,
-      }),
-      ...(selectedAgeGroups.length > 0 && { age_groups: selectedAgeGroups }),
     };
 
     console.log("[CreateGroup] Creating group with payload:", payload);
