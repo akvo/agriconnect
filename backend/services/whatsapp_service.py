@@ -160,7 +160,10 @@ class WhatsAppService:
         return text
 
     def send_template_message(
-        self, to: str, content_sid: str, content_variables: Dict[str, str]
+        self,
+        to: str,
+        content_sid: str,
+        content_variables: Dict[str, str]
     ) -> Dict[str, Any]:
         """
         Send WhatsApp template message via Twilio.
@@ -178,7 +181,7 @@ class WhatsAppService:
                 from_=self.whatsapp_number,
                 to=f"whatsapp:{to}",
                 content_sid=content_sid,
-                content_variables=content_variables,
+                content_variables=json.dumps(content_variables),
             )
             return {
                 "sid": message.sid,
