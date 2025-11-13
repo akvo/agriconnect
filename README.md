@@ -74,12 +74,20 @@ The `./dc.sh` script is a wrapper around Docker Compose that combines multiple c
   ./dc.sh exec frontend bash                # Open bash shell
   ```
 
+- **Monitor Celery worker:**
+  ```bash
+  ./dc.sh logs celery-worker -f  # Follow Celery worker logs
+  ./dc.sh restart celery-worker   # Restart worker after code changes
+  ```
+
 ### Available Services
 
 The environment includes the following services:
 
 - **db**: PostgreSQL database (port 5432)
+- **redis**: Redis server for Celery task queue (port 6379)
 - **backend**: Python FastAPI backend (port 8000)
+- **celery-worker**: Celery worker for asynchronous tasks (broadcast messages, retries)
 - **frontend**: Node.js frontend application (port 3000)
 - **mobileapp**: React Native mobile app development (port 8081)
 - **pgadmin**: Database management interface (port 5050)
@@ -91,13 +99,80 @@ Once the environment is running, you can access:
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
+- API Documentation: http://localhost:8000/api/docs (Swagger UI)
 - pgAdmin: http://localhost:5050
-- Mobile app development via [Expo GO](https://play.google.com/store/apps/details?id=host.exp.exponent&hl=en): exp://<your_ip_address>:14000
+- Mobile app development via [Expo GO](https://play.google.com/store/apps/details?id=host.exp.exponent&hl=en): exp://<your_ip_address>:19000
+
+## Features
+
+### Broadcast Messaging System
+
+AgriConnect includes a comprehensive broadcast messaging system for sending WhatsApp messages to groups of farmers:
+
+- **Group Management**: Create and manage broadcast groups with filters (administrative area, age group, crop type)
+- **Message Broadcasting**: Send messages to multiple recipients via WhatsApp
+- **Asynchronous Processing**: Uses Celery for background task processing
+- **Delivery Tracking**: Real-time status tracking (pending → queued → processing → completed)
+- **Automatic Retries**: Failed messages are automatically retried with configurable intervals
+- **Two-Step Delivery**: WhatsApp template message followed by actual message content
+- **Mobile Integration**: View and manage broadcast messages from the mobile app
+
+#### Celery Task Queue
+
+The broadcast system uses **Celery** with **Redis** for asynchronous task processing:
+
+- **Tasks**:
+  - `process_broadcast`: Processes broadcast messages and sends to recipients
+  - `send_actual_message`: Sends the actual message after template confirmation
+  - `retry_failed_broadcasts`: Periodic task to retry failed message deliveries
+
+- **Configuration**:
+  - Broadcast batch size: Configure via `BROADCAST_BATCH_SIZE` environment variable (default: 50)
+  - Retry intervals: Configure via `BROADCAST_RETRY_INTERVALS` environment variable (default: 5,15,60 minutes)
+  - WhatsApp templates: Configure via environment variables (see `.env.example`)
+
+- **Monitoring**:
+  ```bash
+  # View Celery worker logs
+  ./dc.sh logs celery-worker -f
+
+  # Check Redis connection
+  ./dc.sh exec redis redis-cli ping
+
+  # Monitor task execution
+  ./dc.sh logs celery-worker | grep "Task.*succeeded"
+  ```
+
+- **Testing**:
+  ```bash
+  # Run broadcast tests (mocked to prevent real WhatsApp sends)
+  ./dc.sh exec backend pytest tests/test_broadcast_*.py -v
+
+  # TESTING mode automatically prevents real API calls during tests
+  # Set TESTING=1 environment variable for development testing
+  ```
+
+## Environment Configuration
+
+Create a `.env` file based on `.env.example` with the following key variables:
+
+**Required for Broadcast Messaging:**
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER` - Twilio WhatsApp credentials
+- `WHATSAPP_BROADCAST_TEMPLATE_SID` - WhatsApp template for broadcast messages
+- `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB` - Redis configuration for Celery (auto-configured in Docker)
+
+**Optional Broadcast Configuration:**
+- `BROADCAST_BATCH_SIZE` - Recipients per batch (default: 50)
+- `BROADCAST_RETRY_INTERVALS` - Retry intervals in minutes (default: 5,15,60)
+
+See `.env.example` for complete configuration options.
 
 ## Documentation
 
 Additional documentation is available in the `docs/` directory:
 
+- **[Broadcast API Core Implementation](docs/BROADCAST_API_CORE_IMPLEMENTATION.md)**: Broadcast messaging system architecture and implementation guide
+- **[Broadcast API Twilio Integration](docs/BROADCAST_API_TWILIO_INTEGRATION.md)**: Twilio WhatsApp integration and Celery task queue setup
 - **[Deployment Pipeline](docs/DEPLOYMENT_PIPELINE.md)**: CI/CD pipeline architecture, Kubernetes deployment, and troubleshooting guide
 - **[Mobile App Deployment](docs/MOBILE_APP_DEPLOYMENT.md)**: Complete guide for building and deploying the mobile app using EAS Build and GitHub Actions
 - **[Push Notifications](docs/PUSH_NOTIFICATIONS.md)**: Push notification setup, architecture, and troubleshooting guide for mobile app

@@ -6,6 +6,7 @@ services:
       - 3000:3000
       - 8000:8000
       - 5050:5050
+      - 5555:5555
       - 8081:8081
       - 19000:19000
   pgadmin:
@@ -23,6 +24,8 @@ services:
   frontend:
     network_mode: service:mainnetwork
   backend:
+    depends_on:
+      - redis
     command: ["./dev.sh"]
     network_mode: service:mainnetwork
     volumes:

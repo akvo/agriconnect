@@ -2,6 +2,7 @@ import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from twilio.base.exceptions import TwilioRestException
 
 from database import get_db

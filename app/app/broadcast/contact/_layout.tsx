@@ -10,16 +10,41 @@
  */
 
 import { SafeAreaView } from "react-native-safe-area-context";
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
+import { useBroadcast } from "@/contexts/BroadcastContext";
+import { api } from "@/services/api";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 const BroadcastLayout = () => {
   const pathname = usePathname();
   const router = useRouter();
+  const { setCropTypes } = useBroadcast();
+  const { isOnline } = useNetwork();
+
+  const fetchCropTypes = useCallback(async () => {
+    try {
+      /**
+       * Early return if offline
+       */
+      if (!isOnline) {
+        return;
+      }
+      const response = await api.getCropTypes();
+      setCropTypes(response);
+    } catch (err) {
+      console.error("[BroadcastLayout] Error fetching crop types:", err);
+    }
+  }, [setCropTypes, isOnline]);
+
+  // Fetch crop types once when layout mounts
+  useEffect(() => {
+    fetchCropTypes();
+  }, [fetchCropTypes]);
 
   // Determine active tab based on pathname
   const activeTab = pathname.includes("/broadcast/contact/groups")
@@ -32,6 +57,12 @@ const BroadcastLayout = () => {
       edges={["left", "right", "bottom"]}
     >
       {/* Custom Tabs at Top */}
+      {/* Show banner offline */}
+      {!isOnline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>You are offline</Text>
+        </View>
+      )}
       <View style={styles.tabsContainer}>
         <View style={styles.tabList}>
           <TouchableOpacity
@@ -94,6 +125,7 @@ const BroadcastLayout = () => {
 
 const styles = StyleSheet.create({
   tabsContainer: {
+    marginTop: 16,
     paddingHorizontal: 16,
     paddingBottom: 16,
     backgroundColor: themeColors.background,
@@ -120,6 +152,15 @@ const styles = StyleSheet.create({
   },
   tabInactive: {
     backgroundColor: themeColors["green-50"],
+  },
+  offlineBanner: {
+    backgroundColor: "#6B7280",
+    paddingVertical: 6,
+    alignItems: "center",
+  },
+  offlineText: {
+    ...typography.body3,
+    color: themeColors.light1,
   },
 });
 

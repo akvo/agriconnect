@@ -519,6 +519,311 @@ class ApiClient {
     }
     return response.json();
   }
+
+  // ========== Broadcast Groups ==========
+
+  /**
+   * Create a new broadcast group
+   */
+  async createBroadcastGroup(
+    token: string,
+    data: {
+      name: string;
+      customer_ids: number[];
+    },
+  ): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/broadcast/groups`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      },
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorBody.detail ||
+        errorBody.message ||
+        "Failed to create broadcast group";
+
+      const error = new Error(errorMessage) as Error & {
+        status: number;
+        statusText: string;
+        body: any;
+      };
+      error.status = response.status;
+      error.statusText = response.statusText;
+      error.body = errorBody;
+
+      console.error("[API] createBroadcastGroup failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorMessage,
+        errorBody,
+        requestData: data,
+      });
+
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update a broadcast group
+   *
+   */
+  async updateBroadcastGroup(
+    token: string,
+    groupId: number,
+    data: {
+      name?: string;
+      customer_ids?: number[];
+    },
+  ): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/broadcast/groups/${groupId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      },
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorBody.detail ||
+        errorBody.message ||
+        "Failed to update broadcast group";
+
+      const error = new Error(errorMessage) as Error & {
+        status: number;
+        statusText: string;
+        body: any;
+      };
+      error.status = response.status;
+      error.statusText = response.statusText;
+      error.body = errorBody;
+
+      console.error("[API] updateBroadcastGroup failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorMessage,
+        errorBody,
+        requestData: data,
+      });
+
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get broadcast groups list
+   */
+  async getBroadcastGroups(
+    token: string,
+    params?: {
+      page?: number;
+      size?: number;
+      search?: string;
+    },
+  ): Promise<any> {
+    const queryParams = new URLSearchParams();
+
+    if (params?.page) {
+      queryParams.append("page", params.page.toString());
+    }
+    if (params?.size) {
+      queryParams.append("size", params.size.toString());
+    }
+    if (params?.search) {
+      queryParams.append("search", params.search);
+    }
+
+    const url = `${this.baseUrl}/broadcast/groups${
+      queryParams.toString() ? `?${queryParams.toString()}` : ""
+    }`;
+
+    const response = await this.fetchWithRetry(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorBody.detail ||
+        errorBody.message ||
+        "Failed to fetch broadcast groups";
+
+      const error = new Error(errorMessage) as Error & {
+        status: number;
+        statusText: string;
+        body: any;
+      };
+      error.status = response.status;
+      error.statusText = response.statusText;
+      error.body = errorBody;
+
+      console.error("[API] getBroadcastGroups failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorMessage,
+        errorBody,
+      });
+
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get broadcast group details
+   */
+  async getBroadcastGroupDetail(token: string, groupId: number): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/broadcast/groups/${groupId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch broadcast group detail" }));
+      throw new Error(error.detail || "Failed to fetch broadcast group detail");
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete broadcast group
+   */
+  async deleteBroadcastGroup(token: string, groupId: number): Promise<void> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/broadcast/groups/${groupId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to delete broadcast group" }));
+      throw new Error(error.detail || "Failed to delete broadcast group");
+    }
+  }
+
+  // ========== Broadcast Messages ==========
+
+  /**
+   * Create a broadcast message
+   */
+  async createBroadcastMessage(
+    token: string,
+    data: {
+      message: string;
+      group_ids: number[];
+    },
+  ): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/broadcast/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to create broadcast message" }));
+      throw new Error(error.detail || "Failed to create broadcast message");
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get broadcast message status
+   */
+  async getBroadcastMessageStatus(
+    token: string,
+    broadcastId: number,
+  ): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/broadcast/messages/${broadcastId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch broadcast message status" }));
+      throw new Error(
+        error.detail || "Failed to fetch broadcast message status",
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get broadcast messages by group ID
+   */
+  async getBroadcastMessagesByGroup(
+    token: string,
+    groupId: number,
+  ): Promise<any> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/broadcast/messages/group/${groupId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        detail: "Failed to fetch broadcast messages for group",
+      }));
+      throw new Error(
+        error.detail || "Failed to fetch broadcast messages for group",
+      );
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();

@@ -5,6 +5,9 @@ class TestCropTypeAPI:
     """Tests for the Crop Types API endpoints."""
 
     def test_get_crop_types_empty(self, client, db_session):
+        # Clean up any existing crop types
+        db_session.query(CropType).delete()
+        db_session.commit()
         response = client.get("/api/crop-types/")
         assert response.status_code == 200
         assert response.json() == []

@@ -13,6 +13,59 @@ services:
       - ./database/script:/script:ro
     environment:
       - POSTGRES_PASSWORD=password
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  celery-worker:
+    image: python:3.10-slim
+    depends_on:
+      - db
+      - redis
+    network_mode: service:mainnetwork
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://akvo:password@db:5432/agriconnect}
+      - SECRET_KEY=${SECRET_KEY}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER:-whatsapp:+14155238886}
+      - WHATSAPP_BROADCAST_TEMPLATE_SID=${WHATSAPP_BROADCAST_TEMPLATE_SID}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+      - PYTHONPATH=/app
+    working_dir: /app
+    command: ["./entrypoint-celery.sh", "worker"]
+    volumes:
+      - ./backend:/app:delegated
+    restart: unless-stopped
+  celery-beat:
+    image: python:3.10-slim
+    depends_on:
+      - db
+      - redis
+      - celery-worker
+    network_mode: service:mainnetwork
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://akvo:password@db:5432/agriconnect}
+      - SECRET_KEY=${SECRET_KEY}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+      - PYTHONPATH=/app
+    working_dir: /app
+    command: ["./entrypoint-celery.sh", "beat"]
+    volumes:
+      - ./backend:/app:delegated
+    restart: unless-stopped
   backend:
     depends_on:
       - db
@@ -20,7 +73,7 @@ services:
     image: python:3.10.7
     environment:
       - DATABASE_URL=postgresql://akvo:password@db:5432/agriconnect
-      - SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+      - SECRET_KEY=${SECRET_KEY}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
       - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER:-whatsapp:+14155238886}
@@ -32,7 +85,12 @@ services:
       - WEBDOMAIN=${WEBDOMAIN:-localhost}
       - STORAGE_SECRET=${STORAGE_SECRET}
       - WHATSAPP_CONFIRMATION_TEMPLATE_SID=${WHATSAPP_CONFIRMATION_TEMPLATE_SID}
+      - WHATSAPP_RECONNECTION_TEMPLATE_SID=${WHATSAPP_RECONNECTION_TEMPLATE_SID}
+      - WHATSAPP_BROADCAST_TEMPLATE_SID=${WHATSAPP_BROADCAST_TEMPLATE_SID}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
     command: ["./dev.sh"]
     working_dir: /app
     volumes:
@@ -57,3 +115,4 @@ services:
       - EXPO_TOKEN=${EXPO_TOKEN}
 volumes:
   pg-data:
+  redis-data:

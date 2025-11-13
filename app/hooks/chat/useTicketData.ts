@@ -27,7 +27,7 @@ const convertToUIMessage = (
   return {
     id: msg.id,
     message_sid: msg.message_sid,
-    name: userName,
+    name: `${msg.message_type}` === "BROADCAST" ? "Broadcast" : userName,
     text: msg.body,
     sender: isCustomerMessage ? "customer" : "user",
     timestamp: msg.createdAt,
@@ -106,6 +106,7 @@ export const useTicketData = (
             resolvedAt: ticketData.resolvedAt,
             createdAt: ticketData.createdAt,
             messageId: ticketData.message?.id,
+            unreadCount: 0,
           });
 
           console.log(
@@ -209,6 +210,7 @@ export const useTicketData = (
                     resolver: retryTicketData.resolver,
                     resolvedAt: retryTicketData.resolvedAt,
                     createdAt: retryTicketData.createdAt,
+                    unreadCount: 0,
                   });
 
                   const result = await MessageSyncService.loadInitialMessages(

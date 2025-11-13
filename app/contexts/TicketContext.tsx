@@ -1,5 +1,9 @@
 import { DAOManager } from "@/database/dao";
-import { CreateTicketData, Ticket } from "@/database/dao/types/ticket";
+import {
+  CreateTicketData,
+  UpdateTicketData,
+  Ticket,
+} from "@/database/dao/types/ticket";
 import { useDatabase } from "@/database/context";
 import React, {
   createContext,
@@ -70,7 +74,7 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   const updateTicket = useCallback(
-    async (id: number, data: Partial<CreateTicketData>) => {
+    async (id: number, data: Partial<UpdateTicketData>) => {
       try {
         const success = await dao.ticket.update(db, id, data);
         if (success && isMounted.current) {
@@ -86,7 +90,9 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   return (
-    <TicketContext.Provider value={{ tickets, createTicket, updateTicket }}>
+    <TicketContext.Provider
+      value={{ tickets, setTickets, createTicket, updateTicket }}
+    >
       {children}
     </TicketContext.Provider>
   );
