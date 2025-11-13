@@ -7,7 +7,6 @@ import React, {
   useMemo,
   ReactNode,
 } from "react";
-import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { api } from "@/services/api";
 import { DAOManager } from "@/database/dao";
@@ -39,7 +38,6 @@ interface AuthContextType {
   session: string | null;
   isLoading: boolean;
   signIn: (
-    expoPushToken: string,
     accessToken: string,
     refreshToken: string,
     userData: User,
@@ -117,6 +115,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
       // Store new access token in SecureStore (via setSession)
       setSession(response.access_token);
+      dao.profile.update(db, user?.id || 0, {
+        accessToken: response.access_token,
+      });
 
       console.log("[AuthContext] Access token refreshed successfully");
       return response.access_token;
@@ -150,7 +151,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   }, []);
 
   const signIn = async (
-    expoPushToken: string,
     accessToken: string,
     refreshToken: string,
     userData: User,
@@ -194,15 +194,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         accessToken: accessToken,
       });
       console.log("[Auth] Sign in successful");
-
-      const appVersion = Constants.expoConfig?.version || "1.0.0";
-      await api.registerDevice({
-        push_token: expoPushToken,
-        administrative_id: userData.administrativeLocation
-          ? userData.administrativeLocation.id
-          : undefined,
-        app_version: appVersion,
-      });
     } catch (error) {
       console.error("Error during sign in:", error);
       throw error;
@@ -212,17 +203,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const signOut = async () => {
     try {
       console.log("🔄 Starting sign out process...");
-
-      // Deactivate devices on backend BEFORE clearing local state
-      try {
-        console.log("📱 Deactivating devices on backend...");
-        await api.logoutDevices();
-        console.log("✅ Devices deactivated successfully");
-      } catch (error) {
-        console.error("⚠️ Failed to deactivate devices:", error);
-        // Don't block signOut if device deactivation fails
-      }
-
       // Clear tokens from SecureStore
       setSession(null); // Uses useStorageState
       await SecureStore.deleteItemAsync("refreshToken");
