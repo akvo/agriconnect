@@ -19,10 +19,26 @@ if ! pip show celery >/dev/null 2>&1; then
 fi
 
 echo "⏳ Waiting for PostgreSQL..."
-while ! nc -z db 5432; do
-    sleep 1
-done
-echo "✅ PostgreSQL started"
+# Extract host and port from DATABASE_URL or use defaults
+DB_HOST="db"
+DB_PORT="5432"
+
+# Try to parse from DATABASE_URL if available
+if [ -n "$DATABASE_URL" ]; then
+    # Extract host from DATABASE_URL (handles postgresql://user:pass@host:port/db)
+    DB_HOST=$(echo "$DATABASE_URL" | sed -n 's/.*@\([^:]*\):.*/\1/p')
+    DB_PORT=$(echo "$DATABASE_URL" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+fi
+
+# Only wait for DB if not localhost (in K8s, Cloud SQL Proxy starts alongside)
+if [ "$DB_HOST" != "localhost" ] && [ "$DB_HOST" != "127.0.0.1" ]; then
+    while ! nc -z "$DB_HOST" "$DB_PORT"; do
+        sleep 1
+    done
+    echo "✅ PostgreSQL started"
+else
+    echo "✅ PostgreSQL (using Cloud SQL Proxy on localhost)"
+fi
 
 echo "⏳ Waiting for Redis..."
 while ! nc -z ${REDIS_HOST:-redis} ${REDIS_PORT:-6379}; do
