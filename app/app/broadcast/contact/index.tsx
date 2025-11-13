@@ -140,7 +140,16 @@ const BroadcastFarmerListTab = () => {
         setLoadingMore(false);
       }
     },
-    [isOnline, debouncedSearch, selectedCropTypes, selectedAgeGroups, isAdmin, selectedAdminIds, selectedMembers, customers],
+    [
+      isOnline,
+      debouncedSearch,
+      selectedCropTypes,
+      selectedAgeGroups,
+      isAdmin,
+      selectedAdminIds,
+      selectedMembers,
+      customers,
+    ],
   );
 
   // Reset and fetch on filter/search change
