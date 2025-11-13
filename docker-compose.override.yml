@@ -30,6 +30,23 @@ services:
     network_mode: service:mainnetwork
     volumes:
       - storage-data:/app/storage
+  flower:
+    depends_on:
+      - redis
+      - celery-worker
+    network_mode: service:mainnetwork
+    image: mher/flower
+    environment:
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+    command: >
+      celery
+        --broker=redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/${REDIS_DB:-0}
+        flower
+        --port=5555
+        --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin123}
+    restart: unless-stopped
   mobileapp:
     network_mode: service:mainnetwork
 volumes:
