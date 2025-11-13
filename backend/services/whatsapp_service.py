@@ -45,6 +45,7 @@ def load_message_templates():
 
 # Load WhatsApp messages from template
 WHATSAPP_MESSAGES = load_message_templates()
+MAX_WHATSAPP_MESSAGE_LENGTH = 1500
 
 
 class WhatsAppService:
@@ -159,7 +160,10 @@ class WhatsAppService:
         return text
 
     def send_template_message(
-        self, to: str, content_sid: str, content_variables: Dict[str, str]
+        self,
+        to: str,
+        content_sid: str,
+        content_variables: Dict[str, str]
     ) -> Dict[str, Any]:
         """
         Send WhatsApp template message via Twilio.
@@ -177,7 +181,7 @@ class WhatsAppService:
                 from_=self.whatsapp_number,
                 to=f"whatsapp:{to}",
                 content_sid=content_sid,
-                content_variables=content_variables,
+                content_variables=json.dumps(content_variables),
             )
             return {
                 "sid": message.sid,

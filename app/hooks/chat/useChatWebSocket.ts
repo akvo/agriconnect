@@ -9,6 +9,7 @@ import { DAOManager } from "@/database/dao";
 import { Message } from "@/utils/chat";
 import { MessageFrom } from "@/constants/messageSource";
 import { convertToUIMessage } from "./useTicketData";
+import { UpdateTicketData } from "@/database/dao/types/ticket";
 
 interface TicketData {
   id: number | null;
@@ -38,6 +39,7 @@ interface UseChatWebSocketParams {
   setAISuggestion: React.Dispatch<React.SetStateAction<string | null>>;
   setAISuggestionLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setAISuggestionUsed: React.Dispatch<React.SetStateAction<boolean>>;
+  updateTicket: (id: number, data: Partial<UpdateTicketData>) => Promise<void>;
 }
 
 export const useChatWebSocket = ({
@@ -53,6 +55,7 @@ export const useChatWebSocket = ({
   setAISuggestion,
   setAISuggestionLoading,
   setAISuggestionUsed,
+  updateTicket,
 }: UseChatWebSocketParams) => {
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
@@ -93,8 +96,13 @@ export const useChatWebSocket = ({
           );
 
           // Update last message info in ticket
+          updateTicket(ticket.id!, {
+            lastMessageId: event.message_id,
+            unreadCount: 0,
+          });
           await daoManager.ticket.update(db, ticket.id, {
             lastMessageId: event.message_id,
+            unreadCount: 0,
           });
 
           if (dbMessage) {

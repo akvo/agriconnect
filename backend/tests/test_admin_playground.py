@@ -750,6 +750,121 @@ class TestPlaygroundCallbackHandler:
         assert result["status"] == "received"
         assert result["job_id"] == "test_job_nonexistent"
 
+    @pytest.mark.asyncio
+    async def test_handle_playground_callback_with_failed_status(
+        self, db_session, admin_user
+    ):
+        """Test playground callback with failed status"""
+        from routers.callbacks import handle_playground_callback
+        from schemas.callback import (
+            AIWebhookCallback,
+            CallbackStage,
+            AICallbackParams,
+        )
+
+        session_id = str(uuid.uuid4())
+
+        # Create pending assistant message
+        assistant_message = PlaygroundMessage(
+            admin_user_id=admin_user.id,
+            session_id=session_id,
+            role=PlaygroundMessageRole.ASSISTANT,
+            content="",
+            job_id="failed_job_123",
+            status=PlaygroundMessageStatus.PENDING,
+        )
+        db_session.add(assistant_message)
+        db_session.commit()
+        db_session.refresh(assistant_message)
+
+        # Create callback payload with failed status
+        payload = AIWebhookCallback(
+            job_id="failed_job_123",
+            job="chat",
+            status=CallbackStage.FAILED,
+            stage=CallbackStage.FAILED,
+            output=None,
+            error="AI processing failed",
+            callback_params=AICallbackParams(
+                source="playground",
+                session_id=session_id,
+                admin_user_id=admin_user.id,
+                message_id=assistant_message.id
+            )
+        )
+
+        # Handle callback
+        result = await handle_playground_callback(payload, db_session)
+
+        # Verify result
+        assert result["status"] == "error"
+        assert result["job_id"] == "failed_job_123"
+
+        # Verify message status was updated to FAILED
+        db_session.refresh(assistant_message)
+        assert assistant_message.status == PlaygroundMessageStatus.FAILED
+
+    @pytest.mark.asyncio
+    @patch('routers.callbacks.emit_playground_response')
+    async def test_handle_playground_callback_exception_handling(
+        self, mock_emit, db_session, admin_user
+    ):
+        """Test playground callback exception handling"""
+        from routers.callbacks import handle_playground_callback
+        from schemas.callback import (
+            AIWebhookCallback,
+            CallbackStage,
+            AICallbackParams,
+            CallbackResult
+        )
+
+        session_id = str(uuid.uuid4())
+
+        # Create pending assistant message
+        assistant_message = PlaygroundMessage(
+            admin_user_id=admin_user.id,
+            session_id=session_id,
+            role=PlaygroundMessageRole.ASSISTANT,
+            content="",
+            job_id="error_job_789",
+            status=PlaygroundMessageStatus.PENDING,
+        )
+        db_session.add(assistant_message)
+        db_session.commit()
+        db_session.refresh(assistant_message)
+
+        # Mock emit_playground_response to raise an exception
+        async def mock_emit_error(*args, **kwargs):
+            raise Exception("WebSocket emit failed")
+
+        mock_emit.side_effect = mock_emit_error
+
+        # Create callback payload
+        payload = AIWebhookCallback(
+            job_id="error_job_789",
+            job="chat",
+            status=CallbackStage.COMPLETED,
+            stage=CallbackStage.COMPLETED,
+            output=CallbackResult(
+                answer="Test answer",
+                citations=[]
+            ),
+            callback_params=AICallbackParams(
+                source="playground",
+                session_id=session_id,
+                admin_user_id=admin_user.id,
+                message_id=assistant_message.id
+            )
+        )
+
+        # Handle callback
+        result = await handle_playground_callback(payload, db_session)
+
+        # Should return error status
+        assert result["status"] == "error"
+        assert "error" in result
+        assert result["job_id"] == "error_job_789"
+
 
 class TestWebSocketPlaygroundEvents:
     """Test WebSocket playground room management"""

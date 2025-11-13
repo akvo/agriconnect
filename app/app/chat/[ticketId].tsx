@@ -31,6 +31,7 @@ import {
   useAISuggestion,
   useChatWebSocket,
 } from "@/hooks/chat";
+import { useTicket } from "@/contexts/TicketContext";
 
 const ChatScreen = () => {
   const params = useLocalSearchParams();
@@ -47,6 +48,7 @@ const ChatScreen = () => {
   const { isOnline } = useNetwork();
   const { isConnected, onMessageCreated, onTicketResolved, onWhisperCreated } =
     useWebSocket();
+  const { updateTicket } = useTicket();
 
   const scrollToBottom = useCallback((animated = false) => {
     setTimeout(() => {
@@ -118,6 +120,7 @@ const ChatScreen = () => {
     setAISuggestion,
     setAISuggestionLoading,
     setAISuggestionUsed,
+    updateTicket,
   });
 
   const [totalMessages, setTotalMessages] = useState<number>(0);

@@ -139,7 +139,7 @@ export default function HomeScreen() {
                   : themeColors.mutedBorder,
               },
             ]}
-            onPress={() => router.push("/broadcast/contact")}
+            onPress={() => router.navigate("/broadcast/contact")}
             testID="send-bulk-message-button"
             disabled={!isOnline}
           >

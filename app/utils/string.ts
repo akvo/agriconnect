@@ -1,9 +1,18 @@
 export const initialsFromName = (name: string) =>
-  name
-    .split(" ")
-    .map((n) => n.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join("");
+  /^\+\d{10,}$/.test(name)
+    ? ""
+    : name
+        .split(" ")
+        .map((n) => n.charAt(0).toUpperCase())
+        .slice(0, 2)
+        .join("");
+
+export const capitalizeFirstLetter = (str: string | null): string => {
+  if (!str) {
+    return "";
+  }
+  return str.charAt(0).toUpperCase() + str.slice(1).replace("_", " ");
+};
 
 export const validJSONString = (str: string): boolean => {
   const jsonRegex = /^[\],:{}\s]*$/;
@@ -21,4 +30,5 @@ export const validJSONString = (str: string): boolean => {
 export default {
   initialsFromName,
   validJSONString,
+  capitalizeFirstLetter,
 };
