@@ -7,11 +7,13 @@ import React, {
   useMemo,
   ReactNode,
 } from "react";
-import { useRouter, useSegments, useLocalSearchParams } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { api } from "@/services/api";
 import { DAOManager } from "@/database/dao";
 import { forceClearDatabase, checkDatabaseHealth } from "@/database/utils";
 import { useDatabase } from "@/database/context";
+import { useStorageState } from "@/hooks/useStorageState";
+import { validJSONString } from "@/utils/string";
 
 interface AdministrativeLocation {
   id: number;
@@ -33,25 +35,18 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (accessToken: string, userData: User) => Promise<void>;
-  logout: () => Promise<void>;
+  session: string | null;
+  isLoading: boolean;
+  signIn: (
+    accessToken: string,
+    refreshToken: string,
+    userData: User,
+  ) => Promise<void>;
+  signOut: () => Promise<void>;
   setRegisterDeviceAt: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
-
-const validJSONString = (str: string): boolean => {
-  const jsonRegex = /^[\],:{}\s]*$/;
-  return jsonRegex.test(
-    str
-      .replace(/\\["\\\/bfnrtu]/g, "@")
-      .replace(
-        /"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g,
-        "]",
-      )
-      .replace(/(?:^|:|,)(?:\s*\[)+/g, ""),
-  );
-};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -66,22 +61,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 }: {
   children: ReactNode;
 }) => {
+  const [[isLoading, session], setSession] = useStorageState("accessToken");
   const [user, setUser] = useState<User | null>(null);
-  const [isValid, setIsValid] = useState<boolean>(false);
-  const { token: routeToken } = useLocalSearchParams();
-  const router = useRouter();
-  const segments = useSegments();
   const db = useDatabase();
 
   // Create DAO manager with database from context
   const dao = useMemo(() => new DAOManager(db), [db]);
 
-  const checkAuth = useCallback(async () => {
-    // Get profile with user details from database (single JOIN query)
-    const profileDB = await dao.profile.getCurrentProfile(db);
-
-    if (!user && profileDB) {
-      // Map profile data to user state
+  // Load user data from database when session changes
+  const initialSession = useCallback(() => {
+    // Load user from database
+    const profileDB = dao.profile.getCurrentProfile(db);
+    if (profileDB) {
       const adm =
         profileDB.administrativeLocation &&
         validJSONString(profileDB.administrativeLocation)
@@ -99,84 +90,81 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         accessToken: profileDB.accessToken,
         deviceRegisterAt: profileDB.deviceRegisterAt,
       });
+
+      // Set token from database to API client cache
+      setSession(profileDB.accessToken);
+      api.setAccessToken(profileDB.accessToken);
+      console.log("[Auth] User loaded from database");
     }
-
-    // Get access token from route or profile DB
-    const accessToken = routeToken || profileDB?.accessToken;
-
-    if (!accessToken && segments[0] !== "login") {
-      router.replace("/login");
-      return;
-    }
-
-    if (isValid && user) {
-      return;
-    }
-
-    try {
-      if (!accessToken) {
-        return;
-      }
-
-      // Validate token and get latest user data from API
-      const apiData = await api.getProfile(accessToken);
-      setIsValid(true);
-
-      // Map API response to User interface
-      const userData: User = {
-        id: apiData.id,
-        fullName: apiData.full_name,
-        email: apiData.email,
-        phoneNumber: apiData.phone_number,
-        userType: apiData.user_type,
-        isActive: apiData.is_active,
-        invitationStatus: apiData.invitation_status,
-        administrativeLocation: apiData.administrative_location,
-        accessToken: accessToken,
-        deviceRegisterAt: profileDB?.deviceRegisterAt || null,
-      };
-
-      setUser(userData);
-
-      if (segments[0] === "login") {
-        router.replace("/home");
-      }
-    } catch {
-      if (segments[0] !== "login" && routeToken) {
-        setUser(null);
-        setIsValid(false);
-        router.replace("/login");
-      }
-    }
-  }, [user, segments, router, routeToken, isValid, dao, db]);
+  }, [dao, db, setSession]);
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    initialSession();
+  }, [initialSession]);
 
-  // Register unauthorized handler to auto-logout on 401 responses
+  // Register refresh token handler and unauthorized handler
   useEffect(() => {
+    const handleRefreshToken = async (): Promise<string> => {
+      const refreshToken = await SecureStore.getItemAsync("refreshToken");
+      if (!refreshToken) {
+        throw new Error("No refresh token available");
+      }
+
+      console.log("[AuthContext] Refreshing access token...");
+      const response = await api.refreshTokenMobile(refreshToken);
+
+      // Store new access token in SecureStore (via setSession)
+      setSession(response.access_token);
+      dao.profile.update(db, user?.id || 0, {
+        accessToken: response.access_token,
+      });
+
+      console.log("[AuthContext] Access token refreshed successfully");
+      return response.access_token;
+    };
+
     const handleUnauthorized = () => {
-      // perform logout; don't await here to avoid blocking
-      logout().catch((err) =>
+      signOut().catch((err) =>
         console.error("Error during auto-logout (unauthorized):", err),
       );
     };
 
-    // register
+    const handleClearSession = () => {
+      console.log("[AuthContext] Clearing session after failed refresh");
+      signOut().catch((err) =>
+        console.error("Error during session clear:", err),
+      );
+    };
+
+    // Register handlers
+    api.setRefreshTokenHandler(handleRefreshToken);
     api.setUnauthorizedHandler(handleUnauthorized);
+    api.setClearSessionHandler(handleClearSession);
 
     return () => {
-      // unregister handler on unmount
+      // Unregister handlers on unmount
+      api.setRefreshTokenHandler(undefined);
       api.setUnauthorizedHandler(undefined);
+      api.setClearSessionHandler(undefined);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = async (accessToken: string, userData: User) => {
+  const signIn = async (
+    accessToken: string,
+    refreshToken: string,
+    userData: User,
+  ) => {
     try {
-      // Create new user
-      dao.user.create(db, {
+      // Store tokens in SecureStore
+      setSession(accessToken); // Uses useStorageState
+      await SecureStore.setItemAsync("refreshToken", refreshToken);
+
+      // Set token in API client cache and emit event
+      api.setAccessToken(accessToken);
+
+      // Upsert user (insert or update if exists)
+      dao.user.upsert(db, {
         id: userData.id,
         email: userData.email,
         fullName: userData.fullName,
@@ -187,42 +175,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         administrativeLocation: userData?.administrativeLocation || null,
       });
 
-      // Create new profile
-      dao.profile.create(db, {
-        userId: userData.id,
-        accessToken: accessToken,
-      });
+      // Check if profile exists, update or create
+      const existingProfile = dao.profile.getByUserId(db, userData.id);
+      if (existingProfile) {
+        dao.profile.update(db, existingProfile.id, {
+          accessToken: accessToken,
+        });
+      } else {
+        dao.profile.create(db, {
+          userId: userData.id,
+          accessToken: accessToken,
+        });
+      }
 
+      // Set user state with accessToken
       setUser({
         ...userData,
         accessToken: accessToken,
       });
-      setIsValid(true);
+      console.log("[Auth] Sign in successful");
     } catch (error) {
-      console.error("Error during login:", error);
+      console.error("Error during sign in:", error);
       throw error;
     }
   };
 
-  const logout = async () => {
+  const signOut = async () => {
     try {
-      console.log("🔄 Starting logout process...");
+      console.log("🔄 Starting sign out process...");
+      // Clear tokens from SecureStore
+      setSession(null); // Uses useStorageState
+      await SecureStore.deleteItemAsync("refreshToken");
 
-      // Deactivate devices on backend BEFORE clearing local state
-      if (user?.accessToken) {
-        try {
-          console.log("📱 Deactivating devices on backend...");
-          await api.logoutDevices(user.accessToken);
-          console.log("✅ Devices deactivated successfully");
-        } catch (error) {
-          console.error("⚠️ Failed to deactivate devices:", error);
-          // Don't block logout if device deactivation fails
-        }
-      }
+      // Clear token from API client cache and emit event
+      api.clearToken();
 
       // Set user state to null immediately for UI feedback
       setUser(null);
-      setIsValid(false);
 
       // Check database health first
       const isHealthy = checkDatabaseHealth(db);
@@ -235,35 +224,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       const result = forceClearDatabase(db);
 
       if (!result.success) {
-        console.error("Failed to clear database during logout:", result.error);
-        // Don't throw here - logout should still succeed even if DB clear fails
+        console.error("Failed to clear database during signOut:", result.error);
         console.warn(
-          "Logout completed but database clear failed - data may persist",
+          "Sign out completed but database clear failed - data may persist",
         );
         console.log(
           "💡 User data will be cleared on next app restart when migrations run",
         );
       } else {
-        console.log("✅ Database cleared successfully during logout");
+        console.log("✅ Database cleared successfully during sign out");
       }
     } catch (error) {
-      console.error("Error during logout database clear:", error);
-      // Don't throw - logout should still succeed even if DB clear fails
+      console.error("Error during sign out database clear:", error);
       console.warn(
-        "Logout completed but encountered error during database clear",
+        "Sign out completed but encountered error during database clear",
       );
       console.log("💡 User data will be cleared on next app restart");
     }
   };
 
   const setRegisterDeviceAt = useCallback(async () => {
-    dao.profile.update(db, user!.id, {
+    if (!user) {
+      return;
+    }
+    dao.profile.update(db, user.id, {
       deviceRegisterAt: new Date().toISOString(),
     });
   }, [dao, db, user]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, setRegisterDeviceAt }}>
+    <AuthContext.Provider
+      value={{ user, session, isLoading, signIn, signOut, setRegisterDeviceAt }}
+    >
       {children}
     </AuthContext.Provider>
   );

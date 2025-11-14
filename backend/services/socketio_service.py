@@ -30,7 +30,7 @@ sio_app = socketio.ASGIApp(
     socketio_path=SOCKETIO_PATH,
 )
 
-USER_CACHE: Dict[int, str] = {}
+USER_CONNECTIONS: Dict[int, set] = {}  # user_id -> set of sids (multi-device)
 CONNECTIONS: Dict[str, dict] = {}  # sid -> connection info
 RATE_LIMITS: Dict[str, dict] = {}
 RATE_LIMIT_WINDOW = timedelta(seconds=60)
@@ -38,23 +38,37 @@ MAX_JOINS_PER_WINDOW = 50
 MAX_LEAVES_PER_WINDOW = 50
 
 
-# Helper functions (same as before)
-def set_user_cache(user_id: int, sid: str):
-    USER_CACHE[user_id] = sid
-    logger.info(f"[CACHE] Set: user {user_id} -> sid {sid}")
+# Helper functions for multi-device connection tracking
+def add_user_connection(user_id: int, sid: str):
+    """Add socket connection for user (supports multiple devices)"""
+    if user_id not in USER_CONNECTIONS:
+        USER_CONNECTIONS[user_id] = set()
+    USER_CONNECTIONS[user_id].add(sid)
+    logger.info(
+        f"[CONNECTIONS] Added: user {user_id} -> sid {sid} "
+        f"(total sessions: {len(USER_CONNECTIONS[user_id])})"
+    )
 
 
-def get_user_cache(user_id: int) -> Optional[str]:
-    sid = USER_CACHE.get(user_id)
-    if sid:
-        logger.debug(f"[CACHE] Get: user {user_id} -> sid {sid}")
-    return sid
+def get_user_connections(user_id: int) -> set:
+    """Get all socket connections for a user"""
+    return USER_CONNECTIONS.get(user_id, set())
 
 
-def delete_user_cache(user_id: int):
-    if user_id in USER_CACHE:
-        sid = USER_CACHE.pop(user_id)
-        logger.info(f"[CACHE] Delete: user {user_id} (was sid {sid})")
+def remove_user_connection(user_id: int, sid: str):
+    """Remove socket connection for user"""
+    if user_id in USER_CONNECTIONS:
+        USER_CONNECTIONS[user_id].discard(sid)
+        if not USER_CONNECTIONS[user_id]:
+            del USER_CONNECTIONS[user_id]
+            logger.info(
+                f"[CONNECTIONS] User {user_id} has no more connections"
+            )
+        else:
+            logger.info(
+                f"[CONNECTIONS] Removed: user {user_id} -> sid {sid} "
+                f"(remaining: {len(USER_CONNECTIONS[user_id])})"
+            )
 
 
 def get_user_wards(user: User, db: Session) -> list[int]:
@@ -144,30 +158,22 @@ async def connect(
                 "user_id": user.id,
                 "user_type": user.user_type.value,
                 "ward_ids": ward_ids,
-                "connected_at": datetime.utcnow(),
-                "last_activity": datetime.utcnow(),
+                "connected_at": datetime.now(timezone.utc),
+                "last_activity": datetime.now(timezone.utc),
             }
 
-            # Cache user SID (rag-doll pattern)
-            set_user_cache(user.id, sid)
+            # Track multi-device connections
+            add_user_connection(user.id, sid)
 
-            # Join ward rooms
-            if user.user_type == UserType.ADMIN:
-                await sio_server.enter_room(sid, "ward:admin")
-                logger.info(
-                    f"[CONNECT] Admin user {user.id} joined ward:admin"
-                )
-            else:
-                for ward_id in ward_ids:
-                    room_name = f"ward:{ward_id}"
-                    await sio_server.enter_room(sid, room_name)
-                    logger.info(
-                        f"[CONNECT] User {user.id} joined {room_name}"
-                    )
+            # Join user-specific room (ONLY room needed - simplified!)
+            user_room = f"user:{user.id}"
+            await sio_server.enter_room(sid, user_room)
+            logger.info(f"[CONNECT] User {user.id} joined {user_room}")
 
             logger.info(
-                f"[CONNECT] ✅ Success: {sid} "
-                f"(user {user.id}, {user.user_type.value}, wards {ward_ids})"
+                f"[CONNECT] ✅ Success: sid={sid}, user={user.id}, "
+                f"type={user.user_type.value}, "
+                f"sessions={len(USER_CONNECTIONS[user.id])}"
             )
             return True
 
@@ -182,7 +188,7 @@ async def connect(
 @sio_server.event
 async def disconnect(sid: str):
     """
-    Handle disconnection with cleanup
+    Handle disconnection with comprehensive cleanup
     """
     logger.info(f"[DISCONNECT] Client: {sid}")
 
@@ -190,11 +196,12 @@ async def disconnect(sid: str):
     if sid in CONNECTIONS:
         user_info = CONNECTIONS.pop(sid)
         user_id = user_info.get("user_id")
-        logger.info(f"[DISCONNECT] Cleaned user {user_id}")
+        duration = datetime.now(timezone.utc) - user_info['connected_at']
+        logger.info(f"[DISCONNECT] User {user_id}, duration: {duration}")
 
-        # Remove from cache
+        # Remove from multi-device tracking
         if user_id:
-            delete_user_cache(user_id)
+            remove_user_connection(user_id, sid)
 
     # Clean rate limits
     if sid in RATE_LIMITS:
@@ -266,24 +273,32 @@ async def emit_message_received(
     else:
         event_data["customer_id"] = customer_id
 
-    # Emit to ward room
-    if administrative_id:
+    # Determine which users should receive this message
+    target_users = set()
+
+    for sid, conn in CONNECTIONS.items():
+        user_id = conn.get("user_id")
+        user_type = conn.get("user_type")
+        ward_ids = conn.get("ward_ids", [])
+
+        # All ADMIN users receive all messages
+        if user_type == UserType.ADMIN.value:
+            target_users.add(user_id)
+        # EO users only receive messages from their assigned wards
+        elif administrative_id and administrative_id in ward_ids:
+            target_users.add(user_id)
+
+    # Broadcast to each user's room
+    for user_id in target_users:
         await sio_server.emit(
-            "message_received",
-            event_data,
-            room=f"ward:{administrative_id}",
-        )
-        logger.info(
-            f"[EMIT:TICKETS] message_received to ward:{administrative_id}"
+            "message_received", event_data, room=f"user:{user_id}"
         )
 
-    # Emit to admin room
-    await sio_server.emit(
-        "message_received",
-        event_data,
-        room="ward:admin",
+    logger.info(
+        f"[EMIT:TICKETS] message_received broadcast to "
+        f"{len(target_users)} users "
+        f"(ward_id: {administrative_id})"
     )
-    logger.info("[EMIT:TICKETS] message_received to ward:admin")
 
     # Push notifications
     db = next(get_db())
@@ -334,7 +349,7 @@ async def emit_whisper_created(
     created_at: str,
     administrative_id: Optional[int] = None,
 ):
-    """Emit whisper"""
+    """Emit whisper using user-specific rooms only"""
     event_data = {
         "ticket_id": ticket_id,
         "message_id": message_id,
@@ -343,18 +358,30 @@ async def emit_whisper_created(
         "ts": created_at,
     }
 
-    await sio_server.emit(
-        "whisper",  # Simpler name
-        event_data,
-        room="ward:admin",
+    # Determine which users should receive this whisper
+    target_users = set()
+
+    for sid, conn in CONNECTIONS.items():
+        user_id = conn.get("user_id")
+        user_type = conn.get("user_type")
+        ward_ids = conn.get("ward_ids", [])
+
+        # All ADMIN users receive all whispers
+        if user_type == UserType.ADMIN.value:
+            target_users.add(user_id)
+        # EO users only receive whispers from their assigned wards
+        elif administrative_id and administrative_id in ward_ids:
+            target_users.add(user_id)
+
+    # Broadcast to each user's room
+    for user_id in target_users:
+        await sio_server.emit("whisper", event_data, room=f"user:{user_id}")
+
+    logger.info(
+        f"[EMIT:TICKETS] whisper for ticket {ticket_id} - "
+        f"broadcast to {len(target_users)} users "
+        f"(ward_id: {administrative_id})"
     )
-    if administrative_id:
-        await sio_server.emit(
-            "whisper",
-            event_data,
-            room=f"ward:{administrative_id}",
-        )
-    logger.info(f"[EMIT:TICKETS] whisper for ticket {ticket_id}")
 
 
 async def emit_ticket_resolved(
@@ -363,25 +390,39 @@ async def emit_ticket_resolved(
     resolved_by: Optional[str] = None,
     administrative_id: Optional[int] = None
 ):
-    """Emit ticket resolved"""
+    """Emit ticket resolved using user-specific rooms only"""
     event_data = {
         "ticket_id": ticket_id,
         "resolved_at": resolved_at,
         "resolved_by": resolved_by,
     }
 
-    if administrative_id:
+    # Determine which users should receive this event
+    target_users = set()
+
+    for sid, conn in CONNECTIONS.items():
+        user_id = conn.get("user_id")
+        user_type = conn.get("user_type")
+        ward_ids = conn.get("ward_ids", [])
+
+        # All ADMIN users receive all ticket resolutions
+        if user_type == UserType.ADMIN.value:
+            target_users.add(user_id)
+        # EO users only receive resolutions from their assigned wards
+        elif administrative_id and administrative_id in ward_ids:
+            target_users.add(user_id)
+
+    # Broadcast to each user's room
+    for user_id in target_users:
         await sio_server.emit(
-            "ticket_resolved",
-            event_data,
-            room=f"ward:{administrative_id}",
+            "ticket_resolved", event_data, room=f"user:{user_id}"
         )
-    await sio_server.emit(
-        "ticket_resolved",
-        event_data,
-        room="ward:admin",
+
+    logger.info(
+        f"[EMIT:TICKETS] ticket_resolved for {ticket_id} - "
+        f"broadcast to {len(target_users)} users "
+        f"(ward_id: {administrative_id})"
     )
-    logger.info(f"[EMIT:TICKETS] ticket_resolved for {ticket_id}")
 
 
 # Export

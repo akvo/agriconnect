@@ -46,14 +46,12 @@ class MessageSyncService {
   /**
    * Fetch messages for a ticket from API
    * Uses centralized api client which handles 401 errors with unauthorizedHandler
-   * @param accessToken - User authentication token
    * @param ticketId - Ticket ID
    * @param beforeTs - Optional timestamp to fetch messages before (for pagination)
    * @param limit - Number of messages to fetch
    * @returns Messages from API
    */
   static async fetchMessagesFromAPI(
-    accessToken: string,
     ticketId: number,
     beforeTs?: string,
     limit: number = 20,
@@ -64,12 +62,7 @@ class MessageSyncService {
       );
 
       // Use centralized api client which handles 401 errors
-      const data = await api.getMessages(
-        accessToken,
-        ticketId,
-        beforeTs,
-        limit,
-      );
+      const data = await api.getMessages(ticketId, beforeTs, limit);
       return data;
     } catch (error) {
       console.error("[MessageSync] Error fetching messages from API:", error);
@@ -186,7 +179,6 @@ class MessageSyncService {
    */
   static async syncNewerMessages(
     db: SQLiteDatabase,
-    accessToken: string,
     ticketId: number,
     customerId: number,
     userId?: number,
@@ -197,11 +189,7 @@ class MessageSyncService {
       );
 
       // Fetch latest messages from API (no before_ts = get newest)
-      const apiData = await this.fetchMessagesFromAPI(
-        accessToken,
-        ticketId,
-        undefined,
-      );
+      const apiData = await this.fetchMessagesFromAPI(ticketId, undefined);
 
       // Sync all messages to SQLite (upsert will skip duplicates)
       let newCount = 0;
@@ -236,7 +224,6 @@ class MessageSyncService {
    */
   static async loadOlderMessages(
     db: SQLiteDatabase,
-    accessToken: string,
     ticketId: number,
     customerId: number,
     beforeTimestamp: string,
@@ -250,7 +237,6 @@ class MessageSyncService {
 
       // Fetch older messages from API (backend filters by previous ticket boundary)
       const apiData = await this.fetchMessagesFromAPI(
-        accessToken,
         ticketId,
         beforeTimestamp,
         limit,

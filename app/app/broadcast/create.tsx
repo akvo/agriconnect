@@ -14,52 +14,24 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Feather from "@expo/vector-icons/Feather";
 
-import { useBroadcast, Customer } from "@/contexts/BroadcastContext";
+import { useBroadcast, GroupMember } from "@/contexts/BroadcastContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/services/api";
 import Avatar from "@/components/avatar";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
-import { initialsFromName } from "@/utils/string";
-
-// Helper function to capitalize first letter
-const capitalizeFirstLetter = (str: string | null): string => {
-  if (!str) {
-    return "";
-  }
-  return str.charAt(0).toUpperCase() + str.slice(1).replace("_", " ");
-};
-
-// Dummy API function to simulate group creation
-const dummyApiCreateGroup = async (
-  groupName: string,
-  memberIds: number[],
-): Promise<{ chatId: string }> => {
-  // Log the group creation request
-  console.log(
-    `[DummyAPI] Creating group: "${groupName}" with ${memberIds.length} members`,
-  );
-
-  // Simulate network latency (800-1200ms)
-  const delay = 800 + Math.random() * 400;
-  await new Promise((resolve) => setTimeout(resolve, delay));
-
-  // Randomly simulate failure (10% chance)
-  if (Math.random() < 0.1) {
-    throw new Error("Failed to create group. Please try again.");
-  }
-
-  // Return mock chatId
-  return {
-    chatId: `group_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-  };
-};
+import { initialsFromName, capitalizeFirstLetter } from "@/utils/string";
 
 const CreateGroupScreen = () => {
   const router = useRouter();
-  const { selectedMembers } = useBroadcast();
-  const [groupName, setGroupName] = useState("");
+  const { user } = useAuth();
+  const { selectedMembers, clearMembers } = useBroadcast();
+  const { activeGroup, setActiveGroup } = useBroadcast();
+  const [groupName, setGroupName] = useState(activeGroup?.name || "");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+
   const inputRef = useRef<TextInput>(null);
 
   // Auto-focus on mount
@@ -112,35 +84,66 @@ const CreateGroupScreen = () => {
       return;
     }
 
+    const memberIds = selectedMembers.map((m) => m.customer_id);
+
+    // Create broadcast group with selected members
+    // Note: crop_types and age_groups are now derived from actual members by the API
+    const payload = {
+      name: groupName.trim(),
+      customer_ids: memberIds,
+    };
+
+    console.log("[CreateGroup] Creating group with payload:", payload);
+
     try {
       setIsCreating(true);
       setError(null);
 
-      const memberIds = selectedMembers.map((m) => m.id);
-      const response = await dummyApiCreateGroup(groupName.trim(), memberIds);
+      const response = activeGroup?.id
+        ? await api.updateBroadcastGroup(
+            user?.accessToken || "",
+            activeGroup.id,
+            payload,
+          )
+        : await api.createBroadcastGroup(user?.accessToken || "", payload);
 
-      console.log(
-        `[CreateGroup] Group created successfully: ${response.chatId}`,
-      );
+      console.log(`[CreateGroup] Group created successfully:`, response);
+
+      // Clear context after successful creation
+      clearMembers();
+
+      /**
+       * Toggle active group in context
+       */
+      if (activeGroup?.id) {
+        setActiveGroup(null);
+      } else {
+        setActiveGroup(response);
+      }
 
       // Navigate to group chat page
-      router.push({
+      router.replace({
         pathname: "/broadcast/group/[chatId]",
         params: {
-          chatId: response.chatId,
+          chatId: response.id.toString(),
           name: groupName.trim(),
+          contactCount: selectedMembers.length.toString(),
         },
       });
-    } catch (err) {
+    } catch (err: any) {
+      // API client now provides structured error with status, statusText, and body
       console.error("[CreateGroup] Error creating group:", err);
-      setError(err instanceof Error ? err.message : "Failed to create group");
+
+      // Extract error message (API client already formatted it)
+      const errorMessage = err?.message || "Failed to create group";
+      setError(errorMessage);
     } finally {
       setIsCreating(false);
     }
   };
 
   // Render member item (read-only, no checkbox)
-  const renderMemberItem = useCallback(({ item }: { item: Customer }) => {
+  const renderMemberItem = useCallback(({ item }: { item: GroupMember }) => {
     const displayName = item.full_name || item.phone_number;
     const initials = initialsFromName(displayName);
 
@@ -170,7 +173,10 @@ const CreateGroupScreen = () => {
     );
   }, []);
 
-  const keyExtractor = useCallback((item: Customer) => item.id.toString(), []);
+  const keyExtractor = useCallback(
+    (item: GroupMember) => item.customer_id.toString(),
+    [],
+  );
 
   // Empty state
   const ListEmptyComponent = useCallback(
@@ -278,7 +284,7 @@ const CreateGroupScreen = () => {
             ) : (
               <>
                 <Text style={[typography.label1, { color: themeColors.white }]}>
-                  Create Group
+                  {activeGroup?.id ? "Update Group" : "Create Group"}
                 </Text>
                 <Feather name="check" size={20} color={themeColors.white} />
               </>

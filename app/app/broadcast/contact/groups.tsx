@@ -10,84 +10,27 @@ import {
 import { useRouter } from "expo-router";
 import Feather from "@expo/vector-icons/Feather";
 
+import { useAuth } from "@/contexts/AuthContext";
+import { SavedGroup, useBroadcast } from "@/contexts/BroadcastContext";
+import { api } from "@/services/api";
 import Search from "@/components/search";
 import themeColors from "@/styles/colors";
 import typography from "@/styles/typography";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 // Constants
-const PAGE_SIZE = 10;
 const DEBOUNCE_DELAY = 300;
 
-// Types
-interface SavedGroup {
-  id: string;
-  name: string;
-  memberCount: number;
-  cropTypes: string[];
-  ageGroups: string[];
-}
-
-// Dummy data
-const DUMMY_GROUPS: SavedGroup[] = [
-  {
-    id: "1",
-    name: "Group 1",
-    memberCount: 10,
-    cropTypes: ["Maize", "Wheat"],
-    ageGroups: ["Adult", "Youth"],
-  },
-  {
-    id: "2",
-    name: "Group 2",
-    memberCount: 5,
-    cropTypes: ["Rice"],
-    ageGroups: ["Adult"],
-  },
-  {
-    id: "3",
-    name: "Group 3",
-    memberCount: 8,
-    cropTypes: ["Maize", "Rice"],
-    ageGroups: ["Youth"],
-  },
-];
-
-// Simulated API fetch with delay
-const simulateFetch = (
-  query: string,
-  page: number,
-  size: number,
-): Promise<{ groups: SavedGroup[]; hasMore: boolean }> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Filter by search query
-      const filtered = query
-        ? DUMMY_GROUPS.filter((g) =>
-            g.name.toLowerCase().includes(query.toLowerCase()),
-          )
-        : DUMMY_GROUPS;
-
-      // Paginate
-      const start = (page - 1) * size;
-      const end = start + size;
-      const paginated = filtered.slice(start, end);
-
-      resolve({
-        groups: paginated,
-        hasMore: end < filtered.length,
-      });
-    }, 500); // Simulate network delay
-  });
-};
-
 const SavedGroups = () => {
+  const { user } = useAuth();
+  const { activeGroup } = useBroadcast();
+  const { isOnline } = useNetwork();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [groups, setGroups] = useState<SavedGroup[]>([]);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -101,54 +44,56 @@ const SavedGroups = () => {
   }, [searchQuery]);
 
   // Fetch groups
-  const fetchGroups = useCallback(
-    async (currentPage: number, isLoadingMore: boolean = false) => {
-      try {
-        if (isLoadingMore) {
-          setLoadingMore(true);
-        } else {
-          setLoading(true);
-        }
+  const fetchGroups = useCallback(async () => {
+    try {
+      if (activeGroup?.id) {
+        // append to groups list if activeGroup is set
+        setGroups((prevGroups: SavedGroup[]) => {
+          // check if activeGroup already exists in the list
+          const exists = prevGroups.some(
+            (group) => group.id === activeGroup.id,
+          );
+          if (exists) {
+            return prevGroups;
+          }
 
-        const response = await simulateFetch(
-          debouncedSearch,
-          currentPage,
-          PAGE_SIZE,
-        );
+          // Normalize activeGroup to SavedGroup shape to satisfy typing
+          const groupToAdd: SavedGroup = {
+            id: activeGroup.id,
+            name: activeGroup.name,
+            contact_count: activeGroup?.contact_count,
+            created_at: activeGroup?.created_at,
+            crop_types: activeGroup.crop_types,
+            age_groups: activeGroup.age_groups,
+          };
 
-        if (isLoadingMore) {
-          setGroups((prev) => [...prev, ...response.groups]);
-        } else {
-          setGroups(response.groups);
-        }
-
-        setHasMore(response.hasMore);
-      } catch (err) {
-        console.error("Error fetching groups:", err);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
+          return [groupToAdd, ...prevGroups];
+        });
       }
-    },
-    [debouncedSearch],
-  );
+      /**
+       * Early return if offline
+       */
+      if (!isOnline) {
+        return;
+      }
+      setLoading(true);
 
-  // Reset and fetch on search change
-  useEffect(() => {
-    setPage(1);
-    setGroups([]);
-    fetchGroups(1, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  // Load more handler
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && !loading && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchGroups(nextPage, true);
+      const response = await api.getBroadcastGroups(user?.accessToken || "", {
+        search: debouncedSearch,
+      });
+      setGroups(response);
+    } catch (err) {
+      console.error("[SavedGroups] Error fetching groups:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch groups");
+    } finally {
+      setLoading(false);
     }
-  }, [loadingMore, loading, hasMore, page, fetchGroups]);
+  }, [debouncedSearch, user?.accessToken, isOnline, activeGroup]);
+
+  // Fetch on mount and when search changes
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
 
   // Render group card
   const renderItem = useCallback(
@@ -158,61 +103,63 @@ const SavedGroups = () => {
           style={styles.groupCard}
           activeOpacity={0.7}
           onPress={() => {
-            router.push({
+            router.navigate({
               pathname: "/broadcast/group/[chatId]",
               params: {
-                chatId: item.id,
+                chatId: item.id.toString(),
                 name: item.name,
+                contactCount: item.contact_count.toString(),
               },
             });
           }}
         >
           <View style={styles.groupHeader}>
-            <Text
-              style={[
-                typography.label1,
-                typography.bold,
-                { color: themeColors.textPrimary },
-              ]}
-            >
-              {item.name}
-            </Text>
             <View style={styles.memberBadge}>
               <Feather
                 name="users"
-                size={14}
-                color={themeColors["green-500"]}
+                size={16}
+                color={themeColors.groupIconForeground}
               />
+            </View>
+            <View>
               <Text
                 style={[
-                  typography.body4,
-                  { color: themeColors["green-500"], marginLeft: 4 },
+                  typography.label1,
+                  typography.bold,
+                  { color: themeColors.textPrimary },
                 ]}
               >
-                {item.memberCount}
+                {item.name}
+              </Text>
+              <Text
+                style={[typography.body4, { color: themeColors["green-500"] }]}
+              >
+                {item.contact_count ? `${item.contact_count} member(s)` : ""}
               </Text>
             </View>
           </View>
 
           <View style={styles.tagsContainer}>
-            {item.cropTypes.map((crop, idx) => (
-              <View key={`crop-${idx}`} style={styles.tag}>
-                <Text
-                  style={[typography.caption1, { color: themeColors.dark4 }]}
-                >
-                  {crop}
-                </Text>
-              </View>
-            ))}
-            {item.ageGroups.map((age, idx) => (
-              <View key={`age-${idx}`} style={styles.tag}>
-                <Text
-                  style={[typography.caption1, { color: themeColors.dark4 }]}
-                >
-                  {age}
-                </Text>
-              </View>
-            ))}
+            {item.crop_types &&
+              item.crop_types.map((cropName) => (
+                <View key={`crop-${cropName}`} style={styles.tag}>
+                  <Text
+                    style={[typography.caption1, { color: themeColors.dark4 }]}
+                  >
+                    {cropName}
+                  </Text>
+                </View>
+              ))}
+            {item.age_groups &&
+              item.age_groups.map((age, idx) => (
+                <View key={`age-${idx}`} style={styles.tag}>
+                  <Text
+                    style={[typography.caption1, { color: themeColors.dark4 }]}
+                  >
+                    {`${age} years`}
+                  </Text>
+                </View>
+              ))}
           </View>
         </TouchableOpacity>
       );
@@ -220,30 +167,25 @@ const SavedGroups = () => {
     [router],
   );
 
-  const keyExtractor = useCallback((item: SavedGroup) => item.id, []);
+  const keyExtractor = useCallback(
+    (item: SavedGroup) => item.id.toString(),
+    [],
+  );
 
   // List footer
   const ListFooterComponent = useMemo(() => {
-    if (loadingMore) {
-      return (
-        <View style={styles.footerLoader}>
-          <ActivityIndicator size="small" color={themeColors["green-500"]} />
-        </View>
-      );
-    }
-
-    if (!hasMore && groups.length > 0) {
+    if (groups.length > 0) {
       return (
         <View style={styles.footerMessage}>
           <Text style={[typography.body3, { color: themeColors.dark4 }]}>
-            You reached the end of saved groups.
+            {groups.length} group(s) found
           </Text>
         </View>
       );
     }
 
     return null;
-  }, [loadingMore, hasMore, groups.length]);
+  }, [groups.length]);
 
   // Empty component
   const ListEmptyComponent = useMemo(() => {
@@ -251,6 +193,30 @@ const SavedGroups = () => {
       return (
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={themeColors["green-500"]} />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Feather name="alert-circle" size={48} color={themeColors.error} />
+          <Text
+            style={[
+              typography.body2,
+              { color: themeColors.error, marginTop: 16 },
+            ]}
+          >
+            {error}
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => fetchGroups()}
+          >
+            <Text style={[typography.label2, { color: themeColors.white }]}>
+              Retry
+            </Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -268,7 +234,7 @@ const SavedGroups = () => {
         </Text>
       </View>
     );
-  }, [loading]);
+  }, [loading, error, fetchGroups]);
 
   return (
     <View style={styles.container}>
@@ -284,8 +250,6 @@ const SavedGroups = () => {
         keyExtractor={keyExtractor}
         ListFooterComponent={ListFooterComponent}
         ListEmptyComponent={ListEmptyComponent}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
         contentContainerStyle={styles.listContent}
         style={styles.list}
       />
@@ -317,25 +281,27 @@ const styles = StyleSheet.create({
   },
   groupCard: {
     backgroundColor: themeColors.white,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: themeColors.cardBorder,
+    borderColor: themeColors.mutedBorder,
   },
   groupHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
     marginBottom: 12,
+    gap: 16,
   },
   memberBadge: {
-    flexDirection: "row",
+    height: 32,
+    width: 32,
+    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: themeColors["green-50"],
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    flexDirection: "row",
+    backgroundColor: themeColors.groupIconBackground,
+    borderRadius: 16,
   },
   tagsContainer: {
     flexDirection: "row",
@@ -363,6 +329,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     minHeight: 400,
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: themeColors["green-500"],
+    borderRadius: 8,
   },
 });
 

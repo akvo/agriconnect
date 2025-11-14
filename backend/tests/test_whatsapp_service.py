@@ -1,4 +1,5 @@
 import os
+import json
 from unittest.mock import Mock, patch
 
 import pytest
@@ -301,11 +302,13 @@ class TestWhatsAppService:
                     "body": "Hello John, welcome to AgriConnect!",
                 }
 
+                content_variables = json.dumps({"1": "John"})
+
                 mock_client_instance.messages.create.assert_called_once_with(
                     from_="whatsapp:+14155238886",
                     to="whatsapp:+255123456789",
                     content_sid="HXabc123def456",
-                    content_variables={"1": "John"},
+                    content_variables=content_variables,
                 )
 
     def test_send_template_message_twilio_error(self):
@@ -368,11 +371,13 @@ class TestWhatsAppService:
                     {"1": "AgriConnect Updates"},
                 )
 
+                content_variables = json.dumps({"1": "AgriConnect Updates"})
+
                 mock_client_instance.messages.create.assert_called_once_with(
                     from_="whatsapp:+1987654321",  # Custom number used
                     to="whatsapp:+255123456789",
                     content_sid="HXbroadcast789",
-                    content_variables={"1": "AgriConnect Updates"},
+                    content_variables=content_variables,
                 )
 
     def test_send_template_message_multiple_variables(self):
@@ -410,11 +415,13 @@ class TestWhatsAppService:
                     "body": "Hello John, you have 5 unread messages",
                 }
 
+                content_variables = json.dumps({"1": "John", "2": "5"})
+
                 mock_client_instance.messages.create.assert_called_once_with(
                     from_="whatsapp:+14155238886",
                     to="whatsapp:+255123456789",
                     content_sid="HXreconnect123",
-                    content_variables={"1": "John", "2": "5"},
+                    content_variables=content_variables,
                 )
 
     def test_send_confirmation_template_success(self):

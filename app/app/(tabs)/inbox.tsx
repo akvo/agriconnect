@@ -1,4 +1,10 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import {
   StyleSheet,
   Text,
@@ -22,6 +28,8 @@ import {
   TicketResolvedEvent,
 } from "@/contexts/WebSocketContext";
 import { DAOManager } from "@/database/dao";
+import { useNetwork } from "@/contexts/NetworkContext";
+import { useTicket } from "@/contexts/TicketContext";
 
 const Tabs = {
   PENDING: "open",
@@ -33,7 +41,6 @@ const Inbox: React.FC = () => {
     initTab?: (typeof Tabs)[keyof typeof Tabs];
   }>();
   const router = useRouter();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [activeTab, setActiveTab] = useState<(typeof Tabs)[keyof typeof Tabs]>(
     initTab || Tabs.PENDING,
   );
@@ -44,11 +51,13 @@ const Inbox: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const pageSize = 10; // default page size to request
-  const endReachedTimeout = React.useRef<number | null>(null);
-  const isFetchingRef = React.useRef(false); // prevent duplicate fetches
-  const isInitialMount = React.useRef(true); // track initial mount
+  const endReachedTimeout = useRef<number | null>(null);
+  const isFetchingRef = useRef(false); // prevent duplicate fetches
+  const isInitialMount = useRef(true); // track initial mount
   const db = useDatabase();
   const { isConnected, onMessageCreated, onTicketResolved } = useWebSocket();
+  const { isOnline } = useNetwork();
+  const { tickets, setTickets } = useTicket();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
   const filtered = useMemo(() => {
@@ -129,10 +138,6 @@ const Inbox: React.FC = () => {
         return;
       }
 
-      if (!user?.accessToken) {
-        return;
-      }
-
       isFetchingRef.current = true;
 
       try {
@@ -148,11 +153,10 @@ const Inbox: React.FC = () => {
         // Use TicketSyncService to fetch tickets (local-first approach)
         const syncResult = await TicketSyncService.getTickets(
           db,
-          user.accessToken,
           tab,
           p,
           pageSize,
-          user.id,
+          user?.id,
         );
 
         const fetched: Ticket[] = syncResult.tickets || [];
@@ -176,7 +180,7 @@ const Inbox: React.FC = () => {
         isFetchingRef.current = false;
       }
     },
-    [user?.accessToken, pageSize, db, user?.id],
+    [user?.id, db, setTickets],
   );
 
   // Handle real-time message_created events
@@ -242,7 +246,7 @@ const Inbox: React.FC = () => {
 
         if (shouldAdd) {
           console.log("[Inbox] Creating optimistic ticket for new ticket");
-          setTickets((prevTickets) => [
+          setTickets((prevTickets: Ticket[]) => [
             {
               id: event.ticket_id,
               ticketNumber: event.ticket_number || `TICKET-${event.ticket_id}`,
@@ -279,7 +283,7 @@ const Inbox: React.FC = () => {
     });
 
     return unsubscribe;
-  }, [onMessageCreated, db, daoManager, activeTab, user, tickets]);
+  }, [onMessageCreated, db, daoManager, activeTab, user, tickets, setTickets]);
 
   // Handle real-time ticket_resolved events
   useEffect(() => {
@@ -335,7 +339,7 @@ const Inbox: React.FC = () => {
     });
 
     return unsubscribe;
-  }, [onTicketResolved, tickets, db, daoManager, activeTab]);
+  }, [onTicketResolved, tickets, db, daoManager, activeTab, setTickets]);
 
   // Reset list when tab changes
   useEffect(() => {
@@ -353,7 +357,7 @@ const Inbox: React.FC = () => {
     setError(null);
     // Fetch first page for new tab
     fetchTickets(activeTab, 1, false);
-  }, [activeTab, fetchTickets]);
+  }, [activeTab, fetchTickets, setTickets]);
 
   // Fetch when page changes (but not on initial mount or tab change)
   useEffect(() => {
@@ -412,7 +416,7 @@ const Inbox: React.FC = () => {
        * Connection Status Banner
        * Reconnecting when WebSocket is disconnected and there are tickets
        */}
-      {!isConnected && tickets.length > 0 && (
+      {isOnline && !isConnected && tickets.length > 0 && (
         <View style={styles.connectionBanner}>
           <Text style={[typography.caption1, { color: themeColors.error }]}>
             ⚠️ Reconnecting...

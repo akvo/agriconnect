@@ -28,10 +28,10 @@ from services.socketio_service import (
     emit_ticket_resolved,
     CONNECTIONS,
     RATE_LIMITS,
-    USER_CACHE,
-    set_user_cache,
-    get_user_cache,
-    delete_user_cache,
+    USER_CONNECTIONS,
+    add_user_connection,
+    get_user_connections,
+    remove_user_connection,
 )
 from models.user import User, UserType
 from models.administrative import UserAdministrative
@@ -47,7 +47,7 @@ class TestSocketIOConnection:
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         # Mock Socket.IO server
         mock_sio = MagicMock()
@@ -68,8 +68,8 @@ class TestSocketIOConnection:
                     assert result is True
                     assert "test_sid" in CONNECTIONS
                     assert CONNECTIONS["test_sid"]["user_id"] == sample_user.id
-                    assert sample_user.id in USER_CACHE
-                    assert USER_CACHE[sample_user.id] == "test_sid"
+                    assert sample_user.id in USER_CONNECTIONS
+                    assert "test_sid" in USER_CONNECTIONS[sample_user.id]
 
     @pytest.mark.asyncio
     async def test_connect_without_token(self, db_session):
@@ -77,7 +77,7 @@ class TestSocketIOConnection:
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         mock_sio = MagicMock()
 
@@ -94,7 +94,7 @@ class TestSocketIOConnection:
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         mock_sio = MagicMock()
 
@@ -114,7 +114,7 @@ class TestSocketIOConnection:
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         mock_sio = MagicMock()
         mock_sio.enter_room = AsyncMock()
@@ -149,27 +149,27 @@ class TestSocketIOConnection:
             "leave_count": 3,
             "window_start": datetime.now(timezone.utc),
         }
-        USER_CACHE[1] = "test_sid"
+        USER_CONNECTIONS[1] = {"test_sid"}
 
         await disconnect("test_sid")
 
         assert "test_sid" not in CONNECTIONS
         assert "test_sid" not in RATE_LIMITS
-        assert 1 not in USER_CACHE
+        assert 1 not in USER_CONNECTIONS
 
 
-class TestWardRoomSubscription:
-    """Test ward room subscription on connection"""
+class TestUserSpecificRoomSubscription:
+    """Test user-specific room subscription on connection"""
 
     @pytest.mark.asyncio
-    async def test_eo_joins_assigned_wards(
+    async def test_eo_joins_user_specific_room(
         self, db_session, sample_eo_user, sample_administrative
     ):
-        """Test EO joins their assigned ward rooms"""
+        """Test EO joins their user-specific room"""
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         # Create ward assignment
         ward_assignment = UserAdministrative(
@@ -179,8 +179,8 @@ class TestWardRoomSubscription:
         db_session.add(ward_assignment)
         db_session.commit()
 
-        # Store the administrative ID before session closes
-        admin_id = sample_administrative.id
+        # Store the user ID before session closes
+        user_id = sample_eo_user.id
 
         # Mock Socket.IO
         mock_sio = MagicMock()
@@ -202,16 +202,19 @@ class TestWardRoomSubscription:
                     result = await connect("test_sid", environ)
 
                     assert result is True
-                    assert f"ward:{admin_id}" in entered_rooms
+                    assert f"user:{user_id}" in entered_rooms
 
     @pytest.mark.asyncio
-    async def test_admin_joins_admin_room(self, db_session, sample_admin_user):
-        """Test admin joins the special admin room"""
+    async def test_admin_joins_user_specific_room(
+        self, db_session, sample_admin_user
+    ):
+        """Test admin joins their user-specific room"""
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
+        user_id = sample_admin_user.id
         mock_sio = MagicMock()
         entered_rooms = []
 
@@ -231,7 +234,7 @@ class TestWardRoomSubscription:
                     result = await connect("test_sid", environ)
 
                     assert result is True
-                    assert "ward:admin" in entered_rooms
+                    assert f"user:{user_id}" in entered_rooms
 
 
 class TestPlaygroundRoomManagement:
@@ -245,7 +248,7 @@ class TestPlaygroundRoomManagement:
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         # Setup connection state
         CONNECTIONS["test_sid"] = {
@@ -281,7 +284,7 @@ class TestPlaygroundRoomManagement:
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         # Setup connection state with EO user
         CONNECTIONS["test_sid"] = {
@@ -307,7 +310,7 @@ class TestPlaygroundRoomManagement:
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         CONNECTIONS["test_sid"] = {
             "user_id": sample_admin_user.id,
@@ -327,7 +330,7 @@ class TestPlaygroundRoomManagement:
         # Clear any leftover rate limits
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
-        USER_CACHE.clear()
+        USER_CONNECTIONS.clear()
 
         sid = "test_rate_limit_sid"
 
@@ -347,7 +350,7 @@ class TestEventEmissions:
 
     @pytest.mark.asyncio
     async def test_emit_message_received(self):
-        """Test message_received event emission"""
+        """Test message_received event emission to user-specific rooms"""
         mock_sio = MagicMock()
         emitted_events = []
 
@@ -355,6 +358,19 @@ class TestEventEmissions:
             emitted_events.append({"event": event, "data": data, "room": room})
 
         mock_sio.emit = mock_emit
+
+        # Setup test connections
+        CONNECTIONS.clear()
+        CONNECTIONS["admin_sid"] = {
+            "user_id": 1,
+            "user_type": "admin",
+            "ward_ids": [],
+        }
+        CONNECTIONS["eo_sid"] = {
+            "user_id": 2,
+            "user_type": "extension_officer",
+            "ward_ids": [10],
+        }
 
         # Mock get_db for push notifications (returns mock db session)
         with patch("services.socketio_service.get_db") as mock_get_db:
@@ -374,10 +390,10 @@ class TestEventEmissions:
                     administrative_id=10,
                 )
 
-                # Should emit to ward room and admin room
+                # Should emit to user-specific rooms
                 assert len(emitted_events) >= 2
-                assert any(e["room"] == "ward:10" for e in emitted_events)
-                assert any(e["room"] == "ward:admin" for e in emitted_events)
+                assert any(e["room"] == "user:1" for e in emitted_events)
+                assert any(e["room"] == "user:2" for e in emitted_events)
                 assert all(
                     e["event"] == "message_received" for e in emitted_events
                 )
@@ -461,7 +477,7 @@ class TestEventEmissions:
 
     @pytest.mark.asyncio
     async def test_emit_ticket_resolved(self):
-        """Test ticket_resolved event emission"""
+        """Test ticket_resolved event emission to user-specific rooms"""
         mock_sio = MagicMock()
         emitted_events = []
 
@@ -469,6 +485,19 @@ class TestEventEmissions:
             emitted_events.append({"event": event, "data": data, "room": room})
 
         mock_sio.emit = mock_emit
+
+        # Setup test connections
+        CONNECTIONS.clear()
+        CONNECTIONS["admin_sid"] = {
+            "user_id": 1,
+            "user_type": "admin",
+            "ward_ids": [],
+        }
+        CONNECTIONS["eo_sid"] = {
+            "user_id": 2,
+            "user_type": "extension_officer",
+            "ward_ids": [10],
+        }
 
         with patch("services.socketio_service.sio_server", mock_sio):
             await emit_ticket_resolved(
@@ -478,15 +507,15 @@ class TestEventEmissions:
                 administrative_id=10,
             )
 
-            # Should emit to ward room and admin room
+            # Should emit to user-specific rooms
             assert len(emitted_events) == 2
             assert all(e["event"] == "ticket_resolved" for e in emitted_events)
-            assert any(e["room"] == "ward:10" for e in emitted_events)
-            assert any(e["room"] == "ward:admin" for e in emitted_events)
+            assert any(e["room"] == "user:1" for e in emitted_events)
+            assert any(e["room"] == "user:2" for e in emitted_events)
 
     @pytest.mark.asyncio
     async def test_emit_whisper_created(self):
-        """Test whisper event emission"""
+        """Test whisper event emission to user-specific rooms"""
         mock_sio = MagicMock()
         emitted_events = []
 
@@ -494,6 +523,19 @@ class TestEventEmissions:
             emitted_events.append({"event": event, "data": data, "room": room})
 
         mock_sio.emit = mock_emit
+
+        # Setup test connections
+        CONNECTIONS.clear()
+        CONNECTIONS["admin_sid"] = {
+            "user_id": 1,
+            "user_type": "admin",
+            "ward_ids": [],
+        }
+        CONNECTIONS["eo_sid"] = {
+            "user_id": 2,
+            "user_type": "extension_officer",
+            "ward_ids": [10],
+        }
 
         with patch("services.socketio_service.sio_server", mock_sio):
             await emit_whisper_created(
@@ -505,11 +547,11 @@ class TestEventEmissions:
                 administrative_id=10,
             )
 
-            # Should emit to ward room and admin room
+            # Should emit to user-specific rooms
             assert len(emitted_events) == 2
             assert all(e["event"] == "whisper" for e in emitted_events)
-            assert any(e["room"] == "ward:admin" for e in emitted_events)
-            assert any(e["room"] == "ward:10" for e in emitted_events)
+            assert any(e["room"] == "user:1" for e in emitted_events)
+            assert any(e["room"] == "user:2" for e in emitted_events)
             # Verify event data includes all required fields
             assert all(e["data"]["customer_id"] == 5 for e in emitted_events)
             assert "suggestion" in emitted_events[0]["data"]
@@ -563,29 +605,45 @@ class TestHelperFunctions:
 
         assert ward_ids == []
 
-    def test_user_cache_operations(self):
-        """Test user cache set/get/delete operations"""
-        USER_CACHE.clear()
+    def test_user_connections_operations(self):
+        """Test USER_CONNECTIONS multi-device tracking"""
+        USER_CONNECTIONS.clear()
 
-        # Test set
-        set_user_cache(123, "sid_abc")
-        assert 123 in USER_CACHE
-        assert USER_CACHE[123] == "sid_abc"
+        # Test adding first connection for user
+        add_user_connection(123, "sid_abc")
+        assert 123 in USER_CONNECTIONS
+        assert "sid_abc" in USER_CONNECTIONS[123]
+        assert len(USER_CONNECTIONS[123]) == 1
 
-        # Test get
-        sid = get_user_cache(123)
-        assert sid == "sid_abc"
+        # Test adding second connection for same user (multi-device)
+        add_user_connection(123, "sid_xyz")
+        assert len(USER_CONNECTIONS[123]) == 2
+        assert "sid_abc" in USER_CONNECTIONS[123]
+        assert "sid_xyz" in USER_CONNECTIONS[123]
 
-        # Test get non-existent
-        sid = get_user_cache(999)
-        assert sid is None
+        # Test getting connections
+        sids = get_user_connections(123)
+        assert len(sids) == 2
+        assert "sid_abc" in sids
+        assert "sid_xyz" in sids
 
-        # Test delete
-        delete_user_cache(123)
-        assert 123 not in USER_CACHE
+        # Test getting connections for non-existent user
+        sids = get_user_connections(999)
+        assert len(sids) == 0
 
-        # Test delete non-existent (should not raise error)
-        delete_user_cache(999)
+        # Test removing one connection (user still has other device)
+        remove_user_connection(123, "sid_abc")
+        assert 123 in USER_CONNECTIONS
+        assert "sid_abc" not in USER_CONNECTIONS[123]
+        assert "sid_xyz" in USER_CONNECTIONS[123]
+        assert len(USER_CONNECTIONS[123]) == 1
+
+        # Test removing last connection (user entry should be removed)
+        remove_user_connection(123, "sid_xyz")
+        assert 123 not in USER_CONNECTIONS
+
+        # Test removing from non-existent user (should not raise error)
+        remove_user_connection(999, "sid_nonexistent")
 
 
 # Fixtures for tests

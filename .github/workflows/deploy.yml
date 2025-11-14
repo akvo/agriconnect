@@ -117,6 +117,22 @@ jobs:
           dockerfile-location: "backend/Dockerfile"
           cluster-name: "test"
 
+      - name: Docker Build Celery Worker
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "agriconnect2"
+          service-name: "celery-worker"
+          dockerfile-location: "backend/Dockerfile"
+          cluster-name: "test"
+
+      - name: Docker Build Celery Beat
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "agriconnect2"
+          service-name: "celery-beat"
+          dockerfile-location: "backend/Dockerfile"
+          cluster-name: "test"
+
       - name: Docker Push Nginx
         uses: ./composite-actions/.github/actions/docker-push
         with:
@@ -138,6 +154,22 @@ jobs:
         with:
           app-name: "agriconnect2"
           service-name: "backend"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "test"
+
+      - name: Docker Push Celery Worker
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "agriconnect2"
+          service-name: "celery-worker"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "test"
+
+      - name: Docker Push Celery Beat
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "agriconnect2"
+          service-name: "celery-beat"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
           cluster-name: "test"
 
@@ -175,6 +207,26 @@ jobs:
           app-name: "agriconnect2"
           deployment-name: "backend-deployment"
           container-name: "backend"
+          cluster-name: "test"
+          namespace-name: "agriconnect2-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Celery Worker
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "agriconnect2"
+          deployment-name: "celery-worker-deployment"
+          container-name: "celery-worker"
+          cluster-name: "test"
+          namespace-name: "agriconnect2-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Celery Beat
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "agriconnect2"
+          deployment-name: "celery-beat-deployment"
+          container-name: "celery-beat"
           cluster-name: "test"
           namespace-name: "agriconnect2-namespace"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}

@@ -14,13 +14,15 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Feather from "@expo/vector-icons/Feather";
 
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/services/api";
 import MessageBubble from "@/components/chat/message-bubble";
-import AISuggestionChip from "@/components/chat/ai-suggestion-chip";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import { formatDateLabel } from "@/utils/time";
@@ -32,6 +34,8 @@ interface BroadcastMessage {
   text: string;
   sender: "user"; // Only user messages (no customer variant for broadcast)
   timestamp: string;
+  status?: string;
+  total_recipients?: number;
 }
 
 interface DateSection {
@@ -40,70 +44,118 @@ interface DateSection {
   messages: BroadcastMessage[];
 }
 
-// Mock data for demonstration
-const generateMockMessages = (count: number): BroadcastMessage[] => {
-  const messages: BroadcastMessage[] = [];
-  const now = new Date();
+// Message validation and sanitization
+const WHATSAPP_MAX_LENGTH = 1500;
+const MESSAGE_MIN_LENGTH = 5;
 
-  for (let i = 0; i < count; i++) {
-    const timestamp = new Date(now.getTime() - (count - i) * 3600000); // 1 hour apart
-    messages.push({
-      id: i + 1,
-      name: i % 3 === 0 ? "You" : i % 3 === 1 ? "John Doe" : "Jane Smith",
-      text: `This is a broadcast message ${
-        i + 1
-      }. Testing the group chat functionality with multiple messages.`,
-      sender: "user",
-      timestamp: timestamp.toISOString(),
-    });
+interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+  sanitizedMessage?: string;
+}
+
+const sanitizeAndValidateMessage = (message: string): ValidationResult => {
+  if (!message || !message.trim()) {
+    return {
+      isValid: false,
+      error: "Message cannot be empty",
+    };
   }
 
-  return messages;
-};
+  // Remove control characters except newlines and tabs
+  let sanitized = message.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, "");
 
-// Dummy AI suggestion
-const getDummyAISuggestion = (): string => {
-  const suggestions = [
-    "Don't forget to apply fertilizer this week for best crop yield.",
-    "Weather forecast shows rain tomorrow. Plan your watering accordingly.",
-    "New training session available on sustainable farming practices.",
-    "Reminder: Market day is coming up on Friday.",
-  ];
-  return suggestions[Math.floor(Math.random() * suggestions.length)];
+  // Replace tabs with spaces
+  sanitized = sanitized.replace(/\t/g, " ");
+
+  // Replace more than 4 consecutive spaces with 3 spaces
+  sanitized = sanitized.replace(/ {4,}/g, "   ");
+
+  // Replace more than 2 consecutive newlines with 2 newlines
+  sanitized = sanitized.replace(/\n{3,}/g, "\n\n");
+
+  // Fix punctuation followed by multiple spaces
+  sanitized = sanitized.replace(/([.!?,;:])\s{2,}/g, "$1 ");
+
+  // Trim whitespace
+  sanitized = sanitized.trim();
+
+  // Validate length after sanitization
+  if (sanitized.length < MESSAGE_MIN_LENGTH) {
+    return {
+      isValid: false,
+      error: `Message is too short (minimum ${MESSAGE_MIN_LENGTH} characters)`,
+    };
+  }
+
+  if (sanitized.length > WHATSAPP_MAX_LENGTH) {
+    return {
+      isValid: false,
+      error: `Message is too long (${sanitized.length}/${WHATSAPP_MAX_LENGTH} characters)`,
+    };
+  }
+
+  return {
+    isValid: true,
+    sanitizedMessage: sanitized,
+  };
 };
 
 const BroadcastGroupChatScreen = () => {
   const params = useLocalSearchParams();
   const chatId = params.chatId as string | undefined;
+  const { user } = useAuth();
 
   const [messages, setMessages] = useState<BroadcastMessage[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [text, setText] = useState<string>("");
   const [sending, setSending] = useState<boolean>(false);
-  const [aiSuggestion, setAiSuggestion] = useState<string>("");
   const flatListRef = useRef<FlatList | null>(null);
 
-  // TODO: Replace with real API call to fetch group chat data
+  // Calculate character count for the input
+  const charCount = text.length;
+  const isOverLimit = charCount > WHATSAPP_MAX_LENGTH;
+  const isNearLimit = charCount > WHATSAPP_MAX_LENGTH * 0.9; // 90% of limit
+
+  // Fetch broadcast messages for this group
   const fetchGroupChatData = useCallback(async () => {
+    if (!chatId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       console.log(`[BroadcastGroupChat] Fetching data for chatId: ${chatId}`);
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const response = await api.getBroadcastMessagesByGroup(
+        user?.accessToken || "",
+        parseInt(chatId, 10),
+      );
 
-      // Generate mock messages
-      const mockMessages = generateMockMessages(10);
-      setMessages(mockMessages);
+      // Transform API response to match our message format
+      const transformedMessages: BroadcastMessage[] = response.map(
+        (broadcast: any) => ({
+          id: broadcast.id,
+          name: "You", // All broadcasts are from the current user
+          text: broadcast.message,
+          sender: "user" as const,
+          timestamp: broadcast.created_at,
+          status: broadcast.status,
+          total_recipients: broadcast.total_recipients,
+        }),
+      );
 
-      // Set a dummy AI suggestion
-      setAiSuggestion(getDummyAISuggestion());
-    } catch (error) {
-      console.error("[BroadcastGroupChat] Error fetching data:", error);
+      setMessages(transformedMessages);
+      console.log(
+        `[BroadcastGroupChat] Loaded ${transformedMessages.length} broadcasts`,
+      );
+    } catch (err) {
+      console.error("[BroadcastGroupChat] Error fetching data:", err);
     } finally {
       setLoading(false);
     }
-  }, [chatId]);
+  }, [chatId, user?.accessToken]);
 
   useEffect(() => {
     fetchGroupChatData();
@@ -163,52 +215,98 @@ const BroadcastGroupChatScreen = () => {
 
   // Handle send message
   const handleSendMessage = async () => {
-    if (text.trim().length === 0 || sending) {
+    if (text.trim().length === 0 || sending || !chatId) {
       return;
     }
 
-    const messageText = text.trim();
+    // Validate and sanitize message
+    const validation = sanitizeAndValidateMessage(text);
+
+    if (!validation.isValid) {
+      Alert.alert(
+        "Invalid Message",
+        validation.error || "Please check your message",
+        [{ text: "OK" }],
+      );
+      return;
+    }
+
+    const messageText = validation.sanitizedMessage!;
+    const tempId = Date.now();
     setText("");
 
     try {
       setSending(true);
 
       // Create optimistic UI message
-      const tempId = Date.now();
       const optimisticMessage: BroadcastMessage = {
         id: tempId,
         name: "You",
         text: messageText,
         sender: "user",
         timestamp: new Date().toISOString(),
+        status: "pending",
       };
 
       // Add optimistic message to UI
       setMessages((prev) => [...prev, optimisticMessage]);
       scrollToBottom(true);
 
-      // TODO: Replace with real API call to send broadcast message
       console.log(
-        `[BroadcastGroupChat] Sending message to chatId: ${chatId}, text: "${messageText}"`,
+        `[BroadcastGroupChat] Sending broadcast to groupId: ${chatId}`,
       );
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Send broadcast message via API
+      const response = await api.createBroadcastMessage(
+        user?.accessToken || "",
+        {
+          message: messageText,
+          group_ids: [parseInt(chatId, 10)],
+        },
+      );
 
-      // In real implementation, replace optimistic message with backend response
-      // For now, we keep the optimistic message as is
-    } catch (error) {
-      console.error("[BroadcastGroupChat] Error sending message:", error);
-      // TODO: Show error to user and remove optimistic message
+      console.log(
+        `[BroadcastGroupChat] Broadcast sent successfully: ${response.id}`,
+      );
+
+      // Replace optimistic message with real response
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempId
+            ? {
+                id: response.id,
+                name: "You",
+                text: response.message,
+                sender: "user" as const,
+                timestamp: response.created_at,
+                status: response.status,
+                total_recipients: response.total_recipients,
+              }
+            : msg,
+        ),
+      );
+    } catch (err: any) {
+      console.error("[BroadcastGroupChat] Error sending message:", err);
+
+      // Remove optimistic message on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+
+      // Show error alert with details
+      const errorMessage =
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Failed to send broadcast message";
+
+      Alert.alert("Send Failed", errorMessage, [{ text: "OK" }]);
+
+      console.error("[BroadcastGroupChat] Error details:", {
+        error: err,
+        chatId,
+        messageText,
+      });
     } finally {
       setSending(false);
     }
-  };
-
-  // Handle AI suggestion acceptance
-  const handleAcceptSuggestion = (suggestion: string) => {
-    setText(suggestion);
-    setAiSuggestion(""); // Clear suggestion after accepting
   };
 
   // Render item (date separator or message)
@@ -242,7 +340,7 @@ const BroadcastGroupChatScreen = () => {
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior="height"
+        behavior={undefined}
         keyboardVerticalOffset={48}
       >
         {/* Messages List */}
@@ -260,45 +358,55 @@ const BroadcastGroupChatScreen = () => {
             showsVerticalScrollIndicator={false}
           />
         </View>
-
-        {/* AI Suggestion Chip */}
-        {aiSuggestion && (
-          <AISuggestionChip
-            suggestion={aiSuggestion}
-            onAccept={handleAcceptSuggestion}
-          />
-        )}
-
         {/* Message Input */}
-        <View style={styles.inputRow}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            style={[
-              typography.body3,
-              styles.textInput,
-              { color: themeColors.dark1 },
-            ]}
-            placeholder="Type a broadcast message..."
-            placeholderTextColor={themeColors.dark3}
-            multiline
-            editable={!sending}
-          />
-          <TouchableOpacity
-            onPress={handleSendMessage}
-            style={[
-              styles.sendButton,
-              (sending || text.trim().length === 0) &&
-                styles.sendButtonDisabled,
-            ]}
-            disabled={sending || text.trim().length === 0}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={themeColors.white} />
-            ) : (
-              <Feather name="send" size={20} color={themeColors.white} />
-            )}
-          </TouchableOpacity>
+        <View style={styles.inputContainer}>
+          {/* Character Counter */}
+          {text.length > 0 && (
+            <View style={styles.charCounterContainer}>
+              <Text
+                style={[
+                  typography.caption2,
+                  styles.charCounter,
+                  isOverLimit && styles.charCounterError,
+                  isNearLimit && !isOverLimit && styles.charCounterWarning,
+                ]}
+              >
+                {charCount}/{WHATSAPP_MAX_LENGTH}
+              </Text>
+            </View>
+          )}
+          <View style={styles.inputRow}>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              style={[
+                typography.body3,
+                styles.textInput,
+                { color: themeColors.dark1 },
+                isOverLimit && styles.textInputError,
+              ]}
+              placeholder="Type a broadcast message..."
+              placeholderTextColor={themeColors.dark3}
+              multiline
+              editable={!sending}
+              maxLength={WHATSAPP_MAX_LENGTH + 100} // Allow slightly over for warning
+            />
+            <TouchableOpacity
+              onPress={handleSendMessage}
+              style={[
+                styles.sendButton,
+                (sending || text.trim().length === 0 || isOverLimit) &&
+                  styles.sendButtonDisabled,
+              ]}
+              disabled={sending || text.trim().length === 0 || isOverLimit}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={themeColors.white} />
+              ) : (
+                <Feather name="send" size={20} color={themeColors.white} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -327,13 +435,32 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: 10,
   },
+  inputContainer: {
+    borderTopWidth: 1,
+    borderColor: themeColors.mutedBorder,
+    backgroundColor: themeColors.background,
+  },
+  charCounterContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    alignItems: "flex-end",
+  },
+  charCounter: {
+    color: themeColors.dark3,
+    fontSize: 12,
+  },
+  charCounterWarning: {
+    color: "#FF9800", // Orange
+  },
+  charCounterError: {
+    color: themeColors.error,
+    fontWeight: "600",
+  },
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderColor: themeColors.mutedBorder,
     backgroundColor: themeColors.background,
   },
   textInput: {
@@ -343,6 +470,10 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: themeColors.white,
     borderRadius: 8,
+  },
+  textInputError: {
+    borderWidth: 1,
+    borderColor: themeColors.error,
   },
   sendButton: {
     marginLeft: 8,

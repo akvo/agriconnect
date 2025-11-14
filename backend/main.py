@@ -8,6 +8,8 @@ from routers import (
     admin_playground,
     administrative,
     auth,
+    broadcast_groups,
+    broadcast_messages,
     callbacks,
     customers,
     devices,
@@ -93,6 +95,8 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(admin_users.router, prefix="/api")
 app.include_router(admin_playground.router, prefix="/api")
 app.include_router(administrative.router, prefix="/api")
+app.include_router(broadcast_groups.router, prefix="/api")
+app.include_router(broadcast_messages.router, prefix="/api")
 app.include_router(callbacks.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")

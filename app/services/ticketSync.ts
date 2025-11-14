@@ -25,7 +25,6 @@ class TicketSyncService {
    */
   static async getTickets(
     db: SQLiteDatabase,
-    accessToken: string,
     status: "open" | "resolved",
     page: number = 1,
     pageSize: number = 10,
@@ -47,11 +46,9 @@ class TicketSyncService {
         };
 
         // Sync in background (don't await)
-        this.syncFromAPI(db, accessToken, status, page, pageSize, userId).catch(
-          (err) => {
-            console.error("Background sync failed:", err);
-          },
-        );
+        this.syncFromAPI(db, status, page, pageSize, userId).catch((err) => {
+          console.error("Background sync failed:", err);
+        });
 
         return result;
       }
@@ -59,7 +56,6 @@ class TicketSyncService {
       // If no local data or loading next page, fetch from API
       const apiResult = await this.syncFromAPI(
         db,
-        accessToken,
         status,
         page,
         pageSize,
@@ -87,7 +83,6 @@ class TicketSyncService {
    */
   static async syncFromAPI(
     db: SQLiteDatabase,
-    accessToken: string,
     status: "open" | "resolved",
     page: number = 1,
     pageSize: number = 10,
@@ -98,7 +93,7 @@ class TicketSyncService {
       const dao = new DAOManager(db);
 
       // Fetch from API
-      const apiData = await api.getTickets(accessToken, status, page, pageSize);
+      const apiData = await api.getTickets(status, page, pageSize);
       const apiTickets = apiData?.tickets || [];
 
       // Sync each ticket to local database
@@ -310,39 +305,11 @@ class TicketSyncService {
   }
 
   /**
-   * Force refresh all tickets for a given status
-   * Clears local cache and fetches fresh from API
-   */
-  static async forceRefresh(
-    db: SQLiteDatabase,
-    accessToken: string,
-    status: "open" | "resolved",
-    userId?: number,
-  ): Promise<SyncResult> {
-    try {
-      // Fetch first page from API
-      const result = await this.syncFromAPI(
-        db,
-        accessToken,
-        status,
-        1,
-        10,
-        userId,
-      );
-      return result;
-    } catch (error) {
-      console.error("Error force refreshing tickets:", error);
-      throw error;
-    }
-  }
-
-  /**
    * Fetch a single ticket by ID from API and sync to SQLite
    * Used when opening a chat from notification and ticket doesn't exist locally
    */
   static async syncTicketById(
     db: SQLiteDatabase,
-    accessToken: string,
     ticketId: number,
     userId?: number,
   ): Promise<boolean> {
@@ -350,7 +317,7 @@ class TicketSyncService {
       console.log(`[TicketSync] Fetching ticket ${ticketId} from API...`);
 
       // Fetch ticket details from API
-      const apiTicket = await api.getTicketById(accessToken, ticketId);
+      const apiTicket = await api.getTicketById(ticketId);
 
       if (!apiTicket) {
         console.warn(`[TicketSync] Ticket ${ticketId} not found in API`);
@@ -383,7 +350,6 @@ class TicketSyncService {
    */
   static async getTicketById(
     db: SQLiteDatabase,
-    accessToken: string,
     ticketId: number,
     userId?: number,
   ): Promise<Ticket | null> {
@@ -401,12 +367,7 @@ class TicketSyncService {
       console.log(
         `[TicketSync] Ticket ${ticketId} not in local DB, fetching from API...`,
       );
-      const synced = await this.syncTicketById(
-        db,
-        accessToken,
-        ticketId,
-        userId,
-      );
+      const synced = await this.syncTicketById(db, ticketId, userId);
 
       if (!synced) {
         console.warn(`[TicketSync] Failed to sync ticket ${ticketId}`);
