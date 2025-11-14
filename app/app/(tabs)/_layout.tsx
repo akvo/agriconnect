@@ -59,7 +59,7 @@ export default function TabLayout() {
             textAlign: "center",
           },
         }}
-        initialRouteName="inbox"
+        initialRouteName="home"
       >
         <Tabs.Screen
           name="home"

@@ -109,10 +109,8 @@ const BroadcastFarmerListTab = () => {
           params.administrative_id = selectedAdminIds;
         }
 
-        const response: CustomerListResponse = await api.getCustomersList(
-          user?.accessToken || "",
-          params,
-        );
+        const response: CustomerListResponse =
+          await api.getCustomersList(params);
 
         if (isLoadingMore) {
           // use the current customers array from context instead of an updater function
@@ -144,15 +142,13 @@ const BroadcastFarmerListTab = () => {
     },
     [
       isOnline,
-      isAdmin,
       debouncedSearch,
       selectedCropTypes,
       selectedAgeGroups,
+      isAdmin,
       selectedAdminIds,
-      user?.accessToken,
       selectedMembers,
       customers,
-      setCustomers,
     ],
   );
 

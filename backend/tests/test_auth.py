@@ -38,6 +38,7 @@ class TestUserLogin:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "access_token" in data
+        assert "refresh_token" in data
         assert data["user"]["email"] == user.email
         assert data["user"]["full_name"] == user.full_name
 
@@ -98,6 +99,8 @@ class TestUserLogin:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
         assert data["user"]["administrative_location"] is not None
 
     def test_login_invalid_email(self, client):
@@ -164,9 +167,11 @@ def authenticated_user_token(client, db_session):
         json={"email": user.email, "password": "testpassword123"},
     )
     assert login_response.status_code == status.HTTP_200_OK
-    token = login_response.json()["access_token"]
+    response_data = login_response.json()
+    token = response_data["access_token"]
+    refresh_token = response_data["refresh_token"]
 
-    return {"token": token, "user": user}
+    return {"token": token, "refresh_token": refresh_token, "user": user}
 
 
 class TestUserLogout:
@@ -600,6 +605,51 @@ class TestRegistrationEndpointRemoval:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+class TestTokenRefresh:
+    def test_refresh_token_web_with_cookie(
+        self, client, authenticated_user_token
+    ):
+        """Test token refresh using httpOnly cookie (web flow)"""
+        refresh_token = authenticated_user_token["refresh_token"]
+
+        # Simulate web request with refresh token in cookie
+        client.cookies.set("refresh_token", refresh_token)
+
+        response = client.post("/api/auth/refresh/")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+
+    def test_refresh_token_mobile_with_body(
+        self, client, authenticated_user_token
+    ):
+        """Test token refresh using body parameter (mobile flow)"""
+        refresh_token = authenticated_user_token["refresh_token"]
+
+        payload = {"mobile_refresh_token": refresh_token}
+        response = client.post("/api/auth/refresh/", json=payload)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+
+    def test_refresh_token_invalid(self, client):
+        """Test token refresh with invalid token"""
+        payload = {"mobile_refresh_token": "invalid_token_12345"}
+        response = client.post("/api/auth/refresh/", json=payload)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_refresh_token_missing(self, client):
+        """Test token refresh without providing any token"""
+        response = client.post("/api/auth/refresh/")
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
 class TestAcceptInvitation:
     def test_accept_valid_invitation(self, client, db_session):
         """Test accepting a valid invitation and setting password"""
@@ -628,6 +678,7 @@ class TestAcceptInvitation:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "access_token" in data
+        assert "refresh_token" in data
         assert data["user"]["email"] == user.email
         assert data["user"]["full_name"] == user.full_name
         # User should now be active

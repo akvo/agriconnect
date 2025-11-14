@@ -15,7 +15,6 @@ export const useMessages = (
   ticketId: number | null,
   customerId: number | undefined,
   userId: number | undefined,
-  accessToken: string | undefined,
   oldestTimestamp: string | null,
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
   setOldestTimestamp: React.Dispatch<React.SetStateAction<string | null>>,
@@ -24,7 +23,7 @@ export const useMessages = (
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
   const loadOlderMessages = useCallback(async () => {
-    if (!ticketId || !accessToken || !oldestTimestamp || loadingMore) {
+    if (!ticketId || !oldestTimestamp || loadingMore) {
       return;
     }
 
@@ -36,7 +35,6 @@ export const useMessages = (
 
       const result = await MessageSyncService.loadOlderMessages(
         db,
-        accessToken,
         ticketId,
         customerId || 0,
         oldestTimestamp,
@@ -80,7 +78,6 @@ export const useMessages = (
     }
   }, [
     ticketId,
-    accessToken,
     oldestTimestamp,
     loadingMore,
     db,

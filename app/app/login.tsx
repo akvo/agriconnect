@@ -10,19 +10,20 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api, LoginCredentials } from "../services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import themeColors from "@/styles/colors";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
-  const { login } = useAuth();
+  const { signIn } = useAuth();
+  const { expoPushToken } = useNotifications();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -48,12 +49,29 @@ export default function LoginScreen() {
         administrativeLocation: response.user.administrative_location,
       };
 
-      // Call login with access token and user data
-      // This will save both user and profile to database
-      await login(response.access_token, userData);
+      // Call signIn with access token, refresh token, and user data
+      // This will save tokens in SecureStore and user/profile in database
+      await signIn(
+        response.access_token,
+        response.refresh_token || "",
+        userData,
+      );
 
-      // Navigate to home page
-      router.replace("/home");
+      // Register device with push token if available
+      const appVersion = Constants.expoConfig?.version || "1.0.0";
+      if (expoPushToken) {
+        console.log(
+          "[Login] Registering device with push token:",
+          expoPushToken,
+        );
+        await api.registerDevice({
+          push_token: expoPushToken,
+          administrative_id: userData.administrativeLocation
+            ? userData.administrativeLocation.id
+            : undefined,
+          app_version: appVersion,
+        });
+      }
     } catch (error) {
       Alert.alert(
         "Login Failed",

@@ -9,16 +9,25 @@ import themeColors from "@/styles/colors";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
 import { initialsFromName } from "@/utils/string";
 import Avatar from "@/components/avatar";
+import { api } from "@/services/api";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { logout, user } = useAuth();
+  const { signOut, user } = useAuth();
   const { isOnline } = useNetwork();
 
   const handleLogout = async () => {
     try {
-      await logout();
-      router.replace("/login");
+      console.log("📱 Deactivating devices on backend...");
+      await api.logoutDevices();
+      console.log("✅ Devices deactivated successfully");
+    } catch (error) {
+      console.error("⚠️ Failed to deactivate devices:", error);
+      // Don't block signOut if device deactivation fails
+    }
+    try {
+      await signOut();
+      // Deactivate devices on backend BEFORE clearing local state
     } catch (error) {
       console.error("Error during logout:", error);
     }
