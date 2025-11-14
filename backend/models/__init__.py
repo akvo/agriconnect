@@ -7,6 +7,7 @@ from .administrative import (
 from .customer import Customer, CustomerLanguage
 from .device import Device
 from .knowledge_base import KnowledgeBase
+from .document import Document
 from .message import Message, MessageFrom
 from .service_token import ServiceToken
 from .ticket import Ticket
@@ -20,6 +21,7 @@ __all__ = [
     "CustomerLanguage",
     "Device",
     "KnowledgeBase",
+    "Document",
     "Message",
     "MessageFrom",
     "ServiceToken",

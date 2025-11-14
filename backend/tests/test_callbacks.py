@@ -1,3 +1,4 @@
+import json
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -184,14 +185,41 @@ def test_ai_callback_failed_job(client: TestClient, db_session: Session):
     assert response.json() == {"status": "received", "job_id": "job_456"}
 
 
-def test_kb_callback_success(client: TestClient, db_session: Session):
-    """Test successful KB callback"""
+def test_kb_callback_success(
+    client: TestClient, db_session: Session, monkeypatch
+):
+    """Test successful KB callback with valid payload"""
+    # Mock DocumentService.update_document_status to avoid DB calls
+    called = {}
+
+    def mock_update_document_status(
+        db, document_id, status, external_id, job_id
+    ):
+        called["args"] = {
+            "document_id": document_id,
+            "status": status,
+            "external_id": external_id,
+            "job_id": job_id,
+        }
+
+        class MockDoc:
+            id = document_id
+
+        return MockDoc()
+
+    monkeypatch.setattr(
+        "routers.callbacks.DocumentService.update_document_status",
+        mock_update_document_status,
+    )
+
     payload = {
         "job_id": "kb_job_789",
-        "status": "done",
-        "callback_params": None,  # No KB params to avoid DB access
-        "trace_id": "trace_003",
-        "job": "upload",
+        "status": "completed",
+        "output": json.dumps({"tasks": [{"upload_id": "ext_doc_001"}]}),
+        "error": None,
+        "callback_params": json.dumps(
+            {"kb_id": "kb_123", "document_id": 101, "user_id": 7}
+        ),
     }
 
     response = client.post("/api/callback/kb", json=payload)
@@ -199,24 +227,59 @@ def test_kb_callback_success(client: TestClient, db_session: Session):
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "kb_job_789"}
 
+    # Verify DocumentService was called correctly
+    assert called["args"]["document_id"] == 101
+    assert called["args"]["status"] == "completed"
+    assert called["args"]["external_id"] == "ext_doc_001"
+    assert called["args"]["job_id"] == "kb_job_789"
 
-def test_kb_callback_timeout(client: TestClient, db_session: Session):
-    """Test KB callback for timeout"""
+
+def test_kb_callback_failed_job(
+    client: TestClient, db_session: Session, monkeypatch
+):
+    """Test KB callback for failed job"""
+    called = {}
+
+    def mock_update_document_status(
+        db, document_id, status, external_id, job_id
+    ):
+        called["args"] = {
+            "document_id": document_id,
+            "status": status,
+            "external_id": external_id,
+            "job_id": job_id,
+        }
+
+        class MockDoc:
+            id = document_id
+
+        return MockDoc()
+
+    monkeypatch.setattr(
+        "routers.callbacks.DocumentService.update_document_status",
+        mock_update_document_status,
+    )
+
     payload = {
-        "job_id": "kb_job_timeout",
-        "status": "timeout",
-        "callback_params": None,  # No KB params to avoid DB access
-        "trace_id": "trace_004",
-        "job": "upload",
+        "job_id": "kb_job_failed",
+        "status": "failed",
+        "output": json.dumps({"tasks": [{"upload_id": "ext_doc_002"}]}),
+        "error": "File upload failed",
+        "callback_params": json.dumps(
+            {"kb_id": "kb_999", "document_id": 202, "user_id": 10}
+        ),
     }
 
     response = client.post("/api/callback/kb", json=payload)
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "received",
-        "job_id": "kb_job_timeout",
-    }
+    assert response.json() == {"status": "received", "job_id": "kb_job_failed"}
+
+    # Verify DocumentService was called correctly
+    assert called["args"]["document_id"] == 202
+    assert called["args"]["status"] == "failed"
+    assert called["args"]["external_id"] == "ext_doc_002"
+    assert called["args"]["job_id"] == "kb_job_failed"
 
 
 def test_callback_invalid_stage_enum(client: TestClient):

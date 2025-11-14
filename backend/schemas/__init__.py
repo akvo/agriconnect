@@ -19,6 +19,13 @@ from .user import (
     UserResponse,
     UserUpdate,
 )
+from .knowledge_base import (
+    KnowledgeBaseCreate,
+    KnowledgeBaseUpdate,
+    KnowledgeBaseResponse,
+    KnowledgeBaseListResponse,
+)
+from .document import DocumentResponse, DocumentListResponse, DocumentUpdate
 
 __all__ = [
     "AcceptInvitationRequest",
@@ -40,4 +47,11 @@ __all__ = [
     "UserListResponse",
     "UserResponse",
     "UserUpdate",
+    "KnowledgeBaseCreate",
+    "KnowledgeBaseUpdate",
+    "KnowledgeBaseResponse",
+    "KnowledgeBaseListResponse",
+    "DocumentResponse",
+    "DocumentListResponse",
+    "DocumentUpdate",
 ]

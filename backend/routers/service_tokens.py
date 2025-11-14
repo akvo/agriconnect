@@ -20,6 +20,8 @@ class ServiceTokenCreate(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    kb_url: Optional[str] = None
+    document_url: Optional[str] = None
     default_prompt: Optional[str] = None
     active: Optional[int] = None
 
@@ -28,6 +30,8 @@ class ServiceTokenUpdate(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    kb_url: Optional[str] = None
+    document_url: Optional[str] = None
     default_prompt: Optional[str] = None
     active: Optional[int] = None
 
@@ -38,6 +42,8 @@ class ServiceTokenResponse(BaseModel):
     access_token: Optional[str] = None
     chat_url: Optional[str] = None
     upload_url: Optional[str] = None
+    kb_url: Optional[str] = None
+    document_url: Optional[str] = None
     default_prompt: Optional[str] = None
     active: int
     created_at: datetime
@@ -73,6 +79,8 @@ def create_service_token(
         token_data.access_token,
         token_data.chat_url,
         token_data.upload_url,
+        token_data.kb_url,
+        token_data.document_url,
         token_data.default_prompt,
         token_data.active,
     )
@@ -107,6 +115,8 @@ def update_service_token(
         token_data.access_token,
         token_data.chat_url,
         token_data.upload_url,
+        token_data.kb_url,
+        token_data.document_url,
         token_data.default_prompt,
         token_data.active,
     )

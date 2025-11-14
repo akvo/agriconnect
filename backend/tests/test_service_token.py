@@ -13,6 +13,8 @@ def test_service_token_creation(db_session: Session):
         access_token="akvo_token_123",
         chat_url="https://akvo-rag.example.com/chat",
         upload_url="https://akvo-rag.example.com/upload",
+        kb_url="https://akvo-rag.example.com/kb",
+        document_url="https://akvo-rag.example.com/document",
         default_prompt="Test prompt",
     )
 
@@ -25,6 +27,10 @@ def test_service_token_creation(db_session: Session):
     assert service_token.access_token == "akvo_token_123"
     assert service_token.chat_url == "https://akvo-rag.example.com/chat"
     assert service_token.upload_url == "https://akvo-rag.example.com/upload"
+    assert service_token.kb_url == "https://akvo-rag.example.com/kb"
+    assert (
+        service_token.document_url == "https://akvo-rag.example.com/document"
+    )
     assert service_token.default_prompt == "Test prompt"
     assert service_token.created_at is not None
     assert service_token.updated_at is not None
@@ -73,6 +79,8 @@ def test_service_token_service_create_token(db_session: Session):
     access_token = "akvo_access_token_123"
     chat_url = "https://akvo-rag.example.com/chat"
     upload_url = "https://akvo-rag.example.com/upload"
+    kb_url = "https://akvo-rag.example.com/kb"
+    document_url = "https://akvo-rag.example.com/document"
     default_prompt = "Test AI prompt"
 
     service_token = ServiceTokenService.create_token(
@@ -81,6 +89,8 @@ def test_service_token_service_create_token(db_session: Session):
         access_token,
         chat_url,
         upload_url,
+        kb_url,
+        document_url,
         default_prompt,
     )
 
@@ -90,6 +100,8 @@ def test_service_token_service_create_token(db_session: Session):
     assert service_token.access_token == access_token
     assert service_token.chat_url == chat_url
     assert service_token.upload_url == upload_url
+    assert service_token.kb_url == kb_url
+    assert service_token.document_url == document_url
     assert service_token.default_prompt == default_prompt
 
     # Verify token can be found by service name
