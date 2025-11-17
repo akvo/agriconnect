@@ -48,6 +48,13 @@ class ReconnectionService:
             )
             return False
 
+        if pending_message_count <= 0:
+            logger.debug(
+                f"Customer {customer.id} has no pending messages; "
+                f"skipping reconnection template"
+            )
+            return False
+
         template_sid = settings.whatsapp_reconnection_template_sid
         if not template_sid:
             logger.warning(
