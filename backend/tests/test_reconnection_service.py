@@ -144,10 +144,10 @@ class TestReconnectionDetection:
 class TestReconnectionMessageCreation:
     """Test reconnection message creation and tracking"""
 
-    def test_reconnection_creates_message_in_database(
+    def test_reconnection_not_creates_message_in_database(
         self, db_session: Session
     ):
-        """Test that reconnection template creates a message record"""
+        """Test that reconnection template does NOT create a message record"""
         customer = Customer(
             phone_number="+255712345678",
             full_name="Test Farmer",
@@ -182,14 +182,12 @@ class TestReconnectionMessageCreation:
                     db_session.query(Message)
                     .filter(
                         Message.customer_id == customer.id,
-                        Message.from_source == MessageFrom.LLM,
+                        Message.from_source == MessageFrom.USER,
                     )
                     .all()
                 )
 
-                assert len(messages) == 1
-                assert messages[0].message_sid == "SM_RECONNECT_456"
-                assert "Reconnection:" in messages[0].body
+                assert len(messages) == 0
 
             finally:
                 settings.whatsapp_reconnection_template_sid = original_sid
@@ -229,7 +227,7 @@ class TestReconnectionMessageCreation:
 
                 # Verify last_message was updated
                 assert customer.last_message_at > old_time
-                assert customer.last_message_from == MessageFrom.LLM
+                assert customer.last_message_from == MessageFrom.USER
 
             finally:
                 settings.whatsapp_reconnection_template_sid = original_sid

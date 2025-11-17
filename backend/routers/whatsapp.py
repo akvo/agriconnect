@@ -15,6 +15,7 @@ from models.message import (
     MessageStatus,
     MessageType,
     MediaType,
+    DeliveryStatus,
 )
 from models.ticket import Ticket
 from models.administrative import Administrative
@@ -167,9 +168,19 @@ async def whatsapp_webhook(
 
         # Check if reconnection template needed (24+ hours inactive)
         if not is_new_customer:
+            # Get total pending messages from user to avoid spamming
+            pending_message_count = (
+                db.query(Message)
+                .filter(
+                    Message.customer_id == customer.id,
+                    Message.from_source == MessageFrom.USER,
+                    Message.delivery_status == DeliveryStatus.UNDELIVERED,
+                )
+                .count()
+            )
             reconnection_service = ReconnectionService(db)
             if reconnection_service.check_and_send_reconnection(
-                customer, Body
+                customer, pending_message_count
             ):
                 logger.info(
                     f"Sent reconnection template to {phone_number} "
@@ -423,6 +434,40 @@ async def whatsapp_webhook(
                 )
 
             return {"status": "success", "message": "Escalation processed"}
+
+        reconnect_payload = settings.whatsapp_reconnect_button_payload
+        # ========================================
+        # FLOW 2C: Handle "reconnect" button response
+        # ========================================
+        if ButtonPayload == reconnect_payload:
+            logger.info(f"Customer {phone_number} clicked 'reconnect' button")
+
+            # Load undevelivered messages from user to customer
+            undelivered_messages = (
+                db.query(Message)
+                .filter(
+                    Message.customer_id == customer.id,
+                    Message.from_source == MessageFrom.USER,
+                    Message.delivery_status == DeliveryStatus.UNDELIVERED,
+                    Message.body.isnot(None),
+                )
+                .all()
+            )
+
+            # Re-send via whatsapp service
+            whatsapp_service = WhatsAppService()
+            for undelivered_msg in undelivered_messages:
+                whatsapp_service.send_message(
+                    to_number=customer.phone_number,
+                    message_body=undelivered_msg.body,
+                )
+                logger.info(
+                    f"Re-sent undelivered message "
+                    f"{undelivered_msg.id} to {phone_number}"
+                )
+                # delete old undelivered message
+                db.delete(undelivered_msg)
+                db.commit()
 
         # ========================================
         # FLOW 1: Regular message
