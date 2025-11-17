@@ -17,8 +17,8 @@
 		},
 		"button_payloads": {
 			"escalate": "escalate",
-			"none": "none",
-			"read_broadcast": "read_broadcast"
+			"read_broadcast": "read_broadcast",
+			"reconnect": "reconnect"
 		}
 	},
 	"escalation": {
