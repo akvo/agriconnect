@@ -14,7 +14,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDatabase } from "@/database/context";
-import { useWebSocket } from "@/contexts/WebSocketContext";
+import { MessageCreatedEvent, useWebSocket } from "@/contexts/WebSocketContext";
 import { DAOManager } from "@/database/dao";
 import themeColors from "@/styles/colors";
 import { Message } from "@/utils/chat";
@@ -32,6 +32,8 @@ import {
   useChatWebSocket,
 } from "@/hooks/chat";
 import { useTicket } from "@/contexts/TicketContext";
+import { MESSAGE_CREATED, ticketEmitter } from "@/utils/ticketEvents";
+import { MessageFrom } from "@/constants/messageSource";
 
 const ChatScreen = () => {
   const params = useLocalSearchParams();
@@ -124,6 +126,130 @@ const ChatScreen = () => {
   });
 
   const [totalMessages, setTotalMessages] = useState<number>(0);
+
+  // Handle ticketEmitter (fallback for push notifications)
+  useEffect(() => {
+    const handleTicketEmitterMessage = async (data: any) => {
+      console.log("[ChatScreen] ticketEmitter MESSAGE_CREATED received:", data);
+
+      // Only process if this is the current ticket
+      if (!ticket?.id || parseInt(data.ticketId) !== ticket?.id) {
+        console.log(
+          "[ChatScreen] Ignoring ticketEmitter event for different ticket",
+        );
+        return;
+      }
+
+      // Convert push notification data to MessageCreatedEvent format
+      const event: MessageCreatedEvent = {
+        ticket_id: parseInt(data.ticketId),
+        message_id: parseInt(data.messageId),
+        phone_number: data.phone_number || "",
+        body: data.body || "",
+        from_source: MessageFrom.CUSTOMER,
+        ts: new Date().toISOString(),
+        ticket_number: data.ticketNumber,
+        sender_name: data.name,
+        customer_id: data.customer_id,
+        customer_name: data.name,
+      };
+
+      // Process the message using the same logic as WebSocket
+      try {
+        console.log("[ChatScreen] Processing ticketEmitter message:", event);
+
+        // Set AI suggestion loading for customer messages
+        setAISuggestionLoading(true);
+        setAISuggestionUsed(false);
+        setAISuggestion(null);
+
+        // Save message to SQLite
+        const savedMessage = daoManager.message.upsert(db, {
+          id: event.message_id,
+          from_source: event.from_source,
+          message_sid: `MSG_${Date.now()}`,
+          customer_id: event.customer_id || ticket.customer?.id,
+          user_id: event.user_id || null,
+          body: event.body,
+          createdAt: event.ts,
+        });
+
+        if (savedMessage) {
+          const dbMessage = daoManager.message.findByIdWithUsers(
+            db,
+            savedMessage.id,
+          );
+
+          // Update last message info in ticket
+          updateTicket(ticket.id!, {
+            lastMessageId: event.message_id,
+            unreadCount: 0,
+          });
+          await daoManager.ticket.update(db, ticket.id, {
+            lastMessageId: event.message_id,
+            unreadCount: 0,
+          });
+
+          if (dbMessage) {
+            const uiMessage = {
+              id: dbMessage.id,
+              message_sid: dbMessage.message_sid,
+              name: dbMessage.customer_name || dbMessage.user_name || "Unknown",
+              text: dbMessage.body,
+              sender: dbMessage.from_source === 1 ? "customer" : "user",
+              timestamp: dbMessage.createdAt,
+            } as Message;
+
+            setMessages((prev: Message[]) => {
+              // Deduplication check
+              const existingIndex = prev.findIndex(
+                (m) =>
+                  m.id === uiMessage.id ||
+                  m.message_sid === uiMessage.message_sid,
+              );
+
+              if (existingIndex !== -1) {
+                console.log(
+                  `[ChatScreen] Message ${uiMessage.id} already exists, skipping`,
+                );
+                return prev;
+              }
+
+              console.log(
+                `[ChatScreen] Adding new message ${uiMessage.id} from ticketEmitter`,
+              );
+              return [...prev, uiMessage];
+            });
+
+            setTimeout(() => scrollToBottom(true), 200);
+          }
+        }
+      } catch (error) {
+        console.error(
+          "[ChatScreen] Error handling ticketEmitter message:",
+          error,
+        );
+      }
+    };
+
+    ticketEmitter.on(MESSAGE_CREATED, handleTicketEmitterMessage);
+
+    return () => {
+      ticketEmitter.off(MESSAGE_CREATED, handleTicketEmitterMessage);
+    };
+  }, [
+    ticket?.id,
+    ticket?.customer?.id,
+    db,
+    daoManager,
+    user?.id,
+    updateTicket,
+    setMessages,
+    setAISuggestionLoading,
+    setAISuggestionUsed,
+    setAISuggestion,
+    scrollToBottom,
+  ]);
 
   // Load initial ticket data (only once on mount)
   useEffect(() => {
