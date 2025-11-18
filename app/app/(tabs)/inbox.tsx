@@ -98,7 +98,7 @@ const Inbox: React.FC = () => {
   }, [tickets, activeTab, query]);
   const { user } = useAuth();
 
-  const onPressTicket = (ticket: Ticket) => {
+  const onPressTicket = async (ticket: Ticket) => {
     // update unreadCount
     if (ticket.unreadCount && ticket.unreadCount > 0) {
       const _unreadCount = 0;
@@ -110,6 +110,8 @@ const Inbox: React.FC = () => {
       setTickets((prev: Ticket[]) =>
         prev.map((t: Ticket) => (t.id === ticket.id ? updated : t)),
       );
+      // update unreadCount in database
+      await daoManager.ticket.update(db, ticket.id, { unreadCount: _unreadCount });
     }
     // Navigate to the chat screen, passing ticketNumber as query param
     const chatName =

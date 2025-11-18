@@ -53,6 +53,8 @@ const HeaderOptions = ({ ticketID }: Props) => {
       if (ticket.customer?.id) {
         await dao.message.markWhisperAsUsed(db, ticket.customer.id);
       }
+      // Update unread count in database
+      await dao.ticket.update(db, ticket.id, { unreadCount: 0 });
       // Redirect to inbox after closing with active tab as 'resolved'
       router.replace("/inbox?initTab=resolved");
     } catch (error) {
