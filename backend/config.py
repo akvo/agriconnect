@@ -56,10 +56,9 @@ class Settings(BaseSettings):
         .get("sid"),
     )
     whatsapp_escalate_button_payload: str = (
-        _config.get("whatsapp", {}).get("button_payloads", {}).get("escalate")
-    )
-    whatsapp_none_button_payload: str = (
-        _config.get("whatsapp", {}).get("button_payloads", {}).get("none")
+        _config.get("whatsapp", {})
+        .get("button_payloads", {})
+        .get("escalate", "escalate")
     )
 
     # Escalation settings
@@ -82,6 +81,11 @@ class Settings(BaseSettings):
         _config.get("whatsapp", {})
         .get("reconnection", {})
         .get("threshold_hours", 24)
+    )
+    whatsapp_reconnect_button_payload: str = (
+        _config.get("whatsapp", {})
+        .get("button_payloads", {})
+        .get("reconnect", "reconnect")
     )
 
     # Retry settings for failed message delivery
