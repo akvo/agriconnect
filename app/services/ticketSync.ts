@@ -280,6 +280,9 @@ class TicketSyncService {
       // Create DAO manager instance
       const dao = new DAOManager(db);
 
+      // Check if ticket exists locally to preserve client-side state
+      const existingTicket = dao.ticket.findById(db, ticketData.id);
+
       // Ensure resolvedAt is explicitly null for open tickets
       const resolvedAt =
         ticketData.resolvedAt || ticketData.resolved_at || null;
@@ -287,6 +290,14 @@ class TicketSyncService {
       // IMPORTANT: Derive status from resolvedAt to ensure consistency
       // Don't trust the API's status field - it may be stale
       const status = resolvedAt ? "resolved" : "open";
+
+      // Preserve local unreadCount if ticket exists locally
+      // The backend doesn't track per-device read status, so we must preserve
+      // the local state that's managed by push notifications and user interactions
+      // Only use API unreadCount for new tickets
+      const unreadCount = existingTicket
+        ? existingTicket.unreadCount // Preserve local state
+        : ticketData.unreadCount || ticketData.unread_count || 0;
 
       dao.ticket.upsert(db, {
         id: ticketData.id, // Include API id
@@ -296,7 +307,7 @@ class TicketSyncService {
         status: status, // Use derived status, not API status
         resolvedAt: resolvedAt,
         resolvedBy: ticketData?.resolver?.id || null,
-        unreadCount: ticketData.unreadCount || ticketData.unread_count || 0,
+        unreadCount: unreadCount, // Use preserved value
       });
     } catch (error) {
       console.error("Error syncing ticket:", error);
