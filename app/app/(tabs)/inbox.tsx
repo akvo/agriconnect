@@ -195,6 +195,15 @@ const Inbox: React.FC = () => {
       if (ticketIndex !== -1) {
         setTickets((prevTickets: Ticket[]) => {
           const ticket = prevTickets[ticketIndex];
+
+          // Check if this message is already the last message (prevent duplicate increments)
+          if (ticket.lastMessageId === event.message_id) {
+            console.log(
+              `[Inbox] Message ${event.message_id} already processed for ticket ${event.ticket_id}, skipping duplicate`,
+            );
+            return prevTickets;
+          }
+
           const newUnreadCount = (ticket.unreadCount || 0) + 1;
 
           // Update database asynchronously (don't block UI)

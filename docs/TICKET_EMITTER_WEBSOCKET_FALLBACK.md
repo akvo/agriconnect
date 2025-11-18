@@ -279,16 +279,25 @@ const handleMessageCreatedEvent = async (event: MessageCreatedEvent) => {
 
 ### inbox.tsx Deduplication
 
-**For Existing Tickets (Lines 209-262):**
+**For Existing Tickets (Lines 195-227):**
 ```typescript
 const ticketIndex = tickets.findIndex((t: Ticket) => t.id === event.ticket_id);
 
 if (ticketIndex !== -1) {
-  // Update existing ticket's unreadCount
   setTickets((prevTickets: Ticket[]) => {
+    const ticket = prevTickets[ticketIndex];
+
+    // CRITICAL: Check if message already processed (prevent duplicate unread count increments)
+    if (ticket.lastMessageId === event.message_id) {
+      console.log(`[Inbox] Message already processed, skipping duplicate`);
+      return prevTickets;
+    }
+
+    const newUnreadCount = (ticket.unreadCount || 0) + 1;
+
     return prevTickets.map((t: Ticket) =>
       t.id === event.ticket_id
-        ? { ...t, unreadCount: newUnreadCount, lastMessage: {...}, updatedAt: event.ts }
+        ? { ...t, unreadCount: newUnreadCount, lastMessageId: event.message_id, lastMessage: {...}, updatedAt: event.ts }
         : t
     );
   });
