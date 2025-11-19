@@ -167,6 +167,7 @@ export const useChatWebSocket = ({
     setAISuggestionUsed,
     setAISuggestion,
     ticket.customer?.id,
+    updateTicket,
   ]);
 
   // Handle real-time ticket_resolved events
