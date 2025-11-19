@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/database/context";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 interface TicketData {
   id: number | null;
@@ -37,6 +38,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   setMessages,
 }) => {
   const { user } = useAuth();
+  const { isOnline } = useNetwork();
   const db = useDatabase();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
@@ -183,7 +185,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         placeholderTextColor={themeColors.dark3}
         multiline
       />
-      <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
+      <TouchableOpacity
+        onPress={handleSend}
+        style={[styles.sendButton, !isOnline && styles.sendButtonDisabled]}
+        disabled={!isOnline}
+      >
         <Feathericons name="send" size={20} color={themeColors.white} />
       </TouchableOpacity>
     </View>
@@ -215,5 +221,9 @@ const styles = StyleSheet.create({
     padding: 10,
     justifyContent: "center",
     alignItems: "center",
+  },
+  sendButtonDisabled: {
+    backgroundColor: themeColors.dark4,
+    opacity: 0.5,
   },
 });
