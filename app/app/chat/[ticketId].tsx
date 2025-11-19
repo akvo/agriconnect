@@ -279,6 +279,21 @@ const ChatScreen = () => {
     ticket?.messageId,
   ]);
 
+  // Handle aiSuggestionLoading state that took more than 30 seconds
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    if (aiSuggestionLoading) {
+      timeout = setTimeout(async () => {
+        loadTicketAndMessages(isOnline);
+      }, 30000); // 30 seconds
+    }
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [aiSuggestionLoading, isOnline, loadTicketAndMessages]);
+
   if (loading) {
     return (
       <SafeAreaView
