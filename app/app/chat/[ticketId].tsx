@@ -39,7 +39,6 @@ const ChatScreen = () => {
   const params = useLocalSearchParams();
   const ticketNumber = params.ticketNumber as string | undefined;
   const ticketId = params.ticketId as string | undefined;
-  const refresh = params.refresh as string | undefined;
   const [text, setText] = useState<string>("");
   const [stickyMessage, setStickyMessage] = useState<Message | null>(null);
   const hasLoadedInitially = useRef<boolean>(false);
@@ -124,8 +123,6 @@ const ChatScreen = () => {
     setAISuggestionUsed,
     updateTicket,
   });
-
-  const [totalMessages, setTotalMessages] = useState<number>(0);
 
   // Handle ticketEmitter (fallback for push notifications)
   useEffect(() => {
@@ -255,45 +252,9 @@ const ChatScreen = () => {
   useEffect(() => {
     if (!hasLoadedInitially.current) {
       hasLoadedInitially.current = true;
-      loadTicketAndMessages(refresh === "true");
+      loadTicketAndMessages(isOnline);
     }
-  }, [loadTicketAndMessages, refresh]);
-
-  // Handle refresh parameter
-  useEffect(() => {
-    if (
-      aiSuggestionLoading &&
-      !ticket?.resolvedAt &&
-      !loading &&
-      totalMessages === messages.length
-    ) {
-      /**
-       * When AI suggestion is loading and the ticket still open,
-       * we trigger a refresh to ensure
-       * that any new messages not yet in the local DB are fetched.
-       */
-      console.log("[ChatScreen] Refresh triggered by AI suggestion loading");
-      setTotalMessages(totalMessages + 1);
-      loadTicketAndMessages(true);
-    }
-
-    if (totalMessages !== messages.length && !loading) {
-      setTotalMessages(messages.length);
-    }
-
-    if (aiSuggestionLoading && ticket?.resolvedAt) {
-      setAISuggestionLoading(false);
-    }
-  }, [
-    aiSuggestionLoading,
-    messages.length,
-    totalMessages,
-    loading,
-    ticket?.customer?.id,
-    ticket?.resolvedAt,
-    setAISuggestionLoading,
-    loadTicketAndMessages,
-  ]);
+  }, [loadTicketAndMessages, isOnline]);
 
   // Handle sticky message from messageId parameter
   useEffect(() => {
