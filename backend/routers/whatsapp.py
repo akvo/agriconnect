@@ -307,25 +307,13 @@ async def whatsapp_webhook(
             # Create a message from original question instead of Body = "Yes".
             # To find the original question,
             # we can look by customer and find the latest minus one message.
-            original_message = (
+            message = (
                 db.query(Message)
                 .filter(Message.customer_id == customer.id)
                 .order_by(Message.created_at.desc())
                 .offset(1)
                 .first()
             )
-            message = Message(
-                message_sid=MessageSid,
-                customer_id=customer.id,
-                body=original_message.body if original_message else Body,
-                from_source=MessageFrom.CUSTOMER,
-                status=MessageStatus.ESCALATED,
-                media_url=media_url,
-                media_type=media_type,
-            )
-            db.add(message)
-            db.commit()
-            db.refresh(message)
 
             # Find or create ticket
             ticket = (
@@ -422,7 +410,7 @@ async def whatsapp_webhook(
                         ticket_id=ticket.id,
                         message_id=message.id,
                         phone_number=customer.phone_number,
-                        body=original_message.body,
+                        body=message.body,
                         from_source=MessageFrom.CUSTOMER,
                         ts=message.created_at.isoformat(),
                         administrative_id=ward_id,
