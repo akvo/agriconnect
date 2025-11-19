@@ -7,6 +7,7 @@ import { TouchableOpacity, StatusBar } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { useNetwork } from "@/contexts/NetworkContext";
+import HeaderEditButton from "@/components/account/header-edit-button";
 
 export default function TabLayout() {
   const router = useRouter();
@@ -110,6 +111,9 @@ export default function TabLayout() {
           name="account"
           options={{
             title: "Account",
+            headerShown: true,
+            headerTitleAlign: "center",
+            headerRight: () => <HeaderEditButton />,
             tabBarIcon: ({ color }: { color: string }) => (
               <Feathericons size={24} name="user" color={color} />
             ),
