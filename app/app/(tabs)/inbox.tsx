@@ -111,7 +111,9 @@ const Inbox: React.FC = () => {
         prev.map((t: Ticket) => (t.id === ticket.id ? updated : t)),
       );
       // update unreadCount in database
-      await daoManager.ticket.update(db, ticket.id, { unreadCount: _unreadCount });
+      await daoManager.ticket.update(db, ticket.id, {
+        unreadCount: _unreadCount,
+      });
     }
     // Navigate to the chat screen, passing ticketNumber as query param
     const chatName =
