@@ -118,7 +118,7 @@ def read_root():
     return {"Status": "OK"}
 
 
-# Mount Socket.IO at /ws/socket.io path
-# Socket.IO will handle /ws/socket.io/* requests
+# Mount Socket.IO at /ws path
+# Socket.IO will handle /ws/* requests
 # Must be mounted AFTER all FastAPI routes are defined
-app.mount("/ws/socket.io", sio_app)
+app.mount("/ws", sio_app)
