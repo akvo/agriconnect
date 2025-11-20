@@ -254,7 +254,11 @@ const ChatScreen = () => {
       hasLoadedInitially.current = true;
       loadTicketAndMessages(isOnline);
     }
-  }, [loadTicketAndMessages, isOnline]);
+    // Reset hasLoadedInitially if AI suggestion is not loading and not present
+    if (!aiSuggestionLoading && !aiSuggestion && hasLoadedInitially.current) {
+      hasLoadedInitially.current = false;
+    }
+  }, [loadTicketAndMessages, isOnline, aiSuggestion, aiSuggestionLoading]);
 
   // Handle sticky message from messageId parameter
   useEffect(() => {

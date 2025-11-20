@@ -290,7 +290,7 @@ const Inbox: React.FC = () => {
                 body: event.body,
                 timestamp: event.ts,
               },
-              unreadCount: 1,
+              unreadCount: 0,
               createdAt: event.ts,
               updatedAt: event.ts,
             } as Ticket,
