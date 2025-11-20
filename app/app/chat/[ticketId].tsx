@@ -254,11 +254,7 @@ const ChatScreen = () => {
       hasLoadedInitially.current = true;
       loadTicketAndMessages(isOnline);
     }
-    // Reset hasLoadedInitially if AI suggestion is not loading and not present
-    if (!aiSuggestionLoading && !aiSuggestion && hasLoadedInitially.current) {
-      hasLoadedInitially.current = false;
-    }
-  }, [loadTicketAndMessages, isOnline, aiSuggestion, aiSuggestionLoading]);
+  }, [loadTicketAndMessages, isOnline]);
 
   // Handle sticky message from messageId parameter
   useEffect(() => {
@@ -283,13 +279,13 @@ const ChatScreen = () => {
     ticket?.messageId,
   ]);
 
-  // Handle aiSuggestionLoading state that took more than 30 seconds
+  // Handle aiSuggestionLoading state that took more than 20 seconds
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     if (aiSuggestionLoading) {
       timeout = setTimeout(async () => {
         loadTicketAndMessages(isOnline);
-      }, 30000); // 30 seconds
+      }, 20000); // 20 seconds
     }
     return () => {
       if (timeout) {
@@ -297,6 +293,32 @@ const ChatScreen = () => {
       }
     };
   }, [aiSuggestionLoading, isOnline, loadTicketAndMessages]);
+
+  // Handle aiSuggestion not received within 5 seconds
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    if (
+      !aiSuggestion &&
+      !aiSuggestionLoading &&
+      !aiSuggestionUsed &&
+      hasLoadedInitially.current
+    ) {
+      timeout = setTimeout(async () => {
+        loadTicketAndMessages(isOnline);
+      }, 5000); // 5 seconds
+    }
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [
+    aiSuggestion,
+    aiSuggestionLoading,
+    aiSuggestionUsed,
+    isOnline,
+    loadTicketAndMessages,
+  ]);
 
   if (loading) {
     return (
