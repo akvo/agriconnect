@@ -294,10 +294,13 @@ const ChatScreen = () => {
     };
   }, [aiSuggestionLoading, isOnline, loadTicketAndMessages]);
 
-  // Handle aiSuggestion not received within 5 seconds
+  // Handle aiSuggestion not received within 5 seconds after a customer message
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    const lastMessage = messages?.slice(-1)?.[0];
+    const lastMessageIsCustomer = lastMessage?.sender === "customer";
     if (
+      lastMessageIsCustomer &&
       !aiSuggestion &&
       !aiSuggestionLoading &&
       !aiSuggestionUsed &&
@@ -317,6 +320,7 @@ const ChatScreen = () => {
     aiSuggestionLoading,
     aiSuggestionUsed,
     isOnline,
+    messages,
     loadTicketAndMessages,
   ]);
 
