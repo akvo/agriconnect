@@ -19,7 +19,7 @@ sio_server = socketio.AsyncServer(
     logger=True,
     engineio_logger=False,
     ping_timeout=120,
-    ping_interval=30,
+    ping_interval=130,
     transports=["websocket", "polling"],
 )
 
