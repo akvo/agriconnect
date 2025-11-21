@@ -18,10 +18,9 @@ interface SyncResult {
  */
 class TicketSyncService {
   /**
-   * Get tickets with local-first approach
-   * 1. First try to load from local SQLite
-   * 2. If empty, fetch from API and save to SQLite
-   * 3. If not empty but loading next page, fetch from API and sync
+   * Get tickets with hybrid strategy
+   * - For page 1, fetch from API and sync to SQLite
+   * - For subsequent pages, load from SQLite only
    */
   static async getTickets(
     db: SQLiteDatabase,
@@ -31,24 +30,6 @@ class TicketSyncService {
     userId?: number,
   ): Promise<SyncResult> {
     try {
-      // Create DAO manager instance
-      const dao = new DAOManager(db);
-
-      // Always try local first for initial page
-      const localResult = dao.ticket.findByStatus(db, status, page, pageSize);
-
-      // ✅ CORRECT: If we have local data for page 1, return it (no background sync)
-      if (page === 1 && localResult.tickets.length > 0) {
-        console.log(
-          `[TicketSync] Returning cached ${status} tickets (page ${page}, count: ${localResult.tickets.length})`,
-        );
-
-        return {
-          ...localResult,
-          source: "local",
-        };
-      }
-
       // If no local data or loading next page, fetch from API
       const apiResult = await this.syncFromAPI(
         db,
