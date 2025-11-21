@@ -91,13 +91,13 @@ const Inbox: React.FC = () => {
         return (b.unreadCount || 0) - (a.unreadCount || 0);
       }
       // Then by updatedAt desc
-      if (a?.updatedAt && b?.updatedAt) {
+      if (a?.updatedAt && b?.updatedAt && activeTab === Tabs.PENDING) {
         return (
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         );
       }
-      // Finally by createdAt desc
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      // Finally by id desc as fallback
+      return b.id - a.id;
     });
   }, [activeTab, query, getTicketsByStatus]);
   const { user } = useAuth();
