@@ -21,7 +21,6 @@ from services.message_service import MessageService
 from services.whatsapp_service import WhatsAppService
 from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
-from services.document_service import DocumentService
 from services.socketio_service import emit_whisper_created
 from services.socketio_service import emit_playground_response
 
@@ -392,25 +391,6 @@ async def kb_callback(
         if payload.status == CallbackStage.COMPLETED:
             # Handle successful KB upload/processing
             print(f"KB DOC processing completed for job: {payload.job_id}")
-
-            # Update KB status in database if kb_id is provided
-            if payload.callback_params and callback_params.document_id:
-                updated_doc = DocumentService.update_document_status(
-                    db=db,
-                    document_id=callback_params.document_id,
-                    status=CallbackStage.COMPLETED,
-                    external_id=str(document_upload_id),
-                    job_id=payload.job_id,
-                )
-                if updated_doc:
-                    print(
-                        f"KB DOC status updated to DONE for KB ID: {updated_doc.id}"
-                    )
-                else:
-                    print(
-                        f"Failed to update KB DOC status for KB ID: {payload.callback_params.kb_id}"
-                    )
-
             # Here you would typically also:
             # 1. Notify users that KB is ready
             # 2. Enable KB for queries
@@ -418,25 +398,6 @@ async def kb_callback(
         elif payload.status in ["failed", "timeout"]:
             # Handle error cases
             print(f"KB DOC processing failed: {payload.status}")
-
-            # Update KB status in database if kb_id is provided
-            if payload.callback_params and callback_params.document_id:
-                updated_doc = DocumentService.update_document_status(
-                    db=db,
-                    document_id=callback_params.document_id,
-                    status=payload.status,
-                    external_id=str(document_upload_id),
-                    job_id=payload.job_id,
-                )
-                if updated_doc:
-                    print(
-                        f"KB DOC status updated to {payload.status} for DOC ID: {updated_doc.id}"
-                    )
-                else:
-                    print(
-                        f"Failed to update KB DOC status for DOC ID: {payload.callback_params.get('document_id')}"
-                    )
-
             # Notify users of failure
 
         return {"status": "received", "job_id": payload.job_id}

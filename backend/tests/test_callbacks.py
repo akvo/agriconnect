@@ -185,103 +185,6 @@ def test_ai_callback_failed_job(client: TestClient, db_session: Session):
     assert response.json() == {"status": "received", "job_id": "job_456"}
 
 
-def test_kb_callback_success(
-    client: TestClient, db_session: Session, monkeypatch
-):
-    """Test successful KB callback with valid payload"""
-    # Mock DocumentService.update_document_status to avoid DB calls
-    called = {}
-
-    def mock_update_document_status(
-        db, document_id, status, external_id, job_id
-    ):
-        called["args"] = {
-            "document_id": document_id,
-            "status": status,
-            "external_id": external_id,
-            "job_id": job_id,
-        }
-
-        class MockDoc:
-            id = document_id
-
-        return MockDoc()
-
-    monkeypatch.setattr(
-        "routers.callbacks.DocumentService.update_document_status",
-        mock_update_document_status,
-    )
-
-    payload = {
-        "job_id": "kb_job_789",
-        "status": "completed",
-        "output": json.dumps({"tasks": [{"upload_id": "ext_doc_001"}]}),
-        "error": None,
-        "callback_params": json.dumps(
-            {"kb_id": "kb_123", "document_id": 101, "user_id": 7}
-        ),
-    }
-
-    response = client.post("/api/callback/kb", json=payload)
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "received", "job_id": "kb_job_789"}
-
-    # Verify DocumentService was called correctly
-    assert called["args"]["document_id"] == 101
-    assert called["args"]["status"] == "completed"
-    assert called["args"]["external_id"] == "ext_doc_001"
-    assert called["args"]["job_id"] == "kb_job_789"
-
-
-def test_kb_callback_failed_job(
-    client: TestClient, db_session: Session, monkeypatch
-):
-    """Test KB callback for failed job"""
-    called = {}
-
-    def mock_update_document_status(
-        db, document_id, status, external_id, job_id
-    ):
-        called["args"] = {
-            "document_id": document_id,
-            "status": status,
-            "external_id": external_id,
-            "job_id": job_id,
-        }
-
-        class MockDoc:
-            id = document_id
-
-        return MockDoc()
-
-    monkeypatch.setattr(
-        "routers.callbacks.DocumentService.update_document_status",
-        mock_update_document_status,
-    )
-
-    payload = {
-        "job_id": "kb_job_failed",
-        "status": "failed",
-        "output": json.dumps({"tasks": [{"upload_id": "ext_doc_002"}]}),
-        "error": "File upload failed",
-        "callback_params": json.dumps(
-            {"kb_id": "kb_999", "document_id": 202, "user_id": 10}
-        ),
-    }
-
-    response = client.post("/api/callback/kb", json=payload)
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "received", "job_id": "kb_job_failed"}
-
-    # Verify DocumentService was called correctly
-    assert called["args"]["document_id"] == 202
-    assert called["args"]["status"] == "failed"
-    assert called["args"]["external_id"] == "ext_doc_002"
-    assert called["args"]["job_id"] == "kb_job_failed"
-
-
 def test_callback_invalid_stage_enum(client: TestClient):
     """Test callback with invalid stage enum"""
     payload = {
@@ -619,8 +522,7 @@ def test_ai_callback_reply_with_original_message_not_found(
         "output": {"answer": "Test answer", "citations": []},
         "error": None,
         "callback_params": (
-            '{"message_id": 99999, "message_type": 1, '
-            '"customer_id": 1}'
+            '{"message_id": 99999, "message_type": 1, ' '"customer_id": 1}'
         ),
         "trace_id": "trace_404_001",
         "job": "chat",
@@ -671,8 +573,7 @@ def test_ai_callback_exception_raises_http_exception(
         raise Exception("Database connection failed")
 
     monkeypatch.setattr(
-        "routers.callbacks.MessageService",
-        mock_message_service_error
+        "routers.callbacks.MessageService", mock_message_service_error
     )
 
     payload = {
@@ -737,7 +638,7 @@ def test_kb_callback_exception_raises_http_exception(
         phone_number="+1234567892",
         hashed_password="test_hash",
         user_type=UserType.ADMIN,
-        full_name="KB Test User"
+        full_name="KB Test User",
     )
     db_session.add(user)
     db_session.commit()
@@ -761,7 +662,7 @@ def test_kb_callback_exception_raises_http_exception(
 
     monkeypatch.setattr(
         "services.knowledge_base_service.KnowledgeBaseService",
-        MockKnowledgeBaseServiceError
+        MockKnowledgeBaseServiceError,
     )
 
     payload = {

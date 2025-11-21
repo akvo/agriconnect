@@ -10,6 +10,7 @@ from schemas.knowledge_base import (
     KnowledgeBaseListResponse,
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
+    CreateKnowledgeBaseResponse,
 )
 from services.knowledge_base_service import KnowledgeBaseService
 from services.service_token_service import ServiceTokenService
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/kb", tags=["knowledge_base"])
 
 @router.post(
     "",
-    response_model=KnowledgeBaseResponse,
+    response_model=CreateKnowledgeBaseResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create Knowledge Base",
     description="Create a new knowledge base.",
@@ -61,14 +62,16 @@ async def create_knowledge_base(
 
     kb = KnowledgeBaseService.create_knowledge_base(
         db=db,
-        id=str(rag_kb_response.get("knowledge_base_id")),
+        external_id=str(rag_kb_response.get("knowledge_base_id")),
         user_id=current_user.id,
-        title=kb_data.title,
-        description=kb_data.description,
-        extra_data=kb_data.extra_data,
         service_id=service_token.id,
     )
-    return kb
+    return CreateKnowledgeBaseResponse(
+        id=kb.id,
+        user_id=kb.user_id,
+        title=rag_kb_response.get("name"),
+        description=rag_kb_response.get("description"),
+    )
 
 
 @router.get(
@@ -91,19 +94,62 @@ async def list_knowledge_bases(
         else current_user.id
     )
 
-    knowledge_bases, total = KnowledgeBaseService.get_knowledge_bases(
+    # check for active service token
+    service_token = ServiceTokenService.get_active_token(db=db)
+    if not service_token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active service configured",
+        )
+
+    # Get active service
+    ai_service = ExternalAIService(db)
+    if not ai_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No active AI service configured",
+        )
+
+    knowledge_bases = KnowledgeBaseService.get_knowledge_bases(
         db=db,
         user_id=user_id,
-        page=page,
-        size=size,
-        search=search,
     )
+    kb_external_ids = {kb.external_id: kb.id for kb in knowledge_bases}
+
+    # TODO :: Need to make RAG accept list of kb_ids
+    rag_kb_response = await ai_service.manage_knowledge_base(operation="list")
+
+    # empty
+    if not rag_kb_response.get("total"):
+        return KnowledgeBaseListResponse(
+            data=[],
+            total=0,
+            page=0,
+            size=0,
+        )
+
+    data = []
+    for kb in rag_kb_response.get("data"):
+        kb_id = kb.get("id")
+        kb_id = str(kb_id) if kb_id else None
+        if not kb_id or kb_id not in kb_external_ids.keys():
+            continue
+        current_kb_id = kb_external_ids.get(str(kb_id))
+        data.append(
+            KnowledgeBaseResponse(
+                id=current_kb_id,
+                title=kb.get("name"),
+                description=kb.get("description"),
+                created_at=kb.get("created_at"),
+                updated_at=kb.get("updated_at"),
+            ),
+        )
 
     return KnowledgeBaseListResponse(
-        data=knowledge_bases or [],
-        total=total,
-        page=page,
-        size=size,
+        data=data or [],
+        total=rag_kb_response.get("total", 0),
+        page=rag_kb_response.get("page", 0),
+        size=rag_kb_response.get("size", 0),
     )
 
 
@@ -114,7 +160,7 @@ async def list_knowledge_bases(
     summary="Get Knowledge Base by ID",
 )
 async def get_knowledge_base(
-    kb_id: str,
+    kb_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -136,12 +182,38 @@ async def get_knowledge_base(
             detail="Not authorized to access this KB.",
         )
 
-    return kb
+    # check for active service token
+    service_token = ServiceTokenService.get_active_token(db=db)
+    if not service_token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active service configured",
+        )
+
+    # Get active service
+    ai_service = ExternalAIService(db)
+    if not ai_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No active AI service configured",
+        )
+
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="get", kb_id=kb.external_id
+    )
+
+    return KnowledgeBaseResponse(
+        id=kb_id,
+        title=rag_kb_response.get("name"),
+        description=rag_kb_response.get("description"),
+        created_at=rag_kb_response.get("created_at"),
+        updated_at=rag_kb_response.get("updated_at"),
+    )
 
 
 @router.put(
     "/{kb_id}",
-    response_model=KnowledgeBaseResponse,
+    response_model=CreateKnowledgeBaseResponse,
     status_code=status.HTTP_200_OK,
     summary="Update Knowledge Base",
 )
@@ -174,7 +246,7 @@ async def update_knowledge_base(
         operation="update",
         name=kb_update.title,
         description=kb_update.description,
-        kb_id=kb_id,
+        kb_id=kb.external_id,
     )
 
     if not rag_kb_response:
@@ -183,16 +255,12 @@ async def update_knowledge_base(
             detail="Failed to update knowledge base on external AI service.",
         )
 
-    updated_kb = KnowledgeBaseService.update_knowledge_base(
-        db=db,
-        kb_id=kb_id,
-        title=kb_update.title,
-        description=kb_update.description,
-        extra_data=kb_update.extra_data,
-        active=kb_update.active,
+    return CreateKnowledgeBaseResponse(
+        id=kb_id,
+        user_id=kb.user_id,
+        title=rag_kb_response.get("name"),
+        description=rag_kb_response.get("description"),
     )
-
-    return updated_kb
 
 
 @router.delete(
@@ -224,7 +292,7 @@ async def delete_knowledge_base(
     ai_service = ExternalAIService(db)
     rag_kb_response = await ai_service.manage_knowledge_base(
         operation="delete",
-        kb_id=kb_id,
+        kb_id=kb.external_id,
     )
 
     if not rag_kb_response:

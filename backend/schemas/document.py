@@ -20,11 +20,12 @@ class DocumentResponse(BaseModel):
         from_attributes = True
 
 
-class DocumentUpdate(BaseModel):
-    """Used to update document metadata (title/description in extra_data)."""
+class UploadDocumentResponse(BaseModel):
+    job_id: str
+    status: str
 
-    title: Optional[str] = None
-    description: Optional[str] = None
+    class Config:
+        from_attributes = True
 
 
 class DocumentListResponse(BaseModel):

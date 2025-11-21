@@ -24,8 +24,13 @@ from .knowledge_base import (
     KnowledgeBaseUpdate,
     KnowledgeBaseResponse,
     KnowledgeBaseListResponse,
+    CreateKnowledgeBaseResponse,
 )
-from .document import DocumentResponse, DocumentListResponse, DocumentUpdate
+from .document import (
+    DocumentResponse,
+    DocumentListResponse,
+    UploadDocumentResponse,
+)
 
 __all__ = [
     "AcceptInvitationRequest",
@@ -53,5 +58,6 @@ __all__ = [
     "KnowledgeBaseListResponse",
     "DocumentResponse",
     "DocumentListResponse",
-    "DocumentUpdate",
+    "CreateKnowledgeBaseResponse",
+    "UploadDocumentResponse",
 ]

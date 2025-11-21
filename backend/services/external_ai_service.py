@@ -195,7 +195,6 @@ class ExternalAIService:
         self,
         upload_file,
         kb_id: str,
-        document_id: int,
         user_id: int,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
@@ -227,7 +226,6 @@ class ExternalAIService:
             "metadata": metadata or {},
             "callback_params": {
                 "kb_id": kb_id,
-                "document_id": document_id,
                 "user_id": user_id,
             },
             "knowledge_base_id": kb_id,
@@ -275,6 +273,7 @@ class ExternalAIService:
         name: Optional[str] = None,
         description: Optional[str] = None,
         kb_id: Optional[int] = None,
+        is_doc: Optional[bool] = False,
     ) -> Optional[Dict[str, Any]]:
         """
         Perform knowledge base operations with external AI service.
@@ -294,7 +293,7 @@ class ExternalAIService:
             )
             return None
 
-        url = self.token.kb_url
+        url = self.token.kb_url if not is_doc else self.token.document_url
         headers = {"Authorization": f"Bearer {self.token.access_token}"}
         name = name or "Agriconnect Untitled KB"
 
@@ -314,6 +313,25 @@ class ExternalAIService:
                     response = await client.patch(
                         f"{url}/{kb_id}",
                         json=payload,
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                elif operation == "list":
+                    response = await client.get(
+                        f"{url}",
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                elif operation == "list_docs":
+                    response = await client.get(
+                        f"{url}",
+                        headers=headers,
+                        timeout=30.0,
+                        params={"kb_id": kb_id},
+                    )
+                elif operation == "get":
+                    response = await client.get(
+                        f"{url}/{kb_id}",
                         headers=headers,
                         timeout=30.0,
                     )
