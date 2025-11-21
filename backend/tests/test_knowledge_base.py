@@ -36,7 +36,7 @@ def mock_external_ai_service():
     """
     with (
         patch(
-            "services.external_ai_service.ExternalAIService.manage_knowledge_base",
+            "services.external_ai_service.ExternalAIService.manage_knowledge_base",  # noqa
             new_callable=AsyncMock,
         ) as mock_method,
         patch(
@@ -226,7 +226,7 @@ class TestKnowledgeBaseEndpoints:
             operation="update",
             name=payload["title"],
             description=payload["description"],
-            kb_id=str(kb.id),
+            kb_id="mock-kb-id-456",
         )
 
     def test_update_knowledge_base_forbidden(
