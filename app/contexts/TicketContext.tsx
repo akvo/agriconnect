@@ -16,7 +16,15 @@ import React, {
   ReactNode,
 } from "react";
 
-const TicketContext = createContext<any>(null);
+interface TicketContextType {
+  tickets: Ticket[];
+  setTickets: React.Dispatch<React.SetStateAction<Ticket[]>>;
+  getTicketsByStatus: (status: "open" | "resolved") => Ticket[];
+  createTicket: (data: CreateTicketData) => Promise<void>;
+  updateTicket: (id: number, data: Partial<UpdateTicketData>) => Promise<void>;
+}
+
+const TicketContext = createContext<TicketContextType | undefined>(undefined);
 
 export const useTicket = () => {
   const context = useContext(TicketContext);
@@ -44,11 +52,15 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
     };
   }, []);
 
+  // ✅ CORRECT: Load ALL tickets from SQLite (no limit)
   const loadTickets = useCallback(async () => {
     try {
-      const result = await dao.ticket.findAll(db);
+      const allTickets = await dao.ticket.findAll(db);
       if (isMounted.current) {
-        setTickets(result);
+        setTickets(allTickets);
+        console.log(
+          `[TicketContext] Loaded ${allTickets.length} tickets from SQLite`,
+        );
       }
     } catch (error) {
       console.error("Error loading tickets:", error);
@@ -58,6 +70,17 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
   useEffect(() => {
     loadTickets();
   }, [loadTickets]);
+
+  // Filter tickets by status (in-memory operation)
+  const getTicketsByStatus = useCallback(
+    (status: "open" | "resolved") => {
+      return tickets.filter((t: Ticket) => {
+        const isResolved = !!t.resolvedAt;
+        return status === "resolved" ? isResolved : !isResolved;
+      });
+    },
+    [tickets],
+  );
 
   const createTicket = useCallback(
     async (data: CreateTicketData) => {
@@ -91,7 +114,13 @@ export const TicketProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <TicketContext.Provider
-      value={{ tickets, setTickets, createTicket, updateTicket }}
+      value={{
+        tickets,
+        setTickets,
+        getTicketsByStatus,
+        createTicket,
+        updateTicket,
+      }}
     >
       {children}
     </TicketContext.Provider>
