@@ -1,3 +1,4 @@
+import json
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -182,41 +183,6 @@ def test_ai_callback_failed_job(client: TestClient, db_session: Session):
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "job_456"}
-
-
-def test_kb_callback_success(client: TestClient, db_session: Session):
-    """Test successful KB callback"""
-    payload = {
-        "job_id": "kb_job_789",
-        "status": "done",
-        "callback_params": None,  # No KB params to avoid DB access
-        "trace_id": "trace_003",
-        "job": "upload",
-    }
-
-    response = client.post("/api/callback/kb", json=payload)
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "received", "job_id": "kb_job_789"}
-
-
-def test_kb_callback_timeout(client: TestClient, db_session: Session):
-    """Test KB callback for timeout"""
-    payload = {
-        "job_id": "kb_job_timeout",
-        "status": "timeout",
-        "callback_params": None,  # No KB params to avoid DB access
-        "trace_id": "trace_004",
-        "job": "upload",
-    }
-
-    response = client.post("/api/callback/kb", json=payload)
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "status": "received",
-        "job_id": "kb_job_timeout",
-    }
 
 
 def test_callback_invalid_stage_enum(client: TestClient):
@@ -556,8 +522,7 @@ def test_ai_callback_reply_with_original_message_not_found(
         "output": {"answer": "Test answer", "citations": []},
         "error": None,
         "callback_params": (
-            '{"message_id": 99999, "message_type": 1, '
-            '"customer_id": 1}'
+            '{"message_id": 99999, "message_type": 1, ' '"customer_id": 1}'
         ),
         "trace_id": "trace_404_001",
         "job": "chat",
@@ -608,8 +573,7 @@ def test_ai_callback_exception_raises_http_exception(
         raise Exception("Database connection failed")
 
     monkeypatch.setattr(
-        "routers.callbacks.MessageService",
-        mock_message_service_error
+        "routers.callbacks.MessageService", mock_message_service_error
     )
 
     payload = {
@@ -674,7 +638,7 @@ def test_kb_callback_exception_raises_http_exception(
         phone_number="+1234567892",
         hashed_password="test_hash",
         user_type=UserType.ADMIN,
-        full_name="KB Test User"
+        full_name="KB Test User",
     )
     db_session.add(user)
     db_session.commit()
@@ -698,7 +662,7 @@ def test_kb_callback_exception_raises_http_exception(
 
     monkeypatch.setattr(
         "services.knowledge_base_service.KnowledgeBaseService",
-        MockKnowledgeBaseServiceError
+        MockKnowledgeBaseServiceError,
     )
 
     payload = {

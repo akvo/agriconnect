@@ -1,63 +1,43 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-
+from typing import List, Optional
 from pydantic import BaseModel, Field
-
-from schemas.callback import CallbackStage
 
 
 class KnowledgeBaseCreate(BaseModel):
-    """Schema for creating a knowledge base entry"""
-
-    filename: str = Field(
-        ..., description="Original filename of the uploaded file"
-    )
     title: str = Field(..., description="Title for the knowledge base")
     description: Optional[str] = Field(
-        None, description="Description of the knowledge base content"
-    )
-    extra_data: Optional[Dict[str, Any]] = Field(
-        None, description="Additional metadata as JSON"
+        None, description="Description of the KB"
     )
 
 
 class KnowledgeBaseUpdate(BaseModel):
-    """Schema for updating a knowledge base entry"""
-
-    title: Optional[str] = Field(None, description="Updated title")
-    description: Optional[str] = Field(None, description="Updated description")
-    extra_data: Optional[Dict[str, Any]] = Field(
-        None, description="Updated metadata"
-    )
-
-
-class KnowledgeBaseStatusUpdate(BaseModel):
-    """Schema for updating KB status (used internally by callbacks)"""
-
-    status: CallbackStage = Field(..., description="New status")
+    title: Optional[str] = None
+    description: Optional[str] = None
 
 
 class KnowledgeBaseResponse(BaseModel):
-    """Schema for knowledge base response"""
-
     id: int
-    user_id: int
-    filename: str
     title: str
     description: Optional[str]
-    extra_data: Optional[Dict[str, Any]]
-    status: CallbackStage
-    created_at: datetime
+    created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True
 
 
-class KnowledgeBaseListResponse(BaseModel):
-    """Schema for paginated knowledge base list"""
+class CreateKnowledgeBaseResponse(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    description: Optional[str]
 
-    knowledge_bases: List[KnowledgeBaseResponse]
+    class Config:
+        from_attributes = True
+
+
+class KnowledgeBaseListResponse(BaseModel):
+    data: Optional[List[KnowledgeBaseResponse]] = []
     total: int
     page: int
     size: int

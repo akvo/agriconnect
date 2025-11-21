@@ -193,16 +193,18 @@ class ExternalAIService:
 
     async def create_upload_job(
         self,
-        file_path: str,
-        kb_id: int,
+        upload_file,
+        kb_id: str,
+        user_id: int,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Create an upload job with external AI service.
 
         Args:
-            file_path: Path to file to upload
+            upload_file: File to upload to external service
             kb_id: Knowledge base ID
+            document_id: Document ID as a callback to update document status
             metadata: Optional metadata for the upload
 
         Returns:
@@ -215,14 +217,171 @@ class ExternalAIService:
             )
             return None
 
-        # TODO: Implement file upload logic
-        # This depends on how external service expects files
+        url = self.token.upload_url
+        headers = {"Authorization": f"Bearer {self.token.access_token}"}
 
-        logger.info(
-            f"Upload job creation for KB {kb_id} "
-            f"to {self.token.service_name}"
-        )
-        return None  # Placeholder
+        # Payload RAG expects
+        payload = {
+            "job": "upload",
+            "metadata": metadata or {},
+            "callback_params": {
+                "kb_id": kb_id,
+                "user_id": user_id,
+            },
+            "knowledge_base_id": kb_id,
+        }
+        form_data = {"payload": json.dumps(payload)}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                files = {
+                    "files": (
+                        upload_file.filename,
+                        await upload_file.read(),
+                        upload_file.content_type,
+                    )
+                }
+                response = await client.post(
+                    url,
+                    headers=headers,
+                    data=form_data,
+                    files=files,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+
+                data = response.json()
+                logger.info(
+                    f"✓ File '{upload_file.filename}' uploaded successfully."
+                    f"with URL: {url}"
+                )
+                return data
+
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "✗ RAG upload failed:",
+                f"HTTP {e.response.status_code} - {e.response.text}",
+            )
+            return None
+        except Exception as e:
+            logger.exception(f"✗ Unexpected error during RAG upload: {e}")
+            return None
+
+    async def manage_knowledge_base(
+        self,
+        operation: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        kb_id: Optional[int] = None,
+        is_doc: Optional[bool] = False,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Perform knowledge base operations with external AI service.
+
+        Args:
+            operation: Operation type (e.g., 'create', 'update', 'delete')
+            name: Knowledge base name
+            description: Optional description
+
+        Returns:
+            Operation response, or None if not configured
+        """
+        if not self.is_configured() or not self.token.kb_url:
+            logger.error(
+                "[ExternalAIService] Cannot perform KB operation - "
+                "not configured or kb_url missing"
+            )
+            return None
+
+        url = self.token.kb_url if not is_doc else self.token.document_url
+        headers = {"Authorization": f"Bearer {self.token.access_token}"}
+        name = name or "Agriconnect Untitled KB"
+
+        payload = {
+            "name": name,
+            "description": description,
+            "is_default": False,
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                if operation == "create":
+                    response = await client.post(
+                        url, json=payload, headers=headers, timeout=30.0
+                    )
+                elif operation == "update":
+                    response = await client.patch(
+                        f"{url}/{kb_id}",
+                        json=payload,
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                elif operation == "list":
+                    response = await client.get(
+                        f"{url}",
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                elif operation == "list_docs":
+                    response = await client.get(
+                        f"{url}",
+                        headers=headers,
+                        timeout=30.0,
+                        params={"kb_id": kb_id},
+                    )
+                elif operation == "get":
+                    response = await client.get(
+                        f"{url}/{kb_id}",
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                elif operation == "delete":
+                    response = await client.delete(
+                        f"{url}/{kb_id}",
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                else:
+                    logger.error(
+                        f"[ExternalAIService] Unknown KB operation: {operation}"  # noqa
+                    )
+                    return None
+
+                logger.debug(
+                    f"[ExternalAIService] Response body: {response.text}"
+                )
+                response.raise_for_status()
+
+                # Handle empty body safely
+                if not response.text.strip():
+                    data = {
+                        "status": "success",
+                        "message": f"{operation} completed with no content",
+                    }
+                else:
+                    try:
+                        data = response.json()
+                    except json.JSONDecodeError:
+                        data = {
+                            "status": "success",
+                            "message": f"{operation} completed with non-JSON response",  # noqa
+                        }
+
+                logger.info(
+                    f"✓ KB operation '{operation}' successful for '{name}' "
+                    f"(service: {self.token.service_name})"
+                )
+                return data
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"✗ HTTPStatusError Failed KB operation '{operation}': "
+                f"HTTP {e.response.status_code} - {e.response.text}"
+                f"URL: {url}"
+            )
+            return None
+        except Exception as e:
+            logger.error(f"✗ EXCEPTION Failed KB operation '{operation}': {e}")
+            return None
 
 
 def get_external_ai_service(db: Session) -> ExternalAIService:
