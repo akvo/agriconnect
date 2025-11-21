@@ -326,7 +326,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         LEFT JOIN messages m ON t.messageId = m.id
         LEFT JOIN users r ON t.resolvedBy = r.id
         LEFT JOIN messages lm ON t.lastMessageId = lm.id
-        ORDER BY t.updatedAt DESC, t.createdAt DESC
+        ORDER BY t.unreadCount DESC, t.updatedAt DESC, t.createdAt DESC
         LIMIT ? OFFSET ?`,
       );
 
