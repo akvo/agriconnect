@@ -37,20 +37,16 @@ class TicketSyncService {
       // Always try local first for initial page
       const localResult = dao.ticket.findByStatus(db, status, page, pageSize);
 
-      // If we have local data for page 1, return it and sync in background
+      // ✅ CORRECT: If we have local data for page 1, return it (no background sync)
       if (page === 1 && localResult.tickets.length > 0) {
-        // Return local data immediately
-        const result: SyncResult = {
+        console.log(
+          `[TicketSync] Returning cached ${status} tickets (page ${page}, count: ${localResult.tickets.length})`,
+        );
+
+        return {
           ...localResult,
           source: "local",
         };
-
-        // Sync in background (don't await)
-        this.syncFromAPI(db, status, page, pageSize, userId).catch((err) => {
-          console.error("Background sync failed:", err);
-        });
-
-        return result;
       }
 
       // If no local data or loading next page, fetch from API
