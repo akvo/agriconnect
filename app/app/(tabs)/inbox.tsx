@@ -63,7 +63,8 @@ const Inbox: React.FC = () => {
   const db = useDatabase();
   const { isConnected, onMessageCreated, onTicketResolved } = useWebSocket();
   const { isOnline } = useNetwork();
-  const { tickets, setTickets, getTicketsByStatus } = useTicket();
+  const { tickets, setTickets, getTicketsByStatus, loadMoreResolved } =
+    useTicket();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
   const filtered = useMemo(() => {
@@ -522,18 +523,40 @@ const Inbox: React.FC = () => {
             window.clearTimeout(endReachedTimeout.current);
           }
           // schedule page increment after 200ms; if another call comes in the window it'll reset
-          endReachedTimeout.current = window.setTimeout(() => {
-            const nextPage = page + 1;
-            console.log(`[Inbox] Loading next page: ${nextPage}`);
+          endReachedTimeout.current = window.setTimeout(async () => {
+            // Cache-first pagination for resolved tab
+            if (activeTab === Tabs.RESPONDED) {
+              // Try loading more resolved tickets from cache first (no API call)
+              const resolvedTickets = getTicketsByStatus(Tabs.RESPONDED);
+              const hasMoreInCache = await loadMoreResolved(
+                resolvedTickets.length,
+              );
 
-            // ✅ Update page state for current tab
-            setPageState((prev) => ({ ...prev, [activeTab]: nextPage }));
-            fetchTickets(activeTab, nextPage, true);
+              if (!hasMoreInCache) {
+                // No more in cache, fetch from API
+                console.log(
+                  `[Inbox] Cache exhausted, fetching from API (page ${page + 1})`,
+                );
+                const nextPage = page + 1;
+                setPageState((prev) => ({ ...prev, [activeTab]: nextPage }));
+                fetchTickets(activeTab, nextPage, true);
+              }
+            } else {
+              // Open tab: Fetch from API (all open tickets already in cache)
+              const nextPage = page + 1;
+              console.log(`[Inbox] Loading next page: ${nextPage}`);
+              setPageState((prev) => ({ ...prev, [activeTab]: nextPage }));
+              fetchTickets(activeTab, nextPage, true);
+            }
             endReachedTimeout.current = null;
           }, 200);
         }}
         refreshing={refreshing}
         onRefresh={() => {
+          if (!isOnline) {
+            console.log(`[Inbox] Offline - cannot refresh ${activeTab} tab`);
+            return;
+          }
           // pull-to-refresh: reset to first page and fetch
           console.log(`[Inbox] Pull-to-refresh for ${activeTab} tab`);
           hasLoadedTab.current[activeTab] = false; // Reset loaded flag to allow refresh
