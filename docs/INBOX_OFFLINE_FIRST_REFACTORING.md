@@ -1096,6 +1096,151 @@ const stmt = db.prepareSync(
 - [ ] Real-time updates test - READY FOR TESTING
 - [ ] New ticket unreadCount test - FIXED
 
+### Phase 6: Hybrid Pagination Strategy (Performance Optimization) ⏸️
+
+**Status**: Planned (not yet implemented)
+
+**Problem**: Current implementation loads ALL tickets (open + resolved) into memory using `findAll()`. While this works well for small datasets, it poses scalability risks as resolved tickets accumulate over time.
+
+#### Performance Analysis: Bounded vs Unbounded Growth
+
+**Open Tickets** ✅ **Naturally Bounded** - NOT A PROBLEM
+- Open tickets represent active customer conversations
+- One open ticket per customer maximum (by business logic)
+- Typical range: 50-500 open tickets
+- Memory impact: ~40 KB - 400 KB (negligible)
+- **Conclusion**: Safe to load ALL open tickets in memory
+
+**Resolved Tickets** ⚠️ **Unbounded Growth** - POTENTIAL PROBLEM
+- Resolved tickets accumulate indefinitely as historical records
+- Growth rate: ~5-10 tickets resolved per day
+- Projected counts:
+  - 1 year: ~2,000 resolved tickets (~1.6 MB)
+  - 3 years: ~10,000 resolved tickets (~8 MB)
+  - 5 years: ~18,000 resolved tickets (~14 MB)
+- **Conclusion**: Needs pagination strategy for long-term scalability
+
+#### Memory Impact Comparison
+
+| Scenario | Current Approach | Hybrid Approach | Savings |
+|----------|-----------------|-----------------|---------|
+| 100 open + 100 resolved | ~160 KB | ~160 KB | 0 KB |
+| 100 open + 1,000 resolved | ~880 KB | ~240 KB | ~640 KB |
+| 100 open + 5,000 resolved | ~4 MB | ~240 KB | ~3.8 MB |
+| 100 open + 10,000 resolved | ~8 MB | ~240 KB | ~7.8 MB |
+
+**Ticket Size Calculation**: Each ticket ≈ 800 bytes (with customer, message, resolver data)
+
+#### Proposed Hybrid Strategy (Option A)
+
+**Load ALL open tickets + Paginated resolved tickets**
+
+```typescript
+// Configuration constants
+const OPEN_PAGE_SIZE = 10;      // Load ALL (open tickets are bounded)
+const RESOLVED_PAGE_SIZE = 10;  // Load 10 at a time (resolved tickets unbounded)
+
+// Loading strategy
+const loadTickets = async () => {
+  // ✅ Load ALL open tickets (naturally bounded ~50-500)
+  const openResult = await dao.ticket.findByStatus(db, Tabs.PENDING, 1, OPEN_PAGE_SIZE);
+
+  // ✅ Load first 10 resolved tickets (paginated)
+  const resolvedResult = await dao.ticket.findByStatus(db, Tabs.RESPONDED, 1, RESOLVED_PAGE_SIZE);
+
+  // Combine both
+  const combined = [...openResult.tickets, ...resolvedResult.tickets];
+  setTickets(combined);
+};
+
+// Load more resolved tickets from cache (pagination)
+const loadMoreResolved = async (currentResolvedCount: number) => {
+  const nextPage = Math.floor(currentResolvedCount / RESOLVED_PAGE_SIZE) + 1;
+  const resolvedResult = await dao.ticket.findByStatus(db, Tabs.RESPONDED, nextPage, RESOLVED_PAGE_SIZE);
+
+  if (resolvedResult.tickets.length > 0) {
+    setTickets(prev => [...prev, ...resolvedResult.tickets]);
+    return true; // Has more
+  }
+  return false; // No more
+};
+```
+
+#### Benefits of Hybrid Approach
+
+1. **Memory Efficiency**: Caps memory at ~240 KB regardless of total resolved ticket count
+2. **Open Tab Performance**: Instant (loads all ~100-500 tickets at once)
+3. **Resolved Tab UX**: Fast initial load (100 tickets) + smooth "Load More" from cache
+4. **Cache-First Pagination**: Resolved tab loads from SQLite cache before API
+5. **Backward Compatible**: Additive changes, no breaking modifications
+
+#### Implementation Requirements
+
+**TicketContext.tsx Changes:**
+```typescript
+interface TicketContextType {
+  tickets: Ticket[];
+  setTickets: React.Dispatch<React.SetStateAction<Ticket[]>>;
+  getTicketsByStatus: (status: "open" | "resolved") => Ticket[];
+  loadMoreResolved: (currentCount: number) => Promise<boolean>; // ✅ NEW
+  createTicket: (data: CreateTicketData) => Promise<void>;
+  updateTicket: (id: number, data: Partial<UpdateTicketData>) => Promise<void>;
+}
+```
+
+**inbox.tsx Changes:**
+```typescript
+const handleEndReached = useCallback(async () => {
+  if (activeTab === Tabs.RESPONDED) {
+    // ✅ Try loading more from cache first (no API call)
+    const resolvedTickets = getTicketsByStatus(Tabs.RESPONDED);
+    const hasMore = await loadMoreResolved(resolvedTickets.length);
+
+    if (!hasMore) {
+      // ✅ Fallback to API if cache exhausted
+      fetchTickets(activeTab, page + 1, true);
+    }
+  } else {
+    // Open tab: All tickets already loaded in cache
+    // Fallback to API for edge cases
+    if (hasMore) {
+      fetchTickets(activeTab, page + 1, true);
+    }
+  }
+}, [activeTab, page, hasMore]);
+```
+
+#### Migration Path
+
+**Phase 6.1**: Update TicketContext
+- Add `RESOLVED_PAGE_SIZE` and `OPEN_PAGE_SIZE` constants
+- Modify `loadTickets()` to load ALL open + first 100 resolved
+- Add `loadMoreResolved()` method
+- Update TypeScript interface
+
+**Phase 6.2**: Update inbox.tsx
+- Replace hardcoded `"open"` with `Tabs.PENDING`
+- Replace hardcoded `"resolved"` with `Tabs.RESPONDED`
+- Update `handleEndReached()` to use cache-first approach for resolved tab
+- Add resolved ticket counter (optional UI improvement)
+
+**Phase 6.3**: Testing
+- Test with 1,000+ resolved tickets
+- Verify memory usage stays under 500 KB
+- Confirm resolved tab scrolling is smooth
+- Validate cache-first pagination works offline
+
+#### Checklist
+- [ ] Add configuration constants to TicketContext.tsx
+- [ ] Update `loadTickets()` with hybrid loading strategy
+- [ ] Implement `loadMoreResolved()` method in TicketContext
+- [ ] Update TicketContext TypeScript interface
+- [ ] Replace hardcoded strings with Tabs enum in inbox.tsx
+- [ ] Update `handleEndReached()` with cache-first logic
+- [ ] Test with large resolved ticket dataset (1,000+)
+- [ ] Measure memory usage and performance
+- [ ] Update UAT document with hybrid pagination tests
+
 ---
 
 ## Critical Bug Fix: unreadCount Increment Issues
@@ -1161,10 +1306,11 @@ Final result:
 | 1.2 | 2025-01-20 | Claude Code | Added critical unreadCount bug fixes |
 | 2.0 | 2025-01-21 | Claude Code | **MAJOR REVISION**: Removed 10-item limit, fixed all discovered issues, added lessons learned |
 | 2.1 | 2025-11-21 | Claude Code | **IMPLEMENTED**: All phases complete, added hasLoadedTab tracker, fixed lastMessageId bug, updated with actual implementation details |
+| 2.2 | 2025-11-22 | Claude Code | **PHASE 6 PLANNED**: Added hybrid pagination strategy to address scalability concerns with unbounded resolved ticket growth |
 
 ---
 
-**Status**: ✅ IMPLEMENTED (2025-11-21)
+**Status**: ✅ PHASES 1-5 IMPLEMENTED | ⏸️ PHASE 6 PLANNED (2025-11-22)
 
 **Implementation Summary**:
 - ✅ Phase 1: TicketContext loads ALL tickets from SQLite
@@ -1172,9 +1318,11 @@ Final result:
 - ✅ Phase 3: Inbox.tsx uses `hasLoadedTab` tracker, separate page state, fixed unreadCount bugs
 - ✅ Phase 4: SQLite sorting updated with `unreadCount DESC`
 - ⏳ Phase 5: Ready for comprehensive testing
+- ⏸️ Phase 6: Hybrid pagination strategy planned (addresses scalability with 1,000+ resolved tickets)
 
 **Next Steps**:
-1. Test tab switching (should show 0 API calls)
-2. Test pagination after tab switch (should preserve all loaded tickets)
-3. Test new ticket creation (unreadCount should be 1, not 2)
-4. Test empty inbox (should not infinite loop)
+1. ~~Test tab switching (should show 0 API calls)~~ - READY FOR TESTING
+2. ~~Test pagination after tab switch (should preserve all loaded tickets)~~ - READY FOR TESTING
+3. ~~Test new ticket creation (unreadCount should be 1, not 2)~~ - READY FOR TESTING
+4. ~~Test empty inbox (should not infinite loop)~~ - READY FOR TESTING
+5. **NEW**: Implement Phase 6 hybrid pagination when dataset grows beyond 1,000 resolved tickets
