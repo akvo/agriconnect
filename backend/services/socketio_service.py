@@ -113,20 +113,6 @@ def check_rate_limit(sid: str, action: str) -> bool:
     return True
 
 
-async def log_connected_clients():
-    """Log all currently connected clients"""
-    try:
-        # List of all SIDs in the default namespace "/"
-        has_manager = hasattr(sio_server, 'manager')
-        has_rooms = has_manager and hasattr(sio_server.manager, 'rooms')
-        if has_rooms:
-            namespace_rooms = sio_server.manager.rooms.get('/', {})
-            sids = list(namespace_rooms.keys())
-            logging.info(f"Connected clients: {sids}")
-    except Exception as e:
-        logging.debug(f"Could not log connected clients: {e}")
-
-
 @sio_server.event
 async def connect(
     sid: str, environ: dict, auth: Optional[dict] = None
@@ -196,8 +182,6 @@ async def connect(
                 f"type={user.user_type.value}, "
                 f"sessions={len(USER_CONNECTIONS[user.id])}"
             )
-            # Log current connections
-            await log_connected_clients()
             return True
 
         finally:
@@ -229,8 +213,6 @@ async def disconnect(sid: str):
     # Clean rate limits
     if sid in RATE_LIMITS:
         RATE_LIMITS.pop(sid)
-    # Log current connections
-    await log_connected_clients()
 
 
 @sio_server.event
