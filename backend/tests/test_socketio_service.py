@@ -49,6 +49,10 @@ class TestSocketIOConnection:
         RATE_LIMITS.clear()
         USER_CONNECTIONS.clear()
 
+        # Mock Socket.IO server
+        mock_sio = MagicMock()
+        mock_sio.enter_room = AsyncMock()
+
         # Mock token verification
         with patch("services.socketio_service.verify_token") as mock_verify:
             mock_verify.return_value = {"sub": sample_user.email}
@@ -56,33 +60,16 @@ class TestSocketIOConnection:
             with patch("services.socketio_service.get_db") as mock_get_db:
                 mock_get_db.return_value = iter([db_session])
 
-                # Mock Socket.IO server methods directly
-                with patch(
-                    "services.socketio_service.sio_server.enter_room",
-                    new_callable=AsyncMock,
-                ):
-                    with patch(
-                        "services.socketio_service.sio_server.emit",
-                        new_callable=AsyncMock,
-                    ):
-                        # Test connection
-                        environ = {
-                            "HTTP_AUTHORIZATION": "Bearer valid_token_123"
-                        }
-                        result = await connect("test_sid", environ)
+                with patch("services.socketio_service.sio_server", mock_sio):
+                    # Test connection
+                    environ = {"HTTP_AUTHORIZATION": "Bearer valid_token_123"}
+                    result = await connect("test_sid", environ)
 
-                        assert result is True
-                        assert "test_sid" in CONNECTIONS
-                        assert (
-                            CONNECTIONS["test_sid"]["user_id"]
-                            == sample_user.id
-                        )
-                        assert sample_user.id in USER_CONNECTIONS
-                        assert "test_sid" in USER_CONNECTIONS[sample_user.id]
-                        # Verify playground tracking was added
-                        assert (
-                            f"playground_{sample_user.id}" in USER_CONNECTIONS
-                        )
+                    assert result is True
+                    assert "test_sid" in CONNECTIONS
+                    assert CONNECTIONS["test_sid"]["user_id"] == sample_user.id
+                    assert sample_user.id in USER_CONNECTIONS
+                    assert "test_sid" in USER_CONNECTIONS[sample_user.id]
 
     @pytest.mark.asyncio
     async def test_connect_without_token(self, db_session):
@@ -129,26 +116,22 @@ class TestSocketIOConnection:
         RATE_LIMITS.clear()
         USER_CONNECTIONS.clear()
 
+        mock_sio = MagicMock()
+        mock_sio.enter_room = AsyncMock()
+
         with patch("services.socketio_service.verify_token") as mock_verify:
             mock_verify.return_value = {"sub": sample_user.email}
 
             with patch("services.socketio_service.get_db") as mock_get_db:
                 mock_get_db.return_value = iter([db_session])
 
-                with patch(
-                    "services.socketio_service.sio_server.enter_room",
-                    new_callable=AsyncMock,
-                ):
-                    with patch(
-                        "services.socketio_service.sio_server.emit",
-                        new_callable=AsyncMock,
-                    ):
-                        environ = {}
-                        auth = {"token": "valid_token_123"}
-                        result = await connect("test_sid", environ, auth)
+                with patch("services.socketio_service.sio_server", mock_sio):
+                    environ = {}
+                    auth = {"token": "valid_token_123"}
+                    result = await connect("test_sid", environ, auth)
 
-                        assert result is True
-                        assert "test_sid" in CONNECTIONS
+                    assert result is True
+                    assert "test_sid" in CONNECTIONS
 
     @pytest.mark.asyncio
     async def test_disconnect_cleanup(self):
@@ -214,19 +197,12 @@ class TestUserSpecificRoomSubscription:
             with patch("services.socketio_service.get_db") as mock_get_db:
                 mock_get_db.return_value = iter([db_session])
 
-                with patch(
-                    "services.socketio_service.sio_server.enter_room",
-                    mock_enter_room,
-                ):
-                    with patch(
-                        "services.socketio_service.sio_server.emit",
-                        new_callable=AsyncMock,
-                    ):
-                        environ = {"HTTP_AUTHORIZATION": "Bearer token"}
-                        result = await connect("test_sid", environ)
+                with patch("services.socketio_service.sio_server", mock_sio):
+                    environ = {"HTTP_AUTHORIZATION": "Bearer token"}
+                    result = await connect("test_sid", environ)
 
-                        assert result is True
-                        assert f"user:{user_id}" in entered_rooms
+                    assert result is True
+                    assert f"user:{user_id}" in entered_rooms
 
     @pytest.mark.asyncio
     async def test_admin_joins_user_specific_room(
@@ -253,19 +229,12 @@ class TestUserSpecificRoomSubscription:
             with patch("services.socketio_service.get_db") as mock_get_db:
                 mock_get_db.return_value = iter([db_session])
 
-                with patch(
-                    "services.socketio_service.sio_server.enter_room",
-                    mock_enter_room,
-                ):
-                    with patch(
-                        "services.socketio_service.sio_server.emit",
-                        new_callable=AsyncMock,
-                    ):
-                        environ = {"HTTP_AUTHORIZATION": "Bearer token"}
-                        result = await connect("test_sid", environ)
+                with patch("services.socketio_service.sio_server", mock_sio):
+                    environ = {"HTTP_AUTHORIZATION": "Bearer token"}
+                    result = await connect("test_sid", environ)
 
-                        assert result is True
-                        assert f"user:{user_id}" in entered_rooms
+                    assert result is True
+                    assert f"user:{user_id}" in entered_rooms
 
 
 class TestPlaygroundRoomManagement:
@@ -290,11 +259,6 @@ class TestPlaygroundRoomManagement:
             "last_activity": datetime.now(timezone.utc),
         }
 
-        # Add user connection for playground tracking
-        add_user_connection(
-            f"playground_{sample_admin_user.id}", "session_123"
-        )
-
         # Mock Socket.IO
         mock_sio = MagicMock()
         entered_rooms = []
@@ -304,16 +268,13 @@ class TestPlaygroundRoomManagement:
 
         mock_sio.enter_room = mock_enter_room
 
-        with patch(
-            "services.socketio_service.sio_server.enter_room", mock_enter_room
-        ):
-            result = await join_playground("test_sid", {})
+        with patch("services.socketio_service.sio_server", mock_sio):
+            result = await join_playground(
+                "test_sid", {"session_id": "session_123"}
+            )
 
             assert result["success"] is True
-            # The room name uses the set representation from USER_CONNECTIONS
-            # Since get_user_connections returns a set,
-            # room name will be "playground:{...}"
-            assert any("playground:" in room for room in entered_rooms)
+            assert "playground:session_123" in entered_rooms
 
     @pytest.mark.asyncio
     async def test_join_playground_access_denied(
@@ -345,7 +306,7 @@ class TestPlaygroundRoomManagement:
     async def test_join_playground_without_session_id(
         self, db_session, sample_admin_user
     ):
-        """Test playground join fails without session_id in USER_CONNECTIONS"""
+        """Test playground join fails without session_id"""
         # Clear any leftover connections
         CONNECTIONS.clear()
         RATE_LIMITS.clear()
@@ -358,8 +319,6 @@ class TestPlaygroundRoomManagement:
             "connected_at": datetime.now(timezone.utc),
             "last_activity": datetime.now(timezone.utc),
         }
-
-        # Don't add playground connection - simulates missing session_id
 
         result = await join_playground("test_sid", {})
 
@@ -600,13 +559,6 @@ class TestEventEmissions:
     @pytest.mark.asyncio
     async def test_emit_playground_response(self):
         """Test playground_response event emission"""
-        # Clear any leftover connections
-        USER_CONNECTIONS.clear()
-
-        # Setup playground connection tracking
-        admin_user_id = 1
-        add_user_connection(f"playground_{admin_user_id}", "session_123")
-
         mock_sio = MagicMock()
         emitted_events = []
 
@@ -615,22 +567,17 @@ class TestEventEmissions:
 
         mock_sio.emit = mock_emit
 
-        with patch("services.socketio_service.sio_server.emit", mock_emit):
+        with patch("services.socketio_service.sio_server", mock_sio):
             await emit_playground_response(
                 session_id="session_123",
                 message_id=1,
                 content="AI response",
                 response_time_ms=150,
-                admin_user_id=admin_user_id,
             )
 
             assert len(emitted_events) == 1
             assert emitted_events[0]["event"] == "playground_response"
-            # The room uses the set from USER_CONNECTIONS,
-            # which will be stringified
-            # Expected format: "playground:{'session_123'}"
-            assert "playground:" in emitted_events[0]["room"]
-            assert "session_123" in str(emitted_events[0]["room"])
+            assert emitted_events[0]["room"] == "playground:session_123"
             assert emitted_events[0]["data"]["content"] == "AI response"
 
 

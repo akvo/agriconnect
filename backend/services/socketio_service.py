@@ -172,9 +172,6 @@ async def connect(
             # Track multi-device connections
             add_user_connection(user.id, sid)
 
-            # Track playground connections
-            add_user_connection(f"playground_{user.id}", sid)
-
             # Join user-specific room (ONLY room needed - simplified!)
             user_room = f"user:{user.id}"
             await sio_server.enter_room(sid, user_room)
@@ -184,10 +181,6 @@ async def connect(
                 f"[CONNECT] ✅ Success: sid={sid}, user={user.id}, "
                 f"type={user.user_type.value}, "
                 f"sessions={len(USER_CONNECTIONS[user.id])}"
-            )
-
-            await sio_server.emit(
-                "connect_success", {"session_id": sid}, to=sid
             )
             return True
 
@@ -216,8 +209,6 @@ async def disconnect(sid: str):
         # Remove from multi-device tracking
         if user_id:
             remove_user_connection(user_id, sid)
-            # Remove from playground tracking
-            remove_user_connection(f"playground_{user_id}", sid)
 
     # Clean rate limits
     if sid in RATE_LIMITS:
@@ -237,7 +228,7 @@ async def join_playground(sid: str, data: dict):
     if user_info.get("user_type") != UserType.ADMIN.value:
         return {"success": False, "error": "Admin access required"}
 
-    session_id = get_user_connections(f"playground_{user_info['user_id']}")
+    session_id = data.get("session_id")
     if not session_id:
         return {"success": False, "error": "session_id required"}
 
@@ -334,13 +325,8 @@ async def emit_message_received(
 
 
 async def emit_playground_response(
-    session_id: str,
-    message_id: int,
-    content: str,
-    response_time_ms: int,
-    admin_user_id: int,
+    session_id: str, message_id: int, content: str, response_time_ms: int
 ):
-    playground_sid = get_user_connections(f"playground_{admin_user_id}")
     """Emit response"""
     event_data = {
         "session_id": session_id,
@@ -351,7 +337,7 @@ async def emit_playground_response(
         "status": "completed",
     }
 
-    room_name = f"playground:{playground_sid}"
+    room_name = f"playground:{session_id}"
     await sio_server.emit(
         "playground_response",
         event_data,
