@@ -101,6 +101,7 @@ async def handle_playground_callback(payload: AIWebhookCallback, db: Session):
                 message_id=pg_message.id,
                 content=pg_message.content,
                 response_time_ms=response_time_ms,
+                admin_user_id=pg_message.admin_user_id,
             )
 
         return {"status": "received", "job_id": payload.job_id}
