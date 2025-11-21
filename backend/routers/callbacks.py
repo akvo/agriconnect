@@ -95,6 +95,9 @@ async def handle_playground_callback(payload: AIWebhookCallback, db: Session):
         )
 
         session_id = payload.callback_params.session_id
+        logger.info(
+            f"[callbacks.py] Session ID: {session_id}"
+        )
         if session_id:
             await emit_playground_response(
                 session_id=session_id,
