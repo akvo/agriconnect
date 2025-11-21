@@ -33,8 +33,6 @@ export default function PlaygroundPage() {
   const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef(null);
 
-  console.log("currentSessionId:", currentSessionId);
-
   // Redirect non-admins
   useEffect(() => {
     if (user && user.user_type !== "admin") {

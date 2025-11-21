@@ -327,31 +327,25 @@ async def emit_message_received(
 async def emit_playground_response(
     session_id: str, message_id: int, content: str, response_time_ms: int
 ):
-    try:
-        """Emit response"""
-        event_data = {
-            "session_id": session_id,
-            "message_id": message_id,
-            "content": content,
-            "response_time_ms": response_time_ms,
-            "role": "assistant",
-            "status": "completed",
-        }
+    """Emit response"""
+    event_data = {
+        "session_id": session_id,
+        "message_id": message_id,
+        "content": content,
+        "response_time_ms": response_time_ms,
+        "role": "assistant",
+        "status": "completed",
+    }
 
-        room_name = f"playground:{session_id}"
-        await sio_server.emit(
-            "playground_response",
-            event_data,
-            room=room_name,
-        )
-        logger.info(
-            f"[EMIT:PLAYGROUND] response for session {session_id}"
-        )
-    except Exception as e:
-        logger.error(
-            f"[EMIT:PLAYGROUND] Error emitting response: {e}",
-            exc_info=True
-        )
+    room_name = f"playground:{session_id}"
+    await sio_server.emit(
+        "playground_response",
+        event_data,
+        room=room_name,
+    )
+    logger.info(
+        f"[EMIT:PLAYGROUND] response for session {session_id}"
+    )
 
 
 async def emit_whisper_created(
