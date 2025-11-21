@@ -520,10 +520,10 @@ const Inbox: React.FC = () => {
             return;
           }
           if (endReachedTimeout.current) {
-            window.clearTimeout(endReachedTimeout.current);
+            clearTimeout(endReachedTimeout.current);
           }
-          // schedule page increment after 200ms; if another call comes in the window it'll reset
-          endReachedTimeout.current = window.setTimeout(async () => {
+          // Set a short timeout to batch calls
+          endReachedTimeout.current = setTimeout(async () => {
             // Cache-first pagination for resolved tab
             if (activeTab === Tabs.RESPONDED) {
               // Try loading more resolved tickets from cache first (no API call)
