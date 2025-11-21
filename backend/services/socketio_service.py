@@ -237,7 +237,12 @@ async def join_playground(sid: str, data: dict):
     if user_info.get("user_type") != UserType.ADMIN.value:
         return {"success": False, "error": "Admin access required"}
 
-    session_id = get_user_connections(f"playground_{user_info['user_id']}")
+    session_ids = get_user_connections(f"playground_{user_info['user_id']}")
+    if not session_ids:
+        return {"success": False, "error": "session_id required"}
+
+    # Convert set to list and get first session_id
+    session_id = list(session_ids)[0] if session_ids else None
     if not session_id:
         return {"success": False, "error": "session_id required"}
 
