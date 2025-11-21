@@ -17,6 +17,7 @@ from models import User
 from schemas import (
     DocumentListResponse,
     UploadDocumentResponse,
+    DocumentResponse,
 )
 from services.external_ai_service import ExternalAIService
 from services.knowledge_base_service import KnowledgeBaseService
@@ -127,29 +128,37 @@ async def list_documents(
     rag_doc_response = await ai_service.manage_knowledge_base(
         operation="list_docs", kb_id=kb.external_id, is_doc=True
     )
-    print(rag_doc_response, "xxxxx")
-    # [
-    #     {
-    #         "id": 10,
-    #         "file_name": "knowledge_base-agriculture_africa.docx",
-    #         "status": "completed",
-    #         "knowledge_base_id": 7,
-    #         "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    #         "created_at": "2025-11-05T08:47:14.711127",
-    #     },
-    #     {
-    #         "id": 9,
-    #         "file_name": "websocket-issue-analysis.md",
-    #         "status": "pending",
-    #         "knowledge_base_id": 7,
-    #         "content_type": "text/markdown",
-    #         "created_at": "2025-11-05T08:46:52.909582",
-    #     },
-    # ]
+
+    # empty
+    if not rag_doc_response.get("total"):
+        return DocumentListResponse(
+            data=[],
+            total=0,
+            page=0,
+            size=0,
+        )
+
+    # TODO :: Support search for doc and KB
+
+    data = []
+    for doc in rag_doc_response.get("data"):
+        task = doc.get("processing_tasks")[0] or {}
+        data.append(
+            DocumentResponse(
+                id=doc.get("id"),
+                filename=doc.get("file_name"),
+                file_path=doc.get("file_path"),
+                content_type=doc.get("content_type"),
+                file_size=doc.get("file_size"),
+                status=task.get("status"),
+                created_at=task.get("created_at"),
+                updated_at=task.get("updated_at"),
+            )
+        )
 
     return DocumentListResponse(
-        data=[],
-        total=0,
-        page=0,
-        size=0,
+        data=data,
+        total=rag_doc_response.get("total"),
+        page=rag_doc_response.get("page"),
+        size=rag_doc_response.get("size"),
     )
