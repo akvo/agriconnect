@@ -38,10 +38,26 @@ class TicketSyncService {
         pageSize,
         userId,
       );
+      const dao = new DAOManager(db);
+      const localResult = dao.ticket.findByStatus(db, status, page, pageSize);
+      if (localResult) {
+        return {
+          ...apiResult,
+          tickets: apiResult.tickets.map((ticket) => {
+            // Merge local ticket data to preserve unreadCount and other local state
+            const localTicket = localResult.tickets.find(
+              (t) => t.id === ticket.id,
+            );
+            return localTicket ? { ...ticket, ...localTicket } : ticket;
+          }),
+          total: apiResult.total + localResult.total,
+          source: "hybrid",
+        };
+      }
 
       return {
         ...apiResult,
-        source: page === 1 ? "api" : "hybrid",
+        source: "api",
       };
     } catch (error) {
       console.error("Error getting tickets:", error);
