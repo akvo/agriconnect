@@ -697,7 +697,9 @@ class TestTicketBasedMessageTypeRouting:
         # which should be customer's question or AI's reply depending on order
         escalation_message = (
             db_session.query(Message)
-            .filter(Message.message_sid == "SM_ESCALATE")
+            .filter(Message.customer_id == test_customer.id)
+            .order_by(Message.created_at.desc())
+            .offset(1)
             .first()
         )
         assert escalation_message is not None

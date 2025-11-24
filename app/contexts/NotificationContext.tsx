@@ -11,6 +11,7 @@ import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
+import { MESSAGE_CREATED, ticketEmitter } from "@/utils/ticketEvents";
 
 interface NotificationContextType {
   expoPushToken: string | null;
@@ -190,6 +191,11 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
       Notifications.addNotificationReceivedListener((notification) => {
         console.log("Notification received:", notification);
         setNotification(notification);
+        const notificationData = notification?.request?.content?.data;
+        ticketEmitter.emit(MESSAGE_CREATED, {
+          ...notificationData,
+          body: notification.request.content.body,
+        });
       });
 
     // Listen for notification interactions (user taps notification)

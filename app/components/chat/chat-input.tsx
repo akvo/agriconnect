@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDatabase } from "@/database/context";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 interface TicketData {
   id: number | null;
@@ -37,6 +38,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   setMessages,
 }) => {
   const { user } = useAuth();
+  const { isOnline } = useNetwork();
   const db = useDatabase();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
@@ -177,13 +179,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         style={[
           typography.body3,
           styles.textInput,
-          { color: themeColors.dark1 },
+          { color: themeColors.dark3 },
         ]}
         placeholder="Type a message..."
         placeholderTextColor={themeColors.dark3}
         multiline
       />
-      <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
+      <TouchableOpacity
+        onPress={handleSend}
+        style={[styles.sendButton, !isOnline && styles.sendButtonDisabled]}
+        disabled={!isOnline}
+      >
         <Feathericons name="send" size={20} color={themeColors.white} />
       </TouchableOpacity>
     </View>
@@ -193,27 +199,37 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderColor: themeColors.mutedBorder,
-    backgroundColor: themeColors.background,
+    paddingHorizontal: 12,
+    borderTopWidth: 0,
+    backgroundColor: themeColors.white,
   },
   textInput: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 48,
     maxHeight: 120,
-    padding: 8,
-    backgroundColor: themeColors.white,
-    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: themeColors.background,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: themeColors.mutedBorder,
+    fontSize: 16,
+    lineHeight: 20,
+    textAlignVertical: "center",
   },
   sendButton: {
     marginLeft: 8,
     backgroundColor: themeColors["green-500"],
     borderRadius: 24,
-    padding: 10,
+    width: 48,
+    height: 48,
     justifyContent: "center",
     alignItems: "center",
+  },
+  sendButtonDisabled: {
+    backgroundColor: themeColors.dark4,
+    opacity: 0.5,
   },
 });

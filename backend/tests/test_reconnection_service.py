@@ -36,7 +36,7 @@ class TestReconnectionDetection:
         db_session.commit()
 
         service = ReconnectionService(db_session)
-        result = service.check_and_send_reconnection(customer, "Hello")
+        result = service.check_and_send_reconnection(customer, 0)
 
         # Should NOT send reconnection (too recent)
         assert result is False
@@ -72,7 +72,7 @@ class TestReconnectionDetection:
 
             try:
                 result = service.check_and_send_reconnection(
-                    customer, "I have a question"
+                    customer, 2
                 )
 
                 # Should send reconnection
@@ -83,7 +83,7 @@ class TestReconnectionDetection:
                 call_args = mock_send.call_args
                 assert call_args[1]["to"] == "+255712345678"
                 assert (
-                    "I have a question"
+                    "2"
                     in call_args[1]["content_variables"]["1"]
                 )
 
@@ -105,7 +105,7 @@ class TestReconnectionDetection:
         db_session.commit()
 
         service = ReconnectionService(db_session)
-        result = service.check_and_send_reconnection(customer, "Hello")
+        result = service.check_and_send_reconnection(customer, 1)
 
         # Should NOT send reconnection
         # (customer sent last, we're waiting for them)
@@ -132,7 +132,7 @@ class TestReconnectionDetection:
         settings.whatsapp_reconnection_template_sid = ""
 
         try:
-            result = service.check_and_send_reconnection(customer, "Hello")
+            result = service.check_and_send_reconnection(customer, 0)
 
             # Should NOT send (template not configured)
             assert result is False
@@ -144,10 +144,10 @@ class TestReconnectionDetection:
 class TestReconnectionMessageCreation:
     """Test reconnection message creation and tracking"""
 
-    def test_reconnection_creates_message_in_database(
+    def test_reconnection_not_creates_message_in_database(
         self, db_session: Session
     ):
-        """Test that reconnection template creates a message record"""
+        """Test that reconnection template does NOT create a message record"""
         customer = Customer(
             phone_number="+255712345678",
             full_name="Test Farmer",
@@ -172,7 +172,7 @@ class TestReconnectionMessageCreation:
 
             try:
                 result = service.check_and_send_reconnection(
-                    customer, "Need help"
+                    customer, 3
                 )
 
                 assert result is True
@@ -182,14 +182,12 @@ class TestReconnectionMessageCreation:
                     db_session.query(Message)
                     .filter(
                         Message.customer_id == customer.id,
-                        Message.from_source == MessageFrom.LLM,
+                        Message.from_source == MessageFrom.USER,
                     )
                     .all()
                 )
 
-                assert len(messages) == 1
-                assert messages[0].message_sid == "SM_RECONNECT_456"
-                assert "Reconnection:" in messages[0].body
+                assert len(messages) == 0
 
             finally:
                 settings.whatsapp_reconnection_template_sid = original_sid
@@ -222,14 +220,14 @@ class TestReconnectionMessageCreation:
             settings.whatsapp_reconnection_template_sid = "HX_RECONNECT"
 
             try:
-                service.check_and_send_reconnection(customer, "Question here")
+                service.check_and_send_reconnection(customer, 1)
 
                 # Refresh customer
                 db_session.refresh(customer)
 
                 # Verify last_message was updated
                 assert customer.last_message_at > old_time
-                assert customer.last_message_from == MessageFrom.LLM
+                assert customer.last_message_from == MessageFrom.USER
 
             finally:
                 settings.whatsapp_reconnection_template_sid = original_sid
@@ -308,7 +306,7 @@ class TestReconnectionThreshold:
         # With default 24h threshold, should NOT need reconnection
         service = ReconnectionService(db_session)
         assert service.threshold_hours == 24
-        result = service.check_and_send_reconnection(customer, "Hello")
+        result = service.check_and_send_reconnection(customer, 1)
         assert result is False
 
         # Change threshold to 8 hours
@@ -330,7 +328,7 @@ class TestReconnectionThreshold:
                 try:
                     # With 8h threshold, should need reconnection
                     result = service.check_and_send_reconnection(
-                        customer, "Hello"
+                        customer, 1
                     )
                     assert result is True
 
@@ -369,7 +367,7 @@ class TestReconnectionErrorHandling:
             settings.whatsapp_reconnection_template_sid = "HX_TEST"
 
             try:
-                result = service.check_and_send_reconnection(customer, "Hello")
+                result = service.check_and_send_reconnection(customer, 0)
 
                 # Should return False on error
                 assert result is False

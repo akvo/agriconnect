@@ -13,16 +13,23 @@ from utils.auth import verify_token
 
 logger = logging.getLogger(__name__)
 
+# Configure Socket.IO server with mobile-optimized settings
 sio_server = socketio.AsyncServer(
     async_mode="asgi",
     cors_allowed_origins="*",
     logger=True,
-    engineio_logger=False,
-    ping_timeout=120,
-    ping_interval=30,
-    transports=["websocket", "polling"],
+    engineio_logger=True,  # Enable for debugging WebSocket issues
+    ping_timeout=120,  # Mobile stability (wait 120s for pong)
+    ping_interval=130,  # Mobile battery life (send ping every 130s)
 )
 
+# Path relative to the mount point (/ws)
+# Frontend connects to: /ws/socket.io/
+# FastAPI mounts at /ws and strips it, so ASGI app sees: /socket.io/
+#
+# For socketio.ASGIApp:
+# - Use empty string "" to handle all paths under the mount point
+# - The default Socket.IO path "/socket.io/" will be handled automatically
 SOCKETIO_PATH = ""
 
 sio_app = socketio.ASGIApp(

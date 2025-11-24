@@ -30,6 +30,7 @@ import {
 import { DAOManager } from "@/database/dao";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { useTicket } from "@/contexts/TicketContext";
+import { MESSAGE_CREATED, ticketEmitter } from "@/utils/ticketEvents";
 
 const Tabs = {
   PENDING: "open",
@@ -97,7 +98,7 @@ const Inbox: React.FC = () => {
   }, [tickets, activeTab, query]);
   const { user } = useAuth();
 
-  const onPressTicket = (ticket: Ticket) => {
+  const onPressTicket = async (ticket: Ticket) => {
     // update unreadCount
     if (ticket.unreadCount && ticket.unreadCount > 0) {
       const _unreadCount = 0;
@@ -109,6 +110,10 @@ const Inbox: React.FC = () => {
       setTickets((prev: Ticket[]) =>
         prev.map((t: Ticket) => (t.id === ticket.id ? updated : t)),
       );
+      // update unreadCount in database
+      await daoManager.ticket.update(db, ticket.id, {
+        unreadCount: _unreadCount,
+      });
     }
     // Navigate to the chat screen, passing ticketNumber as query param
     const chatName =
@@ -183,9 +188,9 @@ const Inbox: React.FC = () => {
     [user?.id, db, setTickets],
   );
 
-  // Handle real-time message_created events
-  useEffect(() => {
-    const unsubscribe = onMessageCreated(async (event: MessageCreatedEvent) => {
+  // Shared message handler for both WebSocket and ticketEmitter
+  const handleMessageCreated = useCallback(
+    async (event: MessageCreatedEvent) => {
       // Find the ticket in current state
       const ticketIndex = tickets.findIndex(
         (t: Ticket) => t.id === event.ticket_id,
@@ -194,6 +199,15 @@ const Inbox: React.FC = () => {
       if (ticketIndex !== -1) {
         setTickets((prevTickets: Ticket[]) => {
           const ticket = prevTickets[ticketIndex];
+
+          // Check if this message is already the last message (prevent duplicate increments)
+          if (ticket.lastMessageId === event.message_id) {
+            console.log(
+              `[Inbox] Message ${event.message_id} already processed for ticket ${event.ticket_id}, skipping duplicate`,
+            );
+            return prevTickets;
+          }
+
           const newUnreadCount = (ticket.unreadCount || 0) + 1;
 
           // Update database asynchronously (don't block UI)
@@ -239,14 +253,20 @@ const Inbox: React.FC = () => {
         })();
         return;
       } else {
-        // Ticket not found in current list - create optimistic ticket
-        // Only add if it belongs to the current tab
-        const isNewTicket = true; // New tickets are always "open"
-        const shouldAdd = activeTab === Tabs.PENDING && isNewTicket;
+        console.log("[Inbox] Creating optimistic ticket for new ticket", event);
+        setTickets((prevTickets: Ticket[]) => {
+          // Check if ticket already exists (prevent duplicates from multiple event sources)
+          const alreadyExists = prevTickets.some(
+            (t: Ticket) => t.id === event.ticket_id,
+          );
+          if (alreadyExists) {
+            console.log(
+              "[Inbox] Ticket already exists in list, skipping duplicate",
+            );
+            return prevTickets;
+          }
 
-        if (shouldAdd) {
-          console.log("[Inbox] Creating optimistic ticket for new ticket");
-          setTickets((prevTickets: Ticket[]) => [
+          return [
             {
               id: event.ticket_id,
               ticketNumber: event.ticket_number || `TICKET-${event.ticket_id}`,
@@ -270,20 +290,53 @@ const Inbox: React.FC = () => {
                 body: event.body,
                 timestamp: event.ts,
               },
-              unreadCount: 1,
+              unreadCount: 0,
               createdAt: event.ts,
               updatedAt: event.ts,
             } as Ticket,
             ...prevTickets,
-          ]);
-        } else {
-          console.log("[Inbox] Ticket belongs to different tab, skipping");
-        }
+          ];
+        });
       }
-    });
+    },
+    [tickets, setTickets, daoManager, db],
+  );
 
+  // Subscribe to WebSocket message_created events
+  useEffect(() => {
+    const unsubscribe = onMessageCreated(handleMessageCreated);
     return unsubscribe;
-  }, [onMessageCreated, db, daoManager, activeTab, user, tickets, setTickets]);
+  }, [onMessageCreated, handleMessageCreated]);
+
+  // Subscribe to ticketEmitter (fallback for push notifications)
+  useEffect(() => {
+    const handleTicketEmitterMessage = async (data: any) => {
+      console.log("[Inbox] ticketEmitter MESSAGE_CREATED received:", data);
+
+      // Convert push notification data to MessageCreatedEvent format
+      const event: MessageCreatedEvent = {
+        ticket_id: parseInt(data.ticketId),
+        message_id: parseInt(data.messageId),
+        phone_number: data.phone_number || "",
+        body: data.body || "",
+        from_source: 1, // CUSTOMER
+        ts: new Date().toISOString(),
+        ticket_number: data.ticketNumber,
+        sender_name: data.name,
+        customer_id: data.customer_id,
+        customer_name: data.name,
+      };
+
+      // Call the same handler as WebSocket
+      await handleMessageCreated(event);
+    };
+
+    ticketEmitter.on(MESSAGE_CREATED, handleTicketEmitterMessage);
+
+    return () => {
+      ticketEmitter.off(MESSAGE_CREATED, handleTicketEmitterMessage);
+    };
+  }, [handleMessageCreated]);
 
   // Handle real-time ticket_resolved events
   useEffect(() => {

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from models.customer import Customer
-from models.message import Message, MessageFrom, DeliveryStatus
+from models.message import MessageFrom
 from services.whatsapp_service import WhatsAppService
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class ReconnectionService:
         self.threshold_hours = settings.whatsapp_reconnection_threshold_hours
 
     def check_and_send_reconnection(
-        self, customer: Customer, incoming_message_body: str
+        self, customer: Customer, pending_message_count: int
     ) -> bool:
         """
         Check if reconnection template is needed and send it.
@@ -48,6 +48,13 @@ class ReconnectionService:
             )
             return False
 
+        if pending_message_count <= 0:
+            logger.debug(
+                f"Customer {customer.id} has no pending messages; "
+                f"skipping reconnection template"
+            )
+            return False
+
         template_sid = settings.whatsapp_reconnection_template_sid
         if not template_sid:
             logger.warning(
@@ -58,7 +65,6 @@ class ReconnectionService:
 
         try:
             # Send reconnection template
-            # Template example: "Welcome back! You have a new message: {{1}}"
             logger.info(
                 f"Sending reconnection template to customer {customer.id} "
                 f"(inactive for {self.threshold_hours}+ hours)"
@@ -68,23 +74,13 @@ class ReconnectionService:
                 to=customer.phone_number,
                 content_sid=template_sid,
                 content_variables={
-                    "1": incoming_message_body[:50]  # Preview of their message
+                    "1": f"{pending_message_count}"
                 },
             )
 
-            # Save reconnection message to database
-            reconnection_msg = Message(
-                message_sid=response['sid'],
-                customer_id=customer.id,
-                body=f"Reconnection: {incoming_message_body[:50]}",
-                from_source=MessageFrom.LLM,
-                delivery_status=DeliveryStatus.SENT,
-            )
-            self.db.add(reconnection_msg)
-
             # Update customer last_message tracking
             customer.last_message_at = datetime.now(timezone.utc)
-            customer.last_message_from = MessageFrom.LLM
+            customer.last_message_from = MessageFrom.USER
 
             self.db.commit()
 

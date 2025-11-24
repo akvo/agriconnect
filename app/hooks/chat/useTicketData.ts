@@ -128,6 +128,9 @@ export const useTicketData = (
           console.log(
             `[Chat] Starting background sync for ticket ${ticketData.id}`,
           );
+          if (!forceRefresh) {
+            return;
+          }
           MessageSyncService.syncNewerMessages(
             db,
             ticketData.id,
@@ -219,6 +222,18 @@ export const useTicketData = (
                   );
                   setMessages(uiMessages);
                   setOldestTimestamp(result.oldestTimestamp);
+
+                  // Fetch AI suggestion for the customer
+                  const dbAiSuggestion =
+                    await daoManager.message.getLastAISuggestionByCustomerId(
+                      db,
+                      retryTicketData.customer?.id || 0,
+                    );
+
+                  if (dbAiSuggestion?.body) {
+                    setAISuggestion(dbAiSuggestion.body);
+                  }
+                  setAISuggestionLoading(false);
 
                   setTimeout(() => scrollToBottom(false), 300);
                 } else {

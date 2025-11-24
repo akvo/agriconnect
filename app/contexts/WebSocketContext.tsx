@@ -37,6 +37,7 @@ export interface MessageCreatedEvent {
   sender_name?: string; // Renamed from customer_name for semantic clarity
   user_id?: number; // Present for admin/EO messages (from_source=2)
   customer_id?: number; // Present for customer messages (from_source=1)
+  customer_name?: string;
 }
 
 export interface TicketResolvedEvent {
