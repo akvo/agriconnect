@@ -146,8 +146,6 @@ async def list_documents(
             size=0,
         )
 
-    # TODO :: Support search for doc and KB
-
     data = []
     for doc in rag_doc_response.get("data"):
         task = doc.get("processing_tasks")[0] or {}

@@ -329,6 +329,7 @@ class ExternalAIService:
                         f"{url}",
                         headers=headers,
                         timeout=30.0,
+                        params=query_params,
                     )
                 elif operation == "list_docs":
                     query_params["kb_id"] = kb_id
