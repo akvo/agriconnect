@@ -175,7 +175,7 @@ export default function DocumentPage({ kbId }) {
   };
 
   const handleViewDocument = (doc) => {
-    // TODO: ImpleDocument}l or navigate to detail page
+    // TODO: Implement view document
     console.log("View doc:", doc);
   };
 

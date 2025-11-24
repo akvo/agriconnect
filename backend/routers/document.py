@@ -61,14 +61,14 @@ async def create_document(
             detail="Knowledge Base not found.",
         )
 
-    try:
-        ai_service = ExternalAIService(db=db)
-        if not ai_service.is_configured():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No active AI service configured",
-            )
+    ai_service = ExternalAIService(db=db)
+    if not ai_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No active AI service configured",
+        )
 
+    try:
         rag_doc_response = await ai_service.create_upload_job(
             upload_file=file,
             kb_id=kb.external_id,
@@ -86,6 +86,9 @@ async def create_document(
             status=rag_doc_response.get("status"),
         )
 
+    except HTTPException:
+        # Re-raise HTTPException without wrapping
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -126,7 +129,12 @@ async def list_documents(
         )
 
     rag_doc_response = await ai_service.manage_knowledge_base(
-        operation="list_docs", kb_id=kb.external_id, is_doc=True
+        operation="list_docs",
+        kb_id=kb.external_id,
+        is_doc=True,
+        page=page,
+        size=size,
+        search=search,
     )
 
     # empty

@@ -1,304 +1,651 @@
-# import io
-# import pytest
-# from unittest.mock import AsyncMock, patch
-# from fastapi import status
-# from fastapi.testclient import TestClient
-# from sqlalchemy.orm import Session
-
-# from models import ServiceToken
-# from services.knowledge_base_service import KnowledgeBaseService
+import pytest
+from unittest.mock import AsyncMock, patch
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+from io import BytesIO
+from models import ServiceToken
+from services.knowledge_base_service import KnowledgeBaseService
 
 
-# @pytest.fixture(scope="function")
-# def service_token(db_session: Session) -> ServiceToken:
-#     """
-#     Reusable fixture that creates a valid service token for external service.
-#     """
-#     token = ServiceToken(
-#         service_name="Test Service",
-#         access_token="testtoken",
-#         chat_url="https://api.testservice.com/chat",
-#         upload_url="https://api.testservice.com/upload",
-#         kb_url="https://api.testservice.com/kb",
-#         document_url="https://api.testservice.com/document",
-#         default_prompt="You are an AI assistant.",
-#         active=1,
-#     )
-#     db_session.add(token)
-#     db_session.commit()
-#     db_session.refresh(token)
-#     return token
+# ─────────────────────────────
+# FIXTURES
+# ─────────────────────────────
+@pytest.fixture(scope="function")
+def service_token(db_session: Session) -> ServiceToken:
+    """Reusable fixture that creates a valid service token"""
+    token = ServiceToken(
+        service_name="Test Service",
+        access_token="testtoken",
+        chat_url="https://api.testservice.com/chat",
+        upload_url="https://api.testservice.com/upload",
+        kb_url="https://api.testservice.com/kb",
+        document_url="https://api.testservice.com/document",
+        default_prompt="You are an AI assistant.",
+        active=1,
+    )
+    db_session.add(token)
+    db_session.commit()
+    db_session.refresh(token)
+    return token
 
 
-# @pytest.fixture(scope="function")
-# def mock_external_ai_upload():
-#     """Mock for ExternalAIService.create_upload_job."""
-#     with patch(
-#         "services.external_ai_service.ExternalAIService.create_upload_job",
-#         new_callable=AsyncMock,
-#     ) as mock_method:
-#         mock_method.return_value = {
-#             "job_id": "mock-job-123",
-#             "status": "uploaded",
-#             "external_id": "rag-doc-456",
-#         }
-#         yield mock_method
+@pytest.fixture(scope="function")
+def mock_external_ai_upload():
+    """
+    Mock the external AI service's create_upload_job method and
+    is_configured check
+    """
+    with (
+        patch(
+            "routers.document.ExternalAIService.create_upload_job",
+            new_callable=AsyncMock,
+        ) as mock_method,
+        patch(
+            "routers.document.ExternalAIService.is_configured",
+            return_value=True,
+        ),
+    ):
+        mock_method.return_value = {
+            "job_id": "mock-job-id-123",
+            "status": "pending",
+        }
+        yield mock_method
 
 
-# class TestDocumentEndpoints:
-#     """Test suite for /documents API endpoints."""
+@pytest.fixture(scope="function")
+def mock_external_ai_list_docs():
+    """
+    Mock the external AI service's manage_knowledge_base method for
+    listing documents
+    """
+    with (
+        patch(
+            "routers.document.ExternalAIService.manage_knowledge_base",
+            new_callable=AsyncMock,
+        ) as mock_method,
+        patch(
+            "routers.document.ExternalAIService.is_configured",
+            return_value=True,
+        ),
+    ):
+        mock_method.return_value = {
+            "data": [
+                {
+                    "id": 1,
+                    "file_name": "test.pdf",
+                    "file_path": "/uploads/test.pdf",
+                    "content_type": "application/pdf",
+                    "file_size": 1024,
+                    "processing_tasks": [
+                        {
+                            "status": "completed",
+                            "created_at": "2024-01-01T00:00:00",
+                            "updated_at": "2024-01-01T00:01:00",
+                        }
+                    ],
+                },
+                {
+                    "id": 2,
+                    "file_name": "test2.txt",
+                    "file_path": "/uploads/test2.txt",
+                    "content_type": "text/plain",
+                    "file_size": 512,
+                    "processing_tasks": [
+                        {
+                            "status": "processing",
+                            "created_at": "2024-01-01T00:02:00",
+                            "updated_at": "2024-01-01T00:03:00",
+                        }
+                    ],
+                },
+            ],
+            "total": 2,
+            "page": 1,
+            "size": 10,
+        }
+        yield mock_method
 
-#     # ─────────────────────────────
-#     # CREATE DOCUMENT
-#     # ─────────────────────────────
-#     @pytest.mark.asyncio
-#     async def test_create_document_success(
-#         self,
-#         client: TestClient,
-#         auth_headers_factory,
-#         db_session: Session,
-#         service_token: ServiceToken,
-#         mock_external_ai_upload,
-#     ):
-#         headers, user = auth_headers_factory(user_type="eo")
 
-#         kb = KnowledgeBaseService.create_knowledge_base(
-#             db=db_session,
-#             user_id=user.id,
-#             title="Docs KB",
-#             description="Docs for testing",
-#             service_id=service_token.id,
-#         )
+def create_test_file(filename: str, content: bytes, content_type: str):
+    """Helper function to create a test file"""
+    return (filename, BytesIO(content), content_type)
 
-#         # Prepare file upload
-#         file_content = io.BytesIO(b"dummy pdf content")
-#         files = {
-#             "file": ("test.pdf", file_content, "application/pdf"),
-#         }
-#         data = {
-#             "kb_id": str(kb.id),
-#             "title": "Test Document",
-#             "description": "Sample file for upload test",
-#         }
 
-#         response = client.post(
-#             "/api/documents", files=files, data=data, headers=headers
-#         )
-#         assert response.status_code == status.HTTP_201_CREATED
-#         json_data = response.json()
+# ─────────────────────────────
+# TEST CLASS
+# ─────────────────────────────
+class TestDocumentEndpoints:
 
-#         assert json_data["filename"] == "test.pdf"
-#         assert json_data["kb_id"] == str(kb.id)
-#         assert json_data["user_id"] == user.id
+    # ─────────────────────────────
+    # UPLOAD DOCUMENT
+    # ─────────────────────────────
+    @pytest.mark.asyncio
+    async def test_upload_document_pdf_success(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+        mock_external_ai_upload,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
 
-#         mock_external_ai_upload.assert_awaited_once()
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
 
-#     def test_create_document_invalid_file_type(
-#         self,
-#         client: TestClient,
-#         auth_headers_factory,
-#         db_session: Session,
-#         service_token: ServiceToken,
-#     ):
-#         headers, user = auth_headers_factory(user_type="eo")
-#         kb = KnowledgeBaseService.create_knowledge_base(
-#             db=db_session,
-#             user_id=user.id,
-#             title="KB Invalid Type",
-#             service_id=service_token.id,
-#         )
+        file_content = b"Mock PDF content"
+        files = {
+            "file": create_test_file(
+                "test.pdf", file_content, "application/pdf"
+            )
+        }
+        data = {"kb_id": str(kb.id)}
 
-#         file_content = io.BytesIO(b"fake image")
-#         files = {"file": ("hack.png", file_content, "image/png")}
-#         data = {
-#             "kb_id": str(kb.id),
-#             "title": "Invalid",
-#             "description": "Should fail",
-#         }
+        response = client.post(
+            "/api/documents",
+            files=files,
+            data=data,
+            headers=headers,
+        )
 
-#         response = client.post(
-#             "/api/documents", files=files, data=data, headers=headers
-#         )
-#         assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == 201
+        response_data = response.json()
+        assert response_data["job_id"] == "mock-job-id-123"
+        assert response_data["status"] == "pending"
 
-#     def test_create_document_kb_not_found(
-#         self,
-#         client: TestClient,
-#         auth_headers_factory,
-#     ):
-#         headers, _ = auth_headers_factory(user_type="eo")
-#         file_content = io.BytesIO(b"some text")
-#         files = {"file": ("note.txt", file_content, "text/plain")}
-#         data = {"kb_id": "nonexistent", "title": "Lost Doc"}
+        mock_external_ai_upload.assert_awaited_once()
 
-#         response = client.post(
-#             "/api/documents", files=files, data=data, headers=headers
-#         )
-#         assert response.status_code == status.HTTP_404_NOT_FOUND
+    @pytest.mark.asyncio
+    async def test_upload_document_txt_success(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+        mock_external_ai_upload,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
 
-#     # ─────────────────────────────
-#     # LIST DOCUMENTS
-#     # ─────────────────────────────
-#     def test_list_documents_user_filter(
-#         self,
-#         client: TestClient,
-#         auth_headers_factory,
-#         db_session: Session,
-#         service_token: ServiceToken,
-#     ):
-#         headers, user = auth_headers_factory(user_type="eo")
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
 
-#         kb = KnowledgeBaseService.create_knowledge_base(
-#             db=db_session,
-#             user_id=user.id,
-#             title="KB",
-#             service_id=service_token.id,
-#         )
+        file_content = b"Mock text content"
+        files = {
+            "file": create_test_file("test.txt", file_content, "text/plain")
+        }
+        data = {"kb_id": str(kb.id)}
 
-#         for i in range(5):
-#             DocumentService.create_document(
-#                 db=db_session,
-#                 kb_id=str(kb.id),
-#                 user_id=user.id,
-#                 filename=f"file_{i}.pdf",
-#                 content_type="application/pdf",
-#                 file_size=1000,
-#             )
+        response = client.post(
+            "/api/documents",
+            files=files,
+            data=data,
+            headers=headers,
+        )
 
-#         db_session.commit()
-#         response = client.get(
-# "/api/documents?page=1&size=3", headers=headers)
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
-#         assert len(data["data"]) <= 3
-#         assert data["total"] >= 5
+        assert response.status_code == 201
 
-#     # ─────────────────────────────
-#     # RETRIEVE
-#     # ─────────────────────────────
-#     def test_get_document_success(
-#         self,
-#         client: TestClient,
-#         auth_headers_factory,
-#         db_session: Session,
-#         service_token: ServiceToken,
-#     ):
-#         headers, user = auth_headers_factory(user_type="eo")
-#         kb = KnowledgeBaseService.create_knowledge_base(
-#             db=db_session,
-#             user_id=user.id,
-#             title="KB",
-#             service_id=service_token.id,
-#         )
-#         doc = DocumentService.create_document(
-#             db=db_session,
-#             kb_id=str(kb.id),
-#             user_id=user.id,
-#             filename="mydoc.pdf",
-#             content_type="application/pdf",
-#         )
+    @pytest.mark.asyncio
+    async def test_upload_document_docx_success(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+        mock_external_ai_upload,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
 
-#         response = client.get(f"/api/documents/{doc.id}", headers=headers)
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["filename"] == "mydoc.pdf"
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
 
-#     def test_get_document_not_found(
-#         self, client: TestClient, auth_headers_factory
-#     ):
-#         headers, _ = auth_headers_factory(user_type="eo")
-#         response = client.get("/api/documents/9999", headers=headers)
-#         assert response.status_code == 404
+        file_content = b"Mock DOCX content"
+        files = {
+            "file": create_test_file(
+                "test.docx",
+                file_content,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # noqa
+            )
+        }
+        data = {"kb_id": str(kb.id)}
 
-#     def test_get_document_forbidden(
-#         self,
-#         client: TestClient,
-#         auth_headers_factory,
-#         db_session: Session,
-#         service_token: ServiceToken,
-#     ):
-#         admin_headers, admin = auth_headers_factory(user_type="admin")
-#         eo_headers, eo_user = auth_headers_factory(user_type="eo")
+        response = client.post(
+            "/api/documents",
+            files=files,
+            data=data,
+            headers=headers,
+        )
 
-#         kb = KnowledgeBaseService.create_knowledge_base(
-#             db=db_session,
-#             user_id=admin.id,
-#             title="KB",
-#             service_id=service_token.id,
-#         )
-#         doc = DocumentService.create_document(
-#             db=db_session,
-#             kb_id=str(kb.id),
-#             user_id=admin.id,
-#             filename="secret.pdf",
-#             content_type="application/pdf",
-#         )
+        assert response.status_code == 201
 
-#         response = client.get(f"/api/documents/{doc.id}", headers=eo_headers)
-#         assert response.status_code == 403
+    def test_upload_document_unsupported_file_type(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
 
-#     # ─────────────────────────────
-#     # UPDATE
-#     # ─────────────────────────────
-#     def test_update_document_success(
-#         self,
-#         client: TestClient,
-#         auth_headers_factory,
-#         db_session: Session,
-#         service_token: ServiceToken,
-#     ):
-#         headers, user = auth_headers_factory(user_type="eo")
-#         kb = KnowledgeBaseService.create_knowledge_base(
-#             db=db_session,
-#             user_id=user.id,
-#             title="KB",
-#             service_id=service_token.id,
-#         )
-#         doc = DocumentService.create_document(
-#             db=db_session,
-#             kb_id=str(kb.id),
-#             user_id=user.id,
-#             filename="old.pdf",
-#             extra_data={"title": "Old Title", "description": "Old metadata"},
-#             content_type="application/pdf",
-#         )
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
 
-#         payload = {"title": "Updated Title"}
-#         response = client.put(
-#             f"/api/documents/{doc.id}", json=payload, headers=headers
-#         )
-#         assert response.status_code == 200
-#         assert response.json()["extra_data"]["title"] == "Updated Title"
-#         assert response.json()["extra_data"]["description"] == "Old metadata"
+        file_content = b"Mock image content"
+        files = {
+            "file": create_test_file("test.jpg", file_content, "image/jpeg")
+        }
+        data = {"kb_id": str(kb.id)}
 
-#     def test_update_document_forbidden(
-#         self,
-#         client: TestClient,
-#         auth_headers_factory,
-#         db_session: Session,
-#         service_token: ServiceToken,
-#     ):
-#         admin_headers, admin = auth_headers_factory(user_type="admin")
-#         eo_headers, eo_user = auth_headers_factory(user_type="eo")
+        response = client.post(
+            "/api/documents",
+            files=files,
+            data=data,
+            headers=headers,
+        )
 
-#         kb = KnowledgeBaseService.create_knowledge_base(
-#             db=db_session,
-#             user_id=admin.id,
-#             title="KB",
-#             service_id=service_token.id,
-#         )
-#         doc = DocumentService.create_document(
-#             db=db_session,
-#             kb_id=str(kb.id),
-#             user_id=admin.id,
-#             filename="private.pdf",
-#             content_type="application/pdf",
-#         )
+        assert response.status_code == 400
+        assert "Unsupported file" in response.text
 
-#         response = client.put(
-#             f"/api/documents/{doc.id}",
-#             json={"extra_data": {"hack": True}},
-#             headers=eo_headers,
-#         )
-#         assert response.status_code == 403
+    def test_upload_document_kb_not_found(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        file_content = b"Mock PDF content"
+        files = {
+            "file": create_test_file(
+                "test.pdf", file_content, "application/pdf"
+            )
+        }
+        data = {"kb_id": "999999"}
+
+        response = client.post(
+            "/api/documents",
+            files=files,
+            data=data,
+            headers=headers,
+        )
+
+        assert response.status_code == 404
+        assert "Knowledge Base not found" in response.text
+
+    @pytest.mark.asyncio
+    async def test_upload_document_no_active_service(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        with patch(
+            "routers.document.ExternalAIService.is_configured",
+            return_value=False,
+        ):
+            file_content = b"Mock PDF content"
+            files = {
+                "file": create_test_file(
+                    "test.pdf", file_content, "application/pdf"
+                )
+            }
+            data = {"kb_id": str(kb.id)}
+
+            response = client.post(
+                "/api/documents",
+                files=files,
+                data=data,
+                headers=headers,
+            )
+
+            # With improved exception handling, HTTPException is re-raised
+            assert response.status_code == 503
+            assert "No active AI service configured" in response.text
+
+    @pytest.mark.asyncio
+    async def test_upload_document_external_service_fails(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        with (
+            patch(
+                "routers.document.ExternalAIService.create_upload_job",
+                new_callable=AsyncMock,
+            ) as mock_upload,
+            patch(
+                "routers.document.ExternalAIService.is_configured",
+                return_value=True,
+            ),
+        ):
+            mock_upload.return_value = None
+
+            file_content = b"Mock PDF content"
+            files = {
+                "file": create_test_file(
+                    "test.pdf", file_content, "application/pdf"
+                )
+            }
+            data = {"kb_id": str(kb.id)}
+
+            response = client.post(
+                "/api/documents",
+                files=files,
+                data=data,
+                headers=headers,
+            )
+
+            # With improved exception handling, HTTPException is re-raised
+            assert response.status_code == 502
+            assert "Failed to upload document" in response.text
+
+    def test_upload_document_missing_file(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        data = {"kb_id": str(kb.id)}
+
+        response = client.post(
+            "/api/documents",
+            data=data,
+            headers=headers,
+        )
+
+        assert response.status_code == 422
+
+    def test_upload_document_missing_kb_id(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        file_content = b"Mock PDF content"
+        files = {
+            "file": create_test_file(
+                "test.pdf", file_content, "application/pdf"
+            )
+        }
+
+        response = client.post(
+            "/api/documents",
+            files=files,
+            headers=headers,
+        )
+
+        assert response.status_code == 422
+
+    # ─────────────────────────────
+    # LIST DOCUMENTS
+    # ─────────────────────────────
+    @pytest.mark.asyncio
+    async def test_list_documents_success(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+        mock_external_ai_list_docs,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        response = client.get(
+            f"/api/documents?kb_id={kb.id}",
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["total"] == 2
+        assert data["page"] == 1
+        assert data["size"] == 10
+        assert len(data["data"]) == 2
+
+        assert data["data"][0]["id"] == 1
+        assert data["data"][0]["filename"] == "test.pdf"
+        assert data["data"][0]["status"] == "completed"
+
+        assert data["data"][1]["id"] == 2
+        assert data["data"][1]["filename"] == "test2.txt"
+        assert data["data"][1]["status"] == "processing"
+
+        mock_external_ai_list_docs.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_list_documents_with_pagination(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+        mock_external_ai_list_docs,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        response = client.get(
+            f"/api/documents?kb_id={kb.id}&page=2&size=5",
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+
+        call_kwargs = mock_external_ai_list_docs.call_args.kwargs
+        assert call_kwargs["page"] == 2
+        assert call_kwargs["size"] == 5
+
+    @pytest.mark.asyncio
+    async def test_list_documents_with_search(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+        mock_external_ai_list_docs,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        response = client.get(
+            f"/api/documents?kb_id={kb.id}&search=test",
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+
+        call_kwargs = mock_external_ai_list_docs.call_args.kwargs
+        assert call_kwargs["search"] == "test"
+
+    @pytest.mark.asyncio
+    async def test_list_documents_empty_result(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        with (
+            patch(
+                "routers.document.ExternalAIService.manage_knowledge_base",
+                new_callable=AsyncMock,
+            ) as mock_method,
+            patch(
+                "routers.document.ExternalAIService.is_configured",
+                return_value=True,
+            ),
+        ):
+            mock_method.return_value = {
+                "data": [],
+                "total": 0,
+                "page": 0,
+                "size": 0,
+            }
+
+            response = client.get(
+                f"/api/documents?kb_id={kb.id}",
+                headers=headers,
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["total"] == 0
+            assert len(data["data"]) == 0
+
+    def test_list_documents_kb_not_found(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        response = client.get(
+            "/api/documents?kb_id=999999",
+            headers=headers,
+        )
+
+        assert response.status_code == 404
+        assert "Knowledge Base not found" in response.text
+
+    @pytest.mark.asyncio
+    async def test_list_documents_no_active_service(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        with patch(
+            "routers.document.ExternalAIService.is_configured",
+            return_value=False,
+        ):
+            response = client.get(
+                f"/api/documents?kb_id={kb.id}",
+                headers=headers,
+            )
+
+            assert response.status_code == 503
+            assert "No active AI service configured" in response.text
+
+    def test_list_documents_invalid_pagination(
+        self,
+        client: TestClient,
+        auth_headers_factory,
+        db_session: Session,
+        service_token: ServiceToken,
+    ):
+        headers, user = auth_headers_factory(user_type="eo")
+
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        response = client.get(
+            f"/api/documents?kb_id={kb.id}&page=0",
+            headers=headers,
+        )
+
+        assert response.status_code == 422
+
+        response = client.get(
+            f"/api/documents?kb_id={kb.id}&size=0",
+            headers=headers,
+        )
+
+        assert response.status_code == 422
+
+        response = client.get(
+            f"/api/documents?kb_id={kb.id}&size=101",
+            headers=headers,
+        )
+
+        assert response.status_code == 422

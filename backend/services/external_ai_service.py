@@ -4,6 +4,7 @@ import httpx
 import logging
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
 from models.service_token import ServiceToken
 from services.service_token_service import ServiceTokenService
@@ -274,6 +275,9 @@ class ExternalAIService:
         description: Optional[str] = None,
         kb_id: Optional[int] = None,
         is_doc: Optional[bool] = False,
+        page: Optional[int] = 1,
+        size: Optional[int] = 10,
+        search: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Perform knowledge base operations with external AI service.
@@ -296,6 +300,10 @@ class ExternalAIService:
         url = self.token.kb_url if not is_doc else self.token.document_url
         headers = {"Authorization": f"Bearer {self.token.access_token}"}
         name = name or "Agriconnect Untitled KB"
+
+        # create query param
+        skip = (page - 1) * size
+        query_params = {"skip": skip, "limit": size, "search": search}
 
         payload = {
             "name": name,
@@ -323,11 +331,12 @@ class ExternalAIService:
                         timeout=30.0,
                     )
                 elif operation == "list_docs":
+                    query_params["kb_id"] = kb_id
                     response = await client.get(
                         f"{url}",
                         headers=headers,
                         timeout=30.0,
-                        params={"kb_id": kb_id},
+                        params=query_params,
                     )
                 elif operation == "get":
                     response = await client.get(
@@ -372,6 +381,9 @@ class ExternalAIService:
                     f"(service: {self.token.service_name})"
                 )
                 return data
+        except HTTPException:
+            # Re-raise HTTPException without wrapping
+            raise
         except httpx.HTTPStatusError as e:
             logger.error(
                 f"✗ HTTPStatusError Failed KB operation '{operation}': "
