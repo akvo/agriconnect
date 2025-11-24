@@ -80,7 +80,6 @@ def test_create_service_token_success(
 
     assert response.status_code == 200
     data = response.json()
-    print(data, "xxx")
 
     assert "id" in data
     assert data["service_name"] == "akvo-rag"

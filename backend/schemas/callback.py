@@ -104,11 +104,8 @@ class AICallbackParams(BaseModel):
 class KBCallbackParams(BaseModel):
     """Parameters specific to Knowledge Base processing callbacks"""
 
-    kb_id: Optional[str] = Field(
+    kb_id: Optional[int] = Field(
         None, description="Knowledge base ID that was processed", example=456
-    )
-    document_id: Optional[int] = Field(
-        None, description="Document ID that was processed", example=789
     )
     user_id: Optional[int] = Field(
         None,
@@ -169,19 +166,15 @@ class AIWebhookCallback(BaseModel):
 class KBWebhookCallback(BaseModel):
     """Webhook callback payload for Knowledge Base processing"""
 
-    job_id: str = Field(
-        ..., description="Unique DOC processing job identifier"
+    job_id: str = Field(..., description="Unique KB processing job identifier")
+    status: CallbackStage = Field(..., description="Processing stage")
+    callback_params: Optional[KBCallbackParams] = Field(
+        None, description="KB-specific parameters"
     )
-    status: CallbackStage = Field(..., description="Processing status")
-    output: Optional[str] = Field(
-        None, description="Upload results (when status='completed')"
+    trace_id: Optional[str] = Field(
+        None, description="Tracing ID for debugging"
     )
-    error: Optional[str] = Field(
-        None, description="Error message (when status='failed')"
-    )
-    callback_params: Union[str, KBCallbackParams] = Field(
-        ..., description="KB DOC-specific parameters"
-    )
+    job: JobType = Field(..., description="Job type")
 
     @property
     def stage(self) -> CallbackStage:

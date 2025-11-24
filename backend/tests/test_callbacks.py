@@ -1,4 +1,3 @@
-import json
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -183,6 +182,41 @@ def test_ai_callback_failed_job(client: TestClient, db_session: Session):
 
     assert response.status_code == 200
     assert response.json() == {"status": "received", "job_id": "job_456"}
+
+
+def test_kb_callback_success(client: TestClient, db_session: Session):
+    """Test successful KB callback"""
+    payload = {
+        "job_id": "kb_job_789",
+        "status": "done",
+        "callback_params": None,  # No KB params to avoid DB access
+        "trace_id": "trace_003",
+        "job": "upload",
+    }
+
+    response = client.post("/api/callback/kb", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "received", "job_id": "kb_job_789"}
+
+
+def test_kb_callback_timeout(client: TestClient, db_session: Session):
+    """Test KB callback for timeout"""
+    payload = {
+        "job_id": "kb_job_timeout",
+        "status": "timeout",
+        "callback_params": None,  # No KB params to avoid DB access
+        "trace_id": "trace_004",
+        "job": "upload",
+    }
+
+    response = client.post("/api/callback/kb", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "received",
+        "job_id": "kb_job_timeout",
+    }
 
 
 def test_callback_invalid_stage_enum(client: TestClient):
@@ -631,6 +665,7 @@ def test_kb_callback_exception_raises_http_exception(
     # Create a payload with callback_params that will trigger the service
     from models.knowledge_base import KnowledgeBase
     from models.user import User, UserType
+    from models.service_token import ServiceToken
 
     # Create a test user first
     user = User(
@@ -644,12 +679,24 @@ def test_kb_callback_exception_raises_http_exception(
     db_session.commit()
     db_session.refresh(user)
 
+    # Create a test service token
+    service_token = ServiceToken(
+        service_name="Test Service",
+        access_token="test_access_token_xxx_123",
+        chat_url=None,
+        upload_url="https://upload.test/jobs",
+        kb_url="https://kb.test/kbs",
+        document_url=None,
+        default_prompt="This is default prompt",
+        active=1,
+    )
+    db_session.add(service_token)
+    db_session.commit()
+    db_session.refresh(service_token)
+
     # Create a test KB
     kb = KnowledgeBase(
-        user_id=user.id,
-        title="Test KB",
-        filename="test.pdf",
-        description="Test",
+        user_id=user.id, external_id="kb_id_1", service_id=service_token.id
     )
     db_session.add(kb)
     db_session.commit()
