@@ -17,8 +17,6 @@ export default function DocumentUploadModal({
   uploading = false,
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
@@ -33,12 +31,8 @@ export default function DocumentUploadModal({
 
   useEffect(() => {
     if (selectedDocument) {
-      setTitle(selectedDocument?.extra_data?.title || "");
-      setDescription(selectedDocument?.extra_data?.description || "");
       setSelectedFile(null); // Clear selected file when editing
     } else {
-      setTitle("");
-      setDescription("");
       setSelectedFile(null);
     }
     setError("");
@@ -52,12 +46,6 @@ export default function DocumentUploadModal({
         "Unsupported file type. Only PDF, TXT, and DOCX files are allowed."
       );
       return;
-    }
-
-    // Auto-generate title from filename if not set
-    if (!title) {
-      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-      setTitle(nameWithoutExt);
     }
 
     setSelectedFile(file);
@@ -101,17 +89,8 @@ export default function DocumentUploadModal({
       return;
     }
 
-    if (!title.trim()) {
-      setError("Please enter a title for this document.");
-      return;
-    }
-
     const formData = new FormData();
     formData.append("file", selectedFile);
-    formData.append("title", title.trim());
-    if (description.trim()) {
-      formData.append("description", description.trim());
-    }
 
     try {
       await onUpload(formData);
@@ -128,16 +107,8 @@ export default function DocumentUploadModal({
   const handleEdit = async (e) => {
     e.preventDefault();
 
-    if (!title.trim()) {
-      setError("Please enter a title for this document.");
-      return;
-    }
 
     const formData = new FormData();
-    formData.append("title", title.trim());
-    if (description.trim()) {
-      formData.append("description", description.trim());
-    }
 
     try {
       await onEdit(formData, selectedDocument.id);
@@ -154,8 +125,6 @@ export default function DocumentUploadModal({
   const handleClose = () => {
     if (!uploading) {
       setSelectedFile(null);
-      setTitle("");
-      setDescription("");
       setError("");
       setDragActive(false);
       onClose();
@@ -262,45 +231,6 @@ export default function DocumentUploadModal({
             ""
           )}
 
-          {/* Title Input */}
-          <div className="space-y-2">
-            <label
-              htmlFor="title"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Title *
-            </label>
-            <input
-              type="text"
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter a descriptive title for this document"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={uploading}
-              required
-            />
-          </div>
-
-          {/* Description Input */}
-          <div className="space-y-2">
-            <label
-              htmlFor="description"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Description (Optional)
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the content of this document to help with AI processing"
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              disabled={uploading}
-            />
-          </div>
-
           {/* Error Message */}
           {error && (
             <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-md">
@@ -324,7 +254,7 @@ export default function DocumentUploadModal({
               disabled={
                 selectedDocument
                   ? false
-                  : !selectedFile || !title.trim() || uploading
+                  : !selectedFile || uploading
               }
               className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >

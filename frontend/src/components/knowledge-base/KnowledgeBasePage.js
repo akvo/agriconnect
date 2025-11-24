@@ -82,10 +82,8 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  const handleSearch = (e) => {
-    const newSearchQuery = e.target.value;
+  const handleSearch = (newSearchQuery) => {
     setSearchQuery(newSearchQuery);
-
     // Debounce the search - reset to page 1 and search
     setCurrentPage(1);
     fetchKnowledgeBases(1, newSearchQuery || null);
