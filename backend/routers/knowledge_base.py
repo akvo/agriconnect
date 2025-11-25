@@ -116,9 +116,12 @@ async def list_knowledge_bases(
     )
     kb_external_ids = {kb.external_id: kb.id for kb in knowledge_bases}
 
-    # TODO::Need to make RAG accept list of kb_ids
     rag_kb_response = await ai_service.manage_knowledge_base(
-        operation="list", page=page, size=size, search=search
+        operation="list",
+        page=page,
+        size=size,
+        search=search,
+        kb_ids=kb_external_ids.keys(),
     )
 
     # empty
@@ -132,9 +135,8 @@ async def list_knowledge_bases(
 
     data = []
     for kb in rag_kb_response.get("data"):
-        kb_id = kb.get("id")
-        kb_id = str(kb_id) if kb_id else None
-        if not kb_id or kb_id not in kb_external_ids.keys():
+        kb_id = str(kb.get("id")) if kb.get("id") else None
+        if not kb_id:
             continue
         current_kb_id = kb_external_ids.get(str(kb_id))
         data.append(
@@ -148,7 +150,7 @@ async def list_knowledge_bases(
         )
 
     return KnowledgeBaseListResponse(
-        data=data or [],
+        data=data,
         total=rag_kb_response.get("total", 0),
         page=rag_kb_response.get("page", 0),
         size=rag_kb_response.get("size", 0),

@@ -43,8 +43,11 @@ class KnowledgeBaseService:
         Get list of knowledge bases.
         - If user_id is provided, returns only that user's KBs.
         - If user_id is None (admin), returns all KBs.
+        - Filter for kb that only have external_id
         """
-        query = db.query(KnowledgeBase)
+        query = db.query(KnowledgeBase).filter(
+            KnowledgeBase.external_id.isnot(None)
+        )
 
         if user_id is not None:
             query = query.filter(KnowledgeBase.user_id == user_id)

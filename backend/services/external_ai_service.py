@@ -278,6 +278,7 @@ class ExternalAIService:
         page: Optional[int] = 1,
         size: Optional[int] = 10,
         search: Optional[str] = None,
+        kb_ids: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Perform knowledge base operations with external AI service.
@@ -304,6 +305,8 @@ class ExternalAIService:
         # create query param
         skip = (page - 1) * size
         query_params = {"skip": skip, "limit": size, "search": search}
+        if kb_ids:
+            query_params["kb_ids"] = [int(kb_id) for kb_id in kb_ids]
 
         payload = {
             "name": name,
