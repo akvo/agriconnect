@@ -69,7 +69,7 @@ export default function PlaygroundPage() {
 
   // WebSocket setup
   useEffect(() => {
-    if (!currentSessionId || !user) return;
+    if (!user) return;
 
     const token = api.token;
 
@@ -87,11 +87,6 @@ export default function PlaygroundPage() {
 
     newSocket.on("connect", () => {
       setIsConnected(true);
-
-      // Join playground session room
-      if (currentSessionId) {
-        newSocket.emit("join_playground", { session_id: currentSessionId });
-      }
     });
 
     newSocket.on("disconnect", () => {
@@ -120,7 +115,14 @@ export default function PlaygroundPage() {
     return () => {
       newSocket.close();
     };
-  }, [currentSessionId, user]);
+  }, [user]);
+
+  // Join playground room when session ID is available
+  useEffect(() => {
+    if (socket && isConnected && currentSessionId) {
+      socket.emit("join_playground", { session_id: currentSessionId });
+    }
+  }, [socket, isConnected, currentSessionId]);
 
   // Auto-scroll to bottom
   useEffect(() => {
