@@ -94,6 +94,7 @@ const ChatScreen = () => {
     scrollToBottom,
     setAISuggestionLoading,
     setAISuggestion,
+    updateTicket,
   );
 
   // Messages pagination hook
