@@ -62,6 +62,7 @@ export const useTicketData = (
   scrollToBottom: (animated?: boolean) => void,
   setAISuggestionLoading: React.Dispatch<React.SetStateAction<boolean>>,
   setAISuggestion: React.Dispatch<React.SetStateAction<string | null>>,
+  updateTicket: (id: number, data: Partial<any>) => Promise<void>,
 ): UseTicketDataReturn => {
   const db = useDatabase();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
@@ -251,6 +252,18 @@ export const useTicketData = (
             }
           }
         }
+        if (updateTicket && ticketId) {
+          // Update unread count to 0 in tickets list when loading the ticket
+          await updateTicket(Number(ticketId), {
+            unreadCount: 0,
+          });
+        }
+        if (ticketId) {
+          // Directly use daoManager to avoid stale closure
+          await daoManager.ticket.update(db, Number(ticketId), {
+            unreadCount: 0,
+          });
+        }
       } catch (error: any) {
         if (error?.status === 401) {
           console.log(
@@ -273,6 +286,7 @@ export const useTicketData = (
       scrollToBottom,
       setAISuggestionLoading,
       setAISuggestion,
+      updateTicket,
     ],
   );
 

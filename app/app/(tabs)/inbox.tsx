@@ -46,8 +46,12 @@ const Inbox: React.FC = () => {
     initTab || Tabs.PENDING,
   );
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+
+  // ✅ FIX: Separate page state per tab (not shared)
+  const [pageState, setPageState] = useState({ open: 1, resolved: 1 });
+  const page = pageState[activeTab];
+
+  const [loading, setLoading] = useState(false); // Changed to false - use cache first
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,47 +59,48 @@ const Inbox: React.FC = () => {
   const endReachedTimeout = useRef<number | null>(null);
   const isFetchingRef = useRef(false); // prevent duplicate fetches
   const isInitialMount = useRef(true); // track initial mount
+  const hasLoadedTab = useRef({ open: false, resolved: false }); // track which tabs have been loaded
   const db = useDatabase();
   const { isConnected, onMessageCreated, onTicketResolved } = useWebSocket();
   const { isOnline } = useNetwork();
-  const { tickets, setTickets } = useTicket();
+  const { tickets, setTickets, getTicketsByStatus, loadMoreResolved } =
+    useTicket();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tickets
-      .filter((t: Ticket) => {
-        const isResolved = !!t.resolvedAt;
-        if (activeTab === Tabs.PENDING && isResolved) {
-          return false;
-        }
-        if (activeTab === Tabs.RESPONDED && !isResolved) {
-          return false;
-        }
 
-        if (!q) {
-          return true;
-        }
-        const inName = t.customer?.name?.toString().includes(q);
-        const inContent = (t.message?.body.toString() || "").includes(q);
-        const inTicketId = t.ticketNumber.toLowerCase().includes(q);
-        return inName || inContent || inTicketId;
-      })
-      .sort((a: Ticket, b: Ticket) => {
-        // Sort by unreadCount desc, then createdAt desc
-        if ((b.unreadCount || 0) !== (a.unreadCount || 0)) {
-          return (b.unreadCount || 0) - (a.unreadCount || 0);
-        }
-        // Then by updatedAt or createdAt desc
-        const aTime = a.updatedAt
-          ? new Date(a.updatedAt).getTime()
-          : new Date(a.createdAt).getTime();
-        const bTime = b.updatedAt
-          ? new Date(b.updatedAt).getTime()
-          : new Date(b.createdAt).getTime();
-        return aTime - bTime;
-      });
-  }, [tickets, activeTab, query]);
+    // ✅ Get tickets for current tab from TicketContext (in-memory filter)
+    const tabTickets = getTicketsByStatus(activeTab);
+
+    // Apply search filter
+    const searchFiltered = !q
+      ? tabTickets
+      : tabTickets.filter((t: Ticket) => {
+          const inName = t.customer?.name?.toString().toLowerCase().includes(q);
+          const inContent = (t.message?.body.toString() || "")
+            .toLowerCase()
+            .includes(q);
+          const inTicketId = t.ticketNumber.toLowerCase().includes(q);
+          return inName || inContent || inTicketId;
+        });
+
+    // Sort: unreadCount DESC, updatedAt DESC, createdAt DESC
+    return searchFiltered.sort((a: Ticket, b: Ticket) => {
+      // Sort by unreadCount desc first
+      if ((b.unreadCount || 0) !== (a.unreadCount || 0)) {
+        return (b.unreadCount || 0) - (a.unreadCount || 0);
+      }
+      // Then by updatedAt desc
+      if (a?.updatedAt && b?.updatedAt && activeTab === Tabs.PENDING) {
+        return (
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      }
+      // Finally by id desc as fallback
+      return b.id - a.id;
+    });
+  }, [activeTab, query, getTicketsByStatus]);
   const { user } = useAuth();
 
   const onPressTicket = async (ticket: Ticket) => {
@@ -150,12 +155,15 @@ const Inbox: React.FC = () => {
         if (isRefreshing) {
           setRefreshing(true);
         }
-        if (!append) {
-          // Initial load or tab change - show loading
+        if (!append && p === 1) {
           setLoading(true);
         }
 
-        // Use TicketSyncService to fetch tickets (local-first approach)
+        console.log(
+          `[Inbox] Fetching ${tab} tickets from API (page ${p}, append: ${append})`,
+        );
+
+        // Use TicketSyncService to fetch from API and store to SQLite
         const syncResult = await TicketSyncService.getTickets(
           db,
           tab,
@@ -164,7 +172,6 @@ const Inbox: React.FC = () => {
           user?.id,
         );
 
-        const fetched: Ticket[] = syncResult.tickets || [];
         const total: number = syncResult.total;
         const size: number = syncResult.size;
         const currentPage: number = syncResult.page;
@@ -173,8 +180,15 @@ const Inbox: React.FC = () => {
         const totalPages = Math.ceil(total / size);
         setHasMore(currentPage < totalPages);
 
-        setTickets((prev: Ticket[]) =>
-          append ? [...prev, ...fetched] : fetched,
+        // ✅ CRITICAL: Reload ALL tickets from SQLite into TicketContext
+        const allTickets = await daoManager.ticket.findAll(db);
+        setTickets(allTickets);
+
+        // ✅ Mark this tab as loaded (even if empty)
+        hasLoadedTab.current[tab] = true;
+
+        console.log(
+          `[Inbox] Loaded ${syncResult.tickets.length} tickets from ${syncResult.source}`,
         );
       } catch (error) {
         console.error("Failed to fetch tickets:", error);
@@ -185,7 +199,7 @@ const Inbox: React.FC = () => {
         isFetchingRef.current = false;
       }
     },
-    [user?.id, db, setTickets],
+    [user?.id, db, setTickets, daoManager],
   );
 
   // Shared message handler for both WebSocket and ticketEmitter
@@ -197,6 +211,10 @@ const Inbox: React.FC = () => {
       );
 
       if (ticketIndex !== -1) {
+        // ✅ FIX: Use functional setState and calculate newUnreadCount from fresh state
+        let newUnreadCount = 0;
+        let ticketId = 0;
+
         setTickets((prevTickets: Ticket[]) => {
           const ticket = prevTickets[ticketIndex];
 
@@ -208,9 +226,10 @@ const Inbox: React.FC = () => {
             return prevTickets;
           }
 
-          const newUnreadCount = (ticket.unreadCount || 0) + 1;
+          // ✅ Calculate newUnreadCount from FRESH state (not stale closure)
+          newUnreadCount = (ticket.unreadCount || 0) + 1;
+          ticketId = ticket.id;
 
-          // Update database asynchronously (don't block UI)
           return prevTickets.map((t: Ticket) =>
             t.id === event.ticket_id
               ? {
@@ -227,11 +246,11 @@ const Inbox: React.FC = () => {
           );
         });
 
+        // ✅ FIX: Use the SAME calculated value for DB update (not recalculated from stale state)
         (async () => {
           try {
-            const ticket = tickets[ticketIndex];
-            await daoManager.ticket.update(db, ticket.id, {
-              unreadCount: (ticket.unreadCount || 0) + 1,
+            await daoManager.ticket.update(db, ticketId, {
+              unreadCount: newUnreadCount, // ✅ Use same value as state update
             });
 
             // Upsert message and update lastMessageId
@@ -240,7 +259,7 @@ const Inbox: React.FC = () => {
               event.message_id,
             );
             if (lastMessage) {
-              await daoManager.ticket.update(db, ticket.id, {
+              await daoManager.ticket.update(db, ticketId, {
                 lastMessageId: lastMessage.id,
               });
             }
@@ -253,6 +272,7 @@ const Inbox: React.FC = () => {
         })();
         return;
       } else {
+        // ✅ FIX: New ticket should have unreadCount: 1 (initial message is unread)
         console.log("[Inbox] Creating optimistic ticket for new ticket", event);
         setTickets((prevTickets: Ticket[]) => {
           // Check if ticket already exists (prevent duplicates from multiple event sources)
@@ -272,6 +292,7 @@ const Inbox: React.FC = () => {
               ticketNumber: event.ticket_number || `TICKET-${event.ticket_id}`,
               customerId: event.customer_id || 0,
               messageId: event.message_id,
+              lastMessageId: event.message_id, // ✅ Set lastMessageId for duplicate check
               status: "open",
               resolvedAt: null,
               resolvedBy: null,
@@ -290,7 +311,7 @@ const Inbox: React.FC = () => {
                 body: event.body,
                 timestamp: event.ts,
               },
-              unreadCount: 0,
+              unreadCount: 1, // ✅ FIX: Changed from 0 to 1 (initial message is unread)
               createdAt: event.ts,
               updatedAt: event.ts,
             } as Ticket,
@@ -394,41 +415,32 @@ const Inbox: React.FC = () => {
     return unsubscribe;
   }, [onTicketResolved, tickets, db, daoManager, activeTab, setTickets]);
 
-  // Reset list when tab changes
+  // ✅ CORRECT: Tab switching uses cache, only depend on activeTab
   useEffect(() => {
-    // On initial mount, just fetch - don't reset
-    if (isInitialMount.current) {
+    const isInitial = isInitialMount.current;
+
+    if (isInitial) {
       isInitialMount.current = false;
-      fetchTickets(activeTab, 1, false);
+    }
+
+    // ✅ Check if we've already loaded data for this tab (even if empty)
+    if (hasLoadedTab.current[activeTab]) {
+      console.log(
+        `[Inbox] Tab ${activeTab} already loaded, using cache - NO API CALL`,
+      );
+      setLoading(false);
       return;
     }
 
-    // On subsequent tab changes, reset everything
-    setPage(1);
-    setTickets([]);
+    // ✅ Only fetch if this tab has never been loaded
+    console.log(
+      `[Inbox] First time loading ${activeTab} tab, fetching from API...`,
+    );
+    setPageState((prev) => ({ ...prev, [activeTab]: 1 }));
     setHasMore(true);
     setError(null);
-    // Fetch first page for new tab
     fetchTickets(activeTab, 1, false);
-  }, [activeTab, fetchTickets, setTickets]);
-
-  // Fetch when page changes (but not on initial mount or tab change)
-  useEffect(() => {
-    // Skip if page is 1 (already handled by tab change effect)
-    if (page === 1) {
-      return;
-    }
-    // Skip if refreshing
-    if (refreshing) {
-      return;
-    }
-    // Skip if there's an error
-    if (error) {
-      return;
-    }
-
-    fetchTickets(activeTab, page, true);
-  }, [page, activeTab, fetchTickets, refreshing, error]);
+  }, [activeTab, fetchTickets]); // ✅ Only activeTab dependency
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -441,9 +453,9 @@ const Inbox: React.FC = () => {
           <Text
             onPress={() => {
               // retry
-              setPage(1);
-              setTickets([]);
+              setPageState((prev) => ({ ...prev, [activeTab]: 1 }));
               setHasMore(true);
+              setError(null);
               fetchTickets(activeTab, 1, false);
             }}
             style={[
@@ -483,7 +495,6 @@ const Inbox: React.FC = () => {
           activeTab={activeTab}
           onChange={(t: string) => {
             setActiveTab(t as any);
-            setLoading(true);
           }}
         />
       </View>
@@ -505,23 +516,51 @@ const Inbox: React.FC = () => {
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           // debounce rapid calls
-          if (loading || !hasMore) {
+          if (loading || !hasMore || isFetchingRef.current) {
             return;
           }
           if (endReachedTimeout.current) {
-            window.clearTimeout(endReachedTimeout.current);
+            clearTimeout(endReachedTimeout.current);
           }
-          // schedule page increment after 200ms; if another call comes in the window it'll reset
-          endReachedTimeout.current = window.setTimeout(() => {
-            setPage((prev: number) => prev + 1);
+          // Set a short timeout to batch calls
+          endReachedTimeout.current = setTimeout(async () => {
+            // Cache-first pagination for resolved tab
+            if (activeTab === Tabs.RESPONDED) {
+              // Try loading more resolved tickets from cache first (no API call)
+              const resolvedTickets = getTicketsByStatus(Tabs.RESPONDED);
+              const hasMoreInCache = await loadMoreResolved(
+                resolvedTickets.length,
+              );
+
+              if (!hasMoreInCache) {
+                // No more in cache, fetch from API
+                console.log(
+                  `[Inbox] Cache exhausted, fetching from API (page ${page + 1})`,
+                );
+                const nextPage = page + 1;
+                setPageState((prev) => ({ ...prev, [activeTab]: nextPage }));
+                fetchTickets(activeTab, nextPage, true);
+              }
+            } else {
+              // Open tab: Fetch from API (all open tickets already in cache)
+              const nextPage = page + 1;
+              console.log(`[Inbox] Loading next page: ${nextPage}`);
+              setPageState((prev) => ({ ...prev, [activeTab]: nextPage }));
+              fetchTickets(activeTab, nextPage, true);
+            }
             endReachedTimeout.current = null;
           }, 200);
         }}
         refreshing={refreshing}
         onRefresh={() => {
+          if (!isOnline) {
+            console.log(`[Inbox] Offline - cannot refresh ${activeTab} tab`);
+            return;
+          }
           // pull-to-refresh: reset to first page and fetch
-          setPage(1);
-          setTickets([]);
+          console.log(`[Inbox] Pull-to-refresh for ${activeTab} tab`);
+          hasLoadedTab.current[activeTab] = false; // Reset loaded flag to allow refresh
+          setPageState((prev) => ({ ...prev, [activeTab]: 1 }));
           setHasMore(true);
           setError(null);
           fetchTickets(activeTab, 1, false, true);

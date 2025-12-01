@@ -311,7 +311,6 @@ class ApiClient {
     return {
       ...ticket,
       ticketNumber: ticket.ticket_number,
-      unreadCount: ticket.resolved_at ? 0 : 1,
     };
   }
 
