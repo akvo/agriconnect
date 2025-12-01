@@ -33,6 +33,8 @@ export default function DocumentPage({ kbId }) {
   const [isEdit, setIsEdit] = useState(false);
   const [loadingKnowledgeBase, setLoadingKnowledgeBase] = useState(false);
   const [knowledgeBaseDetails, setKnowledgeBaseDetails] = useState(null);
+  const [showToggleConfirm, setShowToggleConfirm] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState(false);
 
   const ITEMS_PER_PAGE = 10;
   const MAX_AUTO_REFRESHES = 3; // After 3 auto-refreshes, disable
@@ -171,6 +173,27 @@ export default function DocumentPage({ kbId }) {
     } catch (err) {
       console.error("Error updating knowledge base details:", err);
       setLoadingKnowledgeBase(false);
+    }
+  };
+
+  const handleToggleKBActive = async () => {
+    if (!knowledgeBaseDetails) return;
+
+    const confirmText = knowledgeBaseDetails.is_active
+      ? "Are you sure you want to deactivate this Knowledge Base?"
+      : "Are you sure you want to activate this Knowledge Base?";
+
+    const confirmed = window.confirm(confirmText);
+    if (!confirmed) return;
+
+    try {
+      setToggleLoading(true);
+      await knowledgeBaseApi.toggleActive(knowledgeBaseDetails.id);
+      await fetchKnowledgeBaseDetails(); // refresh KB info
+    } catch (err) {
+      console.error("Error toggling KB:", err);
+    } finally {
+      setToggleLoading(false);
     }
   };
 
@@ -321,6 +344,29 @@ export default function DocumentPage({ kbId }) {
                     ? knowledgeBaseDetails.description
                     : "Manage your document library to power AI-driven assistance"}
               </p>
+              {/* Clickable Active / Inactive Badge (Toggle) */}
+              {!loadingKnowledgeBase && knowledgeBaseDetails && (
+                <div className="mt-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleToggleKBActive}
+                      disabled={toggleLoading}
+                      className={`inline-flex items-center px-3 py-1 border text-sm rounded-md transition ${
+                        knowledgeBaseDetails.is_active
+                          ? "bg-green-100 border-green-300 text-green-800 hover:bg-green-200"
+                          : "bg-yellow-100 border-yellow-300 text-yellow-800 hover:bg-yellow-200"
+                      } ${toggleLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                      {knowledgeBaseDetails.is_active
+                        ? "🟢 Active"
+                        : "⚠️ Inactive"}
+                    </button>
+                    <span className="text-xs text-gray-400">
+                      (Tap the badge to activate/deactivate.)
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <div className="mt-4 sm:mt-0 space-x-4">
