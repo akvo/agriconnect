@@ -57,6 +57,28 @@ class KnowledgeBaseService:
         return knowledge_bases
 
     @staticmethod
+    def update_knowledge_base(
+        db: Session,
+        kb_id: int,
+        is_active: Optional[bool] = None,
+    ) -> Optional[KnowledgeBase]:
+        """Update fields of a knowledge base."""
+        kb = KnowledgeBaseService.get_knowledge_base_by_id(db, kb_id)
+        if not kb:
+            return None
+
+        if is_active is not None:
+            kb.is_active = is_active
+
+        try:
+            db.commit()
+            db.refresh(kb)
+            return kb
+        except Exception:
+            db.rollback()
+            return None
+
+    @staticmethod
     def delete_knowledge_base(db: Session, kb_id: str) -> bool:
         """Delete a knowledge base."""
         kb = KnowledgeBaseService.get_knowledge_base_by_id(db, kb_id)

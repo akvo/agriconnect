@@ -221,7 +221,7 @@ class TestKnowledgeBaseEndpoints:
         data = response.json()
         assert data["title"] == "Mock KB"
         assert data["description"] == "Mock KB Desc"
-
+        assert data["is_active"] is False
         mock_external_ai_service.assert_awaited_once_with(
             operation="update",
             name=payload["title"],
@@ -248,6 +248,98 @@ class TestKnowledgeBaseEndpoints:
             headers=eo_headers,
         )
         assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_update_kb_with_is_active(
+        self,
+        client,
+        auth_headers_factory,
+        db_session,
+        service_token,
+        mock_external_ai_service,
+    ):
+        """
+        Test updating with is_active payload
+        """
+        headers, user = auth_headers_factory(user_type="eo")
+
+        # Create KB with default inactive value
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        # Ensure default is False
+        assert kb.is_active is False
+
+        payload = {
+            "is_active": True,
+            "title": "Update to active",
+            "description": "test update to active",
+        }
+
+        response = client.put(
+            f"/api/kb/{kb.id}", json=payload, headers=headers
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["is_active"] is True
+
+        assert data["title"] == "Mock KB"
+        assert data["description"] == "Mock KB Desc"
+        assert data["is_active"] == payload["is_active"]
+        mock_external_ai_service.assert_awaited_once_with(
+            operation="update",
+            name=payload["title"],
+            description=payload["description"],
+            kb_id="mock-kb-id-456",
+        )
+
+    @pytest.mark.asyncio
+    async def test_toggle_is_active(
+        self,
+        client,
+        auth_headers_factory,
+        db_session,
+        service_token,
+    ):
+        """
+        Test updating ONLY is_active (toggle-active) endpoint
+        Should NOT call external AI service.
+        """
+        headers, user = auth_headers_factory(user_type="eo")
+
+        # Create KB with default inactive value
+        kb = KnowledgeBaseService.create_knowledge_base(
+            db=db_session,
+            user_id=user.id,
+            external_id="mock-kb-id-456",
+            service_id=service_token.id,
+        )
+
+        # Ensure default is False
+        assert kb.is_active is False
+
+        # Toggle active
+        response = client.post(
+            f"/api/kb/{kb.id}/toggle-active", headers=headers
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["is_active"] is True
+
+        # Toggle inactive
+        response = client.post(
+            f"/api/kb/{kb.id}/toggle-active", headers=headers
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["is_active"] is False
 
     # ─────────────────────────────
     # DELETE

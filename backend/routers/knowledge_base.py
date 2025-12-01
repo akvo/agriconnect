@@ -11,6 +11,7 @@ from schemas.knowledge_base import (
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
     CreateKnowledgeBaseResponse,
+    ToggleActiveKnowledgeBaseResponse,
 )
 from services.knowledge_base_service import KnowledgeBaseService
 from services.service_token_service import ServiceTokenService
@@ -71,6 +72,7 @@ async def create_knowledge_base(
         user_id=kb.user_id,
         title=rag_kb_response.get("name"),
         description=rag_kb_response.get("description"),
+        is_active=kb.is_active,
     )
 
 
@@ -115,6 +117,7 @@ async def list_knowledge_bases(
         user_id=user_id,
     )
     kb_external_ids = {kb.external_id: kb.id for kb in knowledge_bases}
+    kb_is_actives = {kb.id: kb.is_active for kb in knowledge_bases}
 
     rag_kb_response = await ai_service.manage_knowledge_base(
         operation="list",
@@ -125,7 +128,7 @@ async def list_knowledge_bases(
     )
 
     # empty
-    if not rag_kb_response.get("total"):
+    if not rag_kb_response.get("total") or not len(kb_external_ids.keys()):
         return KnowledgeBaseListResponse(
             data=[],
             total=0,
@@ -135,15 +138,17 @@ async def list_knowledge_bases(
 
     data = []
     for kb in rag_kb_response.get("data"):
-        kb_id = str(kb.get("id")) if kb.get("id") else None
-        if not kb_id:
+        kb_id = str(kb.get("id")) if kb.get("id") else None  # find external_id
+        current_kb_id = kb_external_ids.get(str(kb_id)) if kb_id else None
+        if not kb_id or not current_kb_id:
             continue
-        current_kb_id = kb_external_ids.get(str(kb_id))
+        kb_is_active = kb_is_actives.get(current_kb_id, False)
         data.append(
             KnowledgeBaseResponse(
                 id=current_kb_id,
                 title=kb.get("name"),
                 description=kb.get("description"),
+                is_active=kb_is_active,
                 created_at=kb.get("created_at"),
                 updated_at=kb.get("updated_at"),
             ),
@@ -207,9 +212,10 @@ async def get_knowledge_base(
     )
 
     return KnowledgeBaseResponse(
-        id=kb_id,
+        id=kb.id,
         title=rag_kb_response.get("name"),
         description=rag_kb_response.get("description"),
+        is_active=kb.is_active,
         created_at=rag_kb_response.get("created_at"),
         updated_at=rag_kb_response.get("updated_at"),
     )
@@ -259,11 +265,67 @@ async def update_knowledge_base(
             detail="Failed to update knowledge base on external AI service.",
         )
 
+    if kb_update.is_active is not None:
+        # toggle is active
+        kb = KnowledgeBaseService.update_knowledge_base(
+            db=db,
+            kb_id=kb_id,
+            is_active=kb_update.is_active,
+        )
+
     return CreateKnowledgeBaseResponse(
         id=kb_id,
         user_id=kb.user_id,
         title=rag_kb_response.get("name"),
         description=rag_kb_response.get("description"),
+        is_active=kb.is_active,
+    )
+
+
+@router.post(
+    "/{kb_id}/toggle-active",
+    response_model=ToggleActiveKnowledgeBaseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Toggle active status of a knowledge base",
+)
+async def toggle_kb_active(
+    kb_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Toggle is_active only
+    We need this endpoint to avoid external_service failure
+    """
+    kb = KnowledgeBaseService.get_knowledge_base_by_id(db, kb_id)
+    if not kb:
+        raise HTTPException(
+            status_code=404,
+            detail="Knowledge base not found.",
+        )
+
+    # Permission: Only owner or admin
+    if (
+        current_user.user_type != UserType.ADMIN
+        and kb.user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to modify this KB.",
+        )
+
+    # Toggle field
+    new_status = not kb.is_active
+    KnowledgeBaseService.update_knowledge_base(
+        db=db,
+        kb_id=kb_id,
+        is_active=new_status,
+    )
+
+    return ToggleActiveKnowledgeBaseResponse(
+        id=kb.id,
+        user_id=kb.user_id,
+        is_active=kb.is_active,
     )
 
 

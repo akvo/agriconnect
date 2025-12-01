@@ -35,6 +35,17 @@ def upgrade() -> None:
         sa.Column("external_id", sa.String(), nullable=True),
     )
 
+    # --- Add is_active flag ---
+    op.add_column(
+        "knowledge_bases",
+        sa.Column(
+            "is_active",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+    )
+
     # user_id already exists in the schema – do not recreate
 
     # --- FK for service_id ---
@@ -58,7 +69,8 @@ def downgrade() -> None:
         type_="foreignkey",
     )
 
-    # --- Drop added fields ---
+    # --- Drop newly added fields ---
+    op.drop_column("knowledge_bases", "is_active")
     op.drop_column("knowledge_bases", "external_id")
     op.drop_column("knowledge_bases", "service_id")
 
@@ -98,5 +110,5 @@ def downgrade() -> None:
         sa.Column("extra_data", JSONB, nullable=True),
     )
 
-    # If the enum is unused after downgrade, remove it
+    # Cleanup enum
     op.execute("DROP TYPE IF EXISTS callbackstage CASCADE")

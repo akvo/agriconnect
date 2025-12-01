@@ -1,10 +1,4 @@
-from sqlalchemy import (
-    Column,
-    DateTime,
-    ForeignKey,
-    Integer,
-    String,
-)
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -19,6 +13,7 @@ class KnowledgeBase(Base):
 
     # External ID returned by Akvo RAG (string, e.g. UUID)
     external_id = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=False)
 
     # Who owns the knowledge base
     user_id = Column(

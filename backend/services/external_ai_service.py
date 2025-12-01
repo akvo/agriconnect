@@ -309,10 +309,12 @@ class ExternalAIService:
             query_params["kb_ids"] = [int(kb_id) for kb_id in kb_ids]
 
         payload = {
-            "name": name,
-            "description": description,
             "is_default": False,
         }
+        if name:
+            payload["name"] = name
+        if description:
+            payload["description"] = description
 
         try:
             async with httpx.AsyncClient() as client:
