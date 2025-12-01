@@ -59,6 +59,17 @@ class KnowledgeBaseService:
         return knowledge_bases
 
     @staticmethod
+    def get_active_knowledge_bases(
+        db: Session,
+    ) -> Tuple[List[KnowledgeBase], int]:
+        """Get a active knowledge bases."""
+        return (
+            db.query(KnowledgeBase)
+            .filter(KnowledgeBase.is_active.is_(True))
+            .all()
+        )
+
+    @staticmethod
     def update_knowledge_base(
         db: Session,
         kb_id: int,

@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from models.service_token import ServiceToken
 from services.service_token_service import ServiceTokenService
+from services.knowledge_base_service import KnowledgeBaseService
 from models.message import MessageType
 
 logger = logging.getLogger(__name__)
@@ -154,6 +155,11 @@ class ExternalAIService:
             "chats": chats or [],
             "callback_params": callback_params,
         }
+        # check if active KB defined
+        active_kb = KnowledgeBaseService.get_active_knowledge_bases(db=self.db)
+        if active_kb:
+            active_kb_ids = [kb.external_id for kb in active_kb]
+            job_payload["knowledge_base_ids"] = active_kb_ids
 
         if trace_id:
             job_payload["trace_id"] = trace_id

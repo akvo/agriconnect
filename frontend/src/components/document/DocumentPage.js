@@ -37,7 +37,7 @@ export default function DocumentPage({ kbId }) {
   const [toggleLoading, setToggleLoading] = useState(false);
 
   const ITEMS_PER_PAGE = 10;
-  const MAX_AUTO_REFRESHES = 3; // After 3 auto-refreshes, disable
+  const MAX_AUTO_REFRESHES = 2; // Auto-refreshes count, disable
 
   const fetchKnowledgeBaseDetails = async () => {
     setLoadingKnowledgeBase(true);
@@ -107,7 +107,7 @@ export default function DocumentPage({ kbId }) {
 
       // Fetch with current page and search query
       fetchDocuments(currentPage, searchQuery || null);
-    }, 30000); // 30 seconds
+    }, 5000); // 5 seconds
 
     // Cleanup on unmount or when dependencies change
     return () => clearInterval(intervalId);
