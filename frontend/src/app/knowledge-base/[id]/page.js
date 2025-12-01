@@ -6,8 +6,7 @@ export const metadata = {
     "Manage your document library of a knowledge base for AI-powered assistance",
 };
 
-export default function DocumentPageRoute({ params }) {
-  const { id } = params;
-
+export default async function DocumentPageRoute({ params }) {
+  const { id } = await params;
   return <DocumentPage kbId={id} />;
 }

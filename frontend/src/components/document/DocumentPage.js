@@ -50,11 +50,11 @@ export default function DocumentPage({ kbId }) {
   };
 
   useEffect(() => {
-    if (kbId) {
+    if (kbId && user && !authLoading) {
       fetchKnowledgeBaseDetails();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kbId]);
+  }, [kbId, user, authLoading]);
 
   const fetchDocuments = async (page = 1, search = null) => {
     try {
