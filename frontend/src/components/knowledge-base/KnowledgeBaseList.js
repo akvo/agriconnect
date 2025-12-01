@@ -4,17 +4,20 @@ import {
   CalendarIcon,
   PencilIcon,
   TrashIcon,
-  EllipsisVerticalIcon,
   CircleStackIcon,
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
+import { useState } from "react";
 
 export default function KnowledgeBaseList({
   knowledgeBases,
   loading,
   onEditKnowledgeBase,
   onDeleteKnowledgeBase,
+  onToggleActive,
 }) {
+  const [toggleLoading, setToggleLoading] = useState({}); // { [id]: true }
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -24,6 +27,29 @@ export default function KnowledgeBaseList({
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const handleToggleActive = async (kb) => {
+    // Confirmation dialog
+    const confirm = window.confirm(
+      !kb?.is_active
+        ? `Activate knowledge base "${kb.title}"?`
+        : `Deactivate knowledge base "${kb.title}"?`
+    );
+
+    if (!confirm) return;
+
+    // show per-row spinner
+    setToggleLoading((prev) => ({ ...prev, [kb.id]: true }));
+
+    try {
+      await onToggleActive(kb.id);
+    } catch (err) {
+      console.error("Failed to toggle active:", err);
+      alert("Failed to toggle active. Please try again.");
+    } finally {
+      setToggleLoading((prev) => ({ ...prev, [kb.id]: false }));
+    }
   };
 
   if (loading) {
@@ -75,13 +101,15 @@ export default function KnowledgeBaseList({
               </div>
             </th>
             <th className="px-8 py-5 text-right text-xs font-bold text-secondary-700 uppercase tracking-wider">
-              <div className="flex items-center justify-end">
-                <EllipsisVerticalIcon className="w-4 h-4 mr-2 text-secondary-500" />
-                Actions
-              </div>
+              <div className="flex items-center justify-end">Active</div>
+            </th>
+            <th className="px-8 py-5 text-right text-xs font-bold text-secondary-700 uppercase tracking-wider">
+              Actions
             </th>
           </tr>
         </thead>
+
+        {/* BODY */}
         <tbody className="bg-white divide-y divide-gray-100">
           {knowledgeBases.map((kb, index) => (
             <tr
@@ -90,34 +118,61 @@ export default function KnowledgeBaseList({
               style={{ animationDelay: `${index * 50}ms` }}
             >
               <td className="px-8 py-6 whitespace-nowrap">
-                <div className="flex items-center">
-                  <div className="ml-4">
-                    <div className="text-base font-bold text-secondary-900">
-                      {kb.title}
-                    </div>
-                    <div className="text-sm text-secondary-100 font-normal flex items-center">
-                      {kb.description}
-                    </div>
-                  </div>
+                <div className="text-base font-bold text-secondary-900">
+                  {kb.title}
+                </div>
+                <div className="text-sm text-secondary-500">
+                  {kb.description}
                 </div>
               </td>
+
               <td className="px-8 py-6 whitespace-nowrap">
                 <div className="text-sm text-secondary-600">
                   {formatDate(kb.created_at)}
                 </div>
               </td>
+
+              {/* ACTIVE TOGGLE */}
+              <td className="px-8 py-6 whitespace-nowrap text-right">
+                {toggleLoading[kb.id] ? (
+                  <ArrowPathIcon className="h-5 w-5 animate-spin text-primary-600 inline-block" />
+                ) : (
+                  <label className="inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={kb.is_active}
+                      onChange={() => handleToggleActive(kb)}
+                    />
+                    <div
+                      className={`w-11 h-6 rounded-full transition ${
+                        kb.is_active ? "bg-green-500" : "bg-gray-300"
+                      }`}
+                    >
+                      <div
+                        className={`h-6 w-6 bg-white rounded-full shadow transform transition ${
+                          kb.is_active ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      ></div>
+                    </div>
+                  </label>
+                )}
+              </td>
+
+              {/* ACTIONS */}
               <td className="px-8 py-6 whitespace-nowrap text-right">
                 <div className="flex items-center justify-end space-x-3">
                   <button
                     onClick={() => onEditKnowledgeBase(kb.id)}
-                    className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200    flex items-center cursor-pointer"
+                    className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200 flex items-center cursor-pointer"
                   >
                     <PencilIcon className="w-4 h-4 mr-1" />
                     Edit
                   </button>
+
                   <button
                     onClick={() => onDeleteKnowledgeBase(kb)}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200    flex items-center cursor-pointer"
+                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200 flex items-center cursor-pointer"
                   >
                     <TrashIcon className="w-4 h-4 mr-1" />
                     Delete

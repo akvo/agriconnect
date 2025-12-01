@@ -51,9 +51,9 @@ const knowledgeBaseApi = {
     return response.data;
   },
 
-  // Update knowledge base status
-  updateStatus: async (id, status) => {
-    const response = await api.patch(`/kb/${id}/status`, { status });
+  // Update knowledge base is_active
+  toggleActive: async (id) => {
+    const response = await api.post(`/kb/${id}/toggle-active`);
     return response.data;
   },
 

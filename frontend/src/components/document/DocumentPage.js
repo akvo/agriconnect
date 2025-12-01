@@ -35,7 +35,7 @@ export default function DocumentPage({ kbId }) {
   const [knowledgeBaseDetails, setKnowledgeBaseDetails] = useState(null);
 
   const ITEMS_PER_PAGE = 10;
-  const MAX_AUTO_REFRESHES = 2; // After 2 auto-refreshes, disable
+  const MAX_AUTO_REFRESHES = 3; // After 3 auto-refreshes, disable
 
   const fetchKnowledgeBaseDetails = async () => {
     setLoadingKnowledgeBase(true);

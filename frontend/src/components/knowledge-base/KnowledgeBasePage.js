@@ -89,6 +89,22 @@ export default function KnowledgeBasePage() {
     fetchKnowledgeBases(1, newSearchQuery || null);
   };
 
+  const handleToggleActive = async (kbId, newValue) => {
+    const res = await knowledgeBaseApi.toggleActive(kbId);
+    // Refresh list after update
+    setKnowledgeBases((prev) =>
+      prev.map((kb) => {
+        if (kb.id === res.id) {
+          return {
+            ...kb,
+            ...res,
+          };
+        }
+        return kb;
+      })
+    );
+  };
+
   const handleProfileClick = () => {
     setShowProfileModal(true);
   };
@@ -207,6 +223,7 @@ export default function KnowledgeBasePage() {
           loading={loading}
           onEditKnowledgeBase={handleEditKnowledgeBase}
           onDeleteKnowledgeBase={handleDeleteKnowledgeBase}
+          onToggleActive={handleToggleActive}
         />
 
         {/* Pagination */}
