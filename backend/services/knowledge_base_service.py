@@ -13,12 +13,14 @@ class KnowledgeBaseService:
         user_id: int,
         external_id: str,
         service_id: int,
+        is_active: Optional[bool] = False,
     ) -> KnowledgeBase:
         """Create a new knowledge base entry."""
         kb = KnowledgeBase(
             user_id=user_id,
             external_id=external_id,
             service_id=service_id,
+            is_active=is_active,
         )
         db.add(kb)
         db.commit()

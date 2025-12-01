@@ -66,6 +66,7 @@ async def create_knowledge_base(
         external_id=str(rag_kb_response.get("knowledge_base_id")),
         user_id=current_user.id,
         service_id=service_token.id,
+        is_active=kb_data.is_active,
     )
     return CreateKnowledgeBaseResponse(
         id=kb.id,
