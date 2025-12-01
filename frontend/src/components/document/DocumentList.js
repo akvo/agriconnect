@@ -36,6 +36,7 @@ export default function DocumentList({
     {
       title: "Actions",
       align: "right",
+      hide: true,
     },
   ];
 
@@ -141,7 +142,8 @@ export default function DocumentList({
             </div>
           )}
         </td>
-        <td className="px-8 py-6 whitespace-nowrap text-right">
+        {/* TODO:: Enable Actions when doc feature from RAG deployed */}
+        <td className="px-8 py-6 whitespace-nowrap text-right hidden">
           <div className="flex items-center justify-end space-x-2">
             {/* HIDE FOR NOW UNTIL VIEW FEATURE ENABLED
             <button
@@ -152,6 +154,7 @@ export default function DocumentList({
               View
             </button>
             */}
+            {/* HIDE FOR NOW UNTIL EDIT FEATURE ENABLED
             <button
               onClick={() => onEditDocument(doc)}
               className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-onDeleteDocument"
@@ -159,6 +162,7 @@ export default function DocumentList({
               <PencilIcon className="w-4 h-4 mr-1" />
               Edit
             </button>
+            */}
             {/* HIDE FOR NOW UNTIL DELETE FEATURE ENABLED
             <button
               onClick={() => onDeleteKnowledgeBase(doc)}
@@ -176,7 +180,7 @@ export default function DocumentList({
 
   return (
     <DataTable
-      columns={columns}
+      columns={columns.filter((col) => !col?.hide)}
       data={documents}
       loading={loading}
       emptyStateIcon={CloudArrowUpIcon}
