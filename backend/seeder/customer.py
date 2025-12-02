@@ -11,7 +11,6 @@ from models.administrative import Administrative, CustomerAdministrative
 from models.customer import (
     AgeGroup, Base, CropType, Customer, CustomerLanguage
 )
-from seeder.crop_type import seed_crop_types
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -83,8 +82,8 @@ def generate_customer_data(index: int, country: str = "tanzania"):
         "phone_number": phone_number,
         "full_name": full_name,
         "language": language,
-        "age_group": age_group,
-        "age": age,
+        "birth_year": 2024 - age if age else None,
+        "gender": random.choice(["male", "female", None]),
     }
 
 
@@ -176,8 +175,6 @@ def main():
 
     # Create database session
     db = SessionLocal()
-    # Seed crop types if not already seeded
-    seed_crop_types(db)
 
     try:
         created_count = create_fake_customers(db, count, country)
