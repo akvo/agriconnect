@@ -460,12 +460,11 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_attempts=json.dumps(
-                {"administration": 2}
-            ),  # Store as JSON string
+            onboarding_attempts={"administration": 2},
         )
         db_session.add(customer)
         db_session.commit()
+        db_session.refresh(customer)  # Ensure JSON fields are loaded
 
         # Mock OpenAI to return empty location
         mock_response = MagicMock()
@@ -548,16 +547,18 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_attempts=1,
-            onboarding_candidates=json.dumps(
-                [
+            onboarding_attempts={"administration": 1},
+            onboarding_candidates={
+                "administration": [
                     sample_administrative_data["westlands"].id,
                     sample_administrative_data["kibera"].id,
                 ]
-            ),
+            },
+            current_onboarding_field="administration",
         )
         db_session.add(customer)
         db_session.commit()
+        db_session.refresh(customer)  # Ensure JSON fields are loaded
 
         response = await onboarding_service.process_selection(customer, "1")
 
@@ -611,12 +612,14 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_candidates=json.dumps(
-                [sample_administrative_data["westlands"].id]
-            ),
+            onboarding_candidates={
+                "administration": [sample_administrative_data["westlands"].id]
+            },
+            current_onboarding_field="administration",
         )
         db_session.add(customer)
         db_session.commit()
+        db_session.refresh(customer)  # Ensure JSON fields are loaded
 
         response = await onboarding_service.process_selection(customer, "5")
 

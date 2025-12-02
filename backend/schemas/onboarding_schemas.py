@@ -82,6 +82,22 @@ class SelectionResponse(BaseModel):
     )
 
 
+class CropIdentificationResult(BaseModel):
+    """Structured output for AI crop identification"""
+
+    crop_name: Optional[str] = Field(
+        None,
+        description="The primary crop mentioned (normalized to standard name)",
+    )
+    confidence: str = Field(
+        ..., description="Confidence level: 'high', 'medium', or 'low'"
+    )
+    possible_crops: List[str] = Field(
+        default_factory=list,
+        description="List of possible crop matches if ambiguous",
+    )
+
+
 # ============================================================================
 # GENERIC ONBOARDING FIELD CONFIGURATIONS
 # ============================================================================
@@ -131,7 +147,7 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         priority=2,
         initial_question=(
             "What crops do you grow?\n\n"
-            "For example: coffee, maize, avocado, etc."
+            "For example: cacao, avocado, etc."
         ),
         extraction_method="extract_crop_type",
         matching_method="resolve_crop_ambiguity",
