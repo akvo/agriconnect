@@ -136,13 +136,15 @@ const API = () => {
     },
     post: (url, data, requestConfig = {}) => {
       const baseConfig = getConfig();
+      let headers = { ...baseConfig.headers, ...requestConfig.headers };
+      // Remove default Content-Type if sending FormData
+      if (data instanceof FormData) {
+        delete headers["Content-Type"];
+      }
       const finalConfig = {
         ...baseConfig,
         ...requestConfig,
-        headers: {
-          ...baseConfig.headers,
-          ...requestConfig.headers,
-        },
+        headers,
       };
       return axiosInstance.post(buildUrl(url), data, finalConfig);
     },

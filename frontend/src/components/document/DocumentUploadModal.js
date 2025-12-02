@@ -40,8 +40,12 @@ export default function DocumentUploadModal({
 
   const handleFileSelect = (file) => {
     setError("");
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+    const isMimeSupported = supportedTypes.includes(file.type);
+    const isExtSupported = supportedExtensions.includes(ext);
 
-    if (!supportedTypes.includes(file.type)) {
+    // Allow upload if either MIME type OR extension matches
+    if (!isMimeSupported && !isExtSupported) {
       setError(
         "Unsupported file type. Only PDF, TXT, and DOCX files are allowed."
       );
@@ -83,17 +87,13 @@ export default function DocumentUploadModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!selectedFile) {
       setError("Please select a file to upload.");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-
     try {
-      await onUpload(formData);
+      await onUpload(selectedFile);
       handleClose();
     } catch (err) {
       setError(

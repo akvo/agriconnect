@@ -117,11 +117,11 @@ export default function KnowledgeBaseList({
               className="hover:bg-primary-50/50 transition-all duration-200 group animate-fade-in"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <td className="px-8 py-6 whitespace-nowrap">
-                <div className="text-base font-bold text-secondary-900">
+              <td className="px-8 py-6 overflow-wrap">
+                <div className="text-base font-bold text-secondary-900 wrap-break-word">
                   {kb.title}
                 </div>
-                <div className="text-sm text-secondary-500">
+                <div className="text-sm text-secondary-500 wrap-break-word">
                   {kb.description}
                 </div>
               </td>

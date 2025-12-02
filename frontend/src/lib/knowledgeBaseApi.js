@@ -73,13 +73,8 @@ const knowledgeBaseApi = {
 
   // Upload a document to a specific knowledge base
   uploadDocument: async (formData) => {
-    const config = {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    };
     try {
-      const response = await api.post(`/documents`, formData, config);
+      const response = await api.post(`/documents`, formData);
       return response.data;
     } catch (error) {
       throw error;

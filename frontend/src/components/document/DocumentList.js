@@ -101,16 +101,18 @@ export default function DocumentList({
 
     return (
       <>
-        <td className="px-8 py-6 whitespace-nowrap">
+        <td className="px-8 py-6 overflow-wrap">
           <div className="flex items-center">
             <div className="text-2xl mr-3">
               {getFileTypeIcon(doc.content_type)}
             </div>
             <div className="ml-2">
-              <div className="text-base font-bold text-secondary-900">
+              <div className="text-base font-bold text-secondary-900 break-all">
                 {doc.filename}
               </div>
-              <div className="text-sm text-secondary-600">{doc.filename}</div>
+              <div className="text-sm text-secondary-600 break-all">
+                {doc.filename}
+              </div>
               {/* {doc.description && (
                 <div className="text-xs text-secondary-500 mt-1 max-w-xs truncate">
                   {doc.description}

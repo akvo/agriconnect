@@ -114,9 +114,11 @@ export default function DocumentPage({ kbId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, currentPage, searchQuery, autoRefresh]);
 
-  const handleUpload = async (formData) => {
+  const handleUpload = async (file) => {
     setUploading(true);
     try {
+      const formData = new FormData();
+      formData.append("file", file);
       formData.append("kb_id", kbId);
       await knowledgeBaseApi.uploadDocument(formData);
       // Refresh the list after successful upload
@@ -130,7 +132,8 @@ export default function DocumentPage({ kbId }) {
 
       setUploadModalOpen(false);
     } catch (err) {
-      throw err; // Re-throw to be handled by the modal
+      console.error("Error uploading document:", err);
+      setError("Failed to upload document. Please try again.");
     } finally {
       setUploading(false);
     }
