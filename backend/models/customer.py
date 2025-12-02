@@ -6,8 +6,7 @@ from sqlalchemy import (
     Enum,
     Integer,
     String,
-    ForeignKey,
-    Text,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -33,6 +32,12 @@ class OnboardingStatus(enum.Enum):
     FAILED = "failed"
 
 
+class Gender(enum.Enum):
+    MALE = "male"
+    FEMALE = "female"
+    OTHER = "other"
+
+
 class Customer(Base):
     __tablename__ = "customers"
 
@@ -40,9 +45,10 @@ class Customer(Base):
     phone_number = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=True)
     language = Column(Enum(CustomerLanguage), default=CustomerLanguage.EN)
-    crop_type_id = Column(Integer, ForeignKey("crop_types.id"), nullable=True)
-    age_group = Column(Enum(AgeGroup), nullable=True)
-    age = Column(Integer, nullable=True)
+    # Generic onboarding fields
+    crop_type = Column(String, nullable=True)  # Crop name (not FK)
+    gender = Column(Enum(Gender), nullable=True)
+    birth_year = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -50,16 +56,21 @@ class Customer(Base):
     last_message_at = Column(DateTime(timezone=True), nullable=True)
     last_message_from = Column(Integer, nullable=True)  # MessageFrom value
 
-    # AI Onboarding tracking
+    # Generic Onboarding tracking
     onboarding_status = Column(
         Enum(OnboardingStatus),
         default=OnboardingStatus.NOT_STARTED,
         nullable=False,
     )
-    onboarding_attempts = Column(Integer, default=0, nullable=False)
+    current_onboarding_field = Column(
+        String, nullable=True
+    )  # Current field being collected
+    onboarding_attempts = Column(
+        JSON, nullable=True
+    )  # JSON object: {"field_name": attempt_count}
     onboarding_candidates = Column(
-        Text, nullable=True
-    )  # JSON array of ward IDs
+        JSON, nullable=True
+    )  # JSON object: {"field_name": [candidate_values]}
 
     messages = relationship(
         "Message", back_populates="customer", cascade="all, delete-orphan"
@@ -68,7 +79,28 @@ class Customer(Base):
         "CustomerAdministrative", back_populates="customer"
     )
     tickets = relationship("Ticket", back_populates="customer")
-    crop_type = relationship("CropType", back_populates="customers")
+
+    @property
+    def age(self) -> int | None:
+        """Calculate current age from birth_year"""
+        if not self.birth_year:
+            return None
+        from datetime import datetime
+        current_year = datetime.now().year
+        return current_year - self.birth_year
+
+    @property
+    def age_group(self) -> str | None:
+        """Calculate age group from birth_year"""
+        age = self.age
+        if age is None:
+            return None
+        if 20 <= age <= 35:
+            return "20-35"
+        elif 36 <= age <= 50:
+            return "36-50"
+        else:
+            return "51+"
 
     def needs_reconnection_template(self, threshold_hours: int = 24) -> bool:
         """
@@ -104,5 +136,3 @@ class CropType(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    customers = relationship("Customer", back_populates="crop_type")
