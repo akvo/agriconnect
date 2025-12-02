@@ -93,7 +93,7 @@ async def get_customers_list(
     administrative_ids: Optional[List[int]] = Query(
         None, description="Filter by ward IDs (admin only, multiple supported)"
     ),
-    crop_types: Optional[List[int]] = Query(
+    crop_types: Optional[List[str]] = Query(
         None, description="Filter by crop types"
     ),
     age_groups: Optional[List[str]] = Query(

@@ -9,7 +9,7 @@ from models.administrative import (
     AdministrativeLevel,
     CustomerAdministrative,
 )
-from models.customer import AgeGroup, CropType, Customer, CustomerLanguage
+from models.customer import Customer, CustomerLanguage
 from models.ticket import Ticket
 from datetime import datetime, timezone
 
@@ -144,7 +144,7 @@ class CustomerService:
         size: int = 10,
         search: str = None,
         administrative_ids: List[int] = None,
-        crop_types: List[int] = None,
+        crop_types: List[str] = None,
         age_groups: List[str] = None,
     ) -> Tuple[List[dict], int]:
         """Get paginated list of customers with optional filters.
@@ -166,7 +166,6 @@ class CustomerService:
             joinedload(Customer.customer_administrative).joinedload(
                 CustomerAdministrative.administrative
             ),
-            joinedload(Customer.crop_type)
         )
 
         # Filter by administrative areas (wards) if provided
@@ -187,31 +186,33 @@ class CustomerService:
                 )
             )
 
-        # Filter by crop types (convert names to IDs)
+        # Filter by crop types string names
         if crop_types:
-            # Convert crop type names to IDs
-            crop_type_ids = (
-                self.db.query(CropType.id)
-                .filter(CropType.id.in_(crop_types))
-                .all()
-            )
-            crop_type_id_list = [ct_id[0] for ct_id in crop_type_ids]
-            if crop_type_id_list:
-                query = query.filter(
-                    Customer.crop_type_id.in_(crop_type_id_list)
-                )
+            query = query.filter(Customer.crop_type.in_(crop_types))
 
-        # Filter by age groups (convert strings to enum objects)
+        # Filter by age groups
+        # Note: age_group is now a computed @property from birth_year
+        # We need to filter in Python since it's not a database column
         if age_groups:
-            age_group_enums = [
-                AgeGroup(ag)
-                for ag in age_groups
-                if ag in [e.value for e in AgeGroup]
+            # Fetch all matching customers (before age group filter)
+            all_customers = query.all()
+
+            # Filter by computed age_group property
+            filtered_customers = [
+                c
+                for c in all_customers
+                if c.age_group and c.age_group in age_groups
             ]
-            if age_group_enums:
-                query = query.filter(
-                    Customer.age_group.in_(age_group_enums)
+
+            # Update query to only include filtered customer IDs
+            if filtered_customers:
+                customer_ids = [c.id for c in filtered_customers]
+                query = self.db.query(Customer).filter(
+                    Customer.id.in_(customer_ids)
                 )
+            else:
+                # No customers match age group filter
+                query = self.db.query(Customer).filter(Customer.id == -1)
 
         # Get total count before pagination
         total = query.count()
@@ -238,9 +239,7 @@ class CustomerService:
                     admin_info = {
                         "id": admin.id,
                         "name": admin.name,
-                        "path": self._build_administrative_path(
-                            admin.id
-                        ),
+                        "path": self._build_administrative_path(admin.id),
                     }
 
             customer_dict = {
@@ -248,12 +247,9 @@ class CustomerService:
                 "full_name": customer.full_name,
                 "phone_number": customer.phone_number,
                 "language": customer.language,
-                "crop_type": {
-                    "id": customer.crop_type.id,
-                    "name": customer.crop_type.name
-                } if customer.crop_type else None,
+                "crop_type": customer.crop_type,
                 "age_group": customer.age_group,
-                "age": customer.age,
+                "gender": customer.gender,
                 "administrative": admin_info,
             }
             customer_data.append(customer_dict)
