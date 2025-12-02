@@ -10,7 +10,6 @@ from database import get_db
 from utils.auth_dependencies import get_current_user
 from models.user import User, UserType
 from models.customer import Customer
-from models.customer import CropType, AgeGroup
 from models.broadcast import BroadcastGroupContact
 from models.administrative import UserAdministrative
 from services.broadcast_service import get_broadcast_service
@@ -31,27 +30,34 @@ def _derive_group_attributes(group_id: int, db: Session) -> dict:
     Returns dict with crop_types (list of names) and age_groups (list).
     """
     # Get distinct crop type names from group members
-    crop_names = db.query(func.distinct(CropType.name)).join(
-        Customer, Customer.crop_type_id == CropType.id
-    ).join(
+    # Note: crop_type is now a String field, not a FK
+    crop_names = db.query(func.distinct(Customer.crop_type)).join(
         BroadcastGroupContact,
         BroadcastGroupContact.customer_id == Customer.id
     ).filter(
-        BroadcastGroupContact.broadcast_group_id == group_id
+        BroadcastGroupContact.broadcast_group_id == group_id,
+        Customer.crop_type.isnot(None)
     ).all()
     crop_types_list = [name[0] for name in crop_names if name[0]]
 
     # Get distinct age groups from group members
-    age_groups_result = db.query(
-        func.distinct(Customer.age_group)
-    ).join(
+    # Note: age_group is now a @property calculated from birth_year,
+    # so we need to fetch customers and calculate age_group in Python
+    customers = db.query(Customer).join(
         BroadcastGroupContact,
         BroadcastGroupContact.customer_id == Customer.id
     ).filter(
-        BroadcastGroupContact.broadcast_group_id == group_id
+        BroadcastGroupContact.broadcast_group_id == group_id,
+        Customer.birth_year.isnot(None)
     ).all()
-    age_groups_list = [ag[0] for ag in age_groups_result if ag[0]]
-    age_groups_list = [AgeGroup[ag].value for ag in age_groups_list]
+
+    # Calculate age_groups using the Customer.age_group property
+    age_groups_set = set()
+    for customer in customers:
+        age_group = customer.age_group
+        if age_group:
+            age_groups_set.add(age_group)
+    age_groups_list = sorted(list(age_groups_set))
 
     return {
         "crop_types": crop_types_list,

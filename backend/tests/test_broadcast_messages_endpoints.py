@@ -6,9 +6,8 @@ from models import (
     Customer,
     CustomerAdministrative,
 )
-from models.customer import AgeGroup, CropType, CustomerLanguage
+from models.customer import CustomerLanguage
 from models.message import DeliveryStatus
-from seeder.crop_type import seed_crop_types
 
 
 class TestBroadcastMessagesEndpoint:
@@ -101,31 +100,15 @@ class TestBroadcastMessagesEndpoint:
         setup_administrative_hierarchy
     ):
         """Create test customers with various attributes"""
-        # Seed crop types
-        seed_crop_types(db_session)
-
         wards = setup_administrative_hierarchy
 
-        # Get crop types
-        rice = (
-            db_session.query(CropType).filter(CropType.name == "Rice").first()
-        )
-        coffee = (
-            db_session.query(CropType)
-            .filter(CropType.name == "Coffee")
-            .first()
-        )
-
-        assert rice is not None, "Rice crop type should exist"
-        assert coffee is not None, "Coffee crop type should exist"
-
-        # Customer 1 in Ward 1 with Rice
+        # Customer 1 in Ward 1 with rice
         customer1 = Customer(
             phone_number="+254700000001",
             full_name="John Doe",
             language=CustomerLanguage.EN,
-            crop_type_id=rice.id,
-            age_group=AgeGroup.AGE_20_35,
+            crop_type="rice",
+            birth_year=1995,  # Age 30 (2025 - 1995) -> 20-35 group
         )
         db_session.add(customer1)
         db_session.commit()
@@ -135,13 +118,13 @@ class TestBroadcastMessagesEndpoint:
         )
         db_session.add(customer_admin1)
 
-        # Customer 2 in Ward 1 with Coffee
+        # Customer 2 in Ward 1 with coffee
         customer2 = Customer(
             phone_number="+254700000002",
             full_name="Jane Smith",
             language=CustomerLanguage.SW,
-            crop_type_id=coffee.id,
-            age_group=AgeGroup.AGE_36_50,
+            crop_type="coffee",
+            birth_year=1982,  # Age 43 (2025 - 1982) -> 36-50 group
         )
         db_session.add(customer2)
         db_session.commit()
@@ -151,13 +134,13 @@ class TestBroadcastMessagesEndpoint:
         )
         db_session.add(customer_admin2)
 
-        # Customer 3 in Ward 2 with Rice
+        # Customer 3 in Ward 2 with rice
         customer3 = Customer(
             phone_number="+254700000003",
             full_name="Peter Brown",
             language=CustomerLanguage.EN,
-            crop_type_id=rice.id,
-            age_group=AgeGroup.AGE_51_PLUS,
+            crop_type="rice",
+            birth_year=1964,  # Age 61 (2025 - 1964) -> 51+ group
         )
         db_session.add(customer3)
         db_session.commit()
