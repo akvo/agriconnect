@@ -2,6 +2,9 @@ import json
 import time
 import httpx
 import logging
+import zipfile
+
+from io import BytesIO
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -205,74 +208,103 @@ class ExternalAIService:
         user_id: int,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
-        """
-        Create an upload job with external AI service.
-
-        Args:
-            upload_file: File to upload to external service
-            kb_id: Knowledge base ID
-            document_id: Document ID as a callback to update document status
-            metadata: Optional metadata for the upload
-
-        Returns:
-            Job response with job_id and status, or None if not configured
-        """
         if not self.is_configured() or not self.token.upload_url:
             logger.error(
-                "[ExternalAIService] Cannot create upload job - "
-                "not configured or upload_url missing"
+                "[ExternalAIService] Cannot create upload job - not configured"
             )
             return None
 
         url = self.token.upload_url
         headers = {"Authorization": f"Bearer {self.token.access_token}"}
 
-        # Payload RAG expects
-        payload = {
-            "job": "upload",
-            "metadata": metadata or {},
-            "callback_params": {
-                "kb_id": kb_id,
-                "user_id": user_id,
-            },
-            "knowledge_base_id": kb_id,
-        }
-        form_data = {"payload": json.dumps(payload)}
+        # Read and validate file
+        try:
+            await upload_file.seek(0)
+            file_bytes = await upload_file.read()
+
+            if not file_bytes or len(file_bytes) == 0:
+                logger.error(f"❌ File '{upload_file.filename}' is empty")
+                return None
+
+            logger.info(
+                f"📤 Uploading '{upload_file.filename}': {len(file_bytes):,} bytes, "  # noqa
+                f"content_type: {upload_file.content_type}"
+            )
+
+            # Validate DOCX before sending
+            if upload_file.filename.endswith((".docx", ".xlsx", ".pptx")):
+                try:
+                    with zipfile.ZipFile(BytesIO(file_bytes)) as zf:
+                        logger.info(
+                            f"✅ Verified Office document structure "
+                            f"({len(zf.namelist())} entries)"
+                        )
+                except zipfile.BadZipFile as e:
+                    logger.error(
+                        f"❌ File '{upload_file.filename}' is corrupted before upload: {e}"  # noqa
+                    )
+                    logger.error(f"First 50 bytes: {file_bytes[:50]}")
+                    return None
+
+        except Exception as e:
+            logger.exception(
+                f"❌ Failed to read file '{upload_file.filename}': {e}"
+            )
+            return None
+
+        # Prepare payload
+        payload_json = json.dumps(
+            {
+                "job": "upload",
+                "metadata": metadata or {},
+                "callback_params": {"kb_id": kb_id, "user_id": user_id},
+                "knowledge_base_id": kb_id,
+            }
+        )
+
+        # Use fresh BytesIO stream
+        file_stream = BytesIO(file_bytes)
+
+        form_fields = {"payload": payload_json}
+        files = [
+            (
+                "files",
+                (
+                    upload_file.filename,
+                    file_stream,
+                    upload_file.content_type or "application/octet-stream",
+                ),
+            )
+        ]
 
         try:
-            async with httpx.AsyncClient() as client:
-                files = {
-                    "files": (
-                        upload_file.filename,
-                        await upload_file.read(),
-                        upload_file.content_type,
-                    )
-                }
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 response = await client.post(
                     url,
                     headers=headers,
-                    data=form_data,
+                    data=form_fields,
                     files=files,
-                    timeout=30.0,
                 )
-                response.raise_for_status()
 
+                response.raise_for_status()
                 data = response.json()
+
                 logger.info(
-                    f"✓ File '{upload_file.filename}' uploaded successfully."
-                    f"with URL: {url}"
+                    f"✅ File {upload_file.filename} uploaded successfully"
                 )
                 return data
 
         except httpx.HTTPStatusError as e:
             logger.error(
-                "✗ RAG upload failed:",
-                f"HTTP {e.response.status_code} - {e.response.text}",
+                f"❌ RAG upload failed: HTTP {e.response.status_code} - "
+                f"{e.response.text}"
             )
             return None
         except Exception as e:
-            logger.exception(f"✗ Unexpected error during RAG upload: {e}")
+            logger.exception(f"❌ Unexpected error during RAG upload: {e}")
             return None
+        finally:
+            file_stream.close()
 
     async def manage_knowledge_base(
         self,

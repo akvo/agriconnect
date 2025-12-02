@@ -213,9 +213,9 @@ class TestDocumentEndpoints:
         file_content = b"Mock DOCX content"
         files = {
             "file": create_test_file(
-                "test.docx",
+                "test.txt",
                 file_content,
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # noqa
+                "text/plain",
             )
         }
         data = {"kb_id": str(kb.id)}
