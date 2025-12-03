@@ -118,14 +118,10 @@ class OnboardingService:
         self, customer: Customer, field_config: OnboardingFieldConfig
     ) -> bool:
         """
-        Check if a specific field is already filled.
-
-        Args:
-            customer: Customer instance
-            field_config: Field configuration
-
-        Returns:
-            True if field is complete, False otherwise
+        Check if a specific field is already filled or explicitly skipped.
+        For optional fields: field exists
+        in profile_data (even if None) = complete
+        For required fields: field must have non-empty value
         """
         field_name = field_config.field_name
 
@@ -145,8 +141,17 @@ class OnboardingService:
         if not isinstance(customer.profile_data, dict):
             return False
 
-        field_value = customer.profile_data.get(field_name)
-        return field_value is not None and field_value != ""
+        # Check if field exists in profile_data
+        if field_name in customer.profile_data:
+            if not field_config.required:
+                # Optional field: any value (including None)
+                # means complete/skipped
+                return True
+            else:
+                # Required field: must have non-empty value
+                field_value = customer.profile_data.get(field_name)
+                return field_value is not None and field_value != ""
+        return False
 
     # ================================================================
     # STATE MANAGEMENT HELPERS
@@ -885,6 +890,9 @@ Birth year must be between 1900 and {current_year}."""
                 f"User skipped optional field: {field_name} "
                 f"for customer {customer.id}"
             )
+            # Mark field as skipped with null value
+            customer.set_profile_field(field_name, None)
+
             # Clear field state and move to next
             self._clear_field_state(customer, field_name)
             self.db.commit()
@@ -1189,6 +1197,13 @@ Birth year must be between 1900 and {current_year}."""
                 combined_message = (
                     f"{success_msg}\n\n{next_field.initial_question}"
                 )
+                if next_field.field_name == "crop_type":
+                    crops_formatted = ", ".join(
+                        crop.lower() for crop in self.supported_crops
+                    )
+                    combined_message = combined_message.replace(
+                        "{available_crops}", crops_formatted
+                    )
                 customer.current_onboarding_field = next_field.field_name
                 self.db.commit()
 
@@ -1260,11 +1275,10 @@ Birth year must be between 1900 and {current_year}."""
                 attempts=self._get_attempts(customer, field_name),
             )
         else:
-            # Extract and save invalid value or skip
+            # Optional field - skip and move to next
             customer.set_profile_field(
-                field_name, last_message.strip()
+                field_name, None
             )
-            success_msg = "Thank you!"
 
             # Clear field state
             self._clear_field_state(customer, field_name)
@@ -1278,11 +1292,6 @@ Birth year must be between 1900 and {current_year}."""
                 next_response = self._ask_initial_question(
                     customer, next_field
                 )
-                # Prepend success message if we saved something
-                if success_msg:
-                    next_response.message = (
-                        f"{success_msg}\n\n{next_response.message}"
-                    )
                 return next_response
             else:
                 return self._complete_onboarding(customer)
