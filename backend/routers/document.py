@@ -205,7 +205,11 @@ async def list_documents(
 
     data = []
     for doc in rag_doc_response.get("data"):
-        task = doc.get("processing_tasks")[0] or {}
+        task = (
+            doc.get("processing_tasks")[0]
+            if doc.get("processing_tasks")
+            else {}
+        )
         data.append(
             DocumentResponse(
                 id=doc.get("id"),
