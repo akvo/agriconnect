@@ -18,7 +18,10 @@ from models.administrative import (
     CustomerAdministrative,
 )
 from services.onboarding_service import OnboardingService
-from schemas.onboarding_schemas import CropIdentificationResult
+from schemas.onboarding_schemas import (
+    CropIdentificationResult,
+    get_field_config,
+)
 
 
 class TestGenericOnboardingService:
@@ -1097,3 +1100,333 @@ class TestGenericOnboardingService:
         # It will find the first incomplete field (administration) and ask
         assert response.status == "in_progress"
         assert "location" in response.message.lower()
+
+
+# ============================================================================
+# DYNAMIC CROP ONBOARDING TESTS
+# ============================================================================
+
+class TestDynamicCropOnboarding:
+    """Test cases for dynamic crop listing and fallback storage"""
+
+    @pytest.fixture
+    def mock_openai_service(self):
+        """Mock OpenAI service for testing"""
+        mock_service = MagicMock()
+        mock_service.is_configured.return_value = True
+        return mock_service
+
+    @pytest.fixture
+    def onboarding_service(self, db_session, mock_openai_service):
+        """Create onboarding service with mocked dependencies"""
+        service = OnboardingService(db_session)
+        service.openai_service = mock_openai_service
+        return service
+
+    @pytest.fixture
+    def sample_administrative_data(self, db_session):
+        """Create sample administrative hierarchy"""
+        # Create levels
+        country_level = AdministrativeLevel(name="country")
+        region_level = AdministrativeLevel(name="region")
+        district_level = AdministrativeLevel(name="district")
+        ward_level = AdministrativeLevel(name="ward")
+        db_session.add_all(
+            [country_level, region_level, district_level, ward_level]
+        )
+        db_session.flush()
+
+        # Create hierarchy
+        country = Administrative(
+            code="KEN",
+            name="Kenya",
+            path="Kenya",
+            level_id=country_level.id,
+            parent_id=None,
+        )
+        db_session.add(country)
+        db_session.flush()
+
+        region = Administrative(
+            code="NBO",
+            name="Nairobi Region",
+            path="Kenya > Nairobi Region",
+            level_id=region_level.id,
+            parent_id=country.id,
+        )
+        db_session.add(region)
+        db_session.flush()
+
+        district = Administrative(
+            code="CD",
+            name="Central District",
+            path="Kenya > Nairobi Region > Central District",
+            level_id=district_level.id,
+            parent_id=region.id,
+        )
+        db_session.add(district)
+        db_session.flush()
+
+        ward = Administrative(
+            code="WL",
+            name="Westlands Ward",
+            path="Kenya > Nairobi Region > Central District > Westlands Ward",
+            level_id=ward_level.id,
+            parent_id=district.id,
+        )
+        db_session.add(ward)
+        db_session.flush()
+
+        return {
+            "country": country,
+            "region": region,
+            "district": district,
+            "wards": [ward],
+        }
+
+    def test_crop_question_shows_available_crops(
+        self, db_session, onboarding_service
+    ):
+        """Test that crop question displays available crops from config"""
+        customer = Customer(
+            phone_number="+254700000010",
+            onboarding_status=OnboardingStatus.NOT_STARTED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        response = onboarding_service._ask_initial_question(
+            customer,
+            get_field_config("crop_type"),
+        )
+
+        # Should replace {available_crops} with actual list
+        assert "avocado" in response.message.lower()
+        assert "cacao" in response.message.lower()
+        assert "{available_crops}" not in response.message
+
+    @pytest.mark.asyncio
+    async def test_progressive_error_first_attempt(
+        self, db_session, onboarding_service
+    ):
+        """Test first attempt shows generic error with full question"""
+        from unittest.mock import AsyncMock
+
+        customer = Customer(
+            phone_number="+254700000011",
+            onboarding_status=OnboardingStatus.IN_PROGRESS,
+            current_onboarding_field="crop_type",
+            onboarding_attempts={"crop_type": 0},  # 0 attempts so far
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Mock extraction to return None (invalid crop)
+        onboarding_service.extract_crop_type = AsyncMock(return_value=None)
+
+        from schemas.onboarding_schemas import get_field_config
+
+        response = await onboarding_service._process_field_value(
+            customer, "Rice", get_field_config("crop_type")
+        )
+
+        # First attempt should show full question
+        assert "I couldn't identify that information" in response.message
+        assert "We currently support:" in response.message
+        assert "avocado" in response.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_progressive_error_second_attempt(
+        self, db_session, onboarding_service
+    ):
+        """Test second attempt shows specific crop list"""
+        from unittest.mock import AsyncMock
+
+        customer = Customer(
+            phone_number="+254700000012",
+            onboarding_status=OnboardingStatus.IN_PROGRESS,
+            current_onboarding_field="crop_type",
+            onboarding_attempts={"crop_type": 1},  # 1 attempt so far
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Mock extraction to return None
+        onboarding_service.extract_crop_type = AsyncMock(return_value=None)
+
+        from schemas.onboarding_schemas import get_field_config
+
+        response = await onboarding_service._process_field_value(
+            customer, "Rice", get_field_config("crop_type")
+        )
+
+        # Second attempt should be more specific
+        assert "I still couldn't identify" in response.message
+        assert "Please specify one of these crops:" in response.message
+        assert "avocado, cacao" in response.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_extract_any_crop_name_success(
+        self, db_session, onboarding_service
+    ):
+        """Test extracting crop name from various messages"""
+        # Mock OpenAI response
+        mock_response = MagicMock()
+        mock_response.data = {"crop_name": "Rice"}
+        onboarding_service.openai_service.structured_output = AsyncMock(
+            return_value=mock_response
+        )
+
+        result = await onboarding_service.extract_any_crop_name("Rice farming")
+
+        assert result == "Rice"
+
+    @pytest.mark.asyncio
+    async def test_extract_any_crop_name_variations(
+        self, db_session, onboarding_service
+    ):
+        """Test extracting crop names with variations"""
+        test_cases = [
+            ("I grow maize", "Maize"),
+            ("Chilli peppers", "Chilli"),
+            ("We do corn", "Maize"),
+            ("Tomato", "Tomato"),
+        ]
+
+        for message, expected in test_cases:
+            mock_response = MagicMock()
+            mock_response.data = {"crop_name": expected}
+            onboarding_service.openai_service.structured_output = AsyncMock(
+                return_value=mock_response
+            )
+
+            result = await onboarding_service.extract_any_crop_name(message)
+            assert result == expected, f"Failed for: {message}"
+
+    @pytest.mark.asyncio
+    async def test_extract_any_crop_name_no_crop(
+        self, db_session, onboarding_service
+    ):
+        """Test extracting when no crop mentioned"""
+        mock_response = MagicMock()
+        mock_response.data = {"crop_name": None}
+        onboarding_service.openai_service.structured_output = AsyncMock(
+            return_value=mock_response
+        )
+
+        result = await onboarding_service.extract_any_crop_name("I'm a farmer")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_max_attempts_saves_invalid_crop_and_continues(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """Test that invalid crop is saved after max attempts and continues"""
+        from unittest.mock import AsyncMock
+        from schemas.onboarding_schemas import get_field_config
+
+        # Create customer with administration already set
+        ward = sample_administrative_data["wards"][0]
+        customer = Customer(
+            phone_number="+254700000013",
+            onboarding_status=OnboardingStatus.IN_PROGRESS,
+            current_onboarding_field="crop_type",
+            onboarding_attempts={"crop_type": 4},  # Exceeded max
+        )
+        db_session.add(customer)
+        db_session.flush()
+        # Add administrative data
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=ward.id,
+        )
+        db_session.add(customer_admin)
+        db_session.commit()
+
+        # Mock extract_any_crop_name to return Rice
+        onboarding_service.extract_any_crop_name = AsyncMock(
+            return_value="Rice"
+        )
+
+        response = await onboarding_service._handle_max_attempts(
+            customer,
+            get_field_config("crop_type"),
+            last_message="Rice farming",
+        )
+
+        # Should save Rice and continue to gender
+        assert customer.crop_type == "Rice"
+        assert response.status == "in_progress"
+        assert "Thank you! I've noted that you grow Rice" in response.message
+        assert "gender" in response.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_crop_full_flow(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """
+        Test complete flow: invalid crop after 3 attempts saves and continues
+        """
+        from unittest.mock import AsyncMock
+
+        # Use sample administrative data fixture
+        ward = sample_administrative_data["wards"][0]
+
+        customer = Customer(
+            phone_number="+254700000014",
+            onboarding_status=OnboardingStatus.NOT_STARTED,
+        )
+        customer_admin = CustomerAdministrative(
+            customer=customer, administrative_id=ward.id
+        )
+        db_session.add(customer)
+        db_session.add(customer_admin)
+        db_session.commit()
+
+        # Mock crop extraction to always return None (not in supported list)
+        onboarding_service.extract_crop_type = AsyncMock(return_value=None)
+
+        # First call will ask the initial question (crop_type field)
+        response = await onboarding_service.process_onboarding_message(
+            customer, "Hello"
+        )
+        assert response.status == "in_progress"
+        assert "What crops do you grow" in response.message
+
+        # Attempt 1 - try to answer
+        response = await onboarding_service.process_onboarding_message(
+            customer, "Rice"
+        )
+        assert response.status == "in_progress"
+        assert "I couldn't identify" in response.message
+
+        # Attempt 2
+        response = await onboarding_service.process_onboarding_message(
+            customer, "I grow rice"
+        )
+        assert response.status == "in_progress"
+        assert "I still couldn't identify" in response.message
+
+        # Attempt 3
+        response = await onboarding_service.process_onboarding_message(
+            customer, "Rice farming"
+        )
+        assert response.status == "in_progress"
+        assert "I still couldn't identify" in response.message
+
+        # Attempt 4: Should extract "Rice" and continue
+        # Mock extract_any_crop_name
+        onboarding_service.extract_any_crop_name = AsyncMock(
+            return_value="Rice"
+        )
+
+        response = await onboarding_service.process_onboarding_message(
+            customer, "Rice"
+        )
+
+        # Verify crop saved and moved to gender
+        assert customer.crop_type == "Rice"
+        assert response.status == "in_progress"
+        assert "Thank you!" in response.message
+        assert "gender" in response.message.lower()
