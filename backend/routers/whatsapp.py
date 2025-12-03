@@ -187,13 +187,25 @@ async def whatsapp_webhook(
                     f"(24+ hours inactive)"
                 )
                 # Continue processing message normally after reconnection
+        # Check if customer has an existing unresolved ticket
+        existing_ticket = (
+            db.query(Ticket)
+            .filter(
+                Ticket.customer_id == customer.id,
+                Ticket.resolved_at.is_(None),
+            )
+            .first()
+        )
 
         # ========================================
         # GENERIC ONBOARDING: Collect all required profile fields
         # ========================================
         onboarding_service = get_onboarding_service(db)
 
-        if onboarding_service.needs_onboarding(customer):
+        if (
+            onboarding_service.needs_onboarding(customer) and
+            not existing_ticket
+        ):
             logger.info(
                 f"Customer {phone_number} needs onboarding "
                 f"(status: {customer.onboarding_status.value}, "
@@ -469,16 +481,6 @@ async def whatsapp_webhook(
         # - Existing ticket → WHISPER (no auto-reply)
         # - No ticket → REPLY (auto-reply to farmer)
         # ========================================
-
-        # Check if customer has an existing unresolved ticket
-        existing_ticket = (
-            db.query(Ticket)
-            .filter(
-                Ticket.customer_id == customer.id,
-                Ticket.resolved_at.is_(None),
-            )
-            .first()
-        )
 
         # Create farmer message
         message = Message(
