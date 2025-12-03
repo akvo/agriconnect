@@ -9,8 +9,13 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 from models.administrative import Administrative, CustomerAdministrative
 from models.customer import (
-    AgeGroup, Base, CropType, Customer, CustomerLanguage
+    Base,
+    AgeGroup,
+    Customer,
+    CustomerLanguage,
+    OnboardingStatus,
 )
+from config import settings
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -82,8 +87,12 @@ def generate_customer_data(index: int, country: str = "tanzania"):
         "phone_number": phone_number,
         "full_name": full_name,
         "language": language,
-        "birth_year": 2024 - age if age else None,
-        "gender": random.choice(["male", "female", None]),
+        "onboarding_status": OnboardingStatus.COMPLETED,
+        "profile_data": {
+            "crop_type": random.choice(settings.crop_types),
+            "birth_year": 2024 - age if age else None,
+            "gender": random.choice(["male", "female", "other", None]),
+        }
     }
 
 
@@ -111,11 +120,6 @@ def create_fake_customers(
     for i in range(count):
         # Generate customer data
         customer_data = generate_customer_data(i, country)
-        # Add crop type randomly
-        crop_types = db.query(CropType).all()
-        if crop_types:
-            crop_type = random.choice(crop_types)
-            customer_data["crop_type_id"] = crop_type.id
 
         # Check if phone number already exists
         existing = (
