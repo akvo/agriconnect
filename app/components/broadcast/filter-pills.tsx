@@ -8,11 +8,11 @@ import typography from "@/styles/typography";
 import { capitalizeFirstLetter } from "@/utils/string";
 
 interface FilterPillsProps {
-  selectedCropTypes: number[];
+  selectedCropTypes: string[];
   selectedAgeGroups: string[];
   selectedAdminIds: number[];
   cropTypes: CropType[];
-  onRemoveCropType: (id: number) => void;
+  onRemoveCropType: (name: string) => void;
   onRemoveAgeGroup: (ageGroup: string) => void;
   onRemoveAdminId: (id: number) => void;
   onClearAll: () => void;
@@ -29,7 +29,7 @@ const FilterPills: React.FC<FilterPillsProps> = ({
   onClearAll,
 }) => {
   const listSelectedCropTypes = cropTypes.filter((cropType) =>
-    selectedCropTypes.includes(cropType.id),
+    selectedCropTypes.includes(cropType.name),
   );
 
   return (
@@ -40,7 +40,7 @@ const FilterPills: React.FC<FilterPillsProps> = ({
           <TouchableOpacity
             key={`crop-${cropType.id}`}
             style={styles.filterPill}
-            onPress={() => onRemoveCropType(cropType.id)}
+            onPress={() => onRemoveCropType(cropType.name)}
             testID={`selected-filter-pill-crop-${cropType.id}`}
             accessibilityLabel={`Remove ${cropType.name} filter`}
             accessibilityRole="button"

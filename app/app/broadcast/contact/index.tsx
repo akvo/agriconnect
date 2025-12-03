@@ -56,7 +56,7 @@ const BroadcastFarmerListTab = () => {
   const [hasMore, setHasMore] = useState(true);
 
   // Filter state
-  const [selectedCropTypes, setSelectedCropTypes] = useState<number[]>([]);
+  const [selectedCropTypes, setSelectedCropTypes] = useState<string[]>([]);
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
   const [selectedAdminIds, setSelectedAdminIds] = useState<number[]>([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -97,6 +97,7 @@ const BroadcastFarmerListTab = () => {
         }
 
         if (selectedCropTypes.length > 0) {
+          console.log("Selected Crop Types:", selectedCropTypes);
           params.crop_types = selectedCropTypes;
         }
 
@@ -202,20 +203,20 @@ const BroadcastFarmerListTab = () => {
 
   // Filter handlers
   const toggleCropType = useCallback(
-    (cropTypeID: number) => {
-      setSelectedCropTypes((cropTypeIds) => {
-        const cropTypeObj = cropTypes.find((ct) => ct.id === cropTypeID);
+    (name: string) => {
+      setSelectedCropTypes((cropTypeNames) => {
+        const cropTypeObj = cropTypes.find((ct) => ct.name === name);
         if (!cropTypeObj) {
-          return cropTypeIds;
+          return cropTypeNames;
         }
 
         /**
          * Toggle multiple crop type selection
          */
-        if (cropTypeIds.includes(cropTypeID)) {
-          return cropTypeIds.filter((id) => id !== cropTypeID);
+        if (cropTypeNames.includes(name)) {
+          return cropTypeNames.filter((n) => n !== name);
         } else {
-          return [...cropTypeIds, cropTypeID];
+          return [...cropTypeNames, name];
         }
       });
     },
