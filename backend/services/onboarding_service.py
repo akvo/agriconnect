@@ -138,12 +138,15 @@ class OnboardingService:
                 > 0
             )
 
-        # Standard case: check Customer model field
-        if field_config.db_field:
-            field_value = getattr(customer, field_config.db_field, None)
-            return field_value is not None
+        # Check profile_data JSON for value
+        if not customer.profile_data:
+            return False
 
-        return False
+        if not isinstance(customer.profile_data, dict):
+            return False
+
+        field_value = customer.profile_data.get(field_name)
+        return field_value is not None and field_value != ""
 
     # ================================================================
     # STATE MANAGEMENT HELPERS
@@ -1226,16 +1229,25 @@ Birth year must be between 1900 and {current_year}."""
                     value=value.path
                 )
 
-            # Standard case: set Customer model field
-            elif field_config.db_field:
-                setattr(customer, field_config.db_field, value)
+            # Standard case: save to profile_data JSON
+            else:
+                if not customer.profile_data:
+                    customer.profile_data = {}
+                elif not isinstance(customer.profile_data, dict):
+                    customer.profile_data = {}
+
+                profile_dict = customer.profile_data.copy()
+
+                # Convert enum to value if needed
+                if isinstance(value, Gender):
+                    profile_dict[field_name] = value.value
+                else:
+                    profile_dict[field_name] = value
+
+                customer.profile_data = profile_dict
                 success_msg = field_config.success_message_template.format(
                     value=value
                 )
-
-            else:
-                logger.error(f"No save logic for field: {field_name}")
-                success_msg = "Thank you!"
 
             # Clear field-specific state
             self._clear_field_state(customer, field_name)
@@ -1347,11 +1359,8 @@ Birth year must be between 1900 and {current_year}."""
                             f"Saving unsupported crop after max attempts: "
                             f"{extracted_value}"
                         )
-                        setattr(
-                            customer,
-                            field_config.db_field,
-                            extracted_value
-                        )
+                        # Save to profile_data
+                        customer.set_profile_field(field_name, extracted_value)
                         success_msg = (
                             f"Thank you! I've noted that you grow "
                             f"{extracted_value}."
@@ -1362,20 +1371,18 @@ Birth year must be between 1900 and {current_year}."""
                             f"Could not extract crop from: {last_message}, "
                             f"saving raw message"
                         )
-                        setattr(
-                            customer,
-                            field_config.db_field,
-                            last_message.strip()
+                        # Save to profile_data
+                        customer.set_profile_field(
+                            field_name, last_message.strip()
                         )
                         success_msg = (
                             f"Thank you! I've noted: {last_message.strip()}"
                         )
                 else:
                     # Generic fallback for other fields
-                    setattr(
-                        customer,
-                        field_config.db_field,
-                        last_message.strip()
+                    # Save to profile_data
+                    customer.set_profile_field(
+                        field_name, last_message.strip()
                     )
                     success_msg = "Thank you!"
 

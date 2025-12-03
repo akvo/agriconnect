@@ -28,7 +28,11 @@ def test_customer(db_session: Session):
         phone_number="+1234567890",
         full_name="Test Farmer",
         onboarding_status=OnboardingStatus.COMPLETED,
-        crop_type="Maize",
+        profile_data={
+            "crop_type": "maize",
+            "gender": "male",
+            "birth_year": 1990,
+        },
     )
     db_session.add(customer)
     db_session.commit()

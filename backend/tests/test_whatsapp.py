@@ -152,7 +152,11 @@ class TestWhatsAppWebhook:
         existing_customer = Customer(
             phone_number="+255111111111",
             full_name="John Farmer",
-            crop_type="Maize",
+            profile_data={
+                "crop_type": "maize",
+                "gender": "male",
+                "birth_year": 1985,
+            },
         )
         db_session.add(existing_customer)
         db_session.commit()

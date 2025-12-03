@@ -179,7 +179,7 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.COMPLETED,
-            crop_type="Avocado",
+            profile_data={"crop_type": "Avocado"},
         )
         db_session.add(customer)
         db_session.commit()

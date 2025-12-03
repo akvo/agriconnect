@@ -163,7 +163,7 @@ class TestGenericOnboardingService:
         )
 
         # Set crop type
-        customer.crop_type = "Cacao"
+        customer.profile_data = {"crop_type": "Cacao"}
         db_session.commit()
 
         assert (
@@ -186,7 +186,7 @@ class TestGenericOnboardingService:
         )
 
         # Set gender
-        customer.gender = Gender.MALE
+        customer.profile_data = {"gender": "male"}
         db_session.commit()
 
         assert (
@@ -211,7 +211,7 @@ class TestGenericOnboardingService:
         )
 
         # Set birth year
-        customer.birth_year = 1985
+        customer.profile_data = {"birth_year": 1985}
         db_session.commit()
 
         assert (
@@ -263,9 +263,11 @@ class TestGenericOnboardingService:
         """Test getting next field when all fields are complete"""
         customer = Customer(
             phone_number="+254700000001",
-            crop_type="Cacao",
-            gender=Gender.MALE,
-            birth_year=1990
+            profile_data={
+                "crop_type": "Cacao",
+                "gender": "male",
+                "birth_year": 1990
+            },
         )
         db_session.add(customer)
         db_session.commit()
@@ -666,7 +668,7 @@ class TestGenericOnboardingService:
         """Test needs_onboarding when all required fields are complete"""
         customer = Customer(
             phone_number="+254700000001",
-            crop_type="Cacao",
+            profile_data={"crop_type": "Cacao"},
             onboarding_status=OnboardingStatus.COMPLETED,
         )
         db_session.add(customer)
@@ -1056,9 +1058,11 @@ class TestGenericOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.COMPLETED,
-            crop_type="Cacao",
-            gender=Gender.MALE,
-            birth_year=1990
+            profile_data={
+                "crop_type": "Cacao",
+                "gender": "male",
+                "birth_year": 1990
+            },
         )
         db_session.add(customer)
         db_session.commit()
