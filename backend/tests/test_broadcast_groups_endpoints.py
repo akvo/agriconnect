@@ -104,8 +104,11 @@ class TestBroadcastGroupsEndpoint:
             phone_number="+254700000001",
             full_name="John Doe",
             language=CustomerLanguage.EN,
-            crop_type="rice",
-            birth_year=1995
+            profile_data={
+                "crop_type": "rice",
+                "gender": "male",
+                "birth_year": 1995,
+            },
         )
         db_session.add(customer1)
         db_session.commit()
@@ -121,8 +124,11 @@ class TestBroadcastGroupsEndpoint:
             phone_number="+254700000002",
             full_name="Jane Smith",
             language=CustomerLanguage.SW,
-            crop_type="coffee",
-            birth_year=1980,
+            profile_data={
+                "crop_type": "coffee",
+                "gender": "female",
+                "birth_year": 1980,
+            },
         )
         db_session.add(customer2)
         db_session.commit()
@@ -137,8 +143,11 @@ class TestBroadcastGroupsEndpoint:
             phone_number="+254700000003",
             full_name="Peter Brown",
             language=CustomerLanguage.EN,
-            crop_type="chilli",
-            birth_year=1970,
+            profile_data={
+                "crop_type": "chilli",
+                "gender": "male",
+                "birth_year": 1965,
+            },
         )
         db_session.add(customer3)
         db_session.commit()

@@ -107,8 +107,11 @@ class TestBroadcastMessagesEndpoint:
             phone_number="+254700000001",
             full_name="John Doe",
             language=CustomerLanguage.EN,
-            crop_type="rice",
-            birth_year=1995,  # Age 30 (2025 - 1995) -> 20-35 group
+            profile_data={
+                "crop_type": "rice",
+                "gender": "male",
+                "birth_year": 1995,
+            },
         )
         db_session.add(customer1)
         db_session.commit()
@@ -123,8 +126,11 @@ class TestBroadcastMessagesEndpoint:
             phone_number="+254700000002",
             full_name="Jane Smith",
             language=CustomerLanguage.SW,
-            crop_type="coffee",
-            birth_year=1982,  # Age 43 (2025 - 1982) -> 36-50 group
+            profile_data={
+                "crop_type": "coffee",
+                "gender": "female",
+                "birth_year": 1982,
+            },
         )
         db_session.add(customer2)
         db_session.commit()
@@ -139,8 +145,11 @@ class TestBroadcastMessagesEndpoint:
             phone_number="+254700000003",
             full_name="Peter Brown",
             language=CustomerLanguage.EN,
-            crop_type="rice",
-            birth_year=1964,  # Age 61 (2025 - 1964) -> 51+ group
+            profile_data={
+                "crop_type": "chilli",
+                "gender": "male",
+                "birth_year": 1965,
+            },
         )
         db_session.add(customer3)
         db_session.commit()
