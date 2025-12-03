@@ -28,6 +28,7 @@ def test_customer(db_session: Session):
         phone_number="+1234567890",
         full_name="Test Farmer",
         onboarding_status=OnboardingStatus.COMPLETED,
+        crop_type="Maize",
     )
     db_session.add(customer)
     db_session.commit()
@@ -66,7 +67,7 @@ def test_message(db_session: Session, test_customer):
     message = Message(
         message_sid="SM123456",
         customer_id=test_customer.id,
-        body="How do I plant rice?",
+        body="How do I plant Maize?",
         from_source=1,  # WhatsApp
         message_type=None,  # Incoming messages don't have message_type
     )

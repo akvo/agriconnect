@@ -150,7 +150,9 @@ class TestWhatsAppWebhook:
     ):
         # Create existing customer
         existing_customer = Customer(
-            phone_number="+255111111111", full_name="John Farmer"
+            phone_number="+255111111111",
+            full_name="John Farmer",
+            crop_type="Maize",
         )
         db_session.add(existing_customer)
         db_session.commit()
