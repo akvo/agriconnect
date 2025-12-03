@@ -90,6 +90,7 @@ const BroadcastFarmerListTab = () => {
         const params: any = {
           page: currentPage,
           size: PAGE_SIZE,
+          filters: [],
         };
 
         if (debouncedSearch) {
@@ -97,12 +98,15 @@ const BroadcastFarmerListTab = () => {
         }
 
         if (selectedCropTypes.length > 0) {
-          console.log("Selected Crop Types:", selectedCropTypes);
-          params.crop_types = selectedCropTypes;
+          selectedCropTypes.forEach((ct) =>
+            params.filters.push(`crop_type:${ct}`),
+          );
         }
 
         if (selectedAgeGroups.length > 0) {
-          params.age_groups = selectedAgeGroups;
+          selectedAgeGroups.forEach((ag) =>
+            params.filters.push(`age_group:${ag}`),
+          );
         }
 
         // Only include administrative_id filter for admin users
