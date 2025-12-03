@@ -30,13 +30,15 @@ def _derive_group_attributes(group_id: int, db: Session) -> dict:
     Returns dict with crop_types (list of names) and age_groups (list).
     """
     # Get distinct crop type names from group members
-    # Note: crop_type is now a String field, not a FK
-    crop_names = db.query(func.distinct(Customer.crop_type)).join(
+    # Note: crop_type is now stored in profile_data JSON
+    crop_names = db.query(
+        func.distinct(Customer.profile_data.op("->>")("crop_type"))
+    ).join(
         BroadcastGroupContact,
         BroadcastGroupContact.customer_id == Customer.id
     ).filter(
         BroadcastGroupContact.broadcast_group_id == group_id,
-        Customer.crop_type.isnot(None)
+        Customer.profile_data.op("->>")("crop_type").isnot(None)
     ).all()
     crop_types_list = [name[0] for name in crop_names if name[0]]
 
@@ -48,7 +50,7 @@ def _derive_group_attributes(group_id: int, db: Session) -> dict:
         BroadcastGroupContact.customer_id == Customer.id
     ).filter(
         BroadcastGroupContact.broadcast_group_id == group_id,
-        Customer.birth_year.isnot(None)
+        Customer.profile_data.op("->>")("birth_year").isnot(None)
     ).all()
 
     # Calculate age_groups using the Customer.age_group property
@@ -196,7 +198,7 @@ def get_broadcast_group(
             customer_id=c.customer.id,
             phone_number=c.customer.phone_number,
             full_name=c.customer.full_name,
-            crop_type=c.customer.crop_type,
+            crop_type=c.customer.profile_data.get("crop_type", None),
         )
         for c in group.group_contacts
     ]
