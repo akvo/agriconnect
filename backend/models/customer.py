@@ -45,10 +45,8 @@ class Customer(Base):
     phone_number = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=True)
     language = Column(Enum(CustomerLanguage), default=CustomerLanguage.EN)
-    # Generic onboarding fields
-    crop_type = Column(String, nullable=True)  # Crop name (not FK)
-    gender = Column(Enum(Gender), nullable=True)
-    birth_year = Column(Integer, nullable=True)
+    # JSON object with profile fields
+    profile_data = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -79,6 +77,28 @@ class Customer(Base):
         "CustomerAdministrative", back_populates="customer"
     )
     tickets = relationship("Ticket", back_populates="customer")
+
+    # Profile data property accessors
+    @property
+    def birth_year(self) -> int | None:
+        """Get birth_year from profile_data"""
+        if not self.profile_data:
+            return None
+        return self.profile_data.get("birth_year")
+
+    @property
+    def crop_type(self) -> str | None:
+        """Get crop_type from profile_data"""
+        if not self.profile_data:
+            return None
+        return self.profile_data.get("crop_type")
+
+    @property
+    def gender(self) -> str | None:
+        """Get gender from profile_data"""
+        if not self.profile_data:
+            return None
+        return self.profile_data.get("gender")
 
     @property
     def age(self) -> int | None:
@@ -128,6 +148,29 @@ class Customer(Base):
 
         time_since_last = datetime.now(timezone.utc) - self.last_message_at
         return time_since_last > timedelta(hours=threshold_hours)
+
+    # Profile data helper methods
+    def get_profile_field(self, field_name: str, default=None):
+        """Get a field from profile_data"""
+        if not self.profile_data:
+            return default
+        return self.profile_data.get(field_name, default)
+
+    def set_profile_field(self, field_name: str, value):
+        """Set a field in profile_data (triggers SQLAlchemy update)"""
+        if not self.profile_data:
+            self.profile_data = {}
+        profile_dict = self.profile_data.copy()
+        profile_dict[field_name] = value
+        self.profile_data = profile_dict
+
+    def update_profile_data(self, updates: dict):
+        """Update multiple fields in profile_data at once"""
+        if not self.profile_data:
+            self.profile_data = {}
+        profile_dict = self.profile_data.copy()
+        profile_dict.update(updates)
+        self.profile_data = profile_dict
 
 
 class CropType(Base):

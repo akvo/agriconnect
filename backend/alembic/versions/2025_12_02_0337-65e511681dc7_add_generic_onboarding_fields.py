@@ -7,19 +7,18 @@ Create Date: 2025-12-02 03:37:35.992245
 Changes:
 1. Add current_onboarding_field column (String)
 2. Convert onboarding_attempts: Integer → JSON
-3. Convert onboarding_candidates: Text → JSON  
-4. Add Gender enum and column
-5. Add birth_year column (Integer)
-6. Remove age_group column (will be calculated from birth_year)
-7. Remove age column (will be calculated from birth_year)
-8. Migrate crop_type: FK → String (remove crop_type_id, add crop_type)
+3. Convert onboarding_candidates: Text → JSON
+4. Add profile_data JSON column
+5. Migrate existing crop_type, gender, birth_year → profile_data
+6. Keep old columns temporarily for rollback safety
 """
 
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from models.customer import Gender, AgeGroup
+from sqlalchemy.dialects import postgresql
+from models.customer import AgeGroup
 
 # revision identifiers, used by Alembic.
 revision: str = "65e511681dc7"
@@ -30,7 +29,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """
-    Upgrade to generic onboarding system with birth_year approach
+    Upgrade to profile_data JSON storage system
     """
     # Get connection for data migration
     connection = op.get_bind()
@@ -54,8 +53,8 @@ def upgrade() -> None:
     # Old: Single integer for all fields
     # New: JSON object {"administration": 2, "crop_type": 1}
 
-    # Add temporary JSON column
-    if "onboarding_attempts_json" not in columns:
+    if "onboarding_attempts" in columns:
+        # Add temporary JSON column
         op.add_column(
             "customers",
             sa.Column("onboarding_attempts_json", sa.JSON(), nullable=True),
@@ -124,91 +123,74 @@ def upgrade() -> None:
     )
 
     # ================================================================
-    # 4. CREATE GENDER ENUM AND ADD COLUMN
+    # 4. ADD profile_data JSON COLUMN
     # ================================================================
-    gender_enum = sa.Enum(Gender, name="gender")
-    gender_enum.create(op.get_bind(), checkfirst=True)
-
-    op.add_column(
-        "customers",
-        sa.Column("gender", sa.Enum(Gender, name="gender"), nullable=True),
-    )
+    if "profile_data" not in columns:
+        op.add_column(
+            "customers",
+            sa.Column("profile_data", postgresql.JSONB, nullable=True),
+        )
 
     # ================================================================
-    # 5. ADD birth_year COLUMN
+    # 6. KEEP OLD COLUMNS (for rollback safety)
     # ================================================================
-    op.add_column(
-        "customers", sa.Column("birth_year", sa.Integer(), nullable=True)
-    )
+    # Note: We keep crop_type, gender, birth_year columns
+    # They will be dropped in a future migration after verification
 
-    # ================================================================
-    # 6. MIGRATE age_group TO birth_year (if column exists)
-    # ================================================================
     if "age_group" in columns:
-        # Migrate age_group → birth_year (using midpoints)
+        # Convert age_group to birth_year (using midpoints)
         current_year = 2025
-        try:
-            connection.execute(
-                sa.text(
-                    f"""
-                UPDATE customers
-                SET birth_year = CASE
-                    WHEN age_group::text = 'AGE_20_35' THEN {current_year} - 27
-                    WHEN age_group::text = 'AGE_36_50' THEN {current_year} - 43
-                    WHEN age_group::text = 'AGE_51_PLUS' THEN {current_year} - 61
-                    WHEN age_group::text = '20-35' THEN {current_year} - 27
-                    WHEN age_group::text = '36-50' THEN {current_year} - 43
-                    WHEN age_group::text = '51+' THEN {current_year} - 61
-                    ELSE NULL
-                END
-                WHERE age_group IS NOT NULL
-            """
+        connection.execute(
+            sa.text(
+                f"""
+            UPDATE customers
+            SET profile_data = COALESCE(profile_data, '{{}}'::jsonb) || 
+                jsonb_build_object('birth_year',
+                    CASE
+                        WHEN age_group::text IN ('AGE_20_35', '20-35') THEN {current_year} - 27
+                        WHEN age_group::text IN ('AGE_36_50', '36-50') THEN {current_year} - 43
+                        WHEN age_group::text IN ('AGE_51_PLUS', '51+') THEN {current_year} - 61
+                        ELSE NULL
+                    END
                 )
+            WHERE age_group IS NOT NULL
+        """
             )
-        except Exception as e:
-            print(f"DEBUG: age_group migration failed: {e}")
-            raise
+        )
 
-        # Drop age_group column
-        op.drop_column("customers", "age_group")
-
-    # ================================================================
-    # 7. MIGRATE age TO birth_year (if column exists)
-    # ================================================================
     if "age" in columns:
         # Migrate age → birth_year (current_year - age)
         connection.execute(
             sa.text(
                 f"""
             UPDATE customers
-            SET birth_year = {current_year} - age
-            WHERE age IS NOT NULL AND birth_year IS NULL
+            SET profile_data = COALESCE(profile_data, '{{}}'::jsonb) || 
+                jsonb_build_object('birth_year', {current_year} - age)
+            WHERE age IS NOT NULL 
+                AND (profile_data->>'birth_year') IS NULL
         """
             )
         )
 
-        # Drop age column
+    # Drop only the columns that are definitely replaced
+    if "age_group" in columns:
+        op.drop_column("customers", "age_group")
+
+    if "age" in columns:
         op.drop_column("customers", "age")
 
-    # ================================================================
-    # 8. MIGRATE crop_type: FK → String
-    # ================================================================
-    # Add new crop_type string column
-    op.add_column(
-        "customers", sa.Column("crop_type", sa.String(), nullable=True)
-    )
-
-    # Check if crop_type_id exists
     if "crop_type_id" in columns:
-        # Migrate existing data - copy crop names from crop_types table
+        # Migrate existing data - copy crop names to profile_data
         try:
             connection.execute(
                 sa.text(
                     """
                 UPDATE customers c
-                SET crop_type = ct.name
+                SET profile_data = COALESCE(profile_data, '{}'::jsonb) || 
+                    jsonb_build_object('crop_type', ct.name)
                 FROM crop_types ct
                 WHERE c.crop_type_id = ct.id
+                    AND c.crop_type_id IS NOT NULL
             """
                 )
             )
@@ -223,6 +205,15 @@ def upgrade() -> None:
         # Drop crop_type_id column
         op.drop_column("customers", "crop_type_id")
 
+    # ================================================================
+    # 7. ADD INDEX for better JSON query performance (optional)
+    # ================================================================
+    # GIN index for JSON field searches
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_customers_profile_data "
+        "ON customers USING gin (profile_data)"
+    )
+
 
 def downgrade() -> None:
     """
@@ -234,13 +225,6 @@ def downgrade() -> None:
     op.add_column(
         "customers", sa.Column("crop_type_id", sa.INTEGER(), nullable=True)
     )
-
-    # Note: Manual steps required to restore FK:
-    # 1. Re-seed crop_types table
-    # 2. Map crop_type strings back to crop_type_id
-    # 3. Recreate FK constraint
-
-    op.drop_column("customers", "crop_type")
 
     # ================================================================
     # 2. RESTORE age AND age_group COLUMNS
@@ -260,30 +244,13 @@ def downgrade() -> None:
 
     # Migrate birth_year back to age and age_group (best effort)
     connection = op.get_bind()
-    current_year = 2025
-    connection.execute(
-        sa.text(
-            f"""
-        UPDATE customers
-        SET age = {current_year} - birth_year,
-            age_group = CASE
-                WHEN ({current_year} - birth_year) BETWEEN 20 AND 35 THEN 'AGE_20_35'::agegroup
-                WHEN ({current_year} - birth_year) BETWEEN 36 AND 50 THEN 'AGE_36_50'::agegroup
-                WHEN ({current_year} - birth_year) > 50 THEN 'AGE_51_PLUS'::agegroup
-                ELSE NULL
-            END
-        WHERE birth_year IS NOT NULL
-    """
-        )
-    )
-
-    op.drop_column("customers", "birth_year")
 
     # ================================================================
-    # 3. DROP GENDER COLUMN AND ENUM
+    # 3. DROP profile_data COLUMN
     # ================================================================
-    op.drop_column("customers", "gender")
-    sa.Enum(name="gender").drop(op.get_bind(), checkfirst=True)
+    op.drop_index("idx_customers_profile_data", table_name="customers")
+
+    op.drop_column("customers", "profile_data")
 
     # ================================================================
     # 4. CONVERT onboarding_candidates: JSON → Text
