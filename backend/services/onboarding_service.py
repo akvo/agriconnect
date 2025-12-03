@@ -317,7 +317,12 @@ Set null for any field that's not mentioned."""
         """
         result = await self._identify_crop(message)
 
-        if result.crop_name:
+        if (
+            result.crop_name and
+            result.crop_name.strip().lower() in [
+                c.lower() for c in self.supported_crops
+            ]
+        ):
             logger.info(
                 f"[OnboardingService] Extracted crop: {result.crop_name} "
                 f"(confidence: {result.confidence})"
@@ -328,89 +333,6 @@ Set null for any field that's not mentioned."""
             f"[OnboardingService] No crop identified in message: {message}"
         )
         return None
-
-    async def extract_any_crop_name(self, message: str) -> Optional[str]:
-        """
-        Extract ANY crop name from message (not limited to supported crops).
-
-        Used when max attempts exceeded to capture farmer's actual crop.
-
-        Handles:
-        - Any crop mentioned (not just supported ones)
-        - Common variations (e.g., "corn" → "Maize")
-        - Extracts clean crop name from sentences
-
-        Args:
-            message: Farmer's message text
-
-        Returns:
-            Crop name (capitalized) or None if no crop mentioned
-
-        Examples:
-            "Rice farming" → "Rice"
-            "I grow maize" → "Maize"
-            "We do corn" → "Maize"
-            "Chilli peppers" → "Chilli"
-        """
-        if not self.openai_service.is_configured():
-            logger.error(
-                "[OnboardingService] OpenAI not configured for crop extraction"
-            )
-            return None
-
-        system_prompt = """You are extracting crop names from farmer messages.
-
-TASK:
-Extract ANY crop/plant name mentioned, regardless of what crops are supported.
-
-RULES:
-1. Extract the PRIMARY crop mentioned
-2. Return just the crop name (e.g., "Rice", "Maize", "Tomato")
-3. Capitalize the first letter (e.g., "Rice" not "rice")
-4. Handle variations (e.g., "corn" → "Maize", "maize farming" → "Maize")
-5. If multiple crops, return the main/first one
-6. If no crop mentioned, return null
-
-EXAMPLES:
-- "Rice farming" → "Rice"
-- "I grow maize" → "Maize"
-- "We do corn" → "Maize"
-- "Chilli peppers" → "Chilli"
-- "I'm a farmer" → null
-
-Return JSON: {"crop_name": "Rice"} or {"crop_name": null}
-"""
-
-        try:
-            response = await self.openai_service.structured_output(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Extract crop: {message}"},
-                ],
-                response_format={
-                    "type": "object",
-                    "properties": {
-                        "crop_name": {"type": ["string", "null"]},
-                    },
-                },
-            )
-
-            if not response or not response.data.get("crop_name"):
-                return None
-
-            crop_name = response.data["crop_name"].strip()
-            # Capitalize first letter
-            result = crop_name.capitalize() if crop_name else None
-
-            logger.info(
-                f"[OnboardingService] Extracted any crop: {result} "
-                f"from message: {message}"
-            )
-            return result
-
-        except Exception as e:
-            logger.error(f"Error extracting any crop name: {e}")
-            return None
 
     async def _identify_crop(
         self, message: str, conversation_context: Optional[str] = None
@@ -1303,9 +1225,6 @@ Birth year must be between 1900 and {current_year}."""
         """
         Handle max attempts exceeded.
 
-        For required fields with save_invalid_on_max_attempts=True:
-            - Extract and save the value (even if invalid)
-            - Continue to next field
         For other required fields:
             - Mark as failed and stop onboarding
         For optional fields:
@@ -1318,12 +1237,7 @@ Birth year must be between 1900 and {current_year}."""
             f"customer {customer.id}"
         )
 
-        # Check if we should save invalid input
-        save_invalid = getattr(
-            field_config, "save_invalid_on_max_attempts", False
-        )
-
-        if field_config.required and not save_invalid:
+        if field_config.required:
             # Original behavior - fail onboarding
             self._clear_field_state(customer, field_name)
             customer.onboarding_status = OnboardingStatus.FAILED
@@ -1347,44 +1261,10 @@ Birth year must be between 1900 and {current_year}."""
             )
         else:
             # Extract and save invalid value or skip
-            success_msg = ""
-            if save_invalid and last_message:
-                if field_name == "crop_type":
-                    # Use generic extractor (not limited to supported crops)
-                    extracted_value = await self.extract_any_crop_name(
-                        last_message
-                    )
-                    if extracted_value:
-                        logger.info(
-                            f"Saving unsupported crop after max attempts: "
-                            f"{extracted_value}"
-                        )
-                        # Save to profile_data
-                        customer.set_profile_field(field_name, extracted_value)
-                        success_msg = (
-                            f"Thank you! I've noted that you grow "
-                            f"{extracted_value}."
-                        )
-                    else:
-                        # Couldn't extract crop name, save raw message
-                        logger.warning(
-                            f"Could not extract crop from: {last_message}, "
-                            f"saving raw message"
-                        )
-                        # Save to profile_data
-                        customer.set_profile_field(
-                            field_name, last_message.strip()
-                        )
-                        success_msg = (
-                            f"Thank you! I've noted: {last_message.strip()}"
-                        )
-                else:
-                    # Generic fallback for other fields
-                    # Save to profile_data
-                    customer.set_profile_field(
-                        field_name, last_message.strip()
-                    )
-                    success_msg = "Thank you!"
+            customer.set_profile_field(
+                field_name, last_message.strip()
+            )
+            success_msg = "Thank you!"
 
             # Clear field state
             self._clear_field_state(customer, field_name)

@@ -1270,59 +1270,6 @@ class TestDynamicCropOnboarding:
         assert "avocado, cacao" in response.message.lower()
 
     @pytest.mark.asyncio
-    async def test_extract_any_crop_name_success(
-        self, db_session, onboarding_service
-    ):
-        """Test extracting crop name from various messages"""
-        # Mock OpenAI response
-        mock_response = MagicMock()
-        mock_response.data = {"crop_name": "Rice"}
-        onboarding_service.openai_service.structured_output = AsyncMock(
-            return_value=mock_response
-        )
-
-        result = await onboarding_service.extract_any_crop_name("Rice farming")
-
-        assert result == "Rice"
-
-    @pytest.mark.asyncio
-    async def test_extract_any_crop_name_variations(
-        self, db_session, onboarding_service
-    ):
-        """Test extracting crop names with variations"""
-        test_cases = [
-            ("I grow maize", "Maize"),
-            ("Chilli peppers", "Chilli"),
-            ("We do corn", "Maize"),
-            ("Tomato", "Tomato"),
-        ]
-
-        for message, expected in test_cases:
-            mock_response = MagicMock()
-            mock_response.data = {"crop_name": expected}
-            onboarding_service.openai_service.structured_output = AsyncMock(
-                return_value=mock_response
-            )
-
-            result = await onboarding_service.extract_any_crop_name(message)
-            assert result == expected, f"Failed for: {message}"
-
-    @pytest.mark.asyncio
-    async def test_extract_any_crop_name_no_crop(
-        self, db_session, onboarding_service
-    ):
-        """Test extracting when no crop mentioned"""
-        mock_response = MagicMock()
-        mock_response.data = {"crop_name": None}
-        onboarding_service.openai_service.structured_output = AsyncMock(
-            return_value=mock_response
-        )
-
-        result = await onboarding_service.extract_any_crop_name("I'm a farmer")
-
-        assert result is None
-
-    @pytest.mark.asyncio
     async def test_max_attempts_saves_invalid_crop_and_continues(
         self, db_session, onboarding_service, sample_administrative_data
     ):
@@ -1360,10 +1307,9 @@ class TestDynamicCropOnboarding:
         )
 
         # Should save Rice and continue to gender
-        assert customer.crop_type == "Rice"
-        assert response.status == "in_progress"
-        assert "Thank you! I've noted that you grow Rice" in response.message
-        assert "gender" in response.message.lower()
+        assert customer.crop_type is None  # Not saved in main field
+        assert response.status == "failed"
+        assert "I'm having trouble" in response.message
 
     @pytest.mark.asyncio
     async def test_invalid_crop_full_flow(
@@ -1430,7 +1376,6 @@ class TestDynamicCropOnboarding:
         )
 
         # Verify crop saved and moved to gender
-        assert customer.crop_type == "Rice"
-        assert response.status == "in_progress"
-        assert "Thank you!" in response.message
-        assert "gender" in response.message.lower()
+        assert customer.crop_type is None  # Not saved in main field
+        assert response.status == "failed"
+        assert "I'm having trouble" in response.message
