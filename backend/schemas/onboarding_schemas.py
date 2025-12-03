@@ -115,6 +115,8 @@ class OnboardingFieldConfig:
     max_attempts: int  # Maximum collection attempts before skip
     field_type: str  # Data type: "string", "integer", "enum", "location"
     success_message_template: str  # Message after successful collection
+    # Save invalid value after max attempts
+    save_invalid_on_max_attempts: bool = False
 
 
 # Onboarding fields registry - defines all profile fields to collect
@@ -147,7 +149,8 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         priority=2,
         initial_question=(
             "What crops do you grow?\n\n"
-            "For example: cacao, avocado, etc."
+            "We currently support: {available_crops}\n\n"
+            "Please tell me which crop you grow."
         ),
         extraction_method="extract_crop_type",
         matching_method="resolve_crop_ambiguity",
@@ -156,6 +159,7 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         success_message_template=(
             "Great! I've noted that you grow {value}."
         ),
+        save_invalid_on_max_attempts=True,
     ),
 
     # PRIORITY 3: Gender (OPTIONAL)

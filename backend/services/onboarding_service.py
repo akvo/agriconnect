@@ -73,11 +73,14 @@ class OnboardingService:
         Returns True if any required field is incomplete.
         Returns False if all required fields are complete.
         """
-        # Already completed or failed - skip
-        if customer.onboarding_status in [
-            OnboardingStatus.COMPLETED,
-            OnboardingStatus.FAILED,
-        ]:
+        # If onboarding already completed or failed, no need
+        if (
+            (
+                customer.onboarding_status == OnboardingStatus.COMPLETED and
+                customer.crop_type
+            ) or
+            customer.onboarding_status == OnboardingStatus.FAILED
+        ):
             return False
 
         # Check if there's a next incomplete field
@@ -322,6 +325,89 @@ Set null for any field that's not mentioned."""
             f"[OnboardingService] No crop identified in message: {message}"
         )
         return None
+
+    async def extract_any_crop_name(self, message: str) -> Optional[str]:
+        """
+        Extract ANY crop name from message (not limited to supported crops).
+
+        Used when max attempts exceeded to capture farmer's actual crop.
+
+        Handles:
+        - Any crop mentioned (not just supported ones)
+        - Common variations (e.g., "corn" → "Maize")
+        - Extracts clean crop name from sentences
+
+        Args:
+            message: Farmer's message text
+
+        Returns:
+            Crop name (capitalized) or None if no crop mentioned
+
+        Examples:
+            "Rice farming" → "Rice"
+            "I grow maize" → "Maize"
+            "We do corn" → "Maize"
+            "Chilli peppers" → "Chilli"
+        """
+        if not self.openai_service.is_configured():
+            logger.error(
+                "[OnboardingService] OpenAI not configured for crop extraction"
+            )
+            return None
+
+        system_prompt = """You are extracting crop names from farmer messages.
+
+TASK:
+Extract ANY crop/plant name mentioned, regardless of what crops are supported.
+
+RULES:
+1. Extract the PRIMARY crop mentioned
+2. Return just the crop name (e.g., "Rice", "Maize", "Tomato")
+3. Capitalize the first letter (e.g., "Rice" not "rice")
+4. Handle variations (e.g., "corn" → "Maize", "maize farming" → "Maize")
+5. If multiple crops, return the main/first one
+6. If no crop mentioned, return null
+
+EXAMPLES:
+- "Rice farming" → "Rice"
+- "I grow maize" → "Maize"
+- "We do corn" → "Maize"
+- "Chilli peppers" → "Chilli"
+- "I'm a farmer" → null
+
+Return JSON: {"crop_name": "Rice"} or {"crop_name": null}
+"""
+
+        try:
+            response = await self.openai_service.structured_output(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Extract crop: {message}"},
+                ],
+                response_format={
+                    "type": "object",
+                    "properties": {
+                        "crop_name": {"type": ["string", "null"]},
+                    },
+                },
+            )
+
+            if not response or not response.data.get("crop_name"):
+                return None
+
+            crop_name = response.data["crop_name"].strip()
+            # Capitalize first letter
+            result = crop_name.capitalize() if crop_name else None
+
+            logger.info(
+                f"[OnboardingService] Extracted any crop: {result} "
+                f"from message: {message}"
+            )
+            return result
+
+        except Exception as e:
+            logger.error(f"Error extracting any crop name: {e}")
+            return None
 
     async def _identify_crop(
         self, message: str, conversation_context: Optional[str] = None
@@ -829,8 +915,17 @@ Birth year must be between 1900 and {current_year}."""
             f"for customer {customer.id}"
         )
 
-        # Add skip instruction for optional fields
+        # Get question and replace template variables if needed
         question = field_config.initial_question
+
+        # Replace {available_crops} for crop_type field
+        if field_config.field_name == "crop_type":
+            crops_formatted = ", ".join(
+                crop.lower() for crop in self.supported_crops
+            )
+            question = question.replace("{available_crops}", crops_formatted)
+
+        # Add skip instruction for optional fields
         if not field_config.required:
             question += "\n\n(Reply 'skip' if you prefer not to answer)"
 
@@ -875,14 +970,18 @@ Birth year must be between 1900 and {current_year}."""
             else:
                 return self._complete_onboarding(customer)
 
+        # Get current attempts BEFORE incrementing (for error message logic)
+        current_attempts = self._get_attempts(customer, field_name)
         # Increment attempts
         self._increment_attempts(customer, field_name)
         self.db.commit()
 
-        # Check max attempts
-        current_attempts = self._get_attempts(customer, field_name)
-        if current_attempts > field_config.max_attempts:
-            return self._handle_max_attempts(customer, field_config)
+        # Check max attempts (after increment)
+        new_attempts = self._get_attempts(customer, field_name)
+        if new_attempts > field_config.max_attempts:
+            return await self._handle_max_attempts(
+                customer, field_config, last_message=message
+            )
 
         # Extract value using field-specific extraction method
         try:
@@ -898,18 +997,45 @@ Birth year must be between 1900 and {current_year}."""
                     f"{field_config.initial_question}"
                 ),
                 status="in_progress",
-                attempts=current_attempts,
+                attempts=new_attempts,
             )
 
         # If extraction failed (returned None), ask again
         if extracted_value is None:
-            return OnboardingResponse(
-                message=(
+            # Build progressive error message for crop_type
+            if field_name == "crop_type":
+                if current_attempts == 0:
+                    # First attempt: Generic message with full question
+                    crops_formatted = ", ".join(
+                        crop.lower() for crop in self.supported_crops
+                    )
+                    error_question = field_config.initial_question.replace(
+                        "{available_crops}", crops_formatted
+                    )
+                    error_message = (
+                        "I couldn't identify that information. "
+                        f"{error_question}"
+                    )
+                else:
+                    # Subsequent attempts: More specific
+                    crops_formatted = ", ".join(
+                        crop.lower() for crop in self.supported_crops
+                    )
+                    error_message = (
+                        "I still couldn't identify that information. "
+                        f"Please specify one of these crops: {crops_formatted}"
+                    )
+            else:
+                # Other fields: Keep existing behavior
+                error_message = (
                     "I couldn't identify that information. "
                     f"{field_config.initial_question}"
-                ),
+                )
+
+            return OnboardingResponse(
+                message=error_message,
                 status="in_progress",
-                attempts=current_attempts,
+                attempts=new_attempts,
             )
 
         # Handle based on field type
@@ -1156,14 +1282,22 @@ Birth year must be between 1900 and {current_year}."""
                 attempts=self._get_attempts(customer, field_name),
             )
 
-    def _handle_max_attempts(
-        self, customer: Customer, field_config: OnboardingFieldConfig
+    async def _handle_max_attempts(
+        self,
+        customer: Customer,
+        field_config: OnboardingFieldConfig,
+        last_message: Optional[str] = None,
     ) -> OnboardingResponse:
         """
         Handle max attempts exceeded.
 
-        For required fields: Mark as failed and stop onboarding
-        For optional fields: Skip and move to next field
+        For required fields with save_invalid_on_max_attempts=True:
+            - Extract and save the value (even if invalid)
+            - Continue to next field
+        For other required fields:
+            - Mark as failed and stop onboarding
+        For optional fields:
+            - Skip and move to next field
         """
         field_name = field_config.field_name
 
@@ -1172,12 +1306,14 @@ Birth year must be between 1900 and {current_year}."""
             f"customer {customer.id}"
         )
 
-        # Clear field state
-        self._clear_field_state(customer, field_name)
-        self.db.commit()
+        # Check if we should save invalid input
+        save_invalid = getattr(
+            field_config, "save_invalid_on_max_attempts", False
+        )
 
-        if field_config.required:
-            # Required field failed - mark onboarding as failed
+        if field_config.required and not save_invalid:
+            # Original behavior - fail onboarding
+            self._clear_field_state(customer, field_name)
             customer.onboarding_status = OnboardingStatus.FAILED
             customer.current_onboarding_field = None
             self.db.commit()
@@ -1191,21 +1327,76 @@ Birth year must be between 1900 and {current_year}."""
                 message=(
                     "I'm having trouble collecting your "
                     f"{field_name.replace('_', ' ')}. "
-                    "Please contact support for assistance,"
+                    "Please contact support for assistance, "
                     "or try again later."
                 ),
                 status="failed",
                 attempts=self._get_attempts(customer, field_name),
             )
         else:
-            # Optional field - skip and continue
-            logger.info(
-                f"Skipping optional field {field_name} "
-                f"for customer {customer.id}"
-            )
+            # Extract and save invalid value or skip
+            success_msg = ""
+            if save_invalid and last_message:
+                if field_name == "crop_type":
+                    # Use generic extractor (not limited to supported crops)
+                    extracted_value = await self.extract_any_crop_name(
+                        last_message
+                    )
+                    if extracted_value:
+                        logger.info(
+                            f"Saving unsupported crop after max attempts: "
+                            f"{extracted_value}"
+                        )
+                        setattr(
+                            customer,
+                            field_config.db_field,
+                            extracted_value
+                        )
+                        success_msg = (
+                            f"Thank you! I've noted that you grow "
+                            f"{extracted_value}."
+                        )
+                    else:
+                        # Couldn't extract crop name, save raw message
+                        logger.warning(
+                            f"Could not extract crop from: {last_message}, "
+                            f"saving raw message"
+                        )
+                        setattr(
+                            customer,
+                            field_config.db_field,
+                            last_message.strip()
+                        )
+                        success_msg = (
+                            f"Thank you! I've noted: {last_message.strip()}"
+                        )
+                else:
+                    # Generic fallback for other fields
+                    setattr(
+                        customer,
+                        field_config.db_field,
+                        last_message.strip()
+                    )
+                    success_msg = "Thank you!"
+
+            # Clear field state
+            self._clear_field_state(customer, field_name)
+            self.db.commit()
+
+            # Continue to next field
             next_field = self._get_next_incomplete_field(customer)
             if next_field:
-                return self._ask_initial_question(customer, next_field)
+                # Ask next question
+                # (handles template replacement automatically)
+                next_response = self._ask_initial_question(
+                    customer, next_field
+                )
+                # Prepend success message if we saved something
+                if success_msg:
+                    next_response.message = (
+                        f"{success_msg}\n\n{next_response.message}"
+                    )
+                return next_response
             else:
                 return self._complete_onboarding(customer)
 
