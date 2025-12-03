@@ -95,8 +95,7 @@ class TestCustomersEndpoint:
             phone_number="+254700000001",
             full_name="John Doe",
             language=CustomerLanguage.EN,
-            crop_type="Rice",
-            birth_year=1990,
+            profile_data={"crop_type": "Rice", "birth_year": 1990},
         )
         db_session.add(customer1)
         db_session.commit()
@@ -111,8 +110,7 @@ class TestCustomersEndpoint:
             phone_number="+254700000002",
             full_name="Jane Smith",
             language=CustomerLanguage.SW,
-            crop_type="Coffee",
-            birth_year=1986,
+            profile_data={"crop_type": "Coffee", "birth_year": 1986},
         )
         db_session.add(customer2)
         db_session.commit()
@@ -127,8 +125,7 @@ class TestCustomersEndpoint:
             phone_number="+254700000003",
             full_name="Peter Brown",
             language=CustomerLanguage.EN,
-            crop_type="Chilli",
-            birth_year=1970,
+            profile_data={"crop_type": "Chilli", "birth_year": 1970},
         )
         db_session.add(customer3)
         db_session.commit()
@@ -143,6 +140,7 @@ class TestCustomersEndpoint:
             phone_number="+254700000004",
             full_name="Mary Johnson",
             language=CustomerLanguage.SW,
+            profile_data={},
         )
         db_session.add(customer4)
         db_session.commit()
@@ -317,9 +315,8 @@ class TestCustomersEndpoint:
         """Test filtering by single crop type"""
         headers, _ = auth_headers_factory(user_type="admin")
 
-        ct = "Rice"
         response = client.get(
-            f"/api/customers/list?crop_types={ct}",
+            "/api/customers/list?filters=crop_type:Rice",
             headers=headers
         )
 
@@ -335,10 +332,11 @@ class TestCustomersEndpoint:
         """Test filtering by multiple crop types"""
         headers, _ = auth_headers_factory(user_type="admin")
 
-        ct1 = "Rice"
-        ct2 = "Coffee"
         response = client.get(
-            f"/api/customers/list?crop_types={ct1}&crop_types={ct2}",
+            (
+                "/api/customers/list?filters=crop_type:Rice"
+                "&filters=crop_type:Coffee"
+            ),
             headers=headers,
         )
 
@@ -357,7 +355,7 @@ class TestCustomersEndpoint:
         headers, _ = auth_headers_factory(user_type="admin")
 
         response = client.get(
-            "/api/customers/list?age_groups=36-50", headers=headers
+            "/api/customers/list?filters=age_group:36-50", headers=headers
         )
 
         assert response.status_code == 200
@@ -374,7 +372,10 @@ class TestCustomersEndpoint:
         headers, _ = auth_headers_factory(user_type="admin")
 
         response = client.get(
-            "/api/customers/list?age_groups=20-35&age_groups=51%2B",
+            (
+                "/api/customers/list?filters=age_group:20-35"
+                "&filters=age_group:51%2B"
+            ),
             headers=headers,
         )
 
@@ -392,9 +393,8 @@ class TestCustomersEndpoint:
         """Test combining search with crop type filter"""
         headers, _ = auth_headers_factory(user_type="admin")
 
-        ct = "Rice"
         response = client.get(
-            f"/api/customers/list?search=John&crop_types={ct}",
+            "/api/customers/list?search=John&filters=crop_type:Rice",
             headers=headers,
         )
 
@@ -423,9 +423,8 @@ class TestCustomersEndpoint:
         )
 
         # Filter by Chilli (which only exists in Ward 2)
-        ct = "Chilli"
         response = client.get(
-            f"/api/customers/list?crop_types={ct}", headers=headers
+            "/api/customers/list?filters=crop_type:Chilli", headers=headers
         )
 
         assert response.status_code == 200
@@ -434,9 +433,8 @@ class TestCustomersEndpoint:
         assert data["total"] == 0
 
         # Filter by Rice (exists in Ward 1)
-        ct = "Rice"
         response = client.get(
-            f"/api/customers/list?crop_types={ct}", headers=headers
+            "/api/customers/list?filters=crop_type:Rice", headers=headers
         )
 
         assert response.status_code == 200
@@ -595,10 +593,12 @@ class TestCustomersEndpoint:
         headers, _ = auth_headers_factory(user_type="admin")
 
         # Filter by Ward 1 and Ward 2, crop type = Chilli (only in Ward 2)
-        ct = "Chilli"
         response = client.get(
-            f"/api/customers/list?administrative_ids={wards['ward1'].id}"
-            f"&administrative_ids={wards['ward2'].id}&crop_types={ct}",
+            (
+                f"/api/customers/list?administrative_ids={wards['ward1'].id}"
+                f"&administrative_ids={wards['ward2'].id}"
+                "&filters=crop_type:Chilli"
+            ),
             headers=headers,
         )
 

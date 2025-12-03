@@ -1,4 +1,5 @@
 from typing import List, Optional
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -93,11 +94,13 @@ async def get_customers_list(
     administrative_ids: Optional[List[int]] = Query(
         None, description="Filter by ward IDs (admin only, multiple supported)"
     ),
-    crop_types: Optional[List[str]] = Query(
-        None, description="Filter by crop types"
-    ),
-    age_groups: Optional[List[str]] = Query(
-        None, description="Filter by age groups"
+    filters: Optional[List[str]] = Query(
+        None,
+        description=(
+            "Profile filters in format 'field:value'. "
+            "Multiple values supported. "
+            "Examples: 'crop_type:Maize', 'gender:male', 'age_group:20-35'"
+        ),
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -107,8 +110,14 @@ async def get_customers_list(
     - **Admin users**: Can see all customers, can filter by specific ward(s)
     - **EO users**: Only see customers in their assigned ward(s)
     - Supports search by name/phone
-    - Supports filtering by crop types and age groups
+    - Supports dynamic profile filtering (crop_type, gender, age_group, etc.)
     - Returns ward information for each customer
+
+    **Filter Examples**:
+    - Single filter: `?filters=crop_type:Maize`
+    - Multiple values (OR):
+      `?filters=crop_type:Maize&filters=crop_type:Avocado`
+    - Multiple fields (AND): `?filters=crop_type:Maize&filters=gender:male`
     """
     customer_service = CustomerService(db)
 
@@ -132,14 +141,30 @@ async def get_customers_list(
             )
         filter_administrative_ids = user_administrative_ids
 
+    # Parse filters into dict with lists
+    profile_filters = None
+    if filters:
+        profile_filters = defaultdict(list)
+        for filter_str in filters:
+            if ":" not in filter_str:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Invalid filter format: '{filter_str}'. "
+                        "Use 'field:value'"
+                    ),
+                )
+            field, value = filter_str.split(":", 1)
+            profile_filters[field.strip()].append(value.strip())
+        profile_filters = dict(profile_filters)  # Convert to regular dict
+
     # Get customers list
     customers, total = customer_service.get_customers_list(
         page=page,
         size=size,
         search=search,
         administrative_ids=filter_administrative_ids,
-        crop_types=crop_types,
-        age_groups=age_groups,
+        profile_filters=profile_filters,
     )
 
     return CustomerListResponse(

@@ -1,6 +1,6 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
-from sqlalchemy import or_
+from sqlalchemy import or_, and_, Integer, cast
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -144,8 +144,7 @@ class CustomerService:
         size: int = 10,
         search: str = None,
         administrative_ids: List[int] = None,
-        crop_types: List[str] = None,
-        age_groups: List[str] = None,
+        profile_filters: Dict[str, List[str]] = None,
     ) -> Tuple[List[dict], int]:
         """Get paginated list of customers with optional filters.
 
@@ -155,8 +154,8 @@ class CustomerService:
             search: Optional search term (searches name and phone)
             administrative_ids: Optional list of administrative IDs
                 to filter by. If None or empty, no filtering applied.
-            crop_types: Optional list of crop type IDs to filter by
-            age_groups: Optional list of age groups to filter by
+            profile_filters: Optional dict of profile field filters
+                (e.g., {"crop_type": ["Maize"], "gender": ["male"]})
 
         Returns:
             Tuple of (list of customer dicts, total count)
@@ -186,33 +185,9 @@ class CustomerService:
                 )
             )
 
-        # Filter by crop types string names
-        if crop_types:
-            query = query.filter(Customer.crop_type.in_(crop_types))
-
-        # Filter by age groups
-        # Note: age_group is now a computed @property from birth_year
-        # We need to filter in Python since it's not a database column
-        if age_groups:
-            # Fetch all matching customers (before age group filter)
-            all_customers = query.all()
-
-            # Filter by computed age_group property
-            filtered_customers = [
-                c
-                for c in all_customers
-                if c.age_group and c.age_group in age_groups
-            ]
-
-            # Update query to only include filtered customer IDs
-            if filtered_customers:
-                customer_ids = [c.id for c in filtered_customers]
-                query = self.db.query(Customer).filter(
-                    Customer.id.in_(customer_ids)
-                )
-            else:
-                # No customers match age group filter
-                query = self.db.query(Customer).filter(Customer.id == -1)
+        # Apply profile filters
+        if profile_filters:
+            query = self._apply_profile_filters(query, profile_filters)
 
         # Get total count before pagination
         total = query.count()
@@ -296,6 +271,94 @@ class CustomerService:
                 path_names.append(area.name)
 
         return " - ".join(path_names) if path_names else None
+
+    def _apply_profile_filters(
+        self, query, profile_filters: Dict[str, List[str]]
+    ):
+        """Apply dynamic filters to profile_data JSON column.
+
+        Args:
+            query: SQLAlchemy query object
+            profile_filters: Dict of field names to lists of values
+                Example: {"crop_type": ["Maize"], "gender": ["male"]}
+
+        Returns:
+            Updated query with filters applied
+        """
+        for field_name, field_values in profile_filters.items():
+            if not isinstance(field_values, list):
+                field_values = [field_values]
+
+            if field_name == "age_group":
+                query = self._filter_by_age_groups(query, field_values)
+            else:
+                # JSON field filter with OR logic
+                # Use ->> operator to extract text value without quotes
+                if len(field_values) == 1:
+                    query = query.filter(
+                        Customer.profile_data.op("->>")(field_name)
+                        == str(field_values[0])
+                    )
+                else:
+                    or_conditions = [
+                        Customer.profile_data.op("->>")(field_name)
+                        == str(value)
+                        for value in field_values
+                    ]
+                    query = query.filter(or_(*or_conditions))
+
+        return query
+
+    def _filter_by_age_groups(self, query, age_groups: List[str]):
+        """Filter by age groups (calculated from birth_year).
+
+        Args:
+            query: SQLAlchemy query object
+            age_groups: List of age group strings
+                (e.g., ["20-35", "36-50"])
+
+        Returns:
+            Updated query with age group filters applied
+        """
+        current_year = datetime.now().year
+
+        age_conditions = []
+        for age_group in age_groups:
+            if age_group == "20-35":
+                min_birth_year = current_year - 35
+                max_birth_year = current_year - 20
+            elif age_group == "36-50":
+                min_birth_year = current_year - 50
+                max_birth_year = current_year - 36
+            elif age_group == "51+":
+                min_birth_year = 1900
+                max_birth_year = current_year - 51
+            else:
+                continue
+
+            age_conditions.append(
+                and_(
+                    cast(
+                        Customer.profile_data.op("->>")(
+                            "birth_year"
+                        ),
+                        Integer,
+                    )
+                    >= min_birth_year,
+                    cast(
+                        Customer.profile_data.op("->>")(
+                            "birth_year"
+                        ),
+                        Integer,
+                    )
+                    <= max_birth_year,
+                )
+            )
+
+        if age_conditions:
+            query = query.filter(or_(*age_conditions))
+
+        return query
 
     def create_ticket_for_customer(
         self, customer: Customer, message_id: int
