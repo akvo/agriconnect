@@ -12,7 +12,7 @@ router = APIRouter(prefix="/crop-types", tags=["crop-types"])
 @router.get("/", response_model=List[CropTypeInfo])
 async def get_crop_types(db: Session = Depends(get_db)):
     """Get all crop types from the database."""
-    crop_types = settings.crop_types_enabled_crops
+    crop_types = settings.crop_types
     return [
         {
             "id": index + 1,

@@ -70,10 +70,8 @@
 			"log_usage": true
 		}
 	},
-	"crop_types": {
-		"enabled_crops": [
-			"Avocado",
-			"Cacao"
-		]
-	}
+	"crop_types": [
+		"Avocado",
+		"Cacao"
+	]
 }

@@ -216,8 +216,9 @@ class Settings(BaseSettings):
     )
 
     # Crop types configuration
-    crop_types_enabled_crops: list = _config.get("crop_types", {}).get(
-        "enabled_crops", ["Avocado", "Cacao"]
+    crop_types: list = _config.get(
+        "crop_types",
+        ["Avocado", "Cacao"]
     )
 
     @property

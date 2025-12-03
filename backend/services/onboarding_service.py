@@ -59,7 +59,7 @@ class OnboardingService:
         self.db = db
         self.openai_service = get_openai_service()
         self.fields_config = get_fields_by_priority()
-        self.supported_crops = settings.crop_types_enabled_crops
+        self.supported_crops = settings.crop_types
 
         # Configuration (can be overridden per field)
         self.match_threshold = 60.0  # Minimum score for consideration
