@@ -1,6 +1,6 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
-from sqlalchemy import or_
+from sqlalchemy import or_, and_, Integer, cast
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -9,7 +9,7 @@ from models.administrative import (
     AdministrativeLevel,
     CustomerAdministrative,
 )
-from models.customer import AgeGroup, CropType, Customer, CustomerLanguage
+from models.customer import Customer, CustomerLanguage
 from models.ticket import Ticket
 from datetime import datetime, timezone
 
@@ -144,8 +144,7 @@ class CustomerService:
         size: int = 10,
         search: str = None,
         administrative_ids: List[int] = None,
-        crop_types: List[int] = None,
-        age_groups: List[str] = None,
+        profile_filters: Dict[str, List[str]] = None,
     ) -> Tuple[List[dict], int]:
         """Get paginated list of customers with optional filters.
 
@@ -155,8 +154,8 @@ class CustomerService:
             search: Optional search term (searches name and phone)
             administrative_ids: Optional list of administrative IDs
                 to filter by. If None or empty, no filtering applied.
-            crop_types: Optional list of crop type IDs to filter by
-            age_groups: Optional list of age groups to filter by
+            profile_filters: Optional dict of profile field filters
+                (e.g., {"crop_type": ["Maize"], "gender": ["male"]})
 
         Returns:
             Tuple of (list of customer dicts, total count)
@@ -166,7 +165,6 @@ class CustomerService:
             joinedload(Customer.customer_administrative).joinedload(
                 CustomerAdministrative.administrative
             ),
-            joinedload(Customer.crop_type)
         )
 
         # Filter by administrative areas (wards) if provided
@@ -187,31 +185,9 @@ class CustomerService:
                 )
             )
 
-        # Filter by crop types (convert names to IDs)
-        if crop_types:
-            # Convert crop type names to IDs
-            crop_type_ids = (
-                self.db.query(CropType.id)
-                .filter(CropType.id.in_(crop_types))
-                .all()
-            )
-            crop_type_id_list = [ct_id[0] for ct_id in crop_type_ids]
-            if crop_type_id_list:
-                query = query.filter(
-                    Customer.crop_type_id.in_(crop_type_id_list)
-                )
-
-        # Filter by age groups (convert strings to enum objects)
-        if age_groups:
-            age_group_enums = [
-                AgeGroup(ag)
-                for ag in age_groups
-                if ag in [e.value for e in AgeGroup]
-            ]
-            if age_group_enums:
-                query = query.filter(
-                    Customer.age_group.in_(age_group_enums)
-                )
+        # Apply profile filters
+        if profile_filters:
+            query = self._apply_profile_filters(query, profile_filters)
 
         # Get total count before pagination
         total = query.count()
@@ -238,9 +214,7 @@ class CustomerService:
                     admin_info = {
                         "id": admin.id,
                         "name": admin.name,
-                        "path": self._build_administrative_path(
-                            admin.id
-                        ),
+                        "path": self._build_administrative_path(admin.id),
                     }
 
             customer_dict = {
@@ -248,12 +222,9 @@ class CustomerService:
                 "full_name": customer.full_name,
                 "phone_number": customer.phone_number,
                 "language": customer.language,
-                "crop_type": {
-                    "id": customer.crop_type.id,
-                    "name": customer.crop_type.name
-                } if customer.crop_type else None,
+                "crop_type": customer.crop_type,
                 "age_group": customer.age_group,
-                "age": customer.age,
+                "gender": customer.gender,
                 "administrative": admin_info,
             }
             customer_data.append(customer_dict)
@@ -300,6 +271,94 @@ class CustomerService:
                 path_names.append(area.name)
 
         return " - ".join(path_names) if path_names else None
+
+    def _apply_profile_filters(
+        self, query, profile_filters: Dict[str, List[str]]
+    ):
+        """Apply dynamic filters to profile_data JSON column.
+
+        Args:
+            query: SQLAlchemy query object
+            profile_filters: Dict of field names to lists of values
+                Example: {"crop_type": ["Maize"], "gender": ["male"]}
+
+        Returns:
+            Updated query with filters applied
+        """
+        for field_name, field_values in profile_filters.items():
+            if not isinstance(field_values, list):
+                field_values = [field_values]
+
+            if field_name == "age_group":
+                query = self._filter_by_age_groups(query, field_values)
+            else:
+                # JSON field filter with OR logic
+                # Use ->> operator to extract text value without quotes
+                if len(field_values) == 1:
+                    query = query.filter(
+                        Customer.profile_data.op("->>")(field_name)
+                        == str(field_values[0])
+                    )
+                else:
+                    or_conditions = [
+                        Customer.profile_data.op("->>")(field_name)
+                        == str(value)
+                        for value in field_values
+                    ]
+                    query = query.filter(or_(*or_conditions))
+
+        return query
+
+    def _filter_by_age_groups(self, query, age_groups: List[str]):
+        """Filter by age groups (calculated from birth_year).
+
+        Args:
+            query: SQLAlchemy query object
+            age_groups: List of age group strings
+                (e.g., ["20-35", "36-50"])
+
+        Returns:
+            Updated query with age group filters applied
+        """
+        current_year = datetime.now().year
+
+        age_conditions = []
+        for age_group in age_groups:
+            if age_group == "20-35":
+                min_birth_year = current_year - 35
+                max_birth_year = current_year - 20
+            elif age_group == "36-50":
+                min_birth_year = current_year - 50
+                max_birth_year = current_year - 36
+            elif age_group == "51+":
+                min_birth_year = 1900
+                max_birth_year = current_year - 51
+            else:
+                continue
+
+            age_conditions.append(
+                and_(
+                    cast(
+                        Customer.profile_data.op("->>")(
+                            "birth_year"
+                        ),
+                        Integer,
+                    )
+                    >= min_birth_year,
+                    cast(
+                        Customer.profile_data.op("->>")(
+                            "birth_year"
+                        ),
+                        Integer,
+                    )
+                    <= max_birth_year,
+                )
+            )
+
+        if age_conditions:
+            query = query.filter(or_(*age_conditions))
+
+        return query
 
     def create_ticket_for_customer(
         self, customer: Customer, message_id: int

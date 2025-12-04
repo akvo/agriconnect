@@ -21,9 +21,9 @@ interface FilterModalProps {
   visible: boolean;
   onClose: () => void;
   cropTypes: CropType[];
-  selectedCropTypes: number[];
+  selectedCropTypes: string[];
   selectedAgeGroups: string[];
-  onToggleCropType: (id: number) => void;
+  onToggleCropType: (name: string) => void;
   onToggleAgeGroup: (ageGroup: string) => void;
   onApply: () => void;
   isAdmin: boolean;
@@ -80,16 +80,16 @@ const FilterModal: React.FC<FilterModalProps> = ({
                     key={cropType.id}
                     style={[
                       styles.filterPill,
-                      selectedCropTypes.includes(cropType.id) &&
+                      selectedCropTypes.includes(cropType.name) &&
                         styles.filterPillActive,
                     ]}
-                    onPress={() => onToggleCropType(cropType.id)}
+                    onPress={() => onToggleCropType(cropType.name)}
                   >
                     <Text
                       style={[
                         typography.body2,
                         {
-                          color: selectedCropTypes.includes(cropType.id)
+                          color: selectedCropTypes.includes(cropType.name)
                             ? themeColors.white
                             : themeColors.textPrimary,
                         },

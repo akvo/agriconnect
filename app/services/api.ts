@@ -470,8 +470,7 @@ class ApiClient {
     page?: number;
     size?: number;
     search?: string;
-    crop_types?: string[];
-    age_groups?: string[];
+    filters?: string[];
     administrative_id?: number[];
   }): Promise<any> {
     const queryParams = new URLSearchParams();
@@ -485,11 +484,10 @@ class ApiClient {
     if (params.search) {
       queryParams.append("search", params.search);
     }
-    if (params.crop_types) {
-      params.crop_types.forEach((ct) => queryParams.append("crop_types", ct));
-    }
-    if (params.age_groups) {
-      params.age_groups.forEach((ag) => queryParams.append("age_groups", ag));
+    if (params.filters) {
+      params.filters.forEach((filter) =>
+        queryParams.append("filters", filter),
+      );
     }
     if (params.administrative_id) {
       params.administrative_id.forEach((aid) =>

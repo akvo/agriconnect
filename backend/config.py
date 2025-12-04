@@ -215,6 +215,12 @@ class Settings(BaseSettings):
         [5, 15, 60],
     )
 
+    # Crop types configuration
+    crop_types: list = _config.get(
+        "crop_types",
+        ["Avocado", "Cacao"]
+    )
+
     @property
     def celery_broker_url(self) -> str:
         """Auto-construct Celery broker URL (like Akvo RAG)"""

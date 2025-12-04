@@ -1,6 +1,7 @@
 """
 Tests for AI onboarding service (location collection workflow).
 """
+
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock
@@ -152,7 +153,7 @@ class TestOnboardingService:
     def test_needs_onboarding_with_existing_data(
         self, db_session, onboarding_service, sample_administrative_data
     ):
-        """Test that customer with administrative data doesn't need onboarding"""  # noqa: E501
+        """Test that customer with only admin data still needs onboarding (missing crop)"""  # noqa: E501
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.NOT_STARTED,
@@ -160,7 +161,7 @@ class TestOnboardingService:
         db_session.add(customer)
         db_session.commit()
 
-        # Add administrative data
+        # Add administrative data only (crop_type still missing)
         customer_admin = CustomerAdministrative(
             customer_id=customer.id,
             administrative_id=sample_administrative_data["westlands"].id,
@@ -168,7 +169,8 @@ class TestOnboardingService:
         db_session.add(customer_admin)
         db_session.commit()
 
-        assert onboarding_service.needs_onboarding(customer) is False
+        # Still needs onboarding because crop_type is required and missing
+        assert onboarding_service.needs_onboarding(customer) is True
 
     def test_needs_onboarding_completed_status(
         self, db_session, onboarding_service
@@ -177,6 +179,7 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.COMPLETED,
+            profile_data={"crop_type": "Avocado"},
         )
         db_session.add(customer)
         db_session.commit()
@@ -194,6 +197,7 @@ class TestOnboardingService:
         db_session.add(customer)
         db_session.commit()
 
+        # FAILED status means they're excluded from onboarding flow
         assert onboarding_service.needs_onboarding(customer) is False
 
     @pytest.mark.asyncio
@@ -417,7 +421,7 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.NOT_STARTED,
-            onboarding_attempts=0,
+            onboarding_attempts={},  # Initialize as empty dict
         )
         db_session.add(customer)
         db_session.commit()
@@ -439,7 +443,14 @@ class TestOnboardingService:
         )
 
         assert response.status == "in_progress"
-        assert customer.onboarding_attempts == 1
+        # Refresh and parse onboarding_attempts (service stores as JSON string)
+        db_session.refresh(customer)
+        attempts = (
+            json.loads(customer.onboarding_attempts)
+            if isinstance(customer.onboarding_attempts, str)
+            else customer.onboarding_attempts
+        )
+        assert attempts.get("administration", 0) == 1
         assert "couldn't identify your location" in response.message
 
     @pytest.mark.asyncio
@@ -450,10 +461,11 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_attempts=2,  # Already 2 attempts
+            onboarding_attempts={"administration": 2},
         )
         db_session.add(customer)
         db_session.commit()
+        db_session.refresh(customer)  # Ensure JSON fields are loaded
 
         # Mock OpenAI to return empty location
         mock_response = MagicMock()
@@ -472,8 +484,15 @@ class TestOnboardingService:
         )
 
         assert response.status == "failed"
+        # Refresh and parse onboarding_attempts (service stores as JSON string)
+        db_session.refresh(customer)
         assert customer.onboarding_status == OnboardingStatus.FAILED
-        assert customer.onboarding_attempts == 3
+        attempts = (
+            json.loads(customer.onboarding_attempts)
+            if isinstance(customer.onboarding_attempts, str)
+            else customer.onboarding_attempts
+        )
+        assert attempts.get("administration", 0) == 3
         assert "continue without it" in response.message
 
     @pytest.mark.asyncio
@@ -488,7 +507,6 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.NOT_STARTED,
-            onboarding_attempts=0,
         )
         db_session.add(customer)
         db_session.commit()
@@ -530,16 +548,18 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_attempts=1,
-            onboarding_candidates=json.dumps(
-                [
+            onboarding_attempts={"administration": 1},
+            onboarding_candidates={
+                "administration": [
                     sample_administrative_data["westlands"].id,
                     sample_administrative_data["kibera"].id,
                 ]
-            ),
+            },
+            current_onboarding_field="administration",
         )
         db_session.add(customer)
         db_session.commit()
+        db_session.refresh(customer)  # Ensure JSON fields are loaded
 
         response = await onboarding_service.process_selection(customer, "1")
 
@@ -571,7 +591,6 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_attempts=1,
             onboarding_candidates=json.dumps(
                 [sample_administrative_data["westlands"].id]
             ),
@@ -594,13 +613,14 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_attempts=1,
-            onboarding_candidates=json.dumps(
-                [sample_administrative_data["westlands"].id]
-            ),
+            onboarding_candidates={
+                "administration": [sample_administrative_data["westlands"].id]
+            },
+            current_onboarding_field="administration",
         )
         db_session.add(customer)
         db_session.commit()
+        db_session.refresh(customer)  # Ensure JSON fields are loaded
 
         response = await onboarding_service.process_selection(customer, "5")
 
@@ -615,7 +635,6 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_attempts=1,
             onboarding_candidates=None,
         )
         db_session.add(customer)

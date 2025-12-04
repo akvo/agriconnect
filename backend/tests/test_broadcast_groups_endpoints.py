@@ -6,8 +6,7 @@ from models import (
     Customer,
     CustomerAdministrative,
 )
-from models.customer import AgeGroup, CropType, CustomerLanguage
-from seeder.crop_type import seed_crop_types
+from models.customer import CustomerLanguage
 
 
 class TestBroadcastGroupsEndpoint:
@@ -97,38 +96,19 @@ class TestBroadcastGroupsEndpoint:
 
     @pytest.fixture
     def setup_customers(self, db_session, setup_administrative_hierarchy):
-        # Seed crop types
-        seed_crop_types(db_session)
-
         """Create test customers with various attributes"""
         wards = setup_administrative_hierarchy
-
-        # Get crop types by name for clarity
-        rice = (
-            db_session.query(CropType).filter(CropType.name == "Rice").first()
-        )
-        coffee = (
-            db_session.query(CropType)
-            .filter(CropType.name == "Coffee")
-            .first()
-        )
-        chilli = (
-            db_session.query(CropType)
-            .filter(CropType.name == "Chilli")
-            .first()
-        )
-
-        assert rice is not None, "Rice crop type should exist"
-        assert coffee is not None, "Coffee crop type should exist"
-        assert chilli is not None, "Chilli crop type should exist"
 
         # Customer in Ward 1 with Rice
         customer1 = Customer(
             phone_number="+254700000001",
             full_name="John Doe",
             language=CustomerLanguage.EN,
-            crop_type_id=rice.id,
-            age_group=AgeGroup.AGE_20_35,
+            profile_data={
+                "crop_type": "rice",
+                "gender": "male",
+                "birth_year": 1995,
+            },
         )
         db_session.add(customer1)
         db_session.commit()
@@ -137,15 +117,18 @@ class TestBroadcastGroupsEndpoint:
             customer_id=customer1.id, administrative_id=wards["ward1"].id
         )
         db_session.add(customer_admin1)
+        db_session.commit()
 
         # Customer in Ward 1 with Coffee
         customer2 = Customer(
             phone_number="+254700000002",
             full_name="Jane Smith",
             language=CustomerLanguage.SW,
-            crop_type_id=coffee.id,
-            age_group=AgeGroup.AGE_36_50,
-            age=37,
+            profile_data={
+                "crop_type": "coffee",
+                "gender": "female",
+                "birth_year": 1980,
+            },
         )
         db_session.add(customer2)
         db_session.commit()
@@ -160,8 +143,11 @@ class TestBroadcastGroupsEndpoint:
             phone_number="+254700000003",
             full_name="Peter Brown",
             language=CustomerLanguage.EN,
-            crop_type_id=chilli.id,
-            age_group=AgeGroup.AGE_51_PLUS,
+            profile_data={
+                "crop_type": "chilli",
+                "gender": "male",
+                "birth_year": 1965,
+            },
         )
         db_session.add(customer3)
         db_session.commit()
@@ -230,7 +216,7 @@ class TestBroadcastGroupsEndpoint:
         # Verify response structure
         assert data["name"] == "Young Rice Farmers"
         # crop_types and age_groups are derived from members
-        assert data["crop_types"] == ["Rice"]  # Derived from customer1
+        assert data["crop_types"] == ["rice"]  # Derived from customer1
         assert data["age_groups"] == ["20-35"]  # Derived from customer1
         assert data["contact_count"] == 1
         assert data["administrative_id"] == wards["ward1"].id
@@ -274,7 +260,7 @@ class TestBroadcastGroupsEndpoint:
 
         assert data["name"] == "All Coffee & Rice Farmers"
         # crop_types and age_groups are derived from members
-        assert set(data["crop_types"]) == {"Rice", "Coffee"}
+        assert set(data["crop_types"]) == {"rice", "coffee"}
         assert set(data["age_groups"]) == {"20-35", "36-50"}
         assert data["contact_count"] == 2
         assert data["administrative_id"] is None  # Admin has no ward
@@ -319,7 +305,7 @@ class TestBroadcastGroupsEndpoint:
         group = data[0]
         assert group["name"] == "Ward 1 Group"
         # crop_types and age_groups are derived from members
-        assert group["crop_types"] == ["Rice"]
+        assert group["crop_types"] == ["rice"]
         assert group["age_groups"] == ["20-35"]
         assert group["contact_count"] == 1
         assert group["administrative_id"] == wards["ward1"].id
@@ -438,7 +424,7 @@ class TestBroadcastGroupsEndpoint:
         # Verify group details
         assert data["name"] == "Multi-Contact Group"
         # crop_types and age_groups are derived from members
-        assert set(data["crop_types"]) == {"Rice", "Coffee"}
+        assert set(data["crop_types"]) == {"rice", "coffee"}
         assert set(data["age_groups"]) == {"20-35", "36-50"}
 
         # Verify contacts list
@@ -508,7 +494,7 @@ class TestBroadcastGroupsEndpoint:
         # Verify updates
         assert data["name"] == "Updated Group"
         # crop_types and age_groups are derived from members
-        assert set(data["crop_types"]) == {"Rice", "Coffee"}
+        assert set(data["crop_types"]) == {"rice", "coffee"}
         assert set(data["age_groups"]) == {"20-35", "36-50"}
         assert data["contact_count"] == 2
 

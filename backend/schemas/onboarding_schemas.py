@@ -1,8 +1,9 @@
 """
-Onboarding service schemas for AI-driven farmer location collection.
+Onboarding service schemas for AI-driven farmer profile collection.
 
-Stage 1: Administrative location data (province, district, ward)
+Supports generic multi-field onboarding (administration, crop, gender, age).
 """
+from dataclasses import dataclass
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
@@ -79,3 +80,141 @@ class SelectionResponse(BaseModel):
     selected_ward_id: Optional[int] = Field(
         None, description="Selected ward ID"
     )
+
+
+class CropIdentificationResult(BaseModel):
+    """Structured output for AI crop identification"""
+
+    crop_name: Optional[str] = Field(
+        None,
+        description="The primary crop mentioned (normalized to standard name)",
+    )
+    confidence: str = Field(
+        ..., description="Confidence level: 'high', 'medium', or 'low'"
+    )
+    possible_crops: List[str] = Field(
+        default_factory=list,
+        description="List of possible crop matches if ambiguous",
+    )
+
+
+# ============================================================================
+# GENERIC ONBOARDING FIELD CONFIGURATIONS
+# ============================================================================
+
+@dataclass
+class OnboardingFieldConfig:
+    """Configuration for a single onboarding field"""
+    field_name: str  # Unique identifier for the field
+    db_field: str  # Column name in Customer model
+    required: bool  # Whether field is required for completion
+    priority: int  # Collection order (1 = first, 2 = second, etc.)
+    initial_question: str  # Question to ask user
+    extraction_method: str  # Method name in OnboardingService
+    matching_method: Optional[str]  # Ambiguity resolution method
+    max_attempts: int  # Maximum collection attempts before skip
+    field_type: str  # Data type: "string", "integer", "enum", "location"
+    success_message_template: str  # Message after successful collection
+    # Save invalid value after max attempts
+
+
+# Onboarding fields registry - defines all profile fields to collect
+ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
+    # PRIORITY 1: Administration Location (REQUIRED)
+    OnboardingFieldConfig(
+        field_name="administration",
+        db_field="customer_administrative",
+        required=True,
+        priority=1,
+        initial_question=(
+            "Welcome! To connect you with the right agricultural expert, "
+            "I need to know your location.\n\n"
+            "Please tell me: What ward or village are you from?"
+        ),
+        extraction_method="extract_location",
+        matching_method="resolve_administration_ambiguity",
+        max_attempts=3,
+        field_type="location",
+        success_message_template=(
+            "Perfect! I've noted that you're in {value}."
+        ),
+    ),
+
+    # PRIORITY 2: Crop Type (REQUIRED)
+    OnboardingFieldConfig(
+        field_name="crop_type",
+        db_field="crop_type",
+        required=True,
+        priority=2,
+        initial_question=(
+            "What crops do you grow?\n\n"
+            "We currently support: {available_crops}\n\n"
+            "Please tell me which crop you grow."
+        ),
+        extraction_method="extract_crop_type",
+        matching_method="resolve_crop_ambiguity",
+        max_attempts=3,
+        field_type="string",
+        success_message_template=(
+            "Great! I've noted that you grow {value}."
+        ),
+    ),
+
+    # PRIORITY 3: Gender (OPTIONAL)
+    OnboardingFieldConfig(
+        field_name="gender",
+        db_field="gender",
+        required=False,
+        priority=3,
+        initial_question=(
+            "To help us serve you better, may I know your gender?\n\n"
+            "You can say: male, female, or other"
+        ),
+        extraction_method="extract_gender",
+        matching_method=None,  # Direct enum mapping
+        max_attempts=2,
+        field_type="enum",
+        success_message_template="Thank you for sharing.",
+    ),
+
+    # PRIORITY 4: Birth Year (OPTIONAL)
+    OnboardingFieldConfig(
+        field_name="birth_year",
+        db_field="birth_year",
+        required=False,
+        priority=4,
+        initial_question=(
+            "What year were you born? "
+            "You can also tell me your age if that's easier.\n\n"
+            "For example: '1980' or 'I'm 45 years old'"
+        ),
+        extraction_method="extract_birth_year",
+        matching_method=None,  # AI converts age to birth year
+        max_attempts=2,
+        field_type="integer",
+        success_message_template="Got it, thank you!",
+    ),
+]
+
+
+def get_field_config(field_name: str) -> Optional[OnboardingFieldConfig]:
+    """Get configuration for a specific field by name"""
+    for config in ONBOARDING_FIELDS:
+        if config.field_name == field_name:
+            return config
+    return None
+
+
+def get_required_fields() -> List[OnboardingFieldConfig]:
+    """Get all required fields"""
+    return [f for f in ONBOARDING_FIELDS if f.required]
+
+
+def get_optional_fields() -> List[OnboardingFieldConfig]:
+    """Get all optional fields"""
+    return [f for f in ONBOARDING_FIELDS if not f.required]
+
+
+def get_fields_by_priority() -> List[OnboardingFieldConfig]:
+    """Get all fields sorted by priority (ascending)"""
+    return sorted(ONBOARDING_FIELDS, key=lambda x: x.priority)

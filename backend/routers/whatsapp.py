@@ -187,34 +187,37 @@ async def whatsapp_webhook(
                     f"(24+ hours inactive)"
                 )
                 # Continue processing message normally after reconnection
+        # Check if customer has an existing unresolved ticket
+        existing_ticket = (
+            db.query(Ticket)
+            .filter(
+                Ticket.customer_id == customer.id,
+                Ticket.resolved_at.is_(None),
+            )
+            .first()
+        )
 
         # ========================================
-        # AI ONBOARDING: Check if location onboarding needed
+        # GENERIC ONBOARDING: Collect all required profile fields
         # ========================================
         onboarding_service = get_onboarding_service(db)
 
-        if onboarding_service.needs_onboarding(customer):
+        if (
+            onboarding_service.needs_onboarding(customer) and
+            not existing_ticket
+        ):
             logger.info(
                 f"Customer {phone_number} needs onboarding "
-                f"(status: {customer.onboarding_status.value})"
+                f"(status: {customer.onboarding_status.value}, "
+                f"current_field: {customer.current_onboarding_field})"
             )
 
-            # Check if awaiting selection (from previous ambiguous match)
-            if (
-                customer.onboarding_status == OnboardingStatus.IN_PROGRESS
-                and customer.onboarding_candidates
-            ):
-                # Process selection
-                onboarding_response = (
-                    await onboarding_service.process_selection(customer, Body)
+            # Process onboarding message (handles all fields generically)
+            onboarding_response = (
+                await onboarding_service.process_onboarding_message(
+                    customer, Body
                 )
-            else:
-                # Process location message
-                onboarding_response = (
-                    await onboarding_service.process_location_message(
-                        customer, Body
-                    )
-                )
+            )
 
             # Send onboarding response to farmer
             whatsapp_service = WhatsAppService()
@@ -224,12 +227,15 @@ async def whatsapp_webhook(
 
             logger.info(
                 f"Onboarding response sent to {phone_number} "
-                f"(status: {onboarding_response.status})"
+                f"(status: {onboarding_response.status}, "
+                f"field: {customer.current_onboarding_field})"
             )
 
             # If onboarding still in progress, don't process message further
+            # Note: "awaiting_selection" is a response status,
+            # not in OnboardingStatus enum
             if onboarding_response.status in [
-                "in_progress",
+                OnboardingStatus.IN_PROGRESS.value,
                 "awaiting_selection",
             ]:
                 return {
@@ -237,11 +243,27 @@ async def whatsapp_webhook(
                     "message": "Onboarding in progress",
                 }
 
-            # If onboarding completed or failed, continue to regular flow
-            logger.info(
-                f"Onboarding {onboarding_response.status} for {phone_number}, "
-                f"continuing to regular flow"
-            )
+            # If onboarding just completed,
+            # return without processing as general inquiry
+            if onboarding_response.status == OnboardingStatus.COMPLETED.value:
+                logger.info(
+                    f"Onboarding completed for {phone_number}, "
+                    f"message already handled"
+                )
+                return {
+                    "status": "success",
+                    "message": "Onboarding completed",
+                }
+
+            if onboarding_response.status == OnboardingStatus.FAILED.value:
+                logger.info(
+                    f"Onboarding failed for {phone_number}, "
+                    f"message already handled"
+                )
+                return {
+                    "status": "success",
+                    "message": "Onboarding failed",
+                }
 
         escalate_payload = settings.whatsapp_escalate_button_payload
 
@@ -464,16 +486,6 @@ async def whatsapp_webhook(
         # - No ticket → REPLY (auto-reply to farmer)
         # ========================================
 
-        # Check if customer has an existing unresolved ticket
-        existing_ticket = (
-            db.query(Ticket)
-            .filter(
-                Ticket.customer_id == customer.id,
-                Ticket.resolved_at.is_(None),
-            )
-            .first()
-        )
-
         # Create farmer message
         message = Message(
             message_sid=MessageSid,
@@ -580,7 +592,10 @@ async def whatsapp_webhook(
                 )
             )
 
-        else:
+        if (
+            customer.onboarding_status != OnboardingStatus.IN_PROGRESS and
+            not existing_ticket
+        ):
             # No existing ticket → REPLY mode (auto-reply to farmer)
             logger.info(
                 f"Customer {phone_number} has no unresolved ticket, "
