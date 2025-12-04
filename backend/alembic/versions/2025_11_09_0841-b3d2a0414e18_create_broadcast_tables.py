@@ -22,9 +22,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # 0. Add BROADCAST value to messagetype enum
-    op.execute(
-        "ALTER TYPE messagetype ADD VALUE IF NOT EXISTS 'BROADCAST'"
-    )
+    op.execute("ALTER TYPE messagetype ADD VALUE IF NOT EXISTS 'BROADCAST'")
 
     # 1. Create broadcast_groups table
     # Note: crop_types and age_groups removed - derived from group members
@@ -192,9 +190,7 @@ def upgrade() -> None:
             server_default="PENDING",
             nullable=False,
         ),
-        sa.Column(
-            "confirm_message_sid", sa.String(length=255), nullable=True
-        ),
+        sa.Column("confirm_message_sid", sa.String(length=255), nullable=True),
         sa.Column("actual_message_sid", sa.String(length=255), nullable=True),
         sa.Column("message_id", sa.Integer(), nullable=True),
         sa.Column(

@@ -556,8 +556,7 @@ def test_ai_callback_reply_with_original_message_not_found(
         "output": {"answer": "Test answer", "citations": []},
         "error": None,
         "callback_params": (
-            '{"message_id": 99999, "message_type": 1, '
-            '"customer_id": 1}'
+            '{"message_id": 99999, "message_type": 1, ' '"customer_id": 1}'
         ),
         "trace_id": "trace_404_001",
         "job": "chat",
@@ -608,8 +607,7 @@ def test_ai_callback_exception_raises_http_exception(
         raise Exception("Database connection failed")
 
     monkeypatch.setattr(
-        "routers.callbacks.MessageService",
-        mock_message_service_error
+        "routers.callbacks.MessageService", mock_message_service_error
     )
 
     payload = {
@@ -667,6 +665,7 @@ def test_kb_callback_exception_raises_http_exception(
     # Create a payload with callback_params that will trigger the service
     from models.knowledge_base import KnowledgeBase
     from models.user import User, UserType
+    from models.service_token import ServiceToken
 
     # Create a test user first
     user = User(
@@ -674,18 +673,30 @@ def test_kb_callback_exception_raises_http_exception(
         phone_number="+1234567892",
         hashed_password="test_hash",
         user_type=UserType.ADMIN,
-        full_name="KB Test User"
+        full_name="KB Test User",
     )
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
 
+    # Create a test service token
+    service_token = ServiceToken(
+        service_name="Test Service",
+        access_token="test_access_token_xxx_123",
+        chat_url=None,
+        upload_url="https://upload.test/jobs",
+        kb_url="https://kb.test/kbs",
+        document_url=None,
+        default_prompt="This is default prompt",
+        active=1,
+    )
+    db_session.add(service_token)
+    db_session.commit()
+    db_session.refresh(service_token)
+
     # Create a test KB
     kb = KnowledgeBase(
-        user_id=user.id,
-        title="Test KB",
-        filename="test.pdf",
-        description="Test",
+        user_id=user.id, external_id="kb_id_1", service_id=service_token.id
     )
     db_session.add(kb)
     db_session.commit()
@@ -698,7 +709,7 @@ def test_kb_callback_exception_raises_http_exception(
 
     monkeypatch.setattr(
         "services.knowledge_base_service.KnowledgeBaseService",
-        MockKnowledgeBaseServiceError
+        MockKnowledgeBaseServiceError,
     )
 
     payload = {

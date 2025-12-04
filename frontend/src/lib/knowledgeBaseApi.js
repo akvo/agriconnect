@@ -51,10 +51,44 @@ const knowledgeBaseApi = {
     return response.data;
   },
 
-  // Update knowledge base status
-  updateStatus: async (id, status) => {
-    const response = await api.patch(`/kb/${id}/status`, { status });
+  // Update knowledge base is_active
+  toggleActive: async (id) => {
+    const response = await api.post(`/kb/${id}/toggle-active`);
     return response.data;
+  },
+
+  // Get list of documents by kbId with pagination and search
+  getDocumentList: async (kbId = null, page = 1, size = 10, search = null) => {
+    let url = `/documents?kb_id=${kbId}&page=${page}&size=${size}`;
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+    try {
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Upload a document to a specific knowledge base
+  uploadDocument: async (formData) => {
+    try {
+      const response = await api.post(`/documents`, formData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // update document metadata
+  updateDocument: async (id, data) => {
+    try {
+      const response = await api.put(`/documents/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 };
 

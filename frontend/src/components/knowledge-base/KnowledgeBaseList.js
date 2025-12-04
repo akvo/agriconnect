@@ -1,73 +1,22 @@
 "use client";
 
 import {
-  DocumentIcon,
   CalendarIcon,
-  EyeIcon,
   PencilIcon,
   TrashIcon,
-  CloudArrowUpIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  ClockIcon,
+  CircleStackIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
-import DataTable from "../common/DataTable";
+import { useState } from "react";
 
 export default function KnowledgeBaseList({
   knowledgeBases,
   loading,
-  onViewKnowledgeBase,
   onEditKnowledgeBase,
   onDeleteKnowledgeBase,
+  onToggleActive,
 }) {
-  const columns = [
-    {
-      title: "Document",
-      icon: DocumentIcon,
-    },
-    {
-      title: "Status",
-      icon: ClockIcon,
-    },
-    {
-      title: "Created",
-      icon: CalendarIcon,
-    },
-    {
-      title: "Actions",
-      align: "right",
-    },
-  ];
-
-  const getStatusBadge = (status) => {
-    switch (status?.toLowerCase()) {
-      case "done":
-        return {
-          color: "bg-green-100 text-green-800",
-          icon: CheckCircleIcon,
-          text: "Completed",
-        };
-      case "failed":
-        return {
-          color: "bg-red-100 text-red-800",
-          icon: ExclamationTriangleIcon,
-          text: "Failed",
-        };
-      case "timeout":
-        return {
-          color: "bg-orange-100 text-orange-800",
-          icon: ExclamationTriangleIcon,
-          text: "Timeout",
-        };
-      case "queued":
-      default:
-        return {
-          color: "bg-blue-100 text-blue-800",
-          icon: ClockIcon,
-          text: "Processing",
-        };
-    }
-  };
+  const [toggleLoading, setToggleLoading] = useState({}); // { [id]: true }
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -80,105 +29,160 @@ export default function KnowledgeBaseList({
     });
   };
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return "Unknown size";
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
-  };
-
-  const getFileTypeIcon = (contentType) => {
-    if (contentType?.includes("pdf")) return "📄";
-    if (contentType?.includes("word")) return "📝";
-    if (contentType?.includes("text")) return "📃";
-    return "📄";
-  };
-
-  const renderRow = (kb, index) => {
-    const statusInfo = getStatusBadge(kb.status);
-    const StatusIcon = statusInfo.icon;
-
-    return (
-      <>
-        <td className="px-8 py-6 whitespace-nowrap">
-          <div className="flex items-center">
-            <div className="text-2xl mr-3">
-              {getFileTypeIcon(kb.extra_data?.content_type)}
-            </div>
-            <div className="ml-2">
-              <div className="text-base font-bold text-secondary-900">
-                {kb.title}
-              </div>
-              <div className="text-sm text-secondary-600">{kb.filename}</div>
-              {kb.description && (
-                <div className="text-xs text-secondary-500 mt-1 max-w-xs truncate">
-                  {kb.description}
-                </div>
-              )}
-              {kb.extra_data?.size && (
-                <div className="text-xs text-secondary-400 mt-1">
-                  {formatFileSize(kb.extra_data.size)}
-                </div>
-              )}
-            </div>
-          </div>
-        </td>
-        <td className="px-8 py-6 whitespace-nowrap">
-          <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${statusInfo.color}`}
-          >
-            <StatusIcon className="w-4 h-4 mr-2 flex-shrink-0" />
-            <span className="leading-none">{statusInfo.text}</span>
-          </span>
-        </td>
-        <td className="px-8 py-6 whitespace-nowrap">
-          <div className="text-sm text-secondary-600">
-            {formatDate(kb.created_at)}
-          </div>
-          {kb.updated_at && kb.updated_at !== kb.created_at && (
-            <div className="text-xs text-secondary-500">
-              Updated: {formatDate(kb.updated_at)}
-            </div>
-          )}
-        </td>
-        <td className="px-8 py-6 whitespace-nowrap text-right">
-          <div className="flex items-center justify-end space-x-2">
-            <button
-              onClick={() => onViewKnowledgeBase(kb)}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
-            >
-              <EyeIcon className="w-4 h-4 mr-1" />
-              View
-            </button>
-            <button
-              onClick={() => onEditKnowledgeBase(kb)}
-              className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
-            >
-              <PencilIcon className="w-4 h-4 mr-1" />
-              Edit
-            </button>
-            <button
-              onClick={() => onDeleteKnowledgeBase(kb)}
-              className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
-            >
-              <TrashIcon className="w-4 h-4 mr-1" />
-              Delete
-            </button>
-          </div>
-        </td>
-      </>
+  const handleToggleActive = async (kb) => {
+    // Confirmation dialog
+    const confirm = window.confirm(
+      !kb?.is_active
+        ? `Activate knowledge base "${kb.title}"?`
+        : `Deactivate knowledge base "${kb.title}"?`
     );
+
+    if (!confirm) return;
+
+    // show per-row spinner
+    setToggleLoading((prev) => ({ ...prev, [kb.id]: true }));
+
+    try {
+      await onToggleActive(kb.id);
+    } catch (err) {
+      console.error("Failed to toggle active:", err);
+      alert("Failed to toggle active. Please try again.");
+    } finally {
+      setToggleLoading((prev) => ({ ...prev, [kb.id]: false }));
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center animate-fade-in">
+        <div className="relative mx-auto mb-4">
+          <ArrowPathIcon className="animate-spin h-12 w-12 text-primary-600 mx-auto" />
+          <div className="absolute inset-0 rounded-[5px] bg-gradient-primary opacity-20 blur-lg animate-pulse"></div>
+        </div>
+        <p className="text-secondary-700 font-medium">
+          Loading knowledge base...
+        </p>
+        <p className="text-secondary-500 text-sm mt-1">
+          Please wait while we fetch the knowledge base data
+        </p>
+      </div>
+    );
+  }
+
+  if (knowledgeBases.length === 0) {
+    return (
+      <div className="p-8 text-center">
+        <CircleStackIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900">
+          No knowledge bases found
+        </h3>
+        <p className="mt-1 text-gray-500">
+          Try adjusting your search criteria or create a new knowledge base.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <DataTable
-      columns={columns}
-      data={knowledgeBases}
-      loading={loading}
-      emptyStateIcon={CloudArrowUpIcon}
-      emptyStateTitle="No knowledge base documents found"
-      emptyStateMessage="Upload your first document to get started with AI-powered assistance."
-      renderRow={renderRow}
-    />
+    <div className="overflow-hidden rounded-[5px] bg-white shadow-sm">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gradient-to-r from-secondary-50 to-secondary-100">
+          <tr>
+            <th className="px-8 py-5 text-left text-xs font-bold text-secondary-700 uppercase tracking-wider">
+              <div className="flex items-center">
+                <CircleStackIcon className="w-4 h-4 mr-2 text-secondary-500" />
+                Knowledge Base
+              </div>
+            </th>
+            <th className="px-8 py-5 text-left text-xs font-bold text-secondary-700 uppercase tracking-wider">
+              <div className="flex items-center">
+                <CalendarIcon className="w-4 h-4 mr-2 text-secondary-500" />
+                Created
+              </div>
+            </th>
+            <th className="px-8 py-5 text-right text-xs font-bold text-secondary-700 uppercase tracking-wider">
+              <div className="flex items-center justify-end">Active</div>
+            </th>
+            <th className="px-8 py-5 text-right text-xs font-bold text-secondary-700 uppercase tracking-wider">
+              Actions
+            </th>
+          </tr>
+        </thead>
+
+        {/* BODY */}
+        <tbody className="bg-white divide-y divide-gray-100">
+          {knowledgeBases.map((kb, index) => (
+            <tr
+              key={kb.id}
+              className="hover:bg-primary-50/50 transition-all duration-200 group animate-fade-in"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <td className="px-8 py-6 overflow-wrap">
+                <div className="text-base font-bold text-secondary-900 wrap-break-word">
+                  {kb.title}
+                </div>
+                <div className="text-sm text-secondary-500 wrap-break-word">
+                  {kb.description}
+                </div>
+              </td>
+
+              <td className="px-8 py-6 whitespace-nowrap">
+                <div className="text-sm text-secondary-600">
+                  {formatDate(kb.created_at)}
+                </div>
+              </td>
+
+              {/* ACTIVE TOGGLE */}
+              <td className="px-8 py-6 whitespace-nowrap text-right">
+                {toggleLoading[kb.id] ? (
+                  <ArrowPathIcon className="h-5 w-5 animate-spin text-primary-600 inline-block" />
+                ) : (
+                  <label className="inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={kb.is_active}
+                      onChange={() => handleToggleActive(kb)}
+                    />
+                    <div
+                      className={`w-11 h-6 rounded-full transition ${
+                        kb.is_active ? "bg-green-500" : "bg-gray-300"
+                      }`}
+                    >
+                      <div
+                        className={`h-6 w-6 bg-white rounded-full shadow transform transition ${
+                          kb.is_active ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      ></div>
+                    </div>
+                  </label>
+                )}
+              </td>
+
+              {/* ACTIONS */}
+              <td className="px-8 py-6 whitespace-nowrap text-right">
+                <div className="flex items-center justify-end space-x-3">
+                  <button
+                    onClick={() => onEditKnowledgeBase(kb.id)}
+                    className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200 flex items-center cursor-pointer"
+                  >
+                    <PencilIcon className="w-4 h-4 mr-1" />
+                    Edit
+                  </button>
+
+                  <button
+                    onClick={() => onDeleteKnowledgeBase(kb)}
+                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-[5px] text-xs font-semibold transition-all duration-200 flex items-center cursor-pointer"
+                  >
+                    <TrashIcon className="w-4 h-4 mr-1" />
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

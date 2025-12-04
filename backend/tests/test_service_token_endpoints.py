@@ -69,6 +69,8 @@ def test_create_service_token_success(
         "access_token": "akvo_token_123",
         "chat_url": "https://akvo-rag.example.com/chat",
         "upload_url": "https://akvo-rag.example.com/upload",
+        "kb_url": "https://akvo-rag.example.com/kb",
+        "document_url": "https://akvo-rag.example.com/document",
         "default_prompt": "You are an AI assistant.",
     }
 
@@ -84,6 +86,8 @@ def test_create_service_token_success(
     assert data["access_token"] == "akvo_token_123"
     assert data["chat_url"] == "https://akvo-rag.example.com/chat"
     assert data["upload_url"] == "https://akvo-rag.example.com/upload"
+    assert data["kb_url"] == "https://akvo-rag.example.com/kb"
+    assert data["document_url"] == "https://akvo-rag.example.com/document"
     assert data["default_prompt"] == "You are an AI assistant."
     assert "created_at" in data
     assert "updated_at" in data
@@ -180,6 +184,8 @@ def test_list_service_tokens_success(
     assert "access_token" in token1
     assert "chat_url" in token1
     assert "upload_url" in token1
+    assert "kb_url" in token1
+    assert "document_url" in token1
     assert "default_prompt" in token1
     assert "created_at" in token1
     assert "updated_at" in token1
@@ -223,9 +229,7 @@ def test_delete_service_token_success(
 ):
     """Test deleting service token as admin"""
     # Create a test token
-    service_token = ServiceTokenService.create_token(
-        db_session, "delete-me"
-    )
+    service_token = ServiceTokenService.create_token(db_session, "delete-me")
     token_id = service_token.id
 
     # Verify token exists
@@ -314,6 +318,8 @@ def test_service_token_workflow_integration(
         "access_token": "integration_token_123",
         "chat_url": "https://example.com/chat",
         "upload_url": "https://example.com/upload",
+        "kb_url": "https://example.com/kb",
+        "document_url": "https://example.com/document",
         "default_prompt": "Integration test prompt",
     }
 
@@ -341,6 +347,8 @@ def test_service_token_workflow_integration(
             assert token["access_token"] == "integration_token_123"
             assert token["chat_url"] == "https://example.com/chat"
             assert token["upload_url"] == "https://example.com/upload"
+            assert token["kb_url"] == "https://example.com/kb"
+            assert token["document_url"] == "https://example.com/document"
             assert token["default_prompt"] == "Integration test prompt"
             token_found = True
             break

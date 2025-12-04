@@ -21,11 +21,13 @@ from routers import (
     storage,
     crop_types,
     openai_demo,
+    document,
 )
 from fastapi.staticfiles import StaticFiles
 from services.external_ai_service import ExternalAIService
 from services.socketio_service import sio_app
 from database import SessionLocal
+
 # from tasks.retry_scheduler import start_retry_scheduler, stop_retry_scheduler
 
 logger = logging.getLogger(__name__)
@@ -99,6 +101,7 @@ app.include_router(callbacks.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(knowledge_base.router, prefix="/api")
+app.include_router(document.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(service_tokens.router, prefix="/api")
 app.include_router(whatsapp.router, prefix="/api")

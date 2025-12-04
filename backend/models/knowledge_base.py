@@ -1,31 +1,39 @@
-from sqlalchemy import (
-    Column,
-    DateTime,
-    Enum,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-)
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from database import Base
-from schemas.callback import CallbackStage
 
 
 class KnowledgeBase(Base):
     __tablename__ = "knowledge_bases"
 
+    # Primary key remains INTEGER
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    filename = Column(String, nullable=False)
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    extra_data = Column(JSONB, nullable=True)
-    status = Column(Enum(CallbackStage), default=CallbackStage.QUEUED)
+
+    # External ID returned by Akvo RAG (string, e.g. UUID)
+    external_id = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=False)
+
+    # Who owns the knowledge base
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Which service token was used to create it (optional)
+    service_id = Column(
+        Integer,
+        ForeignKey("service_tokens.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    user = relationship("User")
+    # Relationships
+    user = relationship("User", back_populates="knowledge_bases")
+    service = relationship("ServiceToken", back_populates="knowledge_bases")
