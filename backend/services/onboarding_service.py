@@ -912,9 +912,7 @@ Birth year must be between 1900 and {current_year}."""
         # Check max attempts (after increment)
         new_attempts = self._get_attempts(customer, field_name)
         if new_attempts > field_config.max_attempts:
-            return await self._handle_max_attempts(
-                customer, field_config, last_message=message
-            )
+            return self._handle_max_attempts(customer, field_config)
 
         # Extract value using field-specific extraction method
         try:
@@ -1231,11 +1229,10 @@ Birth year must be between 1900 and {current_year}."""
                 attempts=self._get_attempts(customer, field_name),
             )
 
-    async def _handle_max_attempts(
+    def _handle_max_attempts(
         self,
         customer: Customer,
         field_config: OnboardingFieldConfig,
-        last_message: Optional[str] = None,
     ) -> OnboardingResponse:
         """
         Handle max attempts exceeded.

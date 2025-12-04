@@ -1300,10 +1300,9 @@ class TestDynamicCropOnboarding:
             return_value="Rice"
         )
 
-        response = await onboarding_service._handle_max_attempts(
+        response = onboarding_service._handle_max_attempts(
             customer,
             get_field_config("crop_type"),
-            last_message="Rice farming",
         )
 
         # Should save Rice and continue to gender

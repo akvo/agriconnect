@@ -255,11 +255,15 @@ async def whatsapp_webhook(
                     "message": "Onboarding completed",
                 }
 
-            # If onboarding failed, continue to regular flow
-            logger.info(
-                f"Onboarding {onboarding_response.status} for {phone_number}, "
-                f"continuing to regular flow"
-            )
+            if onboarding_response.status == OnboardingStatus.FAILED.value:
+                logger.info(
+                    f"Onboarding failed for {phone_number}, "
+                    f"message already handled"
+                )
+                return {
+                    "status": "success",
+                    "message": "Onboarding failed",
+                }
 
         escalate_payload = settings.whatsapp_escalate_button_payload
 
