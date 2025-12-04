@@ -1,7 +1,7 @@
 """add_generic_onboarding_fields_remove_age_fields
 
 Revision ID: 65e511681dc7
-Revises: b3d2a0414e18
+Revises: 3a89e7a30c6c
 Create Date: 2025-12-02 03:37:35.992245
 
 Changes:
@@ -22,7 +22,7 @@ from models.customer import AgeGroup
 
 # revision identifiers, used by Alembic.
 revision: str = "65e511681dc7"
-down_revision: Union[str, None] = "b3d2a0414e18"
+down_revision: Union[str, None] = "3a89e7a30c6c"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
