@@ -129,7 +129,11 @@ async def list_knowledge_bases(
     )
 
     # empty
-    if not rag_kb_response.get("total") or not len(kb_external_ids.keys()):
+    if (
+        not rag_kb_response
+        or not rag_kb_response.get("total")
+        or not len(kb_external_ids.keys())
+    ):
         return KnowledgeBaseListResponse(
             data=[],
             total=0,
