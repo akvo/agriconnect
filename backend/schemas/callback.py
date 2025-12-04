@@ -119,8 +119,7 @@ class AIWebhookCallback(BaseModel):
 
     job_id: str = Field(..., description="Unique AI processing job identifier")
     status: CallbackStage = Field(
-        ...,
-        description="Processing status (completed, failed, etc.)"
+        ..., description="Processing status (completed, failed, etc.)"
     )
     output: Optional[CallbackResult] = Field(
         None, description="AI results (when status='completed')"
@@ -130,17 +129,17 @@ class AIWebhookCallback(BaseModel):
     )
     callback_params: Union[str, AICallbackParams] = Field(
         ...,
-        description="AI-specific parameters (can be JSON string or object)"
+        description="AI-specific parameters (can be JSON string or object)",
     )
     trace_id: Optional[str] = Field(
         None, description="Tracing ID for debugging"
     )
     job: JobType = Field(
         default=JobType.CHAT,
-        description="Job type (defaults to 'chat' if not provided)"
+        description="Job type (defaults to 'chat' if not provided)",
     )
 
-    @field_validator('callback_params', mode='before')
+    @field_validator("callback_params", mode="before")
     @classmethod
     def parse_callback_params(cls, v):
         """Parse callback_params if it's a JSON string"""
@@ -185,6 +184,7 @@ class KBWebhookCallback(BaseModel):
 
 class TwilioMessageStatus(str, Enum):
     """Twilio message status values"""
+
     QUEUED = "queued"
     SENDING = "sending"
     SENT = "sent"
@@ -208,9 +208,7 @@ class TwilioStatusCallback(BaseModel):
     MessageStatus: TwilioMessageStatus = Field(
         ..., description="Current message status"
     )
-    ErrorCode: Optional[str] = Field(
-        None, description="Error code if failed"
-    )
+    ErrorCode: Optional[str] = Field(None, description="Error code if failed")
     ErrorMessage: Optional[str] = Field(
         None, description="Error message if failed"
     )
@@ -222,9 +220,7 @@ class TwilioStatusCallback(BaseModel):
     )
 
     # Optional fields that may be included
-    AccountSid: Optional[str] = Field(
-        None, description="Twilio account SID"
-    )
+    AccountSid: Optional[str] = Field(None, description="Twilio account SID")
     MessagingServiceSid: Optional[str] = Field(
         None, description="Messaging service SID"
     )

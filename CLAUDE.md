@@ -91,7 +91,7 @@ Create `.env` file based on `.env.example`:
 - **FastAPI** framework with SQLAlchemy ORM
 - **Alembic** for database migrations
 - **JWT authentication** system
-- **Modular routers**: `auth.py`, `customers.py`, `admin_users.py`, `knowledge_base.py`, `whatsapp.py`, `devices.py`, `ws.py`
+- **Modular routers**: `auth.py`, `customers.py`, `admin_users.py`, `knowledge_base.py`, `document.py`,`whatsapp.py`, `devices.py`, `ws.py`
 - **Services layer** for business logic (including push notification service)
 - **Tests** in `/tests/` directory
 
@@ -213,9 +213,12 @@ AgriConnect uses a **service-agnostic AI integration** managed via the `service_
 CREATE TABLE service_tokens (
     id SERIAL PRIMARY KEY,
     service_name VARCHAR NOT NULL UNIQUE,
-    access_token VARCHAR,           -- Token to authenticate with external service
+    access_token VARCHAR,            -- Token to authenticate with external service
     chat_url VARCHAR,                -- URL for chat job requests
-    upload_url VARCHAR,              -- URL for KB upload job requests
+    upload_url VARCHAR,              -- URL for Document upload job requests
+    kb_url VARCHAR,                  -- URL for CRUD a Knowledge Base
+    document_url VARCHAR,            -- URL for update, view, delete a Document
+    default_prompt VARCHAR,          -- Default system prompt for AI service
     active INTEGER DEFAULT 0,        -- 0=inactive, 1=active (only one can be active)
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()

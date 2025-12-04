@@ -25,8 +25,17 @@ async function handler(request, { params }) {
 
     // Get request body if present
     let body = null;
+    const contentType = request.headers.get("content-type") || "";
+
     if (["POST", "PUT", "PATCH"].includes(request.method)) {
-      body = await request.text();
+      if (contentType.includes("application/json")) {
+        // Read JSON as string
+        body = await request.text();
+      } else {
+        // Read binary-safe
+        const buffer = await request.arrayBuffer();
+        body = Buffer.from(buffer);
+      }
     }
 
     // Make request to backend

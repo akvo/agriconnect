@@ -1,286 +1,382 @@
 from typing import Optional
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    File,
-    Form,
-    HTTPException,
-    Query,
-    UploadFile,
-    status,
-)
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.knowledge_base import KnowledgeBase
-from models.user import User
+from models import User, UserType
 from schemas.knowledge_base import (
     KnowledgeBaseCreate,
     KnowledgeBaseListResponse,
     KnowledgeBaseResponse,
-    KnowledgeBaseStatusUpdate,
     KnowledgeBaseUpdate,
+    CreateKnowledgeBaseResponse,
+    ToggleActiveKnowledgeBaseResponse,
 )
 from services.knowledge_base_service import KnowledgeBaseService
+from services.service_token_service import ServiceTokenService
+from services.external_ai_service import ExternalAIService
 from utils.auth_dependencies import get_current_user
 
 router = APIRouter(prefix="/kb", tags=["knowledge_base"])
 
 
 @router.post(
-    "/",
-    response_model=KnowledgeBaseResponse,
-    summary="Upload Knowledge Base File",
-    # flake8: noqa: E501
-    description="Upload a file and create a knowledge base entry. The file will be processed by the configured external AI service.",
-)
-@router.post(
     "",
-    response_model=KnowledgeBaseResponse,
-    summary="Upload Knowledge Base File (without trailing slash)",
-    # flake8: noqa: E501
-    description="Upload a file and create a knowledge base entry. The file will be processed by the configured external AI service.",
+    response_model=CreateKnowledgeBaseResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Knowledge Base",
+    description="Create a new knowledge base.",
 )
 async def create_knowledge_base(
-    file: UploadFile = File(..., description="File to upload"),
-    title: str = Form(..., description="Title for the knowledge base"),
-    description: str = Form(None, description="Description of the content"),
+    kb_data: KnowledgeBaseCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new knowledge base entry with file upload"""
-    try:
-        # TODO: Implement file upload to storage (S3, local, etc.)
-        # For now, we just store the filename
+    """Create a new Knowledge Base"""
 
-        # Validate file type (optional)
-        if file.content_type not in [
-            "application/pdf",
-            "text/plain",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ]:
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported file type. Only PDF, TXT, and DOCX files are allowed.",
-            )
-
-        # Create extra data from file info
-        extra_data = {
-            "original_filename": file.filename,
-            "content_type": file.content_type,
-            "size": file.size if hasattr(file, "size") else None,
-        }
-
-        kb_service = KnowledgeBaseService(db)
-        kb = kb_service.create_knowledge_base(
-            user_id=current_user.id,
-            filename=file.filename,
-            title=title,
-            description=description,
-            extra_data=extra_data,
-        )
-
-        # Send file to external AI service for processing
-        from services.external_ai_service import ExternalAIService
-        ai_service = ExternalAIService(db)
-        if ai_service.is_configured() and ai_service.token.upload_url:
-            # TODO: Implement file upload when ready
-            # job_response = await ai_service.create_upload_job(
-            #     file_path=...,
-            #     kb_id=kb.id,
-            #     metadata=extra_data
-            # )
-            pass
-
-        return kb
-
-    except Exception as e:
+    # check for active service token
+    service_token = ServiceTokenService.get_active_token(db=db)
+    if not service_token:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating knowledge base: {str(e)}",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active service configured",
         )
 
+    # Get active service
+    ai_service = ExternalAIService(db)
+    if not ai_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No active AI service configured",
+        )
 
-@router.get(
-    "/",
-    response_model=KnowledgeBaseListResponse,
-    summary="List Knowledge Bases",
-    # flake8: noqa: E501
-    description="Get paginated list of knowledge bases. Admin users see all, regular users see only their own.",
-)
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="create", name=kb_data.title, description=kb_data.description
+    )
+
+    if not rag_kb_response:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to create knowledge base on external AI service.",
+        )
+
+    kb = KnowledgeBaseService.create_knowledge_base(
+        db=db,
+        external_id=str(rag_kb_response.get("knowledge_base_id")),
+        user_id=current_user.id,
+        service_id=service_token.id,
+        is_active=kb_data.is_active,
+    )
+    return CreateKnowledgeBaseResponse(
+        id=kb.id,
+        user_id=kb.user_id,
+        title=rag_kb_response.get("name"),
+        description=rag_kb_response.get("description"),
+        is_active=kb.is_active,
+    )
+
+
 @router.get(
     "",
     response_model=KnowledgeBaseListResponse,
-    summary="List Knowledge Bases (without trailing slash)",
-    # flake8: noqa: E501
-    description="Get paginated list of knowledge bases. Admin users see all, regular users see only their own.",
+    status_code=status.HTTP_200_OK,
+    summary="List Knowledge Bases",
 )
 async def list_knowledge_bases(
     page: int = Query(1, ge=1, description="Page number"),
-    size: int = Query(10, ge=1, le=100, description="Number of records per page"),
+    size: int = Query(10, ge=1, le=100, description="Records per page"),
     search: Optional[str] = Query(None, description="Search term"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get paginated list of knowledge bases with optional search"""
-    kb_service = KnowledgeBaseService(db)
+    """Paginated list of knowledge bases"""
+    user_id = (
+        None
+        if current_user.user_type.value == UserType.ADMIN.value
+        else current_user.id
+    )
 
-    # If user is admin, show all knowledge bases
-    # Otherwise, show only user's own knowledge bases
-    if current_user.user_type.value == "admin":
-        knowledge_bases, total = kb_service.get_all_knowledge_bases(
-            page=page, size=size, search=search
+    # check for active service token
+    service_token = ServiceTokenService.get_active_token(db=db)
+    if not service_token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active service configured",
         )
-    else:
-        knowledge_bases, total = kb_service.get_user_knowledge_bases(
-            current_user.id, page=page, size=size, search=search
+
+    # Get active service
+    ai_service = ExternalAIService(db)
+    if not ai_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No active AI service configured",
+        )
+
+    knowledge_bases = KnowledgeBaseService.get_knowledge_bases(
+        db=db,
+        user_id=user_id,
+    )
+    kb_external_ids = {kb.external_id: kb.id for kb in knowledge_bases}
+    kb_is_actives = {kb.id: kb.is_active for kb in knowledge_bases}
+
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="list",
+        page=page,
+        size=size,
+        search=search,
+        kb_ids=kb_external_ids.keys(),
+    )
+
+    # empty
+    if (
+        not rag_kb_response
+        or not rag_kb_response.get("total")
+        or not len(kb_external_ids.keys())
+    ):
+        return KnowledgeBaseListResponse(
+            data=[],
+            total=0,
+            page=0,
+            size=0,
+        )
+
+    data = []
+    for kb in rag_kb_response.get("data"):
+        kb_id = str(kb.get("id")) if kb.get("id") else None  # find external_id
+        current_kb_id = kb_external_ids.get(str(kb_id)) if kb_id else None
+        if not kb_id or not current_kb_id:
+            continue
+        kb_is_active = kb_is_actives.get(current_kb_id, False)
+        data.append(
+            KnowledgeBaseResponse(
+                id=current_kb_id,
+                title=kb.get("name"),
+                description=kb.get("description"),
+                is_active=kb_is_active,
+                created_at=kb.get("created_at"),
+                updated_at=kb.get("updated_at"),
+            ),
         )
 
     return KnowledgeBaseListResponse(
-        knowledge_bases=knowledge_bases,
-        total=total,
-        page=page,
-        size=size,
+        data=data,
+        total=rag_kb_response.get("total", 0),
+        page=rag_kb_response.get("page", 0),
+        size=rag_kb_response.get("size", 0),
     )
 
 
 @router.get(
     "/{kb_id}",
     response_model=KnowledgeBaseResponse,
-    summary="Get Knowledge Base",
-    # flake8: noqa: E501
-    description="Get a specific knowledge base by ID. Users can only access their own KBs unless they are admin.",
+    status_code=status.HTTP_200_OK,
+    summary="Get Knowledge Base by ID",
 )
 async def get_knowledge_base(
     kb_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get knowledge base by ID"""
-    kb_service = KnowledgeBaseService(db)
-    kb = kb_service.get_knowledge_base_by_id(kb_id)
+    """Get a single knowledge base by ID"""
+    kb = KnowledgeBaseService.get_knowledge_base_by_id(db, kb_id)
 
     if not kb:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge base not found",
+            detail="Knowledge base not found.",
         )
 
-    # Check permissions: users can only access their own KBs unless admin
-    if current_user.user_type.value != "admin" and kb.user_id != current_user.id:
+    if (
+        current_user.user_type.value != "admin"
+        and kb.user_id != current_user.id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this knowledge base",
+            detail="Not authorized to access this KB.",
         )
 
-    return kb
+    # check for active service token
+    service_token = ServiceTokenService.get_active_token(db=db)
+    if not service_token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active service configured",
+        )
+
+    # Get active service
+    ai_service = ExternalAIService(db)
+    if not ai_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No active AI service configured",
+        )
+
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="get", kb_id=kb.external_id
+    )
+
+    return KnowledgeBaseResponse(
+        id=kb.id,
+        title=rag_kb_response.get("name"),
+        description=rag_kb_response.get("description"),
+        is_active=kb.is_active,
+        created_at=rag_kb_response.get("created_at"),
+        updated_at=rag_kb_response.get("updated_at"),
+    )
 
 
 @router.put(
     "/{kb_id}",
-    response_model=KnowledgeBaseResponse,
+    response_model=CreateKnowledgeBaseResponse,
+    status_code=status.HTTP_200_OK,
     summary="Update Knowledge Base",
-    description="Update knowledge base metadata. Users can only update their own KBs unless they are admin.",
 )
 async def update_knowledge_base(
-    kb_id: int,
+    kb_id: str,
     kb_update: KnowledgeBaseUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update knowledge base"""
-    kb_service = KnowledgeBaseService(db)
-    kb = kb_service.get_knowledge_base_by_id(kb_id)
-
+    """Update an existing knowledge base"""
+    kb = KnowledgeBaseService.get_knowledge_base_by_id(db, kb_id)
     if not kb:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge base not found",
+            detail="Knowledge base not found.",
         )
 
-    # Check permissions
-    if current_user.user_type.value != "admin" and kb.user_id != current_user.id:
+    if (
+        current_user.user_type.value != "admin"
+        and kb.user_id != current_user.id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this knowledge base",
+            detail="Not authorized to update this KB.",
         )
 
-    updated_kb = kb_service.update_knowledge_base(
-        kb_id=kb_id,
-        title=kb_update.title,
+    # Get active service
+    ai_service = ExternalAIService(db)
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="update",
+        name=kb_update.title,
         description=kb_update.description,
-        extra_data=kb_update.extra_data,
+        kb_id=kb.external_id,
     )
 
-    return updated_kb
+    if not rag_kb_response:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to update knowledge base on external AI service.",
+        )
+
+    if kb_update.is_active is not None:
+        # toggle is active
+        kb = KnowledgeBaseService.update_knowledge_base(
+            db=db,
+            kb_id=kb_id,
+            is_active=kb_update.is_active,
+        )
+
+    return CreateKnowledgeBaseResponse(
+        id=kb_id,
+        user_id=kb.user_id,
+        title=rag_kb_response.get("name"),
+        description=rag_kb_response.get("description"),
+        is_active=kb.is_active,
+    )
+
+
+@router.post(
+    "/{kb_id}/toggle-active",
+    response_model=ToggleActiveKnowledgeBaseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Toggle active status of a knowledge base",
+)
+async def toggle_kb_active(
+    kb_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Toggle is_active only
+    We need this endpoint to avoid external_service failure
+    """
+    kb = KnowledgeBaseService.get_knowledge_base_by_id(db, kb_id)
+    if not kb:
+        raise HTTPException(
+            status_code=404,
+            detail="Knowledge base not found.",
+        )
+
+    # Permission: Only owner or admin
+    if (
+        current_user.user_type != UserType.ADMIN
+        and kb.user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to modify this KB.",
+        )
+
+    # Toggle field
+    new_status = not kb.is_active
+    KnowledgeBaseService.update_knowledge_base(
+        db=db,
+        kb_id=kb_id,
+        is_active=new_status,
+    )
+
+    return ToggleActiveKnowledgeBaseResponse(
+        id=kb.id,
+        user_id=kb.user_id,
+        is_active=kb.is_active,
+    )
 
 
 @router.delete(
     "/{kb_id}",
     summary="Delete Knowledge Base",
-    description="Delete a knowledge base. Users can only delete their own KBs unless they are admin.",
 )
 async def delete_knowledge_base(
-    kb_id: int,
+    kb_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Delete knowledge base"""
-    kb_service = KnowledgeBaseService(db)
-    kb = kb_service.get_knowledge_base_by_id(kb_id)
-
+    kb = KnowledgeBaseService.get_knowledge_base_by_id(db, kb_id)
     if not kb:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge base not found",
+            detail="Knowledge base not found.",
         )
 
-    # Check permissions
-    if current_user.user_type.value != "admin" and kb.user_id != current_user.id:
+    if (
+        current_user.user_type.value != UserType.ADMIN.value
+        and kb.user_id != current_user.id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete this knowledge base",
+            detail="Not authorized to delete this KB.",
         )
 
-    success = kb_service.delete_knowledge_base(kb_id)
-    if not success:
+    # Get active service
+    ai_service = ExternalAIService(db)
+    rag_kb_response = await ai_service.manage_knowledge_base(
+        operation="delete",
+        kb_id=kb.external_id,
+    )
+
+    if not rag_kb_response:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to delete knowledge base on external AI service.",
+        )
+
+    deleted = KnowledgeBaseService.delete_knowledge_base(db, kb_id)
+    if not deleted:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete knowledge base",
+            detail="Failed to delete knowledge base.",
         )
 
-    return {"message": "Knowledge base deleted successfully"}
-
-
-@router.patch(
-    "/{kb_id}/status",
-    response_model=KnowledgeBaseResponse,
-    summary="Update Knowledge Base Status",
-    description="Update the processing status of a knowledge base. Typically used by callback handlers.",
-)
-async def update_knowledge_base_status(
-    kb_id: int,
-    status_update: KnowledgeBaseStatusUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Update knowledge base status"""
-    kb_service = KnowledgeBaseService(db)
-    kb = kb_service.get_knowledge_base_by_id(kb_id)
-
-    if not kb:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge base not found",
-        )
-
-    # Only admin or the owner can update status
-    if current_user.user_type.value != "admin" and kb.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this knowledge base status",
-        )
-
-    updated_kb = kb_service.update_status(kb_id, status_update.status)
-    return updated_kb
+    return {"message": "Knowledge base deleted successfully."}

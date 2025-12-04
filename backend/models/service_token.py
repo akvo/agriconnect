@@ -1,5 +1,6 @@
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 
 from database import Base
 
@@ -17,6 +18,12 @@ class ServiceToken(Base):
     upload_url = Column(
         String, nullable=True
     )  # URL for KB upload job requests
+
+    kb_url = Column(String, nullable=True)  # URL for KB CRUD operations
+    document_url = Column(
+        String, nullable=True
+    )  # URL for document CRUD operations
+
     default_prompt = Column(
         String, nullable=True
     )  # Default system prompt for AI service
@@ -33,6 +40,9 @@ class ServiceToken(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    # Relationships
+    knowledge_bases = relationship("KnowledgeBase", back_populates="service")
 
     def __repr__(self):
         return (
