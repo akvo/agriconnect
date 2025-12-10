@@ -11,6 +11,7 @@ Provides methods for:
 Separate from external_ai_service.py which handles async job-based AI
 services.
 """
+
 import logging
 import httpx
 import tiktoken
@@ -43,9 +44,7 @@ class OpenAIService:
     def __init__(self):
         """Initialize OpenAI service with configuration"""
         if not settings.openai_enabled:
-            logger.warning(
-                "[OpenAIService] OpenAI is disabled in config.json"
-            )
+            logger.warning("[OpenAIService] OpenAI is disabled in config.json")
 
         if not settings.openai_api_key:
             logger.warning(
@@ -69,9 +68,7 @@ class OpenAIService:
 
     def is_configured(self) -> bool:
         """Check if service is properly configured"""
-        is_valid = bool(
-            settings.openai_enabled and settings.openai_api_key
-        )
+        is_valid = bool(settings.openai_enabled and settings.openai_api_key)
 
         if not is_valid:
             missing = []
@@ -87,9 +84,7 @@ class OpenAIService:
 
         return is_valid
 
-    def _track_usage(
-        self, prompt_tokens: int, completion_tokens: int
-    ) -> None:
+    def _track_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
         """Track token usage for monitoring"""
         if settings.openai_cost_tracking_enabled:
             self.usage_stats["total_requests"] += 1
@@ -106,9 +101,7 @@ class OpenAIService:
                 f"(total: {self.usage_stats['total_tokens']})"
             )
 
-    def count_tokens(
-        self, text: str, model: Optional[str] = None
-    ) -> int:
+    def count_tokens(self, text: str, model: Optional[str] = None) -> int:
         """
         Count tokens in text for cost estimation.
 
@@ -200,9 +193,7 @@ class OpenAIService:
                 finish_reason=choice.finish_reason,
                 usage=ChatCompletionUsage(
                     prompt_tokens=(
-                        response.usage.prompt_tokens
-                        if response.usage
-                        else 0
+                        response.usage.prompt_tokens if response.usage else 0
                     ),
                     completion_tokens=(
                         response.usage.completion_tokens
@@ -268,9 +259,7 @@ class OpenAIService:
                 **kwargs,
             )
 
-            logger.info(
-                f"✓ Started streaming chat completion with {model}"
-            )
+            logger.info(f"✓ Started streaming chat completion with {model}")
 
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
@@ -308,15 +297,11 @@ class OpenAIService:
         Note: Provide either audio_url OR audio_file, not both
         """
         if not self.is_configured():
-            logger.error(
-                "[OpenAIService] Cannot transcribe - not configured"
-            )
+            logger.error("[OpenAIService] Cannot transcribe - not configured")
             return None
 
         if not settings.openai_speech_to_text_enabled:
-            logger.warning(
-                "[OpenAIService] Speech-to-text disabled in config"
-            )
+            logger.warning("[OpenAIService] Speech-to-text disabled in config")
             return None
 
         if not audio_url and not audio_file:
@@ -354,9 +339,7 @@ class OpenAIService:
             )
 
             text_len = (
-                len(transcript.text)
-                if hasattr(transcript, 'text')
-                else 0
+                len(transcript.text) if hasattr(transcript, "text") else 0
             )
             logger.info(f"✓ Audio transcribed ({text_len} chars)")
 
@@ -396,9 +379,7 @@ class OpenAIService:
             ModerationResponse or None if error
         """
         if not self.is_configured():
-            logger.error(
-                "[OpenAIService] Cannot moderate - not configured"
-            )
+            logger.error("[OpenAIService] Cannot moderate - not configured")
             return None
 
         if not settings.openai_content_moderation_enabled:
@@ -417,8 +398,7 @@ class OpenAIService:
 
             if result.flagged:
                 flagged_cats = [
-                    k for k, v in result.categories.model_dump().items()
-                    if v
+                    k for k, v in result.categories.model_dump().items() if v
                 ]
                 logger.warning(
                     f"⚠ Content flagged by moderation: "
@@ -546,9 +526,7 @@ class OpenAIService:
                 model=response.model,
                 usage=ChatCompletionUsage(
                     prompt_tokens=(
-                        response.usage.prompt_tokens
-                        if response.usage
-                        else 0
+                        response.usage.prompt_tokens if response.usage else 0
                     ),
                     completion_tokens=(
                         response.usage.completion_tokens
@@ -567,6 +545,165 @@ class OpenAIService:
         except Exception as e:
             logger.error(f"✗ Structured output failed: {e}")
             return None
+
+    async def translate_text(
+        self,
+        text: str,
+        target_language: str,
+        source_language: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Translate text between English and Swahili using OpenAI.
+
+        Args:
+            text: Text to translate
+            target_language: Target language code ("en" or "sw")
+            source_language: Source language (auto-detect if None)
+
+        Returns:
+            Translated text or None if error
+        """
+        if not self.is_configured():
+            logger.error("[OpenAIService] Cannot translate - not configured")
+            return None
+
+        # Skip translation if target is English and source is likely English
+        if target_language == "en" and source_language == "en":
+            logger.info(
+                "[OpenAIService] Skipping translation (already English)"
+            )
+            return text
+
+        # Auto-detect source language if not provided
+        if source_language is None:
+            detected_lang = await self.classify_language(text)
+            source_language = detected_lang if detected_lang else "unknown"
+
+        # Skip if already in target language
+        if source_language == target_language:
+            logger.info(
+                f"[OpenAIService] Text already in {target_language}, "
+                "skipping translation"
+            )
+            return text
+
+        language_names = {
+            "en": "English",
+            "sw": "Swahili",
+        }
+
+        target_name = language_names.get(target_language, target_language)
+        source_name = language_names.get(source_language, source_language)
+
+        system_prompt = (
+            "You are a professional translator specializing in "
+            "agricultural communication.\n\n"
+            "Translate the following text "
+            f"from {source_name} to {target_name}."
+            "Requirements:"
+            "- Maintain the original meaning and tone"
+            "- Preserve formatting (line breaks, punctuation)"
+            "- Keep special characters and placeholders "
+            "(e.g., {{1}}, {{2}}) unchanged"
+            "- Use natural, conversational language appropriate for farmers"
+            "- Preserve technical agricultural terms when appropriate"
+            "Return ONLY the translated text, no explanations."
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text},
+        ]
+
+        try:
+            response = await self.chat_completion(
+                messages=messages,
+                temperature=0.3,  # Lower for consistent translation
+                model=settings.openai_chat_model,
+            )
+
+            if response and response.content:
+                translated = response.content.strip()
+                logger.info(
+                    f"✓ Translated text from {source_language} to "
+                    f"{target_language} "
+                    f"({len(text)} → {len(translated)} chars)"
+                )
+                return translated
+
+            logger.error("[OpenAIService] Translation returned empty response")
+            return None
+
+        except Exception as e:
+            logger.error(f"✗ Translation failed: {e}")
+            return None
+
+    async def classify_language(self, text: str) -> Optional[str]:
+        """
+        Detect language of text (typo-tolerant).
+
+        Args:
+            text: Text to classify
+
+        Returns:
+            Language code ("en" or "sw") or None if error
+        """
+        if not self.is_configured():
+            logger.error(
+                "[OpenAIService] Cannot classify language - not configured"
+            )
+            return None
+
+        # Quick check for empty text
+        if not text or not text.strip():
+            return "en"  # Default to English
+
+        system_prompt = """
+            "You are a language classifier specializing in English and Swahili.
+            Identify whether the text is in English or Swahili.
+            Handle:
+            - Misspellings and typos
+            - Mixed language (choose dominant language)
+            - Short messages and greetings
+            - Numbers and symbols (ignore them)
+            Respond with ONLY one of: 'en' or 'sw' No explanations,
+            just the language code.
+        """
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Classify this text: {text}"},
+        ]
+
+        try:
+            response = await self.chat_completion(
+                messages=messages,
+                temperature=0.0,  # Deterministic classification
+                max_tokens=10,
+                model=settings.openai_chat_model,
+            )
+
+            if response and response.content:
+                language = response.content.strip().lower()
+
+                # Validate response
+                if language in ["en", "sw"]:
+                    logger.info(f"✓ Classified language as: {language}")
+                    return language
+                logger.warning(
+                    f"[OpenAIService] Unexpected language classification: "
+                    f"{language}, defaulting to 'en'"
+                )
+                return "en"
+
+            logger.error(
+                "[OpenAIService] Language classification returned empty"
+            )
+            return "en"  # Default to English
+
+        except Exception as e:
+            logger.error(f"✗ Language classification failed: {e}")
+            return "en"  # Default to English on error
 
     def get_usage_stats(self) -> Dict[str, int]:
         """Get usage statistics"""
