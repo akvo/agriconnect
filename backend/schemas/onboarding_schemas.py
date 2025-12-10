@@ -120,6 +120,27 @@ class OnboardingFieldConfig:
 
 # Onboarding fields registry - defines all profile fields to collect
 ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
+    # PRIORITY 0: Language Preference (REQUIRED)
+    OnboardingFieldConfig(
+        field_name="language",
+        db_field="language",
+        required=True,
+        priority=0,
+        initial_question=(
+            "Welcome to AgriConnect! 🌾\n\n"
+            "Choose your language / Chagua lugha yako:\n"
+            "1. English\n"
+            "2. Swahili / Kiswahili"
+        ),
+        extraction_method="extract_language",
+        matching_method=None,  # Direct enum mapping
+        max_attempts=3,
+        field_type="enum",
+        success_message_template=(
+            "Great! I'll communicate with you in {value}."
+        ),
+    ),
+
     # PRIORITY 1: Administration Location (REQUIRED)
     OnboardingFieldConfig(
         field_name="administration",
