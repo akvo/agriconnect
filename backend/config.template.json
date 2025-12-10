@@ -4,14 +4,17 @@
 		"templates": {
 			"confirmation": {
 				"sid": "HX30987fb04aa06c8f06d80818455ba018",
+				"sid_sw": "HX71aee60f986fbf72a5abd29ad641712f",
 				"description": "Template sent after AI response asking if farmer needs human help"
 			},
 			"reconnection": {
 				"sid": "HXc1711d07d1b1b74589fc035fea0d4f52",
+				"sid_sw": "HXa82af425a498ab15ce2cfa0255deb4f8",
 				"description": "Template sent to reconnect with farmer after escalation"
 			},
 			"broadcast": {
 				"sid": "HX8658667a944883b1ceab9205b83d407b",
+				"sid_sw": "HX3b9f54d9b345b04f5798d655db7bbb25",
 				"description": "Template send to confirm incoming broadcast message"
 			}
 		},
