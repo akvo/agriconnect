@@ -29,7 +29,7 @@ class CustomerService:
     def create_customer(
         self,
         phone_number: str,
-        language: CustomerLanguage = CustomerLanguage.EN,
+        language: CustomerLanguage = None,
     ) -> Customer:
         """Create a new customer with minimal fields."""
         customer = Customer(phone_number=phone_number, language=language)

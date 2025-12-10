@@ -44,7 +44,7 @@ class Customer(Base):
     id = Column(Integer, primary_key=True, index=True)
     phone_number = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=True)
-    language = Column(Enum(CustomerLanguage), default=CustomerLanguage.EN)
+    language = Column(Enum(CustomerLanguage), default=None, nullable=True)
     # JSON object with profile fields
     profile_data = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
