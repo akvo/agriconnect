@@ -67,7 +67,7 @@ class WhatsAppService:
         self.testing_mode = os.getenv("TESTING", "").lower() in (
             "true",
             "1",
-            "yes"
+            "yes",
         )
 
         if self.testing_mode:
@@ -130,25 +130,26 @@ class WhatsAppService:
 
         # Remove wrapping quotation marks (single or double quotes)
         # that wrap the entire response
-        if (text.startswith('"') and text.endswith('"')) or \
-           (text.startswith("'") and text.endswith("'")):
+        if (text.startswith('"') and text.endswith('"')) or (
+            text.startswith("'") and text.endswith("'")
+        ):
             text = text[1:-1].strip()
 
         # Replace more than 4 consecutive spaces with 3 spaces
-        text = re.sub(r' {4,}', '   ', text)
+        text = re.sub(r" {4,}", "   ", text)
 
         # Replace consecutive newlines (2+ newlines) with single newline
-        text = re.sub(r'\n{2,}', '\n', text)
+        text = re.sub(r"\n{2,}", "\n", text)
 
         # Replace tabs with single space
-        text = text.replace('\t', ' ')
+        text = text.replace("\t", " ")
 
         # Fix consecutive punctuation (e.g., "results.." becomes "results.")
-        text = re.sub(r'([.!?]){2,}', r'\1', text)
+        text = re.sub(r"([.!?]){2,}", r"\1", text)
 
         # Fix punctuation followed by multiple spaces
         # (e.g., "results. " becomes "results. ")
-        text = re.sub(r'([.!?,;:])\s{2,}', r'\1 ', text)
+        text = re.sub(r"([.!?,;:])\s{2,}", r"\1 ", text)
 
         # Remove any remaining leading/trailing whitespace
         text = text.strip()
@@ -159,16 +160,76 @@ class WhatsAppService:
 
         return text
 
+    def get_template_sid(
+        self, template_type: str, customer_language: Optional[str] = None
+    ) -> str:
+        """
+        Get the appropriate template SID based on customer language.
+
+        Args:
+            template_type: Type of template
+                ("confirmation", "reconnection", "broadcast")
+            customer_language: Customer's language preference ("en" or "sw")
+
+        Returns:
+            Template SID string
+        """
+        from config import settings
+
+        # Map template types to config attributes
+        template_map = {
+            "confirmation": {
+                "en": settings.whatsapp_confirmation_template_sid,
+                "sw": settings.whatsapp_confirmation_template_sid_sw,
+            },
+            "reconnection": {
+                "en": settings.whatsapp_reconnection_template_sid,
+                "sw": settings.whatsapp_reconnection_template_sid_sw,
+            },
+            "broadcast": {
+                "en": settings.whatsapp_broadcast_template_sid,
+                "sw": settings.whatsapp_broadcast_template_sid_sw,
+            },
+        }
+
+        if template_type not in template_map:
+            logger.warning(
+                f"[WhatsAppService] Unknown template type: {template_type}, "
+                f"defaulting to confirmation"
+            )
+            template_type = "confirmation"
+
+        # Get SID for customer's language, fallback to English
+        language = (
+            customer_language if customer_language in ["en", "sw"] else "en"
+        )
+        sid = template_map[template_type].get(language)
+
+        # Fallback to English if Swahili SID not available
+        if not sid and language == "sw":
+            logger.warning(
+                f"[WhatsAppService] Swahili template not configured for "
+                f"{template_type}, using English"
+            )
+            sid = template_map[template_type].get("en")
+
+        logger.info(
+            f"[WhatsAppService] Selected {template_type} template "
+            f"for language '{language}': {sid}"
+        )
+
+        return sid
+
     def send_template_message(
-        self,
-        to: str,
-        content_sid: str,
-        content_variables: Dict[str, str]
+        self, to: str, content_sid: str, content_variables: Dict[str, str]
     ) -> Dict[str, Any]:
         """
         Send WhatsApp template message via Twilio.
         Use if we have pre-approved templates
         Use for initiated messages only
+
+        Note: Use get_template_sid() to get the appropriate SID
+        based on language
         """
         if self.testing_mode:
             logger.info(
@@ -302,9 +363,7 @@ class WhatsAppService:
             return answer_response
 
     def download_twilio_media(
-        self,
-        media_url: str,
-        save_path: str
+        self, media_url: str, save_path: str
     ) -> Optional[str]:
         """
         Download media file from Twilio.
@@ -327,17 +386,15 @@ class WhatsAppService:
                 f"[TESTING MODE] Mocking media download from {media_url}"
             )
             # Create empty file for testing
-            with open(save_path, 'wb') as f:
-                f.write(b'fake audio data for testing')
+            with open(save_path, "wb") as f:
+                f.write(b"fake audio data for testing")
             return save_path
 
         try:
             # Try without auth first (media URLs are public by default)
             try:
                 response = httpx.get(
-                    media_url,
-                    timeout=30.0,
-                    follow_redirects=True
+                    media_url, timeout=30.0, follow_redirects=True
                 )
                 response.raise_for_status()
 
@@ -357,7 +414,7 @@ class WhatsAppService:
                         media_url,
                         auth=auth,
                         timeout=30.0,
-                        follow_redirects=True
+                        follow_redirects=True,
                     )
                     response.raise_for_status()
 
@@ -369,7 +426,7 @@ class WhatsAppService:
                     raise  # Re-raise other HTTP errors
 
             # Save to file
-            with open(save_path, 'wb') as f:
+            with open(save_path, "wb") as f:
                 f.write(response.content)
 
             return save_path
@@ -412,8 +469,7 @@ class WhatsAppService:
 
             # Format to E.164
             formatted = phonenumbers.format_number(
-                parsed,
-                phonenumbers.PhoneNumberFormat.E164
+                parsed, phonenumbers.PhoneNumberFormat.E164
             )
 
             logger.info(f"Validated phone: {phone} → {formatted}")
@@ -452,10 +508,11 @@ class WhatsAppService:
             logger.error(f"Phone validation failed: {e}")
             if message_id and db:
                 self._update_message_status(
-                    db, message_id,
+                    db,
+                    message_id,
                     delivery_status="FAILED",
                     error_code="INVALID",  # Shortened to fit 10-char limit
-                    error_message=str(e)
+                    error_message=str(e),
                 )
             raise
 
@@ -469,9 +526,10 @@ class WhatsAppService:
             # Update database status even in testing mode
             if message_id and db:
                 self._update_message_status(
-                    db, message_id,
+                    db,
+                    message_id,
                     delivery_status="SENT",
-                    message_sid=mock_sid
+                    message_sid=mock_sid,
                 )
 
             return {
@@ -498,10 +556,11 @@ class WhatsAppService:
                 )
                 if message_id and db:
                     self._update_message_status(
-                        db, message_id,
+                        db,
+                        message_id,
                         delivery_status="FAILED",
                         error_code=str(message.error_code),
-                        error_message=message.error_message
+                        error_message=message.error_message,
                     )
                 raise TwilioRestException(
                     status=400,
@@ -515,9 +574,10 @@ class WhatsAppService:
                 # Map Twilio status to our enum
                 delivery_status = self._map_twilio_status(message.status)
                 self._update_message_status(
-                    db, message_id,
+                    db,
+                    message_id,
                     delivery_status=delivery_status,
-                    message_sid=message.sid
+                    message_sid=message.sid,
                 )
 
             logger.info(
@@ -540,16 +600,14 @@ class WhatsAppService:
                 # Determine if error is retryable
                 # Rate limit, server errors
                 retryable_codes = [20429, 20500, 20503]
-                status = (
-                    "PENDING" if e.code in retryable_codes
-                    else "FAILED"
-                )
+                status = "PENDING" if e.code in retryable_codes else "FAILED"
 
                 self._update_message_status(
-                    db, message_id,
+                    db,
+                    message_id,
                     delivery_status=status,
                     error_code=str(e.code),
-                    error_message=e.msg
+                    error_message=e.msg,
                 )
 
             raise
