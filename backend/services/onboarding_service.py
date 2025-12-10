@@ -18,7 +18,12 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from rapidfuzz import fuzz
 
-from models.customer import Customer, OnboardingStatus, Gender
+from models.customer import (
+    Customer,
+    OnboardingStatus,
+    Gender,
+    CustomerLanguage,
+)
 from models.administrative import Administrative, CustomerAdministrative
 from schemas.onboarding_schemas import (
     LocationData,
@@ -30,6 +35,7 @@ from schemas.onboarding_schemas import (
 )
 from services.openai_service import get_openai_service
 from config import settings
+from utils.i18n import t, get_crop_name_translated
 
 logger = logging.getLogger(__name__)
 
@@ -70,17 +76,21 @@ class OnboardingService:
         """
         Check if customer needs onboarding.
 
-        Returns True if any required field is incomplete.
+        Returns True if:
+        - Language is NULL (even if onboarding was completed), OR
+        - Any required field is incomplete
+
         Returns False if all required fields are complete.
         """
+        # TAC-7: If language is NULL, always trigger language selection
+        if customer.language is None:
+            return True
+
         # If onboarding already completed or failed, no need
         if (
-            (
-                customer.onboarding_status == OnboardingStatus.COMPLETED and
-                customer.crop_type
-            ) or
-            customer.onboarding_status == OnboardingStatus.FAILED
-        ):
+            customer.onboarding_status == OnboardingStatus.COMPLETED
+            and customer.crop_type
+        ) or customer.onboarding_status == OnboardingStatus.FAILED:
             return False
 
         # Check if there's a next incomplete field
@@ -124,6 +134,10 @@ class OnboardingService:
         For required fields: field must have non-empty value
         """
         field_name = field_config.field_name
+
+        # Special case: language uses direct column
+        if field_name == "language":
+            return customer.language is not None
 
         # Special case: administration uses relationship table
         if field_name == "administration":
@@ -322,12 +336,9 @@ Set null for any field that's not mentioned."""
         """
         result = await self._identify_crop(message)
 
-        if (
-            result.crop_name and
-            result.crop_name.strip().lower() in [
-                c.lower() for c in self.supported_crops
-            ]
-        ):
+        if result.crop_name and result.crop_name.strip().lower() in [
+            c.lower() for c in self.supported_crops
+        ]:
             logger.info(
                 f"[OnboardingService] Extracted crop: {result.crop_name} "
                 f"(confidence: {result.confidence})"
@@ -510,6 +521,93 @@ Candidates: ["Avocado", "Cacao"]
         except Exception as e:
             logger.error(f"Error resolving crop ambiguity: {e}")
             return None
+
+    async def extract_language(self, message: str) -> Optional[str]:
+        """
+        Extract language preference from farmer's message.
+
+        Handles various input formats:
+        - Direct: "English", "Swahili", "Kiswahili"
+        - Numbers: "1" → English, "2" → Swahili
+        - Language codes: "en", "sw"
+        - Partial: "eng", "swa"
+
+        Args:
+            message: Farmer's message text
+
+        Returns:
+            CustomerLanguage enum (EN or SW) or None
+        """
+        message_lower = message.lower().strip()
+
+        # Direct mapping for common inputs
+        english_patterns = [
+            "1",
+            "english",
+            "en",
+            "eng",
+            "ingereza",
+            "kiingereza",
+        ]
+        swahili_patterns = ["2", "swahili", "sw", "swa", "kiswahili"]
+
+        if any(pattern in message_lower for pattern in english_patterns):
+            logger.info("[OnboardingService] Language extracted: English")
+            return CustomerLanguage.EN
+
+        if any(pattern in message_lower for pattern in swahili_patterns):
+            logger.info("[OnboardingService] Language extracted: Swahili")
+            return CustomerLanguage.SW
+
+        # Fallback to OpenAI for unclear inputs
+        system_prompt = (
+            "You are extracting language preference from messages.\n"
+            'Extract and normalize to one of: "en" (English), "sw" (Swahili)\n'
+            "Handle these formats:\n"
+            '1. English words: "English", "Kiingereza" → "en"\n'
+            '2. Swahili words: "Swahili", "Kiswahili" → "sw"\n'
+            '3. Numbers: 1 → "en", 2 → "sw"\n'
+            '4. Language codes: "en", "sw"\n\n'
+            "Return a JSON object with: language field."
+            ""
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": f"Extract language preference: {message}",
+            },
+        ]
+
+        response = await self.openai_service.structured_output(
+            messages=messages,
+            response_format={
+                "type": "object",
+                "properties": {
+                    "language": {
+                        "type": ["string", "null"],
+                        "enum": ["en", "sw", None],
+                    },
+                },
+            },
+        )
+
+        if not response or not response.data.get("language"):
+            logger.info(
+                f"[OnboardingService] No language extracted from: {message}"
+            )
+            return None
+
+        language_value = response.data["language"]
+        if language_value == "en":
+            logger.info("[OnboardingService] Extracted language: English")
+            return CustomerLanguage.EN
+        elif language_value == "sw":
+            logger.info("[OnboardingService] Extracted language: Swahili")
+            return CustomerLanguage.SW
+
+        return None
 
     async def extract_gender(self, message: str) -> Optional[str]:
         """
@@ -784,6 +882,62 @@ Birth year must be between 1900 and {current_year}."""
         """
         Main entry point for processing onboarding messages.
 
+        Translation pipeline:
+        - Translates incoming Swahili user input to English for processing
+        - Generates responses directly in customer's
+          preferred language using predefined translations
+        - No real-time translation needed for output (uses i18n)
+
+        Flow:
+        1. Translate incoming message if needed (sw → en)
+        2. Process onboarding logic - generates messages in customer's language
+
+        Args:
+            customer: Customer instance
+            message: Farmer's WhatsApp message text (any language)
+
+        Returns:
+            OnboardingResponse with status and message in customer's language
+        """
+        # Determine customer's language (default to EN if not set yet)
+        customer_language = (
+            customer.language.value if customer.language else "en"
+        )
+
+        # Step 1: Translate incoming message if Swahili user
+        processed_message = message
+        if customer_language == "sw":
+            translated = await self.openai_service.translate_text(
+                text=message,
+                target_language="en",
+                source_language="sw",
+            )
+            if translated:
+                processed_message = translated
+                logger.info(
+                    f"[OnboardingService] Translated sw → en: "
+                    f"{message[:50]}... → {processed_message[:50]}..."
+                )
+            else:
+                logger.warning(
+                    "[OnboardingService] Translation failed, "
+                    "using original message"
+                )
+
+        # Step 2:
+        # Process onboarding logic - responses already in correct language
+        response = await self._process_onboarding_logic(
+            customer, processed_message
+        )
+
+        return response
+
+    async def _process_onboarding_logic(
+        self, customer: Customer, message: str
+    ) -> OnboardingResponse:
+        """
+        Core onboarding logic (always processes in English).
+
         Handles ANY onboarding field generically based on configuration.
 
         Flow:
@@ -797,10 +951,10 @@ Birth year must be between 1900 and {current_year}."""
 
         Args:
             customer: Customer instance
-            message: Farmer's WhatsApp message text
+            message: Farmer's message text (in English)
 
         Returns:
-            OnboardingResponse with status and message to send farmer
+            OnboardingResponse with status and message (in English)
         """
         # Get next field that needs to be collected
         next_field_config = self._get_next_incomplete_field(customer)
@@ -845,19 +999,27 @@ Birth year must be between 1900 and {current_year}."""
             f"for customer {customer.id}"
         )
 
-        # Get question and replace template variables if needed
-        question = field_config.initial_question
+        # Get customer language
+        lang = customer.language.value if customer.language else "en"
+        field_name = field_config.field_name
 
-        # Replace {available_crops} for crop_type field
-        if field_config.field_name == "crop_type":
+        # Get translated question
+        question = t(f"onboarding.{field_name}.question", lang)
+
+        # Replace {available_crops}
+        # for crop_type field with translated crop names
+        if field_name == "crop_type":
             crops_formatted = ", ".join(
-                crop.lower() for crop in self.supported_crops
+                [
+                    get_crop_name_translated(crop, lang)
+                    for crop in self.supported_crops
+                ]
             )
-            question = question.replace("{available_crops}", crops_formatted)
+            question = question.format(available_crops=crops_formatted)
 
         # Add skip instruction for optional fields
         if not field_config.required:
-            question += "\n\n(Reply 'skip' if you prefer not to answer)"
+            question += t("onboarding.common.skip_instruction", lang)
 
         return OnboardingResponse(
             message=question,
@@ -884,7 +1046,12 @@ Birth year must be between 1900 and {current_year}."""
 
         # Check if user wants to skip (only for optional fields)
         if not field_config.required and message.lower().strip() in [
-            "skip", "pass", "next", "no", "n/a", "na"
+            "skip",
+            "pass",
+            "next",
+            "no",
+            "n/a",
+            "na",
         ]:
             logger.info(
                 f"User skipped optional field: {field_name} "
@@ -914,6 +1081,9 @@ Birth year must be between 1900 and {current_year}."""
         if new_attempts > field_config.max_attempts:
             return self._handle_max_attempts(customer, field_config)
 
+        # Get customer language
+        lang = customer.language.value if customer.language else "en"
+
         # Extract value using field-specific extraction method
         try:
             extraction_method = getattr(self, field_config.extraction_method)
@@ -922,10 +1092,21 @@ Birth year must be between 1900 and {current_year}."""
             logger.error(
                 f"Extraction failed for {field_name}: {e}", exc_info=True
             )
+            question = t(f"onboarding.{field_name}.question", lang)
+            if field_name == "crop_type":
+                crops_formatted = ", ".join(
+                    [
+                        get_crop_name_translated(crop, lang)
+                        for crop in self.supported_crops
+                    ]
+                )
+                question = question.format(available_crops=crops_formatted)
+
             return OnboardingResponse(
-                message=(
-                    "I didn't quite understand that. "
-                    f"{field_config.initial_question}"
+                message=t(
+                    "onboarding.common.extraction_failed",
+                    lang,
+                    question=question,
                 ),
                 status="in_progress",
                 attempts=new_attempts,
@@ -935,32 +1116,36 @@ Birth year must be between 1900 and {current_year}."""
         if extracted_value is None:
             # Build progressive error message for crop_type
             if field_name == "crop_type":
+                crops_formatted = ", ".join(
+                    [
+                        get_crop_name_translated(crop, lang)
+                        for crop in self.supported_crops
+                    ]
+                )
+
                 if current_attempts == 0:
                     # First attempt: Generic message with full question
-                    crops_formatted = ", ".join(
-                        crop.lower() for crop in self.supported_crops
-                    )
-                    error_question = field_config.initial_question.replace(
-                        "{available_crops}", crops_formatted
-                    )
-                    error_message = (
-                        "I couldn't identify that information. "
-                        f"{error_question}"
+                    question = t(f"onboarding.{field_name}.question", lang)
+                    question = question.format(available_crops=crops_formatted)
+                    error_message = t(
+                        "onboarding.crop_type.extraction_failed_first",
+                        lang,
+                        question=question,
                     )
                 else:
                     # Subsequent attempts: More specific
-                    crops_formatted = ", ".join(
-                        crop.lower() for crop in self.supported_crops
-                    )
-                    error_message = (
-                        "I still couldn't identify that information. "
-                        f"Please specify one of these crops: {crops_formatted}"
+                    error_message = t(
+                        "onboarding.crop_type.extraction_failed_retry",
+                        lang,
+                        available_crops=crops_formatted,
                     )
             else:
-                # Other fields: Keep existing behavior
-                error_message = (
-                    "I couldn't identify that information. "
-                    f"{field_config.initial_question}"
+                # Other fields: Use generic extraction failed message
+                question = t(f"onboarding.{field_name}.question", lang)
+                error_message = t(
+                    "onboarding.common.extraction_failed",
+                    lang,
+                    question=question,
                 )
 
             return OnboardingResponse(
@@ -988,17 +1173,19 @@ Birth year must be between 1900 and {current_year}."""
         field_config: OnboardingFieldConfig,
     ) -> OnboardingResponse:
         """Handle administration location field with fuzzy matching."""
+        # Get customer language
+        lang = customer.language.value if customer.language else "en"
+
         # Find matching wards
         candidates = self.find_matching_wards(location)
 
         if not candidates:
             # No match found
             return OnboardingResponse(
-                message=(
-                    f"I couldn't find a matching location for "
-                    f"'{location.full_text}'. "
-                    "Could you please provide your location more "
-                    "specifically? Include your region, district, and ward."
+                message=t(
+                    "onboarding.administration.no_match",
+                    lang,
+                    input=location.full_text,
                 ),
                 status="in_progress",
                 attempts=self._get_attempts(customer, field_config.field_name),
@@ -1039,6 +1226,9 @@ Birth year must be between 1900 and {current_year}."""
 
         self.db.commit()
 
+        # Get customer language
+        lang = customer.language.value if customer.language else "en"
+
         # Build options message
         options_text = "\n".join(
             [f"{i+1}. {c.path}" for i, c in enumerate(top_candidates)]
@@ -1050,10 +1240,10 @@ Birth year must be between 1900 and {current_year}."""
         )
 
         return OnboardingResponse(
-            message=(
-                f"I found multiple locations that match. "
-                f"Please select the correct one:\n\n{options_text}\n\n"
-                "Reply with the number (e.g., '1', '2', etc.)"
+            message=t(
+                "onboarding.administration.multiple_matches",
+                lang,
+                options=options_text,
             ),
             status="awaiting_selection",
             candidates=top_candidates,
@@ -1069,15 +1259,15 @@ Birth year must be between 1900 and {current_year}."""
         """Process farmer's numeric selection from ambiguous options."""
         field_name = field_config.field_name
 
+        # Get customer language
+        lang = customer.language.value if customer.language else "en"
+
         # Parse selection
         selection_index = self.parse_selection(message)
 
         if selection_index is None:
             return OnboardingResponse(
-                message=(
-                    "I didn't understand your selection. "
-                    "Please reply with a number (e.g., '1', '2', '3')"
-                ),
+                message=t("onboarding.common.invalid_selection", lang),
                 status="awaiting_selection",
                 attempts=self._get_attempts(customer, field_name),
             )
@@ -1092,9 +1282,10 @@ Birth year must be between 1900 and {current_year}."""
 
         if selection_index >= len(candidate_ids):
             return OnboardingResponse(
-                message=(
-                    f"Please select a number between 1 and "
-                    f"{len(candidate_ids)}"
+                message=t(
+                    "onboarding.common.selection_out_of_range",
+                    lang,
+                    max=len(candidate_ids),
                 ),
                 status="awaiting_selection",
                 attempts=self._get_attempts(customer, field_name),
@@ -1113,7 +1304,7 @@ Birth year must be between 1900 and {current_year}."""
             if not selected_obj:
                 logger.error(f"Administrative {selected_value} not found")
                 return OnboardingResponse(
-                    message="Sorry, something went wrong. Please try again.",
+                    message=t("onboarding.common.database_error", lang),
                     status="in_progress",
                     attempts=self._get_attempts(customer, field_name),
                 )
@@ -1136,9 +1327,26 @@ Birth year must be between 1900 and {current_year}."""
         """
         field_name = field_config.field_name
 
+        # Get customer language
+        lang = customer.language.value if customer.language else "en"
+
         try:
+            # Special case: language uses direct column
+            if field_name == "language":
+                customer.language = value
+                lang = value.value
+                language_name = (
+                    "English" if value == CustomerLanguage.EN else "Swahili"
+                )
+                success_msg = t(
+                    f"onboarding.{field_name}.success",
+                    lang,
+                    value=language_name,
+                )
+                print(f"success_msg: {success_msg}", f"lang: {lang}")
+
             # Special case: administration uses relationship table
-            if field_name == "administration":
+            elif field_name == "administration":
                 # value is an Administrative object
                 existing = (
                     self.db.query(CustomerAdministrative)
@@ -1153,8 +1361,8 @@ Birth year must be between 1900 and {current_year}."""
                         administrative_id=value.id,
                     )
                     self.db.add(customer_admin)
-                success_msg = field_config.success_message_template.format(
-                    value=value.path
+                success_msg = t(
+                    f"onboarding.{field_name}.success", lang, value=value.path
                 )
 
             # Standard case: save to profile_data JSON
@@ -1169,12 +1377,20 @@ Birth year must be between 1900 and {current_year}."""
                 # Convert enum to value if needed
                 if isinstance(value, Gender):
                     profile_dict[field_name] = value.value
+                    display_value = value.value
                 else:
                     profile_dict[field_name] = value
+                    display_value = value
+
+                # For crop_type, translate the crop name
+                if field_name == "crop_type":
+                    display_value = get_crop_name_translated(value, lang)
 
                 customer.profile_data = profile_dict
-                success_msg = field_config.success_message_template.format(
-                    value=value
+                success_msg = t(
+                    f"onboarding.{field_name}.success",
+                    lang,
+                    value=display_value,
                 )
 
             # Clear field-specific state
@@ -1192,16 +1408,23 @@ Birth year must be between 1900 and {current_year}."""
 
             if next_field:
                 # More fields to collect - combine success msg with next Q
-                combined_message = (
-                    f"{success_msg}\n\n{next_field.initial_question}"
+                next_question = t(
+                    f"onboarding.{next_field.field_name}.question", lang
                 )
+
+                # Handle crop_type field with translated crop names
                 if next_field.field_name == "crop_type":
                     crops_formatted = ", ".join(
-                        crop.lower() for crop in self.supported_crops
+                        [
+                            get_crop_name_translated(crop, lang)
+                            for crop in self.supported_crops
+                        ]
                     )
-                    combined_message = combined_message.replace(
-                        "{available_crops}", crops_formatted
+                    next_question = next_question.format(
+                        available_crops=crops_formatted
                     )
+
+                combined_message = f"{success_msg}\n\n{next_question}"
                 customer.current_onboarding_field = next_field.field_name
                 self.db.commit()
 
@@ -1221,10 +1444,7 @@ Birth year must be between 1900 and {current_year}."""
             self.db.rollback()
 
             return OnboardingResponse(
-                message=(
-                    "Sorry, I had trouble saving that information. "
-                    "Please try again."
-                ),
+                message=t("onboarding.common.save_error", lang),
                 status="in_progress",
                 attempts=self._get_attempts(customer, field_name),
             )
@@ -1244,6 +1464,10 @@ Birth year must be between 1900 and {current_year}."""
         """
         field_name = field_config.field_name
 
+        # Get customer language
+        lang = customer.language.value if customer.language else "en"
+        field_display = t(f"onboarding.{field_name}.field_name", lang)
+
         logger.warning(
             f"Max attempts exceeded for {field_name}, "
             f"customer {customer.id}"
@@ -1262,20 +1486,17 @@ Birth year must be between 1900 and {current_year}."""
             )
 
             return OnboardingResponse(
-                message=(
-                    "I'm having trouble collecting your "
-                    f"{field_name.replace('_', ' ')}. "
-                    "Please contact support for assistance, "
-                    "or try again later."
+                message=t(
+                    "onboarding.common.max_attempts_required",
+                    lang,
+                    field=field_display,
                 ),
                 status="failed",
                 attempts=self._get_attempts(customer, field_name),
             )
         else:
             # Optional field - skip and move to next
-            customer.set_profile_field(
-                field_name, None
-            )
+            customer.set_profile_field(field_name, None)
 
             # Clear field state
             self._clear_field_state(customer, field_name)
@@ -1299,13 +1520,13 @@ Birth year must be between 1900 and {current_year}."""
         customer.current_onboarding_field = None
         self.db.commit()
 
+        # Get customer language
+        lang = customer.language.value if customer.language else "en"
+
         logger.info(f"✓ Onboarding completed for customer {customer.id}")
 
         return OnboardingResponse(
-            message=(
-                "Perfect! Your profile is all set up. "
-                "How can I help you today?"
-            ),
+            message=t("onboarding.common.completion", lang),
             status="completed",
             attempts=0,
         )
@@ -1319,6 +1540,15 @@ Birth year must be between 1900 and {current_year}."""
     ) -> OnboardingResponse:
         """
         Process farmer's message during onboarding.
+
+        DEPRECATED: This method is kept for backward compatibility only.
+        Use process_onboarding_message() instead for full multi-field
+        onboarding with proper translation support.
+        This method only handles administration/location field collection
+        and uses hardcoded English messages. It does not support:
+        - Multi-field onboarding workflow
+        - Predefined translations (i18n)
+        - Other field types (crop_type, gender, birth_year, language)
 
         Args:
             customer: Customer object
