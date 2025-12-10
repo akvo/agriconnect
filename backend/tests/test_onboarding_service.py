@@ -6,7 +6,11 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from models.customer import Customer, OnboardingStatus
+from models.customer import (
+    Customer,
+    OnboardingStatus,
+    CustomerLanguage,
+)
 from models.administrative import (
     Administrative,
     AdministrativeLevel,
@@ -144,6 +148,7 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.NOT_STARTED,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -157,6 +162,7 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.NOT_STARTED,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -180,6 +186,7 @@ class TestOnboardingService:
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.COMPLETED,
             profile_data={"crop_type": "Avocado"},
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -193,6 +200,7 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.FAILED,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -422,6 +430,7 @@ class TestOnboardingService:
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.NOT_STARTED,
             onboarding_attempts={},  # Initialize as empty dict
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -462,6 +471,7 @@ class TestOnboardingService:
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             onboarding_attempts={"administration": 2},
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -507,6 +517,7 @@ class TestOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.NOT_STARTED,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -556,6 +567,7 @@ class TestOnboardingService:
                 ]
             },
             current_onboarding_field="administration",
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -594,6 +606,7 @@ class TestOnboardingService:
             onboarding_candidates=json.dumps(
                 [sample_administrative_data["westlands"].id]
             ),
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -617,6 +630,7 @@ class TestOnboardingService:
                 "administration": [sample_administrative_data["westlands"].id]
             },
             current_onboarding_field="administration",
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -636,6 +650,7 @@ class TestOnboardingService:
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             onboarding_candidates=None,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()

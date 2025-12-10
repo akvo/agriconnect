@@ -5,7 +5,11 @@ Tests for skipping optional onboarding fields in customer onboarding process.
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from models.customer import Customer, OnboardingStatus
+from models.customer import (
+    Customer,
+    OnboardingStatus,
+    CustomerLanguage,
+)
 from models.administrative import (
     Administrative,
     AdministrativeLevel,
@@ -106,6 +110,7 @@ class TestOptionalFieldSkip:
             profile_data={"crop_type": "Cacao"},
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             current_onboarding_field="gender",
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -424,6 +429,7 @@ class TestOptionalFieldSkip:
         customer = Customer(
             phone_number="+254700999002",
             profile_data={"gender": None},
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -441,6 +447,7 @@ class TestOptionalFieldSkip:
         customer = Customer(
             phone_number="+254700999003",
             profile_data={"crop_type": None},
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -458,6 +465,7 @@ class TestOptionalFieldSkip:
         customer = Customer(
             phone_number="+254700999004",
             profile_data={"gender": ""},
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -549,6 +557,7 @@ class TestOptionalFieldSkip:
             profile_data={},
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             current_onboarding_field="crop_type",
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()

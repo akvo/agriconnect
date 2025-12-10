@@ -11,7 +11,12 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime
 
-from models.customer import Customer, OnboardingStatus, Gender
+from models.customer import (
+    Customer,
+    OnboardingStatus,
+    Gender,
+    CustomerLanguage,
+)
 from models.administrative import (
     Administrative,
     AdministrativeLevel,
@@ -112,7 +117,10 @@ class TestGenericOnboardingService:
         """Test administration field completion check - empty"""
         from schemas.onboarding_schemas import get_field_config
 
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -128,7 +136,10 @@ class TestGenericOnboardingService:
         """Test administration field completion check - filled"""
         from schemas.onboarding_schemas import get_field_config
 
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -152,7 +163,10 @@ class TestGenericOnboardingService:
         """Test crop type field completion check"""
         from schemas.onboarding_schemas import get_field_config
 
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -175,7 +189,10 @@ class TestGenericOnboardingService:
         """Test gender field completion check"""
         from schemas.onboarding_schemas import get_field_config
 
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -200,7 +217,10 @@ class TestGenericOnboardingService:
         """Test birth year field completion check"""
         from schemas.onboarding_schemas import get_field_config
 
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -227,7 +247,10 @@ class TestGenericOnboardingService:
         self, db_session, onboarding_service
     ):
         """Test getting next field for brand new customer"""
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -240,7 +263,10 @@ class TestGenericOnboardingService:
         self, db_session, onboarding_service, sample_administrative_data
     ):
         """Test getting next field after administration is complete"""
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -268,6 +294,7 @@ class TestGenericOnboardingService:
                 "gender": "male",
                 "birth_year": 1990
             },
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -289,7 +316,10 @@ class TestGenericOnboardingService:
 
     def test_increment_attempts(self, db_session, onboarding_service):
         """Test incrementing attempt counter for a field"""
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -318,7 +348,10 @@ class TestGenericOnboardingService:
         self, db_session, onboarding_service
     ):
         """Test storing and retrieving candidate values"""
-        customer = Customer(phone_number="+254700000001")
+        customer = Customer(
+            phone_number="+254700000001",
+            onboarding_status=OnboardingStatus.IN_PROGRESS,
+        )
         db_session.add(customer)
         db_session.commit()
 
@@ -345,6 +378,7 @@ class TestGenericOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             current_onboarding_field="crop_type",
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -555,6 +589,7 @@ class TestGenericOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.NOT_STARTED,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -627,6 +662,7 @@ class TestGenericOnboardingService:
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             current_onboarding_field="crop_type",
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -670,6 +706,7 @@ class TestGenericOnboardingService:
             phone_number="+254700000001",
             profile_data={"crop_type": "Cacao"},
             onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -691,6 +728,7 @@ class TestGenericOnboardingService:
         customer = Customer(
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -1063,6 +1101,7 @@ class TestGenericOnboardingService:
                 "gender": "male",
                 "birth_year": 1990
             },
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -1091,7 +1130,8 @@ class TestGenericOnboardingService:
         """Test processing message with failed status resumes onboarding"""
         customer = Customer(
             phone_number="+254700000001",
-            onboarding_status=OnboardingStatus.FAILED
+            onboarding_status=OnboardingStatus.FAILED,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -1195,6 +1235,7 @@ class TestDynamicCropOnboarding:
         customer = Customer(
             phone_number="+254700000010",
             onboarding_status=OnboardingStatus.NOT_STARTED,
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -1221,6 +1262,7 @@ class TestDynamicCropOnboarding:
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             current_onboarding_field="crop_type",
             onboarding_attempts={"crop_type": 0},  # 0 attempts so far
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -1251,6 +1293,7 @@ class TestDynamicCropOnboarding:
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             current_onboarding_field="crop_type",
             onboarding_attempts={"crop_type": 1},  # 1 attempt so far
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -1284,6 +1327,7 @@ class TestDynamicCropOnboarding:
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             current_onboarding_field="crop_type",
             onboarding_attempts={"crop_type": 4},  # Exceeded max
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.flush()
@@ -1325,6 +1369,7 @@ class TestDynamicCropOnboarding:
         customer = Customer(
             phone_number="+254700000014",
             onboarding_status=OnboardingStatus.NOT_STARTED,
+            language=CustomerLanguage.EN,
         )
         customer_admin = CustomerAdministrative(
             customer=customer, administrative_id=ward.id
