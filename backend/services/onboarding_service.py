@@ -1128,7 +1128,7 @@ Birth year must be between 1900 and {current_year}."""
                     question = t(f"onboarding.{field_name}.question", lang)
                     question = question.format(available_crops=crops_formatted)
                     error_message = t(
-                        "onboarding.crop_type.extraction_failed_first",
+                        "onboarding.common.extraction_failed",
                         lang,
                         question=question,
                     )

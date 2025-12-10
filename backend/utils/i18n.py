@@ -156,10 +156,6 @@ trans: Dict[str, Any] = {
                 "sw": "Mazao makuu yamerekodiwa: {value}.",
             },
             "field_name": {"en": "Primary Crops", "sw": "Mazao Makuu"},
-            "extraction_failed_first": {
-                "en": "I couldn't identify that information. {question}",
-                "sw": "Sikuweza kutambua taarifa hiyo. {question}",
-            },
             "extraction_failed_retry": {
                 "en": (
                     "I still couldn't identify that information. Please "
@@ -212,8 +208,8 @@ trans: Dict[str, Any] = {
         },
         "common": {
             "extraction_failed": {
-                "en": "I didn't quite understand that. {question}",
-                "sw": "Sikuelewa vizuri. {question}",
+                "en": "I couldn't identify that information. {question}",
+                "sw": "Sikuweza kutambua taarifa hiyo. {question}",
             },
             "selection_prompt": {
                 "en": "Reply with the number (e.g., '1', '2', etc.)",
