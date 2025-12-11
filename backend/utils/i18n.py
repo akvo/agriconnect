@@ -33,19 +33,33 @@ trans: Dict[str, Any] = {
             },
             "field_name": {"en": "Language", "sw": "Lugha"},
         },
+        "full_name": {
+            "question": {
+                "en": (
+                    "To get started, I need to know your full name.\n\n"
+                    "Please tell me: What is your full name?"
+                ),
+                "sw": (
+                    "Ili kuanza, ninahitaji kujua jina lako kamili.\n\n"
+                    "Tafadhali niambie: Jina lako kamili ni nani?"
+                ),
+            },
+            "success": {
+                "en": "Thank you, {value}!",
+                "sw": "Asante, {value}!",
+            },
+            "field_name": {"en": "Name", "sw": "Jina"},
+        },
         "administration": {
             "question": {
                 "en": (
-                    "Welcome! "
-                    "To connect you with the right agricultural expert, "
                     "I need to know your location.\n\n"
                     "Please tell me: What ward "
                     "or village are you from?"
                 ),
                 "sw": (
-                    "Karibu! Ili niweze kukuunganisha na mtaalamu sahihi wa "
-                    "kilimo, ninahitaji kujua eneo lako.\n\nTafadhali "
-                    "niambie: Unatoka kata gani au kijiji gani?"
+                    "Ninahitaji kujua eneo lako.\n\n"
+                    "Tafadhali niambie: Unatoka kata gani au kijiji kipi?"
                 ),
             },
             "success": {
