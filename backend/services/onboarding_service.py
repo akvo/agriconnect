@@ -86,11 +86,8 @@ class OnboardingService:
         if customer.language is None:
             return True
 
-        # If onboarding already completed or failed, no need
-        if (
-            customer.onboarding_status == OnboardingStatus.COMPLETED
-            and customer.crop_type
-        ) or customer.onboarding_status == OnboardingStatus.FAILED:
+        # If onboarding previously failed, do not retry
+        if customer.onboarding_status == OnboardingStatus.FAILED:
             return False
 
         # Check if there's a next incomplete field
@@ -138,6 +135,13 @@ class OnboardingService:
         # Special case: language uses direct column
         if field_name == "language":
             return customer.language is not None
+
+        # Special case: full_name uses direct column
+        if field_name == "full_name":
+            return (
+                customer.full_name and
+                customer.full_name.strip() != ""
+            )
 
         # Special case: administration uses relationship table
         if field_name == "administration":
@@ -1085,6 +1089,11 @@ Birth year must be between 1900 and {current_year}."""
         lang = customer.language.value if customer.language else "en"
 
         # Extract value using field-specific extraction method
+        if field_config.extraction_method is None:
+            # No extraction method defined - save raw message
+            return self._save_field_value(
+                customer, message, field_config
+            )
         try:
             extraction_method = getattr(self, field_config.extraction_method)
             extracted_value = await extraction_method(message)
@@ -1344,6 +1353,12 @@ Birth year must be between 1900 and {current_year}."""
                     value=language_name,
                 )
                 print(f"success_msg: {success_msg}", f"lang: {lang}")
+            # Special case: "full_name" uses direct column
+            elif field_name == "full_name":
+                customer.full_name = value
+                success_msg = t(
+                    f"onboarding.{field_name}.success", lang, value=value
+                )
 
             # Special case: administration uses relationship table
             elif field_name == "administration":
