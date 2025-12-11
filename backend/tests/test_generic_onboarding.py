@@ -118,6 +118,7 @@ class TestGenericOnboardingService:
         from schemas.onboarding_schemas import get_field_config
 
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             language=CustomerLanguage.EN,
         )
@@ -137,6 +138,7 @@ class TestGenericOnboardingService:
         from schemas.onboarding_schemas import get_field_config
 
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             language=CustomerLanguage.EN,
         )
@@ -164,6 +166,7 @@ class TestGenericOnboardingService:
         from schemas.onboarding_schemas import get_field_config
 
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             language=CustomerLanguage.EN,
         )
@@ -190,6 +193,7 @@ class TestGenericOnboardingService:
         from schemas.onboarding_schemas import get_field_config
 
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             language=CustomerLanguage.EN,
         )
@@ -218,6 +222,7 @@ class TestGenericOnboardingService:
         from schemas.onboarding_schemas import get_field_config
 
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             language=CustomerLanguage.EN,
         )
@@ -256,14 +261,32 @@ class TestGenericOnboardingService:
 
         next_field = onboarding_service._get_next_incomplete_field(customer)
         assert next_field is not None
-        assert next_field.field_name == "administration"
+        assert next_field.field_name == "full_name"
         assert next_field.priority == 1
+
+    def test_get_next_incomplete_field_after_full_name(
+        self, db_session, onboarding_service
+    ):
+        """Test getting next field after full name is complete"""
+        customer = Customer(
+            full_name="John Doe",
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        next_field = onboarding_service._get_next_incomplete_field(customer)
+        assert next_field is not None
+        assert next_field.field_name == "administration"
+        assert next_field.priority == 2
 
     def test_get_next_incomplete_field_after_administration(
         self, db_session, onboarding_service, sample_administrative_data
     ):
         """Test getting next field after administration is complete"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             language=CustomerLanguage.EN,
         )
@@ -281,13 +304,14 @@ class TestGenericOnboardingService:
         next_field = onboarding_service._get_next_incomplete_field(customer)
         assert next_field is not None
         assert next_field.field_name == "crop_type"
-        assert next_field.priority == 2
+        assert next_field.priority == 3
 
     def test_get_next_incomplete_field_all_complete(
         self, db_session, onboarding_service, sample_administrative_data
     ):
         """Test getting next field when all fields are complete"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             profile_data={
                 "crop_type": "Cacao",
@@ -317,6 +341,7 @@ class TestGenericOnboardingService:
     def test_increment_attempts(self, db_session, onboarding_service):
         """Test incrementing attempt counter for a field"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             language=CustomerLanguage.EN,
         )
@@ -349,6 +374,7 @@ class TestGenericOnboardingService:
     ):
         """Test storing and retrieving candidate values"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.IN_PROGRESS,
         )
@@ -376,6 +402,7 @@ class TestGenericOnboardingService:
     def test_clear_field_state(self, db_session, onboarding_service):
         """Test clearing field-specific state"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             current_onboarding_field="crop_type",
             language=CustomerLanguage.EN,
@@ -594,10 +621,21 @@ class TestGenericOnboardingService:
         db_session.add(customer)
         db_session.commit()
 
-        # STEP 1: First message - should ask for administration
+        # STEP 1: First message - should ask for full name
         response = await onboarding_service.process_onboarding_message(
             customer, "Hello"
         )
+        assert response.status == "in_progress"
+        assert "name" in response.message.lower()
+        assert customer.current_onboarding_field == "full_name"
+
+        # Provide full name
+        response = await onboarding_service.process_onboarding_message(
+            customer, "John Doe"
+        )
+        # Should save name and ask for administration
+        db_session.refresh(customer)
+        assert customer.full_name == "John Doe"
         assert response.status == "in_progress"
         assert "location" in response.message.lower()
         assert customer.current_onboarding_field == "administration"
@@ -703,8 +741,13 @@ class TestGenericOnboardingService:
     ):
         """Test needs_onboarding when all required fields are complete"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
-            profile_data={"crop_type": "Cacao"},
+            profile_data={
+                "crop_type": "Cacao",
+                "gender": None,
+                "birth_year": None,
+            },
             onboarding_status=OnboardingStatus.COMPLETED,
             language=CustomerLanguage.EN,
         )
@@ -1094,6 +1137,7 @@ class TestGenericOnboardingService:
     ):
         """Test processing message when onboarding already completed"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.COMPLETED,
             profile_data={
@@ -1129,6 +1173,7 @@ class TestGenericOnboardingService:
     ):
         """Test processing message with failed status resumes onboarding"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.FAILED,
             language=CustomerLanguage.EN,
@@ -1367,6 +1412,7 @@ class TestDynamicCropOnboarding:
         ward = sample_administrative_data["wards"][0]
 
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000014",
             onboarding_status=OnboardingStatus.NOT_STARTED,
             language=CustomerLanguage.EN,

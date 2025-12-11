@@ -179,16 +179,32 @@ class TestOnboardingService:
         assert onboarding_service.needs_onboarding(customer) is True
 
     def test_needs_onboarding_completed_status(
-        self, db_session, onboarding_service
+        self,
+        db_session,
+        onboarding_service,
+        sample_administrative_data,
     ):
         """Test that completed customer doesn't need onboarding"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700000001",
             onboarding_status=OnboardingStatus.COMPLETED,
-            profile_data={"crop_type": "Avocado"},
+            profile_data={
+                "crop_type": "Avocado",
+                "gender": None,
+                "birth_year": None,
+            },
             language=CustomerLanguage.EN,
         )
         db_session.add(customer)
+        db_session.commit()
+
+        # Add administrative data
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=sample_administrative_data["westlands"].id,
+        )
+        db_session.add(customer_admin)
         db_session.commit()
 
         assert onboarding_service.needs_onboarding(customer) is False
