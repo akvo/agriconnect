@@ -1540,11 +1540,48 @@ Birth year must be between 1900 and {current_year}."""
 
         logger.info(f"✓ Onboarding completed for customer {customer.id}")
 
+        profile_summary = self._generate_profile_summary(customer, lang)
+        message = t("onboarding.common.completion", lang)
+        if profile_summary:
+            message = message.replace("{profile_summary}", profile_summary)
         return OnboardingResponse(
-            message=t("onboarding.common.completion", lang),
+            message=message,
             status="completed",
             attempts=0,
         )
+
+    def _generate_profile_summary(
+        self, customer: Customer, lang: str
+    ) -> str:
+        # field_name: display_value
+        f_lang = t("onboarding.language.field_name", lang)
+        f_name = t("onboarding.full_name.field_name", lang)
+        f_crop_type = t("onboarding.crop_type.field_name", lang)
+        f_administration = t("onboarding.administration.field_name", lang)
+        f_gender = t("onboarding.gender.field_name", lang)
+        f_birth_year = t("onboarding.birth_year.field_name", lang)
+
+        c_lang = (
+            "English"
+            if customer.language == CustomerLanguage.EN else "Swahili"
+        )
+        c_name = customer.full_name if customer.full_name else "N/A"
+        c_crop_type = customer.crop_type
+        c_administration = "N/A"
+        if customer.customer_administrative[0]:
+            c_administration = customer.customer_administrative[0] \
+                .administrative.path
+        c_gender = customer.gender
+        c_birth_year = customer.birth_year
+        profile_summary = (
+            f"{f_lang}: {c_lang}\n"
+            f"{f_name}: {c_name}\n"
+            f"{f_administration}: {c_administration}\n"
+            f"{f_crop_type}: {c_crop_type}\n"
+            f"{f_gender}: {c_gender}\n"
+            f"{f_birth_year}: {c_birth_year}"
+        )
+        return profile_summary.strip()
 
     # ================================================================
     # LEGACY METHOD (for backward compatibility)

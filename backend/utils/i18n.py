@@ -285,11 +285,14 @@ trans: Dict[str, Any] = {
             },
             "completion": {
                 "en": (
-                    "Perfect! Your profile is all set up. "
+                    "Perfect! Your profile is all set up. Here's a summary:"
+                    "\n\n{profile_summary}\n\n"
                     "How can I help you today?"
                 ),
                 "sw": (
-                    "Kamili! Wasifu wako umekamilika. "
+                    "Bora! Profaili yako imewekwa kikamilifu. "
+                    "Hapa kuna muhtasari:"
+                    "\n\n{profile_summary}\n\n"
                     "Ninaweza kukusaidiaje leo?"
                 ),
             },
