@@ -1568,7 +1568,10 @@ Birth year must be between 1900 and {current_year}."""
         c_name = customer.full_name if customer.full_name else "N/A"
         c_crop_type = customer.crop_type
         c_administration = "N/A"
-        if customer.customer_administrative[0]:
+        if (
+            hasattr(customer, "customer_administrative")
+            and len(customer.customer_administrative) > 0
+        ):
             c_administration = customer.customer_administrative[0] \
                 .administrative.path
         c_gender = t(
