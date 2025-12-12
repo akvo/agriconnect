@@ -30,7 +30,12 @@ const RootNavigator = () => {
           }) => ({
             headerShown: true,
             headerTitleAlign: "left",
-            headerTitle: () => <HeaderTitle name={route?.params?.name} />,
+            headerTitle: () => (
+              <HeaderTitle
+                name={route?.params?.name}
+                customerId={route?.params?.customerId}
+              />
+            ),
             headerRight: () => (
               <HeaderOptions ticketID={route?.params?.ticketNumber} />
             ),
