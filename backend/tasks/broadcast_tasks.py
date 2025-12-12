@@ -120,6 +120,17 @@ def process_broadcast(broadcast_id: int) -> Dict[str, Any]:
                         failed_count += 1
                         continue
 
+                    # Get language-specific template SID
+                    customer_lang = (
+                        customer.language.value
+                        if customer.language
+                        else "en"
+                    )
+                    template_sid = whatsapp_service.get_template_sid(
+                        template_type="broadcast",
+                        customer_language=customer_lang
+                    )
+
                     # Send template message (skip in test mode)
                     if os.getenv("TESTING"):
                         # In test mode, simulate success without sending
@@ -131,7 +142,7 @@ def process_broadcast(broadcast_id: int) -> Dict[str, Any]:
                     else:
                         result = whatsapp_service.send_template_message(
                             to=customer.phone_number,
-                            content_sid=content_sid,
+                            content_sid=template_sid,
                             content_variables={},
                         )
                         logger.info(
@@ -342,6 +353,17 @@ def retry_failed_broadcasts() -> Dict[str, Any]:
                         )
                         continue
 
+                    # Get language-specific template SID for retry
+                    customer_lang = (
+                        customer.language.value
+                        if customer.language
+                        else "en"
+                    )
+                    retry_template_sid = whatsapp_service.get_template_sid(
+                        template_type="broadcast",
+                        customer_language=customer_lang
+                    )
+
                     # Retry sending template (skip in test mode)
                     if os.getenv("TESTING"):
                         # In test mode, simulate success without sending
@@ -353,7 +375,7 @@ def retry_failed_broadcasts() -> Dict[str, Any]:
                     else:
                         result = whatsapp_service.send_template_message(
                             to=customer.phone_number,
-                            content_sid=content_sid,
+                            content_sid=retry_template_sid,
                             content_variables={},
                         )
                         logger.info(

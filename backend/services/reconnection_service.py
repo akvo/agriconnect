@@ -55,7 +55,12 @@ class ReconnectionService:
             )
             return False
 
-        template_sid = settings.whatsapp_reconnection_template_sid
+        # Select template based on customer's language
+        customer_lang = customer.language.value if customer.language else "en"
+        template_sid = self.whatsapp_service.get_template_sid(
+            template_type="reconnection",
+            customer_language=customer_lang
+        )
         if not template_sid:
             logger.warning(
                 f"Reconnection template needed for customer {customer.id} "

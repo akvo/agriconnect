@@ -201,6 +201,29 @@ async def ai_callback(
                         try:
                             whatsapp_service = WhatsAppService()
 
+                            # TRANSLATION: Translate AI response if customer uses Swahili (TAC-4)
+                            customer_lang = (
+                                ai_message.customer.language.value
+                                if ai_message.customer.language
+                                else "en"
+                            )
+                            ai_response_text = payload.output.answer
+
+                            if customer_lang == "sw":
+                                from services.openai_service import get_openai_service
+                                openai_service = get_openai_service()
+                                translated_response = await openai_service.translate_text(
+                                    text=ai_response_text,
+                                    target_language="sw",
+                                    source_language="en",
+                                )
+                                if translated_response:
+                                    ai_response_text = translated_response
+                                    logger.info(
+                                        f"[Translation] AI response en → sw for "
+                                        f"{ai_message.customer.phone_number}"
+                                    )
+
                             # CRITICAL: Send to WhatsApp BEFORE committing to database
                             # Step 1: Send AI answer as separate message
                             logger.info(
@@ -210,7 +233,7 @@ async def ai_callback(
                             answer_response = whatsapp_service.send_message_with_tracking(
                                 to_number=ai_message.customer.phone_number,
                                 message_body=WhatsAppService.sanitize_whatsapp_content(
-                                    payload.output.answer
+                                    ai_response_text
                                 ),
                                 message_id=ai_message.id,
                                 db=db,
@@ -225,10 +248,15 @@ async def ai_callback(
                             )
 
                             # Step 2: Send confirmation template (non-critical)
-                            from config import settings
-
-                            template_sid = (
-                                settings.whatsapp_confirmation_template_sid
+                            # Select template based on customer's language
+                            customer_lang = (
+                                ai_message.customer.language.value
+                                if ai_message.customer.language
+                                else "en"
+                            )
+                            template_sid = whatsapp_service.get_template_sid(
+                                template_type="confirmation",
+                                customer_language=customer_lang
                             )
                             if template_sid:
                                 try:
@@ -276,6 +304,8 @@ async def ai_callback(
                         == MessageType.WHISPER
                     ):
                         # WHISPER mode: Store suggestion for EO (does NOT go to WhatsApp)
+                        # TAC-5: Whisper messages stay in English (internal use by EOs)
+                        # No translation needed - AI response is already in English
                         # Whisper messages don't go to WhatsApp, safe to commit immediately
                         message_service.commit_message(ai_message)
 

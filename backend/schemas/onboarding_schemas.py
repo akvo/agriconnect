@@ -109,7 +109,6 @@ class OnboardingFieldConfig:
     db_field: str  # Column name in Customer model
     required: bool  # Whether field is required for completion
     priority: int  # Collection order (1 = first, 2 = second, etc.)
-    initial_question: str  # Question to ask user
     extraction_method: str  # Method name in OnboardingService
     matching_method: Optional[str]  # Ambiguity resolution method
     max_attempts: int  # Maximum collection attempts before skip
@@ -120,17 +119,40 @@ class OnboardingFieldConfig:
 
 # Onboarding fields registry - defines all profile fields to collect
 ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
-    # PRIORITY 1: Administration Location (REQUIRED)
+    # PRIORITY 0: Language Preference (REQUIRED)
+    OnboardingFieldConfig(
+        field_name="language",
+        db_field="language",
+        required=True,
+        priority=0,
+        extraction_method="extract_language",
+        matching_method=None,  # Direct enum mapping
+        max_attempts=3,
+        field_type="enum",
+        success_message_template=(
+            "Great! I'll communicate with you in {value}."
+        ),
+    ),
+
+    # PRIORITY 1: Customer Name (REQUIRED)
+    OnboardingFieldConfig(
+        field_name="full_name",
+        db_field="full_name",
+        required=True,
+        priority=1,
+        extraction_method=None,
+        matching_method=None,  # Direct text mapping
+        max_attempts=1,
+        field_type="string",
+        success_message_template="Thank you, {value}!",
+    ),
+
+    # PRIORITY 2: Administration Location (REQUIRED)
     OnboardingFieldConfig(
         field_name="administration",
         db_field="customer_administrative",
         required=True,
-        priority=1,
-        initial_question=(
-            "Welcome! To connect you with the right agricultural expert, "
-            "I need to know your location.\n\n"
-            "Please tell me: What ward or village are you from?"
-        ),
+        priority=2,
         extraction_method="extract_location",
         matching_method="resolve_administration_ambiguity",
         max_attempts=3,
@@ -140,17 +162,12 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         ),
     ),
 
-    # PRIORITY 2: Crop Type (REQUIRED)
+    # PRIORITY 3: Crop Type (REQUIRED)
     OnboardingFieldConfig(
         field_name="crop_type",
         db_field="crop_type",
         required=True,
-        priority=2,
-        initial_question=(
-            "What crops do you grow?\n\n"
-            "We currently support: {available_crops}\n\n"
-            "Please tell me which crop you grow."
-        ),
+        priority=3,
         extraction_method="extract_crop_type",
         matching_method="resolve_crop_ambiguity",
         max_attempts=3,
@@ -160,16 +177,12 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         ),
     ),
 
-    # PRIORITY 3: Gender (OPTIONAL)
+    # PRIORITY 4: Gender (OPTIONAL)
     OnboardingFieldConfig(
         field_name="gender",
         db_field="gender",
         required=False,
-        priority=3,
-        initial_question=(
-            "To help us serve you better, may I know your gender?\n\n"
-            "You can say: male, female, or other"
-        ),
+        priority=4,
         extraction_method="extract_gender",
         matching_method=None,  # Direct enum mapping
         max_attempts=2,
@@ -177,17 +190,12 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         success_message_template="Thank you for sharing.",
     ),
 
-    # PRIORITY 4: Birth Year (OPTIONAL)
+    # PRIORITY 5: Birth Year (OPTIONAL)
     OnboardingFieldConfig(
         field_name="birth_year",
         db_field="birth_year",
         required=False,
-        priority=4,
-        initial_question=(
-            "What year were you born? "
-            "You can also tell me your age if that's easier.\n\n"
-            "For example: '1980' or 'I'm 45 years old'"
-        ),
+        priority=5,
         extraction_method="extract_birth_year",
         matching_method=None,  # AI converts age to birth year
         max_attempts=2,

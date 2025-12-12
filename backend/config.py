@@ -55,6 +55,10 @@ class Settings(BaseSettings):
         .get("confirmation", {})
         .get("sid"),
     )
+    whatsapp_confirmation_template_sid_sw: str = _config.get("whatsapp", {}) \
+        .get("templates", {}) \
+        .get("confirmation", {}) \
+        .get("sid_sw", "")
     whatsapp_escalate_button_payload: str = (
         _config.get("whatsapp", {})
         .get("button_payloads", {})
@@ -77,6 +81,10 @@ class Settings(BaseSettings):
         .get("reconnection", {})
         .get("sid", ""),
     )
+    whatsapp_reconnection_template_sid_sw: str = _config.get("whatsapp", {}) \
+        .get("templates", {}) \
+        .get("reconnection", {}) \
+        .get("sid_sw", "")
     whatsapp_reconnection_threshold_hours: int = (
         _config.get("whatsapp", {})
         .get("reconnection", {})
@@ -201,6 +209,10 @@ class Settings(BaseSettings):
         .get("broadcast", {})
         .get("sid", ""),
     )
+    whatsapp_broadcast_template_sid_sw: str = _config.get("whatsapp", {}) \
+        .get("templates", {}) \
+        .get("broadcast", {}) \
+        .get("sid_sw", "")
     broadcast_confirmation_button_payload: str = (
         _config.get("whatsapp", {})
         .get("button_payloads", {})

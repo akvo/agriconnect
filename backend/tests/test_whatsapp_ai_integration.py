@@ -14,7 +14,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models.customer import Customer, OnboardingStatus
+from models.customer import (
+    Customer,
+    CustomerLanguage,
+    OnboardingStatus,
+)
 from models.message import Message, MessageType
 from models.ticket import Ticket
 from models.administrative import Administrative, CustomerAdministrative
@@ -33,6 +37,7 @@ def test_customer(db_session: Session):
             "gender": "male",
             "birth_year": 1990,
         },
+        language=CustomerLanguage.EN,
     )
     db_session.add(customer)
     db_session.commit()

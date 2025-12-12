@@ -89,7 +89,9 @@ class TestCustomerEndpoints:
             is_active=True,
         )
         customer = Customer(
-            phone_number="+255123456789", full_name="John Farmer"
+            phone_number="+255123456789",
+            full_name="John Farmer",
+            language=CustomerLanguage.EN,
         )
         db_session.add_all([admin, customer])
         db_session.commit()
@@ -232,7 +234,9 @@ class TestCustomerEndpoints:
             is_active=True,
         )
         customer = Customer(
-            phone_number="+255123456789", full_name="John Farmer"
+            phone_number="+255123456789",
+            full_name="John Farmer",
+            language=CustomerLanguage.EN,
         )
         db_session.add_all([admin, customer])
         db_session.commit()

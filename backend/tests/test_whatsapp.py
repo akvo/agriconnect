@@ -157,6 +157,7 @@ class TestWhatsAppWebhook:
                 "gender": "male",
                 "birth_year": 1985,
             },
+            language=CustomerLanguage.EN,
         )
         db_session.add(existing_customer)
         db_session.commit()
@@ -207,7 +208,10 @@ class TestWhatsAppWebhook:
         self, client: TestClient, db_session: Session
     ):
         # Create customer and message first
-        customer = Customer(phone_number="+255123456789")
+        customer = Customer(
+            phone_number="+255123456789",
+            language=CustomerLanguage.EN,
+        )
         db_session.add(customer)
         db_session.commit()
 

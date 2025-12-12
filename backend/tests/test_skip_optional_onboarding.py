@@ -5,7 +5,11 @@ Tests for skipping optional onboarding fields in customer onboarding process.
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from models.customer import Customer, OnboardingStatus
+from models.customer import (
+    Customer,
+    OnboardingStatus,
+    CustomerLanguage,
+)
 from models.administrative import (
     Administrative,
     AdministrativeLevel,
@@ -102,10 +106,12 @@ class TestOptionalFieldSkip:
     ):
         """Customer with administration and crop_type complete"""
         customer = Customer(
+            full_name="John Doe",
             phone_number="+254700999001",
             profile_data={"crop_type": "Cacao"},
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             current_onboarding_field="gender",
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -422,8 +428,10 @@ class TestOptionalFieldSkip:
     ):
         """Test optional field with null value is considered complete"""
         customer = Customer(
+            full_name="Joe Doe",
             phone_number="+254700999002",
             profile_data={"gender": None},
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -439,8 +447,10 @@ class TestOptionalFieldSkip:
     ):
         """Test required field with null value is NOT complete"""
         customer = Customer(
+            full_name="Jake Doe",
             phone_number="+254700999003",
             profile_data={"crop_type": None},
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -456,8 +466,10 @@ class TestOptionalFieldSkip:
     ):
         """Test optional field with empty string is considered complete"""
         customer = Customer(
+            full_name="Jhon Smith",
             phone_number="+254700999004",
             profile_data={"gender": ""},
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
@@ -545,10 +557,12 @@ class TestOptionalFieldSkip:
     ):
         """Test that 'skip' keyword doesn't work on required fields"""
         customer = Customer(
+            full_name="Jim Doe",
             phone_number="+254700999005",
             profile_data={},
             onboarding_status=OnboardingStatus.IN_PROGRESS,
             current_onboarding_field="crop_type",
+            language=CustomerLanguage.EN,
         )
         db_session.add(customer)
         db_session.commit()
