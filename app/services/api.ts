@@ -485,9 +485,7 @@ class ApiClient {
       queryParams.append("search", params.search);
     }
     if (params.filters) {
-      params.filters.forEach((filter) =>
-        queryParams.append("filters", filter),
-      );
+      params.filters.forEach((filter) => queryParams.append("filters", filter));
     }
     if (params.administrative_id) {
       params.administrative_id.forEach((aid) =>
