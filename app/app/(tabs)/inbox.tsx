@@ -132,6 +132,7 @@ const Inbox: React.FC = () => {
         ticketNumber: ticket.ticketNumber,
         name: chatName,
         messageId: ticket.message?.id || undefined,
+        customerId: ticket.customer?.id || undefined,
       },
     });
   };

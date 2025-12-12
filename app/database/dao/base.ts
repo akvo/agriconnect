@@ -17,9 +17,9 @@ export interface DatabaseResult {
 }
 
 // Base DAO class with common functionality
-export abstract class BaseDAOImpl<T extends { id: number }>
-  implements BaseDAO<T>
-{
+export abstract class BaseDAOImpl<
+  T extends { id: number },
+> implements BaseDAO<T> {
   constructor(protected tableName: string) {}
 
   findById(db: SQLiteDatabase, id: number): T | null {

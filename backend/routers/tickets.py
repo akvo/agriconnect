@@ -79,6 +79,13 @@ def _serialize_ticket(
     customer = ticket.customer
     message = ticket.message
 
+    ward = None
+    if (
+        hasattr(customer, "customer_administrative")
+        and len(customer.customer_administrative) > 0
+    ):
+        admin = customer.customer_administrative[0].administrative
+        ward = admin.path
     return {
         "id": ticket.id,
         "ticket_number": ticket.ticket_number,
@@ -87,6 +94,11 @@ def _serialize_ticket(
                 "id": customer.id,
                 "name": customer.full_name,
                 "phone_number": customer.phone_number,
+                "crop_type": customer.crop_type,
+                "gender": customer.gender,
+                "age": customer.age,
+                "language": customer.language,
+                "ward": ward,
             }
             if customer
             else None
