@@ -13,6 +13,11 @@ class TicketCustomer(BaseModel):
     id: Optional[int]
     name: Optional[str]
     phone_number: Optional[str]
+    crop_type: Optional[str]
+    gender: Optional[str]
+    age: Optional[int]
+    language: Optional[str]
+    ward: Optional[str]
 
 
 class TicketMessage(BaseModel):
