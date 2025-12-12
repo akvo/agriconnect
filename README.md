@@ -80,6 +80,32 @@ The `./dc.sh` script is a wrapper around Docker Compose that combines multiple c
   ./dc.sh restart celery-worker   # Restart worker after code changes
   ```
 
+### Database Management
+
+- **Reset customer onboarding:**
+  ```bash
+  ./dc.sh exec backend python -m seeder.reset_onboarding --phone-number="+25512345xxxx"
+  ```
+
+  **⚠️ WARNING**: This script will permanently delete:
+  - Customer's full name
+  - Language preference
+  - All profile data (age group, gender, crop types, etc.)
+  - Onboarding attempts counter
+  - Administrative area assignments (ward/region associations)
+  - Onboarding status (resets to `not_started`)
+
+  **Use Cases**:
+  - Testing onboarding flow with real phone numbers
+  - Allowing customers to re-register with updated information
+  - Fixing corrupted onboarding data
+
+  **Important Notes**:
+  - The phone number itself is NOT deleted (customer account remains)
+  - Customer's message history is preserved
+  - This action cannot be undone
+  - Always confirm the phone number before executing
+
 ### Available Services
 
 The environment includes the following services:
