@@ -306,12 +306,21 @@ trans: Dict[str, Any] = {
                     "Tafadhali niambie eneo lako tena?"
                 ),
             },
+            "age": {
+                "en": "Age",
+                "sw": "Umri",
+            }
         },
     },
     "crops": {
         "Avocado": {"name": {"en": "avocado", "sw": "parachichi"}},
         "Cacao": {"name": {"en": "cacao", "sw": "kakao"}},
     },
+    "gender": {
+        "male": {"en": "Male", "sw": "Mwanamume"},
+        "female": {"en": "Female", "sw": "Mwanamke"},
+        "other": {"en": "Other", "sw": "Nyingine"},
+    }
 }
 
 
