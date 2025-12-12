@@ -4,6 +4,10 @@ export interface CustomerUser {
   phoneNumber: string;
   fullName: string;
   language: string;
+  cropType?: string;
+  gender?: string;
+  age?: number;
+  ward?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -13,10 +17,18 @@ export interface CreateCustomerUserData {
   phoneNumber: string;
   fullName: string;
   language?: string;
+  cropType?: string;
+  gender?: string;
+  age?: number;
+  ward?: string;
 }
 
 export interface UpdateCustomerUserData {
   phoneNumber?: string;
   fullName?: string;
   language?: string;
+  cropType?: string;
+  gender?: string;
+  age?: number;
+  ward?: string;
 }
