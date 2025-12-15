@@ -31,6 +31,8 @@ interface User {
   administrativeLocation?: AdministrativeLocation | null;
   accessToken?: string | null;
   deviceRegisterAt?: string | null;
+  editFullName?: string | null;
+  editPhoneNumber?: string | null;
 }
 
 interface AuthContextType {
@@ -40,12 +42,13 @@ interface AuthContextType {
   signIn: (
     accessToken: string,
     refreshToken: string,
-    userData: User
+    userData: User,
   ) => Promise<void>;
   signOut: () => Promise<void>;
   setRegisterDeviceAt: () => Promise<void>;
   isEditUser?: boolean;
   setIsEditUser?: React.Dispatch<React.SetStateAction<boolean>>;
+  setUser?: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -128,14 +131,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
     const handleUnauthorized = () => {
       signOut().catch((err) =>
-        console.error("Error during auto-logout (unauthorized):", err)
+        console.error("Error during auto-logout (unauthorized):", err),
       );
     };
 
     const handleClearSession = () => {
       console.log("[AuthContext] Clearing session after failed refresh");
       signOut().catch((err) =>
-        console.error("Error during session clear:", err)
+        console.error("Error during session clear:", err),
       );
     };
 
@@ -156,7 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const signIn = async (
     accessToken: string,
     refreshToken: string,
-    userData: User
+    userData: User,
   ) => {
     try {
       // Store tokens in SecureStore
@@ -220,7 +223,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       const isHealthy = checkDatabaseHealth(db);
       console.log(
         "Database health check:",
-        isHealthy ? "✅ Healthy" : "⚠️ Issues detected"
+        isHealthy ? "✅ Healthy" : "⚠️ Issues detected",
       );
 
       // Try force clear (which includes multiple fallback strategies)
@@ -229,10 +232,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       if (!result.success) {
         console.error("Failed to clear database during signOut:", result.error);
         console.warn(
-          "Sign out completed but database clear failed - data may persist"
+          "Sign out completed but database clear failed - data may persist",
         );
         console.log(
-          "💡 User data will be cleared on next app restart when migrations run"
+          "💡 User data will be cleared on next app restart when migrations run",
         );
       } else {
         console.log("✅ Database cleared successfully during sign out");
@@ -240,7 +243,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     } catch (error) {
       console.error("Error during sign out database clear:", error);
       console.warn(
-        "Sign out completed but encountered error during database clear"
+        "Sign out completed but encountered error during database clear",
       );
       console.log("💡 User data will be cleared on next app restart");
     }
@@ -266,6 +269,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         isEditUser,
         setIsEditUser,
         setRegisterDeviceAt,
+        setUser,
       }}
     >
       {children}

@@ -19,7 +19,7 @@ const Account: React.FC = () => {
   const [isConfirmLogoutVisible, setIsConfirmLogoutVisible] =
     useState<boolean>(false);
 
-  const { user, isEditUser, signOut } = useAuth();
+  const { user, isEditUser, setIsEditUser, signOut, setUser } = useAuth();
 
   const onLogout = async () => {
     try {
@@ -28,6 +28,7 @@ const Account: React.FC = () => {
       console.error("[Account] Logout failed:", error);
     }
   };
+
   return (
     <View style={styles.container}>
       <View style={[styles.card, styles.headerCard]}>
@@ -44,27 +45,65 @@ const Account: React.FC = () => {
         <View style={styles.formGroup}>
           <Text style={styles.label}>Name</Text>
           {isEditUser ? (
-            <TextInput style={styles.input} value={user?.fullName} />
+            <TextInput
+              style={styles.input}
+              value={isEditUser ? user?.editFullName : user?.fullName}
+              onChangeText={(text) =>
+                setUser?.((prev) =>
+                  prev ? { ...prev, editFullName: text } : prev,
+                )
+              }
+            />
           ) : (
             <Text>{user?.fullName}</Text>
           )}
         </View>
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Email</Text>
-          {isEditUser ? (
-            <TextInput style={styles.input} value={user?.email} />
-          ) : (
-            <Text>{user?.email}</Text>
-          )}
-        </View>
-        <View style={styles.formGroup}>
           <Text style={styles.label}>Phone</Text>
           {isEditUser ? (
-            <TextInput style={styles.input} value={user?.phoneNumber} />
+            <TextInput
+              style={styles.input}
+              value={isEditUser ? user?.editPhoneNumber : user?.phoneNumber}
+              onChangeText={(text) =>
+                setUser?.((prev) =>
+                  prev ? { ...prev, editPhoneNumber: text } : prev,
+                )
+              }
+            />
           ) : (
             <Text>{user?.phoneNumber}</Text>
           )}
         </View>
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Email</Text>
+          {/* {isEditUser ? (
+            <TextInput style={styles.input} value={user?.email} />
+          ) : ( */}
+          <Text>{user?.email}</Text>
+          {/* )} */}
+        </View>
+        {/** Cancel Button */}
+        {isEditUser && (
+          <View style={[styles.buttonsCard]}>
+            <TouchableOpacity
+              style={[styles.dangerButton]}
+              onPress={() => {
+                setIsEditUser?.(false);
+                setUser?.((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        editFullName: null,
+                        editPhoneNumber: null,
+                      }
+                    : prev,
+                );
+              }}
+            >
+              <Text style={[styles.dangerButtonText]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <View style={[styles.card, styles.buttonsCard]}>
@@ -90,23 +129,30 @@ const Account: React.FC = () => {
 
       <Modal
         visible={isConfirmLogoutVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
+        onRequestClose={() => setIsConfirmLogoutVisible(false)}
       >
-        <View style={styles.container}>
-          <View style={[styles.card, styles.formCard]}>
-            <Text style={styles.title}>Confirm Logout</Text>
-            <Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm Logout</Text>
+            <Text style={styles.modalText}>
               Are you sure you want to logout? This will clear all local data.
             </Text>
-            <View style={styles.buttonContainer}>
+            <View style={styles.modalButtonContainer}>
               <TouchableOpacity
+                style={styles.modalButton}
                 onPress={() => setIsConfirmLogoutVisible(false)}
               >
-                <Text style={styles.buttonText}>Cancel</Text>
+                <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={onLogout}>
-                <Text style={[styles.buttonText, styles.logoutText]}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalLogoutButton]}
+                onPress={onLogout}
+              >
+                <Text
+                  style={[styles.modalButtonText, styles.modalLogoutButtonText]}
+                >
                   Logout
                 </Text>
               </TouchableOpacity>
@@ -195,6 +241,74 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 24,
+    width: "90%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 12,
+    color: "#333333",
+  },
+  modalText: {
+    fontSize: 16,
+    color: "#666666",
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 6,
+    backgroundColor: "#F5F5F5",
+  },
+  modalLogoutButton: {
+    backgroundColor: "#FF3B30",
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333333",
+  },
+  modalLogoutButtonText: {
+    color: "#FFFFFF",
+  },
+  dangerButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#FF3B30",
+    borderRadius: 6,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  dangerButtonText: {
+    color: "#FF3B30",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 

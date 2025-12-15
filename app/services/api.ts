@@ -863,6 +863,29 @@ class ApiClient {
 
     return response.json();
   }
+
+  /**
+   * Update profile
+   */
+  async updateProfile(data: {
+    full_name?: string;
+    phone_number?: string;
+  }): Promise<UserResponse> {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/auth/profile`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to update profile" }));
+      throw new Error(error.detail || "Failed to update profile");
+    }
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();
