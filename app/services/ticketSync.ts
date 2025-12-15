@@ -213,6 +213,10 @@ class TicketSyncService {
           fullName: customerData.name || customerData.full_name,
           phoneNumber: customerData.phone_number,
           language: customerData.language,
+          cropType: customerData.crop_type || null,
+          gender: customerData.gender || null,
+          age: customerData.age || null,
+          ward: customerData.ward || null,
         });
         return existing.id;
       } else {
@@ -222,6 +226,10 @@ class TicketSyncService {
           phoneNumber: customerData.phone_number || `unknown_${Date.now()}`,
           fullName: customerData.name || customerData.full_name || "",
           language: customerData.language || "en",
+          cropType: customerData.crop_type || null,
+          gender: customerData.gender || null,
+          age: customerData.age || null,
+          ward: customerData.ward || null,
         });
         return created.id;
       }

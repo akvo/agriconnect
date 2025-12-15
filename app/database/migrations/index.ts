@@ -8,6 +8,7 @@ import { alterMessagesAddIsUsedMigration } from "./007_alter_messages_add_is_use
 import { alterMessagesAddDeliveryStatusMigration } from "./008_alter_messages_add_delivery_status";
 import { alterProfileAddDeviceRegisterAtMigration } from "./009_alter_profile_add_deviceRegisterAt";
 import { alterTicketsAddLastMessageIdMigration } from "./010_alter_tickets_add_lastMessageId";
+import { customerProfileFieldsMigration } from "./011_alter_customer_add_profile";
 
 // Type definition for migration objects
 export interface Migration {
@@ -49,8 +50,13 @@ export const allMigrations: Migration[] = [
     name: "alter_tickets_add_lastMessageId",
     migration: alterTicketsAddLastMessageIdMigration,
   },
+  {
+    version: 8,
+    name: "customer_add_profile_fields",
+    migration: customerProfileFieldsMigration,
+  },
   // Future migrations can be added here
-  // { version: 8, name: 'some_new_feature', migration: someNewFeatureMigration },
+  // { version: X, name: "migration_name", migration: migrationScript },
 ];
 
 // Helper function to get migrations by version

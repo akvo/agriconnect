@@ -17,13 +17,13 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
     const stmt = hasId
       ? db.prepareSync(
           `INSERT INTO customer_users (
-            id, phoneNumber, fullName, language, createdAt, updatedAt
-          ) VALUES (?, ?, ?, ?, ?, ?)`,
+            id, phoneNumber, fullName, language, cropType, gender, age, ward, createdAt, updatedAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
       : db.prepareSync(
           `INSERT INTO customer_users (
-            phoneNumber, fullName, language, createdAt, updatedAt
-          ) VALUES (?, ?, ?, ?, ?)`,
+            phoneNumber, fullName, language, cropType, gender, age, ward, createdAt, updatedAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         );
 
     try {
@@ -34,12 +34,30 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
             data.phoneNumber,
             data.fullName,
             data.language || "en",
+            data.cropType || null,
+            data.gender || null,
+            data.age || null,
+            data.ward || null,
             now,
             now,
           ]
-        : [data.phoneNumber, data.fullName, data.language || "en", now, now];
+        : [
+            data.phoneNumber,
+            data.fullName,
+            data.language || "en",
+            data.cropType || null,
+            data.gender || null,
+            data.age || null,
+            data.ward || null,
+            now,
+            now,
+          ];
 
-      const result = stmt.executeSync(params);
+      // sanitize params so there are no `undefined` values (SQLite bind params don't accept undefined)
+      const safeParams = params.map((p) =>
+        p === undefined ? null : p,
+      ) as unknown as any;
+      const result = stmt.executeSync(safeParams);
 
       const userId = hasId ? data.id! : result.lastInsertRowId;
       const user = this.findById(db, userId);
@@ -75,6 +93,26 @@ export class CustomerUserDAO extends BaseDAOImpl<CustomerUser> {
       if (data.language !== undefined) {
         updates.push("language = ?");
         values.push(data.language);
+      }
+
+      if (data.cropType !== undefined) {
+        updates.push("cropType = ?");
+        values.push(data.cropType);
+      }
+
+      if (data.gender !== undefined) {
+        updates.push("gender = ?");
+        values.push(data.gender);
+      }
+
+      if (data.age !== undefined) {
+        updates.push("age = ?");
+        values.push(data.age);
+      }
+
+      if (data.ward !== undefined) {
+        updates.push("ward = ?");
+        values.push(data.ward);
       }
 
       if (updates.length === 0) {
