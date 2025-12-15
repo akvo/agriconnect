@@ -41,15 +41,15 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 8,
+    marginLeft: -18,
   },
   textContainer: {
     marginLeft: 8,
     flex: 1,
   },
   customerName: {
-    color: themeColors.dark1,
-    fontWeight: "600",
+    color: themeColors.textPrimary,
+    fontWeight: "700",
   },
 });
 
