@@ -576,8 +576,7 @@ class OpenAIService:
 
         # Auto-detect source language if not provided
         if source_language is None:
-            detected_lang = await self.classify_language(text)
-            source_language = detected_lang if detected_lang else "unknown"
+            source_language = await self.classify_language(text)
 
         # Skip if already in target language
         if source_language == target_language:
@@ -646,28 +645,27 @@ class OpenAIService:
             text: Text to classify
 
         Returns:
-            Language code ("en" or "sw") or None if error
+            Language code (e.g., "en", "sw"), defaults to "en" on error
         """
         if not self.is_configured():
             logger.error(
                 "[OpenAIService] Cannot classify language - not configured"
             )
-            return None
+            return "en"  # Default to English
 
         # Quick check for empty text
         if not text or not text.strip():
             return "en"  # Default to English
 
         system_prompt = """
-            "You are a language classifier specializing in English and Swahili.
-            Identify whether the text is in English or Swahili.
+            You are a language classifier language detection AI.\n\n"
+            Classify the language of the given text
             Handle:
             - Misspellings and typos
             - Mixed language (choose dominant language)
             - Short messages and greetings
             - Numbers and symbols (ignore them)
-            Respond with ONLY one of: 'en' or 'sw' No explanations,
-            just the language code.
+            Respond with ONLY the 2 letter language code. No explanations.
         """
 
         messages = [
@@ -685,15 +683,8 @@ class OpenAIService:
 
             if response and response.content:
                 language = response.content.strip().lower()
-
-                # Validate response
-                if language in ["en", "sw"]:
-                    logger.info(f"✓ Classified language as: {language}")
+                if language:
                     return language
-                logger.warning(
-                    f"[OpenAIService] Unexpected language classification: "
-                    f"{language}, defaulting to 'en'"
-                )
                 return "en"
 
             logger.error(

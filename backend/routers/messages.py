@@ -9,12 +9,14 @@ from models.message import Message, MessageFrom, MessageStatus
 from models.ticket import Ticket
 from models.user import User, UserType
 from models.administrative import UserAdministrative
+from models.customer import CustomerLanguage
 from utils.auth_dependencies import get_current_user
 from services.whatsapp_service import WhatsAppService
 from services.socketio_service import (
     emit_message_received,
     emit_ticket_resolved
 )
+from services.openai_service import OpenAIService
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -254,10 +256,27 @@ async def create_message(
 
             # Send WhatsApp message
             whatsapp_service = WhatsAppService()
-            response = whatsapp_service.send_message(
-                to_number=customer_phone,
-                message_body=new_message.body,
-            )
+
+            # Translate message to customer's language if needed
+            if (
+                ticket.customer.language and
+                ticket.customer.language != CustomerLanguage.EN
+            ):
+                openai_service = OpenAIService()
+                whatsapp_message = await openai_service.translate_text(
+                    text=new_message.body,
+                    target_language=ticket.customer.language.value,
+                    source_language=None,  # Auto-detect source language
+                )
+                response = whatsapp_service.send_message(
+                    to_number=customer_phone,
+                    message_body=whatsapp_message,
+                )
+            else:
+                response = whatsapp_service.send_message(
+                    to_number=customer_phone,
+                    message_body=new_message.body,
+                )
 
             print(
                 f"WhatsApp reply sent to {customer_phone}: "
