@@ -625,3 +625,273 @@ class TestOpenAIService:
         service2 = get_openai_service()
 
         assert service1 is service2
+
+    @pytest.mark.asyncio
+    async def test_translate_text_success(self, openai_service):
+        """Test successful text translation from English to Swahili"""
+        # Mock chat completion response
+        mock_choice = MagicMock()
+        mock_choice.message.content = "Habari ya asubuhi"
+        mock_choice.finish_reason = "stop"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.model = "gpt-4o-mini"
+        mock_response.usage = None
+
+        openai_service.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
+        )
+
+        # Test translation
+        result = await openai_service.translate_text(
+            text="Good morning",
+            target_language="sw",
+            source_language="en",
+        )
+
+        assert result == "Habari ya asubuhi"
+
+        # Verify correct parameters were passed
+        call_kwargs = (
+            openai_service.client.chat.completions.create.call_args.kwargs
+        )
+        assert call_kwargs["temperature"] == 0.3
+        assert "English" in str(call_kwargs["messages"])
+        assert "Swahili" in str(call_kwargs["messages"])
+
+    @pytest.mark.asyncio
+    async def test_translate_text_skip_same_language(
+        self, openai_service
+    ):
+        """Test translation skips when source equals target language"""
+        result = await openai_service.translate_text(
+            text="Hello world",
+            target_language="en",
+            source_language="en",
+        )
+
+        # Should return original text without calling API
+        assert result == "Hello world"
+
+    @pytest.mark.asyncio
+    async def test_translate_text_auto_detect_language(
+        self, openai_service
+    ):
+        """Test translation with auto-detect source language"""
+        # Mock classify_language to return "sw"
+        with patch.object(
+            openai_service, "classify_language", return_value="sw"
+        ) as mock_classify:
+            # Mock chat completion for translation
+            mock_choice = MagicMock()
+            mock_choice.message.content = "Good morning"
+            mock_choice.finish_reason = "stop"
+
+            mock_response = MagicMock()
+            mock_response.choices = [mock_choice]
+            mock_response.model = "gpt-4o-mini"
+            mock_response.usage = None
+
+            openai_service.client.chat.completions.create = AsyncMock(
+                return_value=mock_response
+            )
+
+            result = await openai_service.translate_text(
+                text="Habari ya asubuhi",
+                target_language="en",
+                source_language=None,  # Auto-detect
+            )
+
+            # Verify classify_language was called
+            mock_classify.assert_called_once_with("Habari ya asubuhi")
+            assert result == "Good morning"
+
+    @pytest.mark.asyncio
+    async def test_translate_text_skip_after_auto_detect(
+        self, openai_service
+    ):
+        """Test translation skips when auto-detected language matches target"""
+        # Mock classify_language to return "en"
+        with patch.object(
+            openai_service, "classify_language", return_value="en"
+        ):
+            result = await openai_service.translate_text(
+                text="Hello world",
+                target_language="en",
+                source_language=None,  # Auto-detect
+            )
+
+            # Should skip translation
+            assert result == "Hello world"
+
+    @pytest.mark.asyncio
+    async def test_translate_text_not_configured(
+        self, mock_openai_client
+    ):
+        """Test translation when service is not configured"""
+        with patch("services.openai_service.settings") as mock_settings:
+            mock_settings.openai_enabled = False
+            mock_settings.openai_api_key = ""
+
+            service = OpenAIService()
+            result = await service.translate_text(
+                text="Hello",
+                target_language="sw",
+            )
+
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_translate_text_api_error(self, openai_service):
+        """Test translation with API error"""
+        from openai import OpenAIError
+
+        # Mock classify_language
+        with patch.object(
+            openai_service, "classify_language", return_value="en"
+        ):
+            openai_service.client.chat.completions.create = AsyncMock(
+                side_effect=OpenAIError("API error")
+            )
+
+            result = await openai_service.translate_text(
+                text="Hello world",
+                target_language="sw",
+                source_language="en",
+            )
+
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_translate_text_empty_response(self, openai_service):
+        """Test translation with empty API response"""
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+        mock_choice.finish_reason = "stop"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.model = "gpt-4o-mini"
+        mock_response.usage = None
+
+        openai_service.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
+        )
+
+        result = await openai_service.translate_text(
+            text="Hello world",
+            target_language="sw",
+            source_language="en",
+        )
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_classify_language_success(self, openai_service):
+        """Test successful language classification"""
+        mock_choice = MagicMock()
+        mock_choice.message.content = "sw"
+        mock_choice.finish_reason = "stop"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.model = "gpt-4o-mini"
+        mock_response.usage = None
+
+        openai_service.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
+        )
+
+        result = await openai_service.classify_language(
+            "Habari ya asubuhi"
+        )
+
+        assert result == "sw"
+
+        # Verify correct parameters were passed
+        call_kwargs = (
+            openai_service.client.chat.completions.create.call_args.kwargs
+        )
+        assert call_kwargs["temperature"] == 0.0
+        assert call_kwargs["max_tokens"] == 10
+
+    @pytest.mark.asyncio
+    async def test_classify_language_empty_text(self, openai_service):
+        """Test language classification with empty text"""
+        result = await openai_service.classify_language("")
+        assert result == "en"  # Default to English
+
+        result = await openai_service.classify_language("   ")
+        assert result == "en"  # Default to English
+
+    @pytest.mark.asyncio
+    async def test_classify_language_not_configured(
+        self, mock_openai_client
+    ):
+        """Test language classification when not configured"""
+        with patch("services.openai_service.settings") as mock_settings:
+            mock_settings.openai_enabled = False
+            mock_settings.openai_api_key = ""
+
+            service = OpenAIService()
+            result = await service.classify_language("Hello world")
+
+            assert result == "en"  # Default to English
+
+    @pytest.mark.asyncio
+    async def test_classify_language_api_error(self, openai_service):
+        """Test language classification with API error"""
+        from openai import OpenAIError
+
+        openai_service.client.chat.completions.create = AsyncMock(
+            side_effect=OpenAIError("API error")
+        )
+
+        result = await openai_service.classify_language("Hello world")
+
+        assert result == "en"  # Default to English on error
+
+    @pytest.mark.asyncio
+    async def test_classify_language_empty_response(
+        self, openai_service
+    ):
+        """Test language classification with empty API response"""
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+        mock_choice.finish_reason = "stop"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.model = "gpt-4o-mini"
+        mock_response.usage = None
+
+        openai_service.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
+        )
+
+        result = await openai_service.classify_language("Hello world")
+
+        assert result == "en"  # Default to English
+
+    @pytest.mark.asyncio
+    async def test_classify_language_with_typos(self, openai_service):
+        """Test language classification handles typos"""
+        mock_choice = MagicMock()
+        mock_choice.message.content = "sw"
+        mock_choice.finish_reason = "stop"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.model = "gpt-4o-mini"
+        mock_response.usage = None
+
+        openai_service.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
+        )
+
+        result = await openai_service.classify_language(
+            "Habariii ya asubuhi"  # Typo in "Habari"
+        )
+
+        assert result == "sw"

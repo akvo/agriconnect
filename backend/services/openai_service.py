@@ -658,15 +658,19 @@ class OpenAIService:
             return "en"  # Default to English
 
         system_prompt = """
-            You are a language classifier language detection AI.\n\n"
-            Classify the language of the given text
-            Handle:
-            - Misspellings and typos
-            - Mixed language (choose dominant language)
-            - Short messages and greetings
-            - Numbers and symbols (ignore them)
-            Respond with ONLY the 2 letter language code. No explanations.
-        """
+        You are a language detection AI that identifies the language of
+        any given text.
+        Your task:
+        - Detect the language of the provided text
+        - Handle misspellings and typos
+        - For mixed-language text, identify the dominant language
+        - Work with short messages, greetings, and informal text
+        - Ignore numbers and symbols when determining language
+        Response format:
+        - Return ONLY the ISO 639-1 two-letter language code
+        (e.g., "en", "sw", "fr", "es", "ar")
+        - Use lowercase
+        - No explanations or additional text"""
 
         messages = [
             {"role": "system", "content": system_prompt},
