@@ -347,3 +347,40 @@ def reset_external_ai_cache():
     ExternalAIService.invalidate_cache()
     yield
     ExternalAIService.invalidate_cache()
+
+
+@pytest.fixture
+def customer(db_session):
+    """Fixture to create a customer for testing."""
+    from models.customer import Customer, CustomerLanguage
+
+    def _create_customer(
+        phone_number: str = "+255123456789",
+        full_name: str = None,
+        language: CustomerLanguage = CustomerLanguage.EN,
+        profile_data: dict = None,
+    ) -> Customer:
+        """
+        Create a customer with optional profile data.
+
+        Args:
+            phone_number: Customer's phone number (default: +255123456789)
+            full_name: Customer's full name (optional)
+            language: Customer's preferred language
+            profile_data: Additional profile data (crop_type, gender, etc.)
+
+        Returns:
+            Customer instance
+        """
+        customer_obj = Customer(
+            phone_number=phone_number,
+            full_name=full_name,
+            language=language,
+            profile_data=profile_data,
+        )
+        db_session.add(customer_obj)
+        db_session.commit()
+        db_session.refresh(customer_obj)
+        return customer_obj
+
+    return _create_customer
