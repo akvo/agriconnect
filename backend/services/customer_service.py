@@ -9,7 +9,11 @@ from models.administrative import (
     AdministrativeLevel,
     CustomerAdministrative,
 )
-from models.customer import Customer, CustomerLanguage
+from models.customer import (
+    Customer,
+    CustomerLanguage,
+    OnboardingStatus,
+)
 from models.ticket import Ticket
 from datetime import datetime, timezone
 
@@ -66,12 +70,78 @@ class CustomerService:
             return None
 
         for key, value in kwargs.items():
+            # Handle ward_id specially (not a direct customer attribute)
+            if key == "ward_id":
+                # Update or create CustomerAdministrative entry
+                # Flush any pending changes to ensure we see existing records
+                self.db.flush()
+                cust_admin = (
+                    self.db.query(CustomerAdministrative)
+                    .filter(
+                        CustomerAdministrative.customer_id
+                        == customer.id
+                    )
+                    .first()
+                )
+                if cust_admin:
+                    cust_admin.administrative_id = value
+                else:
+                    new_cust_admin = CustomerAdministrative(
+                        customer_id=customer.id,
+                        administrative_id=value,
+                    )
+                    self.db.add(new_cust_admin)
+                continue
             if hasattr(customer, key):
+                if key in [
+                    "crop_type",
+                    "gender",
+                ]:
+                    # IMPORTANT:
+                    # Create a copy to trigger SQLAlchemy's change tracking
+                    profile_data = (customer.profile_data or {}).copy()
+                    if value is None:
+                        # delete the key if value is None
+                        if key in profile_data:
+                            del profile_data[key]
+                        customer.profile_data = profile_data
+                        continue
+                    # Convert enum values to their string value
+                    # for JSON serialization
+                    if hasattr(value, 'value'):
+                        profile_data[key] = value.value
+                    else:
+                        profile_data[key] = value
+                    customer.profile_data = profile_data
+                    continue
+                if key == "age":
+                    # Calculate birth_year from age
+                    current_year = datetime.now().year
+                    birth_year = None
+                    # Only set birth_year if age is a valid number
+                    if value and str(value).strip() != "":
+                        birth_year = current_year - value
+                    # IMPORTANT:
+                    # Create a copy to trigger SQLAlchemy's change tracking
+                    profile_data = (customer.profile_data or {}).copy()
+                    if birth_year is None:
+                        # delete the key if birth_year is None
+                        if "birth_year" in profile_data:
+                            del profile_data["birth_year"]
+                        customer.profile_data = profile_data
+                        continue
+                    profile_data["birth_year"] = birth_year
+                    customer.profile_data = profile_data
+                    continue
                 # Handle empty strings as None for optional fields like
                 # full_name
                 if key == "full_name" and value == "":
                     value = None
                 setattr(customer, key, value)
+        # If onboarding fields are set, mark onboarding as completed
+        if customer.onboarding_attempts is not None:
+            customer.onboarding_attempts = None
+            customer.onboarding_status = OnboardingStatus.COMPLETED
 
         self.db.commit()
         self.db.refresh(customer)

@@ -10,9 +10,9 @@ class CustomerBase(BaseModel):
     phone_number: str
     full_name: Optional[str] = None
     language: CustomerLanguage = CustomerLanguage.EN
-    crop_type_id: Optional[int] = None
+    crop_type: Optional[str] = None
     gender: Optional[Gender] = None
-    birth_year: Optional[int] = None
+    age: Optional[int] = None
 
 
 class CustomerCreate(CustomerBase):
@@ -24,16 +24,8 @@ class CustomerUpdate(BaseModel):
     language: Optional[CustomerLanguage] = None
     crop_type: Optional[str] = None
     gender: Optional[Gender] = None
-    birth_year: Optional[int] = None
-
-
-class CustomerResponse(CustomerBase):
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    age: Optional[int] = None
+    ward_id: Optional[int] = None
 
 
 class CustomerAdministrativeInfo(BaseModel):
@@ -41,7 +33,18 @@ class CustomerAdministrativeInfo(BaseModel):
 
     id: Optional[int] = None
     name: Optional[str] = None
+    parent_id: Optional[int] = None
     path: Optional[str] = None
+
+
+class CustomerResponse(CustomerBase):
+    id: int
+    administrative: Optional[CustomerAdministrativeInfo] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 
 class CropTypeInfo(BaseModel):
