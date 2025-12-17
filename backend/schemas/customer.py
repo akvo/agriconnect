@@ -24,7 +24,8 @@ class CustomerUpdate(BaseModel):
     language: Optional[CustomerLanguage] = None
     crop_type: Optional[str] = None
     gender: Optional[Gender] = None
-    birth_year: Optional[int] = None
+    age: Optional[int] = None
+    ward_id: Optional[int] = None
 
 
 class CustomerResponse(CustomerBase):
