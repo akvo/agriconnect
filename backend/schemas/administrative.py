@@ -3,10 +3,15 @@ from typing import List, Optional
 from pydantic import BaseModel, field_validator
 
 
+class AdministrativeLevelBase(BaseModel):
+    id: int
+    name: str
+
+
 class AdministrativeBase(BaseModel):
     code: str
     name: str
-    level: str
+    level: AdministrativeLevelBase
     parent_id: Optional[int] = None
     path: str
 

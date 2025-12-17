@@ -2,10 +2,12 @@ from typing import List, Optional
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-
+from sqlalchemy.orm import Session, joinedload
 from database import get_db
-from models.administrative import UserAdministrative
+from models.administrative import (
+    UserAdministrative,
+    CustomerAdministrative,
+)
 from models.customer import Customer
 from models.user import User, UserType
 from schemas.customer import (
@@ -82,8 +84,45 @@ async def get_all_customers(
     db: Session = Depends(get_db), current_user=Depends(admin_required)
 ):
     """Get all customers (admin only) - Legacy endpoint."""
-    customers = db.query(Customer).all()
-    return customers
+    # Load customers with administrative data
+    customers = (
+        db.query(Customer)
+        .options(
+            joinedload(Customer.customer_administrative).joinedload(
+                CustomerAdministrative.administrative
+            )
+        )
+        .all()
+    )
+
+    # Format response with administrative info
+    customer_responses = []
+    for customer in customers:
+        admin_info = None
+        if customer.customer_administrative:
+            customer_admin = customer.customer_administrative[0]
+            if customer_admin.administrative:
+                admin = customer_admin.administrative
+                admin_info = {
+                    "id": admin.id,
+                    "name": admin.name,
+                    "parent_id": admin.parent_id,
+                    "path": admin.path,
+                }
+        customer_dict = {
+            "id": customer.id,
+            "phone_number": customer.phone_number,
+            "full_name": customer.full_name,
+            "language": customer.language,
+            "crop_type": customer.crop_type,
+            "gender": customer.gender,
+            "age": customer.age,
+            "administrative": admin_info,
+            "created_at": customer.created_at,
+            "updated_at": customer.updated_at,
+        }
+        customer_responses.append(customer_dict)
+    return customer_responses
 
 
 @router.get("/list", response_model=CustomerListResponse)
