@@ -9,7 +9,11 @@ from models.administrative import (
     AdministrativeLevel,
     CustomerAdministrative,
 )
-from models.customer import Customer, CustomerLanguage
+from models.customer import (
+    Customer,
+    CustomerLanguage,
+    OnboardingStatus,
+)
 from models.ticket import Ticket
 from datetime import datetime, timezone
 
@@ -107,7 +111,10 @@ class CustomerService:
                 if key == "age":
                     # Calculate birth_year from age
                     current_year = datetime.now().year
-                    birth_year = current_year - value
+                    birth_year = None
+                    # Only set birth_year if age is a valid number
+                    if value and str(value).strip() != "":
+                        birth_year = current_year - value
                     # IMPORTANT:
                     # Create a copy to trigger SQLAlchemy's change tracking
                     profile_data = (customer.profile_data or {}).copy()
@@ -119,6 +126,10 @@ class CustomerService:
                 if key == "full_name" and value == "":
                     value = None
                 setattr(customer, key, value)
+        # If onboarding fields are set, mark onboarding as completed
+        if customer.onboarding_attempts is not None:
+            customer.onboarding_attempts = None
+            customer.onboarding_status = OnboardingStatus.COMPLETED
 
         self.db.commit()
         self.db.refresh(customer)
