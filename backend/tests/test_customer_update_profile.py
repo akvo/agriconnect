@@ -291,6 +291,124 @@ class TestCustomerProfileUpdateService:
         assert updated.gender == "male"
         assert updated.age == 45
 
+    def test_update_crop_type_to_none_removes_from_profile_data(
+        self, db_session: Session, customer
+    ):
+        """Test updating crop_type to None removes it from profile_data."""
+        # Create customer with crop_type
+        cust = customer(profile_data={"crop_type": "Maize", "gender": "male"})
+        service = CustomerService(db_session)
+
+        # Update crop_type to None
+        updated = service.update_customer_profile(cust.id, crop_type=None)
+
+        assert updated is not None
+        assert updated.profile_data is not None
+        # crop_type should be removed
+        assert "crop_type" not in updated.profile_data
+        assert updated.crop_type is None
+        # Other fields should be preserved
+        assert updated.profile_data.get("gender") == "male"
+
+    def test_update_gender_to_none_removes_from_profile_data(
+        self, db_session: Session, customer
+    ):
+        """Test updating gender to None removes it from profile_data."""
+        # Create customer with gender
+        cust = customer(
+            profile_data={"crop_type": "Avocado", "gender": "female"}
+        )
+        service = CustomerService(db_session)
+
+        # Update gender to None
+        updated = service.update_customer_profile(cust.id, gender=None)
+
+        assert updated is not None
+        assert updated.profile_data is not None
+        # gender should be removed
+        assert "gender" not in updated.profile_data
+        assert updated.gender is None
+        # Other fields should be preserved
+        assert updated.profile_data.get("crop_type") == "Avocado"
+
+    def test_update_age_to_none_removes_birth_year_from_profile_data(
+        self, db_session: Session, customer
+    ):
+        """Test updating age to None removes birth_year from profile_data."""
+        current_year = datetime.now().year
+        # Create customer with birth_year
+        cust = customer(
+            profile_data={
+                "birth_year": current_year - 30,
+                "crop_type": "Coffee",
+            }
+        )
+        service = CustomerService(db_session)
+
+        # Update age to None
+        updated = service.update_customer_profile(cust.id, age=None)
+
+        assert updated is not None
+        assert updated.profile_data is not None
+        # birth_year should be removed
+        assert "birth_year" not in updated.profile_data
+        assert updated.birth_year is None
+        assert updated.age is None
+        # Other fields should be preserved
+        assert updated.profile_data.get("crop_type") == "Coffee"
+
+    def test_update_age_empty_string_removes_birth_year(
+        self, db_session: Session, customer
+    ):
+        """Test updating age to empty string removes birth_year."""
+        current_year = datetime.now().year
+        # Create customer with birth_year
+        cust = customer(
+            profile_data={
+                "birth_year": current_year - 25,
+                "gender": "male",
+            }
+        )
+        service = CustomerService(db_session)
+
+        # Update age to empty string
+        updated = service.update_customer_profile(cust.id, age="")
+
+        assert updated is not None
+        assert updated.profile_data is not None
+        # birth_year should be removed
+        assert "birth_year" not in updated.profile_data
+        assert updated.birth_year is None
+        # Other fields should be preserved
+        assert updated.profile_data.get("gender") == "male"
+
+    def test_update_multiple_fields_to_none(
+        self, db_session: Session, customer
+    ):
+        """Test updating multiple profile fields to None removes them all."""
+        current_year = datetime.now().year
+        # Create customer with all profile fields
+        cust = customer(
+            profile_data={
+                "crop_type": "Maize",
+                "gender": "female",
+                "birth_year": current_year - 40,
+            }
+        )
+        service = CustomerService(db_session)
+
+        # Update all fields to None
+        updated = service.update_customer_profile(
+            cust.id, crop_type=None, gender=None, age=None
+        )
+
+        assert updated is not None
+        # All profile_data fields should be removed
+        assert updated.profile_data == {} or updated.profile_data is None
+        assert updated.crop_type is None
+        assert updated.gender is None
+        assert updated.birth_year is None
+
 
 class TestCustomerProfileUpdateEndpoint:
     """Test PUT /api/customers/{customer_id} endpoint."""
@@ -552,3 +670,46 @@ class TestCustomerProfileUpdateEndpoint:
         )
         assert cust_admin is not None
         assert cust_admin.administrative_id == admin.id
+
+    def test_update_customer_remove_profile_fields_via_endpoint(
+        self,
+        client: TestClient,
+        db_session: Session,
+        auth_headers_factory,
+        customer,
+    ):
+        """Test removing profile fields by setting them to null via API."""
+        headers, _ = auth_headers_factory(user_type="admin")
+
+        current_year = datetime.now().year
+        # Create customer with all profile fields
+        cust = customer(
+            profile_data={
+                "crop_type": "Maize",
+                "gender": "male",
+                "birth_year": current_year - 35,
+            }
+        )
+
+        # Update crop_type and gender to null (removing them)
+        update_data = {
+            "crop_type": None,
+            "gender": None,
+        }
+
+        response = client.put(
+            f"/api/customers/{cust.id}",
+            json=update_data,
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+
+        # Verify fields are removed from database
+        db_session.refresh(cust)
+        assert cust.crop_type is None
+        assert cust.gender is None
+        # birth_year should still exist
+        assert cust.birth_year == current_year - 35
+        assert "crop_type" not in (cust.profile_data or {})
+        assert "gender" not in (cust.profile_data or {})

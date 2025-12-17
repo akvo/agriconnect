@@ -100,6 +100,12 @@ class CustomerService:
                     # IMPORTANT:
                     # Create a copy to trigger SQLAlchemy's change tracking
                     profile_data = (customer.profile_data or {}).copy()
+                    if value is None:
+                        # delete the key if value is None
+                        if key in profile_data:
+                            del profile_data[key]
+                        customer.profile_data = profile_data
+                        continue
                     # Convert enum values to their string value
                     # for JSON serialization
                     if hasattr(value, 'value'):
@@ -118,6 +124,12 @@ class CustomerService:
                     # IMPORTANT:
                     # Create a copy to trigger SQLAlchemy's change tracking
                     profile_data = (customer.profile_data or {}).copy()
+                    if birth_year is None:
+                        # delete the key if birth_year is None
+                        if "birth_year" in profile_data:
+                            del profile_data["birth_year"]
+                        customer.profile_data = profile_data
+                        continue
                     profile_data["birth_year"] = birth_year
                     customer.profile_data = profile_data
                     continue
