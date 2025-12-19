@@ -48,23 +48,6 @@ export default function HomeScreen() {
           <View style={styles.profileDetails}>
             <Text style={styles.welcomeText}>Welcome Back</Text>
             <Text style={styles.nameText}>{user?.fullName || "User"}</Text>
-            {user?.administrativeLocation?.full_path && (
-              <Text style={styles.locationText}>
-                {user?.administrativeLocation?.full_path}
-              </Text>
-            )}
-            {user?.userType && (
-              <Text
-                style={[
-                  styles.userTypeLabel,
-                  user.userType === "eo"
-                    ? styles.eoTypeLabel
-                    : styles.adminTypeLabel,
-                ]}
-              >
-                {user.userType === "eo" ? "Extension Officer" : "Admin"}
-              </Text>
-            )}
           </View>
         </View>
         <TouchableOpacity

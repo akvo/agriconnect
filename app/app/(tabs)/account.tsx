@@ -4,18 +4,18 @@ import {
   Text,
   View,
   TextInput,
-  Switch,
   TouchableOpacity,
   Modal,
+  ScrollView,
 } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import themeColors from "@/styles/colors";
 import Avatar from "@/components/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { initialsFromName } from "@/utils/string";
+import typography from "@/styles/typography";
 
 const Account: React.FC = () => {
-  const [isWifiOnly, setIsWifiOnly] = useState<boolean>(false);
   const [isConfirmLogoutVisible, setIsConfirmLogoutVisible] =
     useState<boolean>(false);
 
@@ -30,14 +30,16 @@ const Account: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={[styles.card, styles.headerCard]}>
         <View>
           <Avatar initials={initialsFromName(user?.fullName || "")} />
         </View>
         <View>
           <Text style={styles.title}>{user?.fullName}</Text>
-          <Text style={styles.subTitle}>{user?.userType}</Text>
+          <Text style={styles.subTitle}>
+            {user?.userType === "eo" ? "Extension Officer" : "Admin"}
+          </Text>
         </View>
       </View>
 
@@ -47,7 +49,9 @@ const Account: React.FC = () => {
           {isEditUser ? (
             <TextInput
               style={styles.input}
-              value={isEditUser ? user?.editFullName : user?.fullName}
+              value={
+                isEditUser ? (user?.editFullName ?? "") : (user?.fullName ?? "")
+              }
               onChangeText={(text) =>
                 setUser?.((prev) =>
                   prev ? { ...prev, editFullName: text } : prev,
@@ -55,7 +59,9 @@ const Account: React.FC = () => {
               }
             />
           ) : (
-            <Text>{user?.fullName}</Text>
+            <Text style={[typography.body1, styles.textValue]}>
+              {user?.fullName}
+            </Text>
           )}
         </View>
         <View style={styles.formGroup}>
@@ -63,7 +69,11 @@ const Account: React.FC = () => {
           {isEditUser ? (
             <TextInput
               style={styles.input}
-              value={isEditUser ? user?.editPhoneNumber : user?.phoneNumber}
+              value={
+                isEditUser
+                  ? (user?.editPhoneNumber ?? "")
+                  : (user?.phoneNumber ?? "")
+              }
               onChangeText={(text) =>
                 setUser?.((prev) =>
                   prev ? { ...prev, editPhoneNumber: text } : prev,
@@ -71,22 +81,28 @@ const Account: React.FC = () => {
               }
             />
           ) : (
-            <Text>{user?.phoneNumber}</Text>
+            <Text style={[typography.body1, styles.textValue]}>
+              {user?.phoneNumber}
+            </Text>
           )}
         </View>
         <View style={styles.formGroup}>
           <Text style={styles.label}>Email</Text>
-          {/* {isEditUser ? (
-            <TextInput style={styles.input} value={user?.email} />
-          ) : ( */}
-          <Text>{user?.email}</Text>
-          {/* )} */}
+          <Text style={[typography.body1, styles.textValue]}>
+            {user?.email}
+          </Text>
+        </View>
+        <View style={[styles.formGroup, styles.formGroupLast]}>
+          <Text style={styles.label}>Location</Text>
+          <Text style={[typography.body1, styles.textValue]}>
+            {user?.administrativeLocation?.path}
+          </Text>
         </View>
         {/** Cancel Button */}
         {isEditUser && (
           <View style={[styles.buttonsCard]}>
             <TouchableOpacity
-              style={[styles.dangerButton]}
+              style={[styles.cancelButton]}
               onPress={() => {
                 setIsEditUser?.(false);
                 setUser?.((prev) =>
@@ -100,22 +116,13 @@ const Account: React.FC = () => {
                 );
               }}
             >
-              <Text style={[styles.dangerButtonText]}>Cancel</Text>
+              <Text style={[styles.cancelButtonText]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
 
       <View style={[styles.card, styles.buttonsCard]}>
-        <View style={styles.switchContainer}>
-          <View style={styles.buttonContainer}>
-            <View style={[styles.iconContainer, styles.wifiIcon]}>
-              <Feathericons name="wifi" size={16} color="#2b7fff" />
-            </View>
-            <Text style={[styles.buttonText]}>Sync over WiFi only</Text>
-          </View>
-          <Switch value={isWifiOnly} onValueChange={setIsWifiOnly} />
-        </View>
         <TouchableOpacity
           style={styles.buttonContainer}
           onPress={() => setIsConfirmLogoutVisible(true)}
@@ -160,7 +167,7 @@ const Account: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -171,7 +178,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    borderRadius: 16,
     padding: 16,
     margin: 16,
     shadowColor: "#000",
@@ -191,18 +198,29 @@ const styles = StyleSheet.create({
   },
   formCard: {
     gap: 12,
+    paddingHorizontal: 0,
   },
   formGroup: {
     gap: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: themeColors.mutedBorder,
+    paddingBottom: 8,
+    paddingHorizontal: 16,
+  },
+  formGroupLast: {
+    borderBottomWidth: 0,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333333",
+    fontSize: 12,
+    fontWeight: 400,
+    color: themeColors.textSecondary,
+  },
+  textValue: {
+    fontWeight: 500,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#CCCCCC",
+    borderColor: themeColors.mutedBorder,
     borderRadius: 4,
     padding: 8,
     fontSize: 16,
@@ -210,6 +228,7 @@ const styles = StyleSheet.create({
   buttonsCard: {
     flexDirection: "column",
     gap: 12,
+    marginBottom: 124,
   },
   switchContainer: {
     flexDirection: "row",
@@ -295,20 +314,20 @@ const styles = StyleSheet.create({
   modalLogoutButtonText: {
     color: "#FFFFFF",
   },
-  dangerButton: {
+  cancelButton: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#FF3B30",
+    borderColor: themeColors.mutedBorder,
     borderRadius: 6,
     padding: 12,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 16,
   },
-  dangerButtonText: {
-    color: "#FF3B30",
+  cancelButtonText: {
+    color: themeColors.textSecondary,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: 600,
   },
 });
 

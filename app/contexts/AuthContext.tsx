@@ -17,7 +17,8 @@ import { validJSONString } from "@/utils/string";
 
 interface AdministrativeLocation {
   id: number;
-  full_path: string;
+  parent_id: number | null;
+  path: string | null;
 }
 
 interface User {
