@@ -9,7 +9,8 @@ from utils.validators import validate_phone_number
 
 class AdministrativeLocationInfo(BaseModel):
     id: Optional[int] = None
-    full_path: Optional[str] = None
+    parent_id: Optional[int] = None
+    path: Optional[str] = None
 
 
 class UserCreate(BaseModel):

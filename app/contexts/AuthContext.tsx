@@ -17,7 +17,8 @@ import { validJSONString } from "@/utils/string";
 
 interface AdministrativeLocation {
   id: number;
-  full_path: string;
+  parent_id: number | null;
+  path: string | null;
 }
 
 interface User {
@@ -31,6 +32,8 @@ interface User {
   administrativeLocation?: AdministrativeLocation | null;
   accessToken?: string | null;
   deviceRegisterAt?: string | null;
+  editFullName?: string | null;
+  editPhoneNumber?: string | null;
 }
 
 interface AuthContextType {
@@ -44,6 +47,9 @@ interface AuthContextType {
   ) => Promise<void>;
   signOut: () => Promise<void>;
   setRegisterDeviceAt: () => Promise<void>;
+  isEditUser?: boolean;
+  setIsEditUser?: React.Dispatch<React.SetStateAction<boolean>>;
+  setUser?: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -63,6 +69,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const [[isLoading, session], setSession] = useStorageState("accessToken");
   const [user, setUser] = useState<User | null>(null);
+  const [isEditUser, setIsEditUser] = useState<boolean>(false);
   const db = useDatabase();
 
   // Create DAO manager with database from context
@@ -254,7 +261,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <AuthContext.Provider
-      value={{ user, session, isLoading, signIn, signOut, setRegisterDeviceAt }}
+      value={{
+        user,
+        session,
+        isLoading,
+        signIn,
+        signOut,
+        isEditUser,
+        setIsEditUser,
+        setRegisterDeviceAt,
+        setUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

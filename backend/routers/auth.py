@@ -66,7 +66,9 @@ def login_user(
     )
 
     # Get user administrative info
-    admin_info = UserService._get_user_administrative_info(db, user.id)
+    admin_info = UserService._get_user_administrative_info(
+        db, user.id, user.user_type
+    )
     # Build user response with administrative location
     user_response = UserResponse.model_validate(user)
     # If no administrative info and user is admin, assign national level
@@ -151,7 +153,11 @@ def get_profile(
 ):
     """Get current user's profile"""
     # Get user administrative info
-    admin_info = UserService._get_user_administrative_info(db, current_user.id)
+    admin_info = UserService._get_user_administrative_info(
+        db,
+        current_user.id,
+        current_user.user_type,
+    )
     # Build user response with administrative location
     user_response = UserResponse.model_validate(current_user)
     user_response.administrative_location = admin_info
@@ -167,7 +173,11 @@ def update_profile(
     """Update current user's profile and optionally change password"""
     updated_user = UserService.update_self(db, current_user, update_data)
     # Get user administrative info
-    admin_info = UserService._get_user_administrative_info(db, updated_user.id)
+    admin_info = UserService._get_user_administrative_info(
+        db,
+        updated_user.id,
+        updated_user.user_type
+    )
     # Build user response with administrative location
     user_response = UserResponse.model_validate(updated_user)
     user_response.administrative_location = admin_info
@@ -254,7 +264,11 @@ def accept_invitation(
     )
 
     # Get user administrative info
-    admin_info = UserService._get_user_administrative_info(db, user.id)
+    admin_info = UserService._get_user_administrative_info(
+        db,
+        user.id,
+        user.user_type
+    )
     # Build user response with administrative location
     user_response = UserResponse.model_validate(user)
     user_response.administrative_location = admin_info

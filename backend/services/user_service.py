@@ -7,11 +7,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models import (
-    User,
     UserAdministrative,
     Administrative,
-    AdministrativeLevel,
 )
+from models.user import User, UserType
 from schemas.user import (
     AdminUserCreate,
     SelfUpdateRequest,
@@ -38,45 +37,11 @@ from utils.constants import (
 
 class UserService:
     @staticmethod
-    def _build_administrative_path(
-        db: Session, administrative_id: int
-    ) -> str:
-        """Build the full administrative path."""
-        # Example: 'Region - District - Ward'
-        if not administrative_id:
-            return None
-
-        # Get the administrative area and its full hierarchy
-        admin = (
-            db.query(Administrative)
-            .filter(Administrative.id == administrative_id)
-            .first()
-        )
-        if not admin:
-            return None
-
-        # Split the path to get all administrative codes
-        path_parts = admin.path.split('.') if admin.path else []
-
-        # Query all administrative areas in the path
-        areas = (
-            db.query(Administrative)
-            .join(AdministrativeLevel)
-            .filter(Administrative.code.in_(path_parts))
-            .order_by(AdministrativeLevel.id)
-            .all()
-        )
-
-        # Build the path string, excluding country level (level_id 1)
-        path_names = []
-        for area in areas:
-            if area.level_id != 1:  # Skip country level
-                path_names.append(area.name)
-
-        return ' - '.join(path_names) if path_names else None
-
-    @staticmethod
-    def _get_user_administrative_info(db: Session, user_id: int) -> dict:
+    def _get_user_administrative_info(
+        db: Session,
+        user_id: int,
+        user_type: str = None,
+    ) -> dict:
         """Get administrative location information for a user"""
         # Get the user's administrative assignment
         user_admin = (
@@ -84,20 +49,24 @@ class UserService:
             .filter(UserAdministrative.user_id == user_id)
             .first()
         )
-
+        if user_admin:
+            user_admin = user_admin.administrative
+        if not user_admin and user_type == UserType.ADMIN:
+            user_admin = (
+                db.query(Administrative)
+                .filter(Administrative.parent_id.is_(None))
+                .first()
+            )
         if not user_admin:
             return {
                 'id': None,
-                'full_path': None
+                'parent_id': None,
+                'path': None
             }
-
-        full_path = UserService._build_administrative_path(
-            db, user_admin.administrative_id
-        )
-
         return {
-            'id': user_admin.administrative_id,
-            'full_path': full_path,
+            'id': user_admin.id,
+            'parent_id': user_admin.parent_id,
+            'path': user_admin.path,
         }
 
     @staticmethod
@@ -286,7 +255,11 @@ class UserService:
                 'invitation_status': None,
                 'password_set_at': user.password_set_at,
                 'administrative_location': (
-                    UserService._get_user_administrative_info(db, user.id)
+                    UserService._get_user_administrative_info(
+                        db,
+                        user.id,
+                        user.user_type
+                    )
                 ),
             }
             user_data.append(user_dict)
@@ -441,7 +414,11 @@ class UserService:
             'created_at': user.created_at,
             'updated_at': user.updated_at,
             'administrative_location': (
-                UserService._get_user_administrative_info(db, user.id)
+                UserService._get_user_administrative_info(
+                    db,
+                    user.id,
+                    user.user_type
+                )
             ),
         }
 
