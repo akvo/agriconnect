@@ -1226,12 +1226,7 @@ Birth year must be between 1900 and {current_year}."""
         top_candidates = candidates[: self.max_candidates]
 
         # Store candidate IDs
-        if field_name == "administration":
-            self._store_candidates(
-                customer, field_name, [c.id for c in top_candidates]
-            )
-        else:
-            self._store_candidates(customer, field_name, top_candidates)
+        self._store_candidates(customer, field_name, top_candidates)
 
         self.db.commit()
 
