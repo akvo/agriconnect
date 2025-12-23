@@ -83,14 +83,18 @@ export default function CustomerList({
         </div>
       </td>
       <td className="px-8 py-6 whitespace-nowrap">
-        <span
-          className={`inline-flex items-center px-4 py-2 rounded-[5px] text-sm font-bold ${getLanguageBadgeColor(customer.language)}`}
-        >
-          <GlobeAltIcon className="w-4 h-4 mr-2 flex-shrink-0" />
-          <span className="leading-none">
-            {getLanguageLabel(customer.language)}
+        {customer.language ? (
+          <span
+            className={`inline-flex items-center px-4 py-2 rounded-[5px] text-sm font-bold ${getLanguageBadgeColor(customer.language)}`}
+          >
+            <GlobeAltIcon className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span className="leading-none">
+              {getLanguageLabel(customer.language)}
+            </span>
           </span>
-        </span>
+        ) : (
+          <span className="text-secondary-500 text-sm">N/A</span>
+        )}
       </td>
       <td className="px-8 py-6 whitespace-nowrap">
         <div className="text-sm text-secondary-600">

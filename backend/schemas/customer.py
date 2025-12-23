@@ -9,7 +9,7 @@ from models.customer import AgeGroup, CustomerLanguage, Gender
 class CustomerBase(BaseModel):
     phone_number: str
     full_name: Optional[str] = None
-    language: CustomerLanguage = CustomerLanguage.EN
+    language: Optional[CustomerLanguage] = None
     crop_type: Optional[str] = None
     gender: Optional[Gender] = None
     age: Optional[int] = None

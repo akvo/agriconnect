@@ -337,7 +337,7 @@ class TestCustomerEndpoints:
         data = response.json()
         assert data["phone_number"] == "+255987654321"
         assert data["full_name"] is None
-        assert data["language"] == "en"  # Default value
+        assert data["language"] is None
 
     def test_create_customer_duplicate_phone(
         self, client: TestClient, db_session: Session
