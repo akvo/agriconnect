@@ -271,7 +271,6 @@ export default function EditCustomerModal({
                 >
                   Crop Type
                 </label>
-                {/* Select Avocado, Cacao */}
                 <select
                   id="crop_type"
                   name="crop_type"

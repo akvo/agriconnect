@@ -315,6 +315,7 @@ trans: Dict[str, Any] = {
     "crops": {
         "Avocado": {"name": {"en": "avocado", "sw": "parachichi"}},
         "Cacao": {"name": {"en": "cacao", "sw": "kakao"}},
+        "Potato": {"name": {"en": "potato", "sw": "viazi"}},
     },
     "gender": {
         "male": {"en": "Male", "sw": "Mwanamume"},

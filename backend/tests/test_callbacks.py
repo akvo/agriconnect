@@ -402,7 +402,9 @@ def test_ai_callback_whisper_type_with_ticket_id(
         "job_id": "whisper_job_001",
         "status": "completed",
         "output": {
-            "answer": "Plant rice in well-drained soil with sunlight.",
+            "answer": (
+                "Plant rice in well-drained soil with sunlight[citation:1]."
+            ),
             "citations": [
                 {
                     "document": "Rice Growing Guide",
