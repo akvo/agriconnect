@@ -43,6 +43,7 @@ class TestGenericOnboardingService:
     def onboarding_service(self, db_session, mock_openai_service):
         """Create onboarding service with mocked dependencies"""
         service = OnboardingService(db_session)
+        service.supported_crops = ["Avocado", "Cacao"]
         service.openai_service = mock_openai_service
         return service
 
@@ -1209,6 +1210,7 @@ class TestDynamicCropOnboarding:
     def onboarding_service(self, db_session, mock_openai_service):
         """Create onboarding service with mocked dependencies"""
         service = OnboardingService(db_session)
+        service.supported_crops = ["Avocado", "Cacao"]
         service.openai_service = mock_openai_service
         return service
 

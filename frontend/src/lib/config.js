@@ -1,1 +1,1 @@
-export const CROP_TYPES = ["Avocado", "Cacao"];
+export const CROP_TYPES = ["Avocado", "Potato"];
