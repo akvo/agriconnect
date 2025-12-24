@@ -1,4 +1,5 @@
 import logging
+import re
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
@@ -92,6 +93,9 @@ class MessageService:
         # Generate temporary message_sid (will be updated with real Twilio SID)
         if not message_sid:
             message_sid = f"pending_ai_{original_message_id}"
+
+        # Remove [citation:{number}] patterns from ai_response
+        ai_response = re.sub(r"\[citation:\d+\]", "", ai_response)
 
         ai_message = Message(
             message_sid=message_sid,

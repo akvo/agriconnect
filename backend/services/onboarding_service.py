@@ -1561,7 +1561,10 @@ Birth year must be between 1900 and {current_year}."""
             if customer.language == CustomerLanguage.EN else "Swahili"
         )
         c_name = customer.full_name if customer.full_name else "N/A"
-        c_crop_type = customer.crop_type
+        c_crop_type = t(
+            f"crops.{customer.crop_type}.name",
+            lang,
+        ) if customer.crop_type else "N/A"
         c_administration = "N/A"
         if (
             hasattr(customer, "customer_administrative")

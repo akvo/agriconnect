@@ -115,6 +115,7 @@ class WhatsAppService:
         - Wrapping quotation marks
         - Trailing punctuation followed by multiple spaces
         - Empty or null strings
+        - Remove [citation:{number}] patterns
 
         Args:
             text: The text to sanitize
@@ -157,6 +158,9 @@ class WhatsAppService:
         # Ensure we still have content after sanitization
         if not text:
             return "Response is being processed."
+
+        # Remove [citation:{number}] patterns
+        text = re.sub(r"\[citation:\d+\]", "", text)
 
         return text
 
