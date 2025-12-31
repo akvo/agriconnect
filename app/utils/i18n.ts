@@ -4,6 +4,10 @@ export const i18n = {
       en: "What would you like to know about:\n{topic}",
       sw: "Ungependa kujua nini kuhusu:\n{topic}",
     },
+    fallback_no_topic: {
+      en: "What would you like to know?",
+      sw: "Ungependa kujua nini?",
+    },
   },
 } as const;
 

@@ -122,25 +122,31 @@ export const useTicketData = (
           console.log(
             `[Chat] Loaded ${result.messages.length} cached messages from SQLite`,
           );
-          // if aiSuggestion is NULL, customer.language exists and result.messages.length < 3
-          // 2 messages: initial message from customer and first reply from agent
-          // then set aiSuggestion with quick reply from i18n config and get by customer language
-          // replace {topic} with ticketData.message.body
+          /**
+           * If there's no AI suggestion yet, and the customer has a language set,
+           * and there are less than 3 messages, generate a quick reply prompt.
+           */
           if (
             !aiSuggestion &&
             ticketData.customer?.language &&
             result.messages.length < 3
           ) {
-            const topic = ticketData.message?.body || "the topic";
+            const topic = ticketData.message?.body || null;
             const customerLang = ticketData.customer.language;
-            const quickReply = trans(
-              "quick_reply.know_more_about_topic",
+            let quickReply = trans(
+              "quick_reply.fallback_no_topic",
               customerLang as "en" | "sw",
             );
-            const formattedReply = quickReply
-              .replace("{topic}", topic)
-              ?.slice(0, WHATSAPP_MAX_LENGTH);
-            setAISuggestion(formattedReply);
+            if (topic) {
+              quickReply = trans(
+                "quick_reply.know_more_about_topic",
+                customerLang as "en" | "sw",
+              )
+                ?.replace("{topic}", topic)
+                ?.slice(0, WHATSAPP_MAX_LENGTH);
+            }
+
+            setAISuggestion(quickReply);
           }
 
           const uiMessages = result.messages.map((msg) =>
