@@ -40,6 +40,18 @@ const colors = {
   "green-100": "#B1D7CD",
   "green-50": "#E6F2EF",
 
+  // Blues requested
+  "blue-900": "#001F3F",
+  "blue-800": "#003060",
+  "blue-700": "#004080",
+  "blue-600": "#0050A0",
+  "blue-500": "#0060C0",
+  "blue-400": "#3388D1",
+  "blue-300": "#5599E0",
+  "blue-200": "#8BB9F1",
+  "blue-100": "#B1D7FF",
+  "blue-50": "#E6F2FF",
+
   // Additional aliases used in components
   borderLight: "#e0e0e0", // commonly used subtle border
   cardBorder: "#B1D7CD",
@@ -56,7 +68,6 @@ const colors = {
   // group icon background
   groupIconBackground: "#ECEFF4",
   groupIconForeground: "#74777A",
-
 };
 
 export default colors;

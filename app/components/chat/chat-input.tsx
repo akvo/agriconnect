@@ -1,10 +1,13 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   Text,
+  Animated,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api } from "@/services/api";
@@ -49,13 +52,53 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const db = useDatabase();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
-  const [charCount, isOverLimit, isNearLimit] = useMemo(() => {
-    // Calculate character count for the input
-    const charCount = text.length;
-    const isOverLimit = charCount > WHATSAPP_MAX_LENGTH;
-    const isNearLimit = charCount > WHATSAPP_MAX_LENGTH * 0.9; // 90% of limit
-    return [charCount, isOverLimit, isNearLimit];
-  }, [text]);
+  // Tooltip state
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipOpacity = useRef(new Animated.Value(0)).current;
+  const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Translation loading state
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const showTooltipAnimated = () => {
+    setShowTooltip(true);
+    Animated.timing(tooltipOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto-hide after 2 seconds
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+    }
+    tooltipTimeout.current = setTimeout(() => {
+      hideTooltipAnimated();
+    }, 2000);
+  };
+
+  const hideTooltipAnimated = () => {
+    Animated.timing(tooltipOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowTooltip(false);
+    });
+  };
+
+  const handleTranslateLongPress = () => {
+    showTooltipAnimated();
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeout.current) {
+        clearTimeout(tooltipTimeout.current);
+      }
+    };
+  }, []);
 
   const handleSend = async () => {
     if (
@@ -186,22 +229,43 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const handleTranslate = async () => {
+    if (text.trim().length === 0) {
+      return;
+    }
+
+    setIsTranslating(true);
+
+    try {
+      console.log(`[Chat] Translating message text: "${text.trim()}"`);
+      const response = await api.translateMessage("en", "sw", text.trim());
+
+      console.log("[Chat] ✅ Message translated successfully:", response);
+
+      // Update the TextInput with the translated text
+      setText(response.translated_text);
+    } catch (error) {
+      console.error("[Chat] ❌ Failed to translate message:", error);
+
+      // Show error alert with stack trace
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack =
+        error instanceof Error ? error.stack : "No stack trace available";
+
+      Alert.alert(
+        "Translation Failed",
+        `An error occurred while translating the message.\n\nError: ${errorMessage}\n\nStack trace:\n${errorStack}`,
+        [{ text: "OK", style: "default" }],
+      );
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   return (
-    <View style={styles.inputContainer}>
-      {/* Character Counter */}
-      <View style={styles.charCounterContainer}>
-        <Text
-          style={[
-            typography.caption2,
-            styles.charCounter,
-            isOverLimit && styles.charCounterError,
-            isNearLimit && !isOverLimit && styles.charCounterWarning,
-          ]}
-        >
-          {charCount}/{WHATSAPP_MAX_LENGTH}
-        </Text>
-      </View>
-      <View style={styles.inputRow}>
+    <View style={styles.inputRow}>
+      <View style={styles.textInputContainer}>
         <TextInput
           value={text}
           onChangeText={setText}
@@ -212,21 +276,48 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           ]}
           placeholder="Type a message..."
           placeholderTextColor={themeColors.dark3}
-          editable={isOnline}
-          maxLength={WHATSAPP_MAX_LENGTH}
           multiline
         />
         <TouchableOpacity
-          onPress={handleSend}
+          onPress={handleTranslate}
+          onLongPress={handleTranslateLongPress}
+          disabled={isTranslating}
           style={[
-            styles.sendButton,
-            (!isOnline || isOverLimit) && styles.sendButtonDisabled,
+            (isTranslating || text.trim().length === 0) &&
+              styles.translateButtonDisabled,
+            styles.translateButton,
           ]}
-          disabled={!isOnline || isOverLimit}
         >
-          <Feathericons name="send" size={20} color={themeColors.white} />
+          {isTranslating ? (
+            <ActivityIndicator size="small" color={themeColors["blue-500"]} />
+          ) : (
+            <Feathericons
+              name="globe"
+              size={24}
+              color={themeColors["blue-500"]}
+            />
+          )}
         </TouchableOpacity>
+        {showTooltip && (
+          <Animated.View
+            style={[
+              styles.tooltip,
+              {
+                opacity: tooltipOpacity,
+              },
+            ]}
+          >
+            <Text style={styles.tooltipText}>Translate message</Text>
+          </Animated.View>
+        )}
       </View>
+      <TouchableOpacity
+        onPress={handleSend}
+        style={[styles.sendButton, !isOnline && styles.sendButtonDisabled]}
+        disabled={!isOnline}
+      >
+        <Feathericons name="send" size={20} color={themeColors.white} />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -239,13 +330,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderTopWidth: 0,
     backgroundColor: themeColors.white,
+    position: "relative",
+  },
+  textInputContainer: {
+    flex: 1,
+    position: "relative",
   },
   textInput: {
-    flex: 1,
     minHeight: 48,
     maxHeight: 120,
     paddingVertical: 12,
     paddingHorizontal: 16,
+    paddingRight: 64,
     backgroundColor: themeColors.background,
     borderRadius: 24,
     borderWidth: 1,
@@ -267,25 +363,39 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.dark4,
     opacity: 0.5,
   },
-  inputContainer: {
-    borderTopWidth: 0.5,
-    borderTopColor: themeColors.mutedBorder,
-    backgroundColor: themeColors.white,
+  translateButton: {
+    backgroundColor: "transparent",
+    borderRadius: 24,
+    width: 40,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 1,
   },
-  charCounterContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    alignItems: "flex-start",
+  translateButtonDisabled: {
+    opacity: 0.3,
   },
-  charCounter: {
-    color: themeColors.dark3,
+  tooltip: {
+    position: "absolute",
+    right: 0,
+    top: -40,
+    backgroundColor: themeColors.dark1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 2,
+  },
+  tooltipText: {
+    ...typography.body4,
+    color: themeColors.white,
     fontSize: 12,
-  },
-  charCounterWarning: {
-    color: "#FF9800", // Orange
-  },
-  charCounterError: {
-    color: themeColors.error,
-    fontWeight: "600",
   },
 });
