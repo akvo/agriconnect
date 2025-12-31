@@ -26,7 +26,8 @@ import MessageBubble from "@/components/chat/message-bubble";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import { formatDateLabel } from "@/utils/time";
-
+import { WHATSAPP_MAX_LENGTH } from "@/constants/message";
+import { sanitizeAndValidateMessage } from "@/utils/chat";
 // Types
 interface BroadcastMessage {
   id: number;
@@ -43,63 +44,6 @@ interface DateSection {
   title: string;
   messages: BroadcastMessage[];
 }
-
-// Message validation and sanitization
-const WHATSAPP_MAX_LENGTH = 1500;
-const MESSAGE_MIN_LENGTH = 5;
-
-interface ValidationResult {
-  isValid: boolean;
-  error?: string;
-  sanitizedMessage?: string;
-}
-
-const sanitizeAndValidateMessage = (message: string): ValidationResult => {
-  if (!message || !message.trim()) {
-    return {
-      isValid: false,
-      error: "Message cannot be empty",
-    };
-  }
-
-  // Remove control characters except newlines and tabs
-  let sanitized = message.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, "");
-
-  // Replace tabs with spaces
-  sanitized = sanitized.replace(/\t/g, " ");
-
-  // Replace more than 4 consecutive spaces with 3 spaces
-  sanitized = sanitized.replace(/ {4,}/g, "   ");
-
-  // Replace more than 2 consecutive newlines with 2 newlines
-  sanitized = sanitized.replace(/\n{3,}/g, "\n\n");
-
-  // Fix punctuation followed by multiple spaces
-  sanitized = sanitized.replace(/([.!?,;:])\s{2,}/g, "$1 ");
-
-  // Trim whitespace
-  sanitized = sanitized.trim();
-
-  // Validate length after sanitization
-  if (sanitized.length < MESSAGE_MIN_LENGTH) {
-    return {
-      isValid: false,
-      error: `Message is too short (minimum ${MESSAGE_MIN_LENGTH} characters)`,
-    };
-  }
-
-  if (sanitized.length > WHATSAPP_MAX_LENGTH) {
-    return {
-      isValid: false,
-      error: `Message is too long (${sanitized.length}/${WHATSAPP_MAX_LENGTH} characters)`,
-    };
-  }
-
-  return {
-    isValid: true,
-    sanitizedMessage: sanitized,
-  };
-};
 
 const BroadcastGroupChatScreen = () => {
   const params = useLocalSearchParams();
@@ -361,20 +305,18 @@ const BroadcastGroupChatScreen = () => {
         {/* Message Input */}
         <View style={styles.inputContainer}>
           {/* Character Counter */}
-          {text.length > 0 && (
-            <View style={styles.charCounterContainer}>
-              <Text
-                style={[
-                  typography.caption2,
-                  styles.charCounter,
-                  isOverLimit && styles.charCounterError,
-                  isNearLimit && !isOverLimit && styles.charCounterWarning,
-                ]}
-              >
-                {charCount}/{WHATSAPP_MAX_LENGTH}
-              </Text>
-            </View>
-          )}
+          <View style={styles.charCounterContainer}>
+            <Text
+              style={[
+                typography.caption2,
+                styles.charCounter,
+                isOverLimit && styles.charCounterError,
+                isNearLimit && !isOverLimit && styles.charCounterWarning,
+              ]}
+            >
+              {charCount}/{WHATSAPP_MAX_LENGTH}
+            </Text>
+          </View>
           <View style={styles.inputRow}>
             <TextInput
               value={text}
@@ -442,7 +384,7 @@ const styles = StyleSheet.create({
   charCounterContainer: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    alignItems: "flex-end",
+    alignItems: "flex-start",
   },
   charCounter: {
     color: themeColors.dark3,
