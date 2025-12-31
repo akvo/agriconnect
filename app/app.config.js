@@ -62,7 +62,7 @@ module.exports = {
       "expo-secure-store",
     ],
     androidNavigationBar: {
-      visible: "sticky-immersive",
+      visible: "overscan",
       barStyle: "light-content",
       backgroundColor: "#000000",
     },
