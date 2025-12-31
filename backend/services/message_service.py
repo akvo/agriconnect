@@ -116,13 +116,15 @@ class MessageService:
         )
         return ai_message
 
-    def commit_message(self, message: Message):
+    def commit_message(self, message: Message, body: str = None) -> Message:
         """
         Commit message after successful delivery.
 
         Args:
             message: Message object to commit
         """
+        if body:
+            message.body = body
         self.db.commit()
         self.db.refresh(message)
         logger.info(f"✓ Committed message {message.id} to database")
