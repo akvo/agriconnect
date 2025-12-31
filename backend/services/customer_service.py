@@ -56,11 +56,8 @@ class CustomerService:
         if customer:
             return customer
 
-        language = (
-            self._detect_language_from_message(message_text)
-            if message_text
-            else CustomerLanguage.EN
-        )
+        # The language will be set during onboarding based on user input.
+        language = None
         return self.create_customer(phone_number, language)
 
     def update_customer_profile(self, customer_id: int, **kwargs) -> Customer:
