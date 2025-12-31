@@ -80,30 +80,26 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
       ]}
     >
       {/* Header */}
-      <View style={styles.whisperHeader}>
-        <View style={styles.headerLeft}>
-          <Ionicons
-            name="sparkles-outline"
-            size={18}
-            color={themeColors["green-500"]}
-          />
-          <Text style={styles.whisperTitle}>AI Suggestion</Text>
-        </View>
-        <View style={styles.headerRight}>
-          {/* Expand/Collapse button */}
-          <TouchableOpacity
-            onPress={toggleExpanded}
-            style={styles.iconButton}
-            disabled={loading}
-          >
+      <TouchableOpacity onPress={toggleExpanded} disabled={loading}>
+        <View style={styles.whisperHeader}>
+          <View style={styles.headerLeft}>
+            <Ionicons
+              name="sparkles-outline"
+              size={18}
+              color={themeColors["green-500"]}
+            />
+            <Text style={styles.whisperTitle}>AI Suggestion</Text>
+          </View>
+          <View style={styles.headerRight}>
             <Ionicons
               name={expanded ? "chevron-down" : "chevron-up"}
               size={20}
               color={themeColors.textSecondary}
+              style={styles.iconButton}
             />
-          </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Content */}
       <View style={styles.whisperContent}>
