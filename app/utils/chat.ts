@@ -1,3 +1,5 @@
+import { MESSAGE_MIN_LENGTH, WHATSAPP_MAX_LENGTH } from "@/constants/message";
+
 export interface Message {
   id: number;
   message_sid: string; // Twilio message SID or system-generated ID
@@ -44,6 +46,61 @@ const groupMessagesByDate = (messages: Message[]) => {
         return timeA.getTime() - timeB.getTime();
       }),
     }));
+};
+
+interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+  sanitizedMessage?: string;
+}
+
+export const sanitizeAndValidateMessage = (
+  message: string,
+): ValidationResult => {
+  if (!message || !message.trim()) {
+    return {
+      isValid: false,
+      error: "Message cannot be empty",
+    };
+  }
+
+  // Remove control characters except newlines and tabs
+  let sanitized = message.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, "");
+
+  // Replace tabs with spaces
+  sanitized = sanitized.replace(/\t/g, " ");
+
+  // Replace more than 4 consecutive spaces with 3 spaces
+  sanitized = sanitized.replace(/ {4,}/g, "   ");
+
+  // Replace more than 2 consecutive newlines with 2 newlines
+  sanitized = sanitized.replace(/\n{3,}/g, "\n\n");
+
+  // Fix punctuation followed by multiple spaces
+  sanitized = sanitized.replace(/([.!?,;:])\s{2,}/g, "$1 ");
+
+  // Trim whitespace
+  sanitized = sanitized.trim();
+
+  // Validate length after sanitization
+  if (sanitized.length < MESSAGE_MIN_LENGTH) {
+    return {
+      isValid: false,
+      error: `Message is too short (minimum ${MESSAGE_MIN_LENGTH} characters)`,
+    };
+  }
+
+  if (sanitized.length > WHATSAPP_MAX_LENGTH) {
+    return {
+      isValid: false,
+      error: `Message is too long (${sanitized.length}/${WHATSAPP_MAX_LENGTH} characters)`,
+    };
+  }
+
+  return {
+    isValid: true,
+    sanitizedMessage: sanitized,
+  };
 };
 
 export default {
