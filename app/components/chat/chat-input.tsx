@@ -19,12 +19,17 @@ import { useDatabase } from "@/database/context";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import { useNetwork } from "@/contexts/NetworkContext";
-import { WHATSAPP_MAX_LENGTH } from "@/constants/message";
+import { LANGUAGES } from "@/constants/customer";
 
 interface TicketData {
   id: number | null;
   ticketNumber?: string;
-  customer?: { id: number; name: string } | null;
+  customer?: {
+    id: number;
+    name: string;
+    phoneNumber: string;
+    language?: string;
+  } | null;
   resolver?: { id: number; name: string } | null;
   resolvedAt?: string | null;
   createdAt?: string | null;
@@ -238,7 +243,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     try {
       console.log(`[Chat] Translating message text: "${text.trim()}"`);
-      const response = await api.translateMessage("en", "sw", text.trim());
+      const response = await api.translateMessage(
+        "en",
+        ticket?.customer?.language || "sw",
+        text.trim(),
+      );
 
       console.log("[Chat] ✅ Message translated successfully:", response);
 
@@ -273,31 +282,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             typography.body3,
             styles.textInput,
             { color: themeColors.dark3 },
+            ticket?.customer?.language &&
+              ticket?.customer?.language !== "en" && { paddingRight: 32 },
           ]}
           placeholder="Type a message..."
           placeholderTextColor={themeColors.dark3}
           multiline
         />
-        <TouchableOpacity
-          onPress={handleTranslate}
-          onLongPress={handleTranslateLongPress}
-          disabled={isTranslating}
-          style={[
-            (isTranslating || text.trim().length === 0) &&
-              styles.translateButtonDisabled,
-            styles.translateButton,
-          ]}
-        >
-          {isTranslating ? (
-            <ActivityIndicator size="small" color={themeColors["blue-500"]} />
-          ) : (
-            <Feathericons
-              name="globe"
-              size={24}
-              color={themeColors["blue-500"]}
-            />
-          )}
-        </TouchableOpacity>
+        {ticket?.customer?.language && ticket?.customer?.language !== "en" && (
+          <TouchableOpacity
+            onPress={handleTranslate}
+            onLongPress={handleTranslateLongPress}
+            disabled={isTranslating}
+            style={[
+              (isTranslating || text.trim().length === 0) &&
+                styles.translateButtonDisabled,
+              styles.translateButton,
+            ]}
+          >
+            {isTranslating ? (
+              <ActivityIndicator size="small" color={themeColors["blue-500"]} />
+            ) : (
+              <Feathericons
+                name="globe"
+                size={24}
+                color={themeColors["blue-500"]}
+              />
+            )}
+          </TouchableOpacity>
+        )}
         {showTooltip && (
           <Animated.View
             style={[
@@ -307,7 +320,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               },
             ]}
           >
-            <Text style={styles.tooltipText}>Translate message</Text>
+            <Text style={styles.tooltipText}>
+              Translate message from {LANGUAGES["en"]} to{" "}
+              {LANGUAGES[ticket?.customer?.language || "sw"]}
+            </Text>
           </Animated.View>
         )}
       </View>
@@ -341,7 +357,6 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    paddingRight: 64,
     backgroundColor: themeColors.background,
     borderRadius: 24,
     borderWidth: 1,
