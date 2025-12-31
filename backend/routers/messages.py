@@ -9,7 +9,6 @@ from models.message import Message, MessageFrom, MessageStatus
 from models.ticket import Ticket
 from models.user import User, UserType
 from models.administrative import UserAdministrative
-from models.customer import CustomerLanguage
 from utils.auth_dependencies import get_current_user
 from services.whatsapp_service import WhatsAppService
 from services.socketio_service import (
@@ -257,26 +256,10 @@ async def create_message(
             # Send WhatsApp message
             whatsapp_service = WhatsAppService()
 
-            # Translate message to customer's language if needed
-            if (
-                ticket.customer.language and
-                ticket.customer.language != CustomerLanguage.EN
-            ):
-                openai_service = OpenAIService()
-                whatsapp_message = await openai_service.translate_text(
-                    text=new_message.body,
-                    target_language=ticket.customer.language.value,
-                    source_language=None,  # Auto-detect source language
-                )
-                response = whatsapp_service.send_message(
-                    to_number=customer_phone,
-                    message_body=whatsapp_message,
-                )
-            else:
-                response = whatsapp_service.send_message(
-                    to_number=customer_phone,
-                    message_body=new_message.body,
-                )
+            response = whatsapp_service.send_message(
+                to_number=customer_phone,
+                message_body=new_message.body,
+            )
 
             print(
                 f"WhatsApp reply sent to {customer_phone}: "
@@ -337,3 +320,32 @@ async def create_message(
         message_sid=new_message.message_sid,
         created_at=new_message.created_at,
     )
+
+
+@router.get(
+    "/translate/{origin}/{target}",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+)
+async def translate_message(
+    origin: str,
+    target: str,
+    text: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Translate a message from origin language to target language using OpenAI.
+    """
+    try:
+        openai_service = OpenAIService()
+        translated_text = await openai_service.translate_text(
+            text=text,
+            source_language=origin,
+            target_language=target,
+        )
+        return {"translated_text": translated_text}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Translation failed: {e}",
+        )
