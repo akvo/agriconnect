@@ -886,30 +886,6 @@ class ApiClient {
     }
     return response.json();
   }
-  /** Translate message */
-  async translateMessage(
-    origin: string,
-    target: string,
-    text: string,
-  ): Promise<{ translated_text: string }> {
-    const response = await this.fetchWithRetry(
-      `${this.baseUrl}/messages/translate/${origin}/${target}?text=${encodeURIComponent(
-        text,
-      )}`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    );
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ detail: "Failed to translate message" }));
-      throw new Error(error.detail || "Failed to translate message");
-    }
-    return response.json();
-  }
 }
 
 export const api = new ApiClient();

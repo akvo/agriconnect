@@ -15,7 +15,6 @@ from services.socketio_service import (
     emit_message_received,
     emit_ticket_resolved
 )
-from services.openai_service import OpenAIService
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -320,32 +319,3 @@ async def create_message(
         message_sid=new_message.message_sid,
         created_at=new_message.created_at,
     )
-
-
-@router.get(
-    "/translate/{origin}/{target}",
-    response_model=dict,
-    status_code=status.HTTP_200_OK,
-)
-async def translate_message(
-    origin: str,
-    target: str,
-    text: str,
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Translate a message from origin language to target language using OpenAI.
-    """
-    try:
-        openai_service = OpenAIService()
-        translated_text = await openai_service.translate_text(
-            text=text,
-            source_language=origin,
-            target_language=target,
-        )
-        return {"translated_text": translated_text}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Translation failed: {e}",
-        )

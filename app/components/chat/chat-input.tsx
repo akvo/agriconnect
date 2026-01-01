@@ -1,14 +1,5 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Text,
-  Animated,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import React, { useMemo } from "react";
+import { View, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api } from "@/services/api";
 import { DAOManager } from "@/database/dao";
@@ -19,7 +10,6 @@ import { useDatabase } from "@/database/context";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import { useNetwork } from "@/contexts/NetworkContext";
-import { LANGUAGES } from "@/constants/customer";
 
 interface TicketData {
   id: number | null;
@@ -56,54 +46,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const { isOnline } = useNetwork();
   const db = useDatabase();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
-
-  // Tooltip state
-  const [showTooltip, setShowTooltip] = useState(false);
-  const tooltipOpacity = useRef(new Animated.Value(0)).current;
-  const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Translation loading state
-  const [isTranslating, setIsTranslating] = useState(false);
-
-  const showTooltipAnimated = () => {
-    setShowTooltip(true);
-    Animated.timing(tooltipOpacity, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-
-    // Auto-hide after 2 seconds
-    if (tooltipTimeout.current) {
-      clearTimeout(tooltipTimeout.current);
-    }
-    tooltipTimeout.current = setTimeout(() => {
-      hideTooltipAnimated();
-    }, 2000);
-  };
-
-  const hideTooltipAnimated = () => {
-    Animated.timing(tooltipOpacity, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowTooltip(false);
-    });
-  };
-
-  const handleTranslateLongPress = () => {
-    showTooltipAnimated();
-  };
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (tooltipTimeout.current) {
-        clearTimeout(tooltipTimeout.current);
-      }
-    };
-  }, []);
 
   const handleSend = async () => {
     if (
@@ -234,44 +176,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const handleTranslate = async () => {
-    if (text.trim().length === 0) {
-      return;
-    }
-
-    setIsTranslating(true);
-
-    try {
-      console.log(`[Chat] Translating message text: "${text.trim()}"`);
-      const response = await api.translateMessage(
-        "en",
-        ticket?.customer?.language || "sw",
-        text.trim(),
-      );
-
-      console.log("[Chat] ✅ Message translated successfully:", response);
-
-      // Update the TextInput with the translated text
-      setText(response.translated_text);
-    } catch (error) {
-      console.error("[Chat] ❌ Failed to translate message:", error);
-
-      // Show error alert with stack trace
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack =
-        error instanceof Error ? error.stack : "No stack trace available";
-
-      Alert.alert(
-        "Translation Failed",
-        `An error occurred while translating the message.\n\nError: ${errorMessage}\n\nStack trace:\n${errorStack}`,
-        [{ text: "OK", style: "default" }],
-      );
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
   return (
     <View style={styles.inputRow}>
       <View style={styles.textInputContainer}>
@@ -289,43 +193,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           placeholderTextColor={themeColors.dark3}
           multiline
         />
-        {ticket?.customer?.language && ticket?.customer?.language !== "en" && (
-          <TouchableOpacity
-            onPress={handleTranslate}
-            onLongPress={handleTranslateLongPress}
-            disabled={isTranslating}
-            style={[
-              (isTranslating || text.trim().length === 0) &&
-                styles.translateButtonDisabled,
-              styles.translateButton,
-            ]}
-          >
-            {isTranslating ? (
-              <ActivityIndicator size="small" color={themeColors["blue-500"]} />
-            ) : (
-              <Feathericons
-                name="globe"
-                size={24}
-                color={themeColors["blue-500"]}
-              />
-            )}
-          </TouchableOpacity>
-        )}
-        {showTooltip && (
-          <Animated.View
-            style={[
-              styles.tooltip,
-              {
-                opacity: tooltipOpacity,
-              },
-            ]}
-          >
-            <Text style={styles.tooltipText}>
-              Translate message from {LANGUAGES["en"]} to{" "}
-              {LANGUAGES[ticket?.customer?.language || "sw"]}
-            </Text>
-          </Animated.View>
-        )}
       </View>
       <TouchableOpacity
         onPress={handleSend}
@@ -377,40 +244,5 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: themeColors.dark4,
     opacity: 0.5,
-  },
-  translateButton: {
-    backgroundColor: "transparent",
-    borderRadius: 24,
-    width: 40,
-    height: 48,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "absolute",
-    right: 0,
-    top: 0,
-    zIndex: 1,
-  },
-  translateButtonDisabled: {
-    opacity: 0.3,
-  },
-  tooltip: {
-    position: "absolute",
-    right: 0,
-    top: -40,
-    backgroundColor: themeColors.dark1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    zIndex: 2,
-  },
-  tooltipText: {
-    ...typography.body4,
-    color: themeColors.white,
-    fontSize: 12,
   },
 });
