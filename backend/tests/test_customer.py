@@ -94,9 +94,7 @@ class TestCustomerService:
         )
 
         assert customer.phone_number == "+255123456789"
-        assert (
-            customer.language == CustomerLanguage.EN
-        )  # Default for English greeting
+        assert customer.language is None
 
     def test_get_or_create_customer_existing(self, db_session: Session):
         existing = Customer(phone_number="+255123456789", full_name="Jane")

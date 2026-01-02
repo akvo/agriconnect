@@ -15,6 +15,8 @@ from models.customer import (
     OnboardingStatus,
 )
 from models.ticket import Ticket
+from models.message import Message
+from models.broadcast import BroadcastGroupContact, BroadcastRecipient
 from datetime import datetime, timezone
 
 
@@ -54,11 +56,8 @@ class CustomerService:
         if customer:
             return customer
 
-        language = (
-            self._detect_language_from_message(message_text)
-            if message_text
-            else CustomerLanguage.EN
-        )
+        # The language will be set during onboarding based on user input.
+        language = None
         return self.create_customer(phone_number, language)
 
     def update_customer_profile(self, customer_id: int, **kwargs) -> Customer:
@@ -200,6 +199,26 @@ class CustomerService:
             return False
 
         try:
+            # Delete associated CustomerAdministrative entries
+            self.db.query(CustomerAdministrative).filter(
+                CustomerAdministrative.customer_id == customer_id
+            ).delete(synchronize_session=False)
+            # Delete associated Tickets
+            self.db.query(Ticket).filter(
+                Ticket.customer_id == customer_id
+            ).delete(synchronize_session=False)
+            # Delete associated BroadcastRecipients
+            self.db.query(BroadcastRecipient).filter(
+                BroadcastRecipient.customer_id == customer_id
+            ).delete(synchronize_session=False)
+            # Delete associated BroadcastGroupContacts
+            self.db.query(BroadcastGroupContact).filter(
+                BroadcastGroupContact.customer_id == customer_id
+            ).delete(synchronize_session=False)
+            # Delete associated Messages
+            self.db.query(Message).filter(
+                Message.customer_id == customer_id
+            ).delete(synchronize_session=False)
             # Delete the customer (messages will be cascaded if configured)
             self.db.delete(customer)
             self.db.commit()

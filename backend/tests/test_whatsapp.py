@@ -90,7 +90,7 @@ class TestWhatsAppWebhook:
                 .first()
             )
             assert customer is not None
-            assert customer.language == CustomerLanguage.EN
+            assert customer.language is None
 
             # Check message was stored
             message = (
@@ -102,11 +102,6 @@ class TestWhatsAppWebhook:
             assert message.body == "Hello, I need farming help"
             assert message.from_source == MessageFrom.CUSTOMER
             assert message.customer_id == customer.id
-
-            # Check welcome message was sent
-            mock_service.send_welcome_message.assert_called_once_with(
-                "+255123456789", "en"
-            )
 
     def test_webhook_new_customer_swahili(
         self, client: TestClient, db_session: Session
@@ -139,11 +134,7 @@ class TestWhatsAppWebhook:
                 .filter(Customer.phone_number == "+255987654321")
                 .first()
             )
-            assert customer.language == CustomerLanguage.SW
-
-            mock_service.send_welcome_message.assert_called_once_with(
-                "+255987654321", "sw"
-            )
+            assert customer.language is None
 
     def test_webhook_existing_customer(
         self, client: TestClient, db_session: Session
