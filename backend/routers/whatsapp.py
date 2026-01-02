@@ -347,11 +347,13 @@ async def whatsapp_webhook(
                 .first()
             )
 
+            is_new_ticket = False
             if not ticket:
                 # Create new ticket
                 ticket = customer_service.create_ticket_for_customer(
                     customer=customer, message_id=message.id
                 )
+                is_new_ticket = True
 
             if ticket:
                 # Get chat history for AI context
@@ -392,8 +394,9 @@ async def whatsapp_webhook(
                     }
                 )
 
-                if not os.getenv("TESTING"):
-                    # Create WHISPER job (AI suggests to EO) if not testing
+                if not os.getenv("TESTING") and not is_new_ticket:
+                    # Create WHISPER job (AI suggests to EO)
+                    # only if not testing and not new ticket
                     ai_service = get_external_ai_service(db)
                     asyncio.create_task(
                         ai_service.create_chat_job(

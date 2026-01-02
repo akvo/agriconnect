@@ -6,6 +6,8 @@ import TicketSyncService from "@/services/ticketSync";
 import { MessageWithUsers } from "@/database/dao/types/message";
 import { Message } from "@/utils/chat";
 import { MessageFrom } from "@/constants/messageSource";
+import { trans } from "@/utils/i18n";
+import { WHATSAPP_MAX_LENGTH } from "@/constants/message";
 
 // Helper function to convert MessageWithUsers to Message
 const convertToUIMessage = (
@@ -59,6 +61,7 @@ export const useTicketData = (
   ticketNumber: string | undefined,
   ticketId: string | undefined,
   userId: number | undefined,
+  aiSuggestion: string | null,
   scrollToBottom: (animated?: boolean) => void,
   setAISuggestionLoading: React.Dispatch<React.SetStateAction<boolean>>,
   setAISuggestion: React.Dispatch<React.SetStateAction<string | null>>,
@@ -119,6 +122,32 @@ export const useTicketData = (
           console.log(
             `[Chat] Loaded ${result.messages.length} cached messages from SQLite`,
           );
+          /**
+           * If there's no AI suggestion yet, and the customer has a language set,
+           * and there are less than 3 messages, generate a quick reply prompt.
+           */
+          if (
+            !aiSuggestion &&
+            ticketData.customer?.language &&
+            result.messages.length < 3
+          ) {
+            const topic = ticketData.message?.body || null;
+            const customerLang = ticketData.customer.language;
+            let quickReply = trans(
+              "quick_reply.fallback_no_topic",
+              customerLang as "en" | "sw",
+            );
+            if (topic) {
+              quickReply = trans(
+                "quick_reply.know_more_about_topic",
+                customerLang as "en" | "sw",
+              )
+                ?.replace("{topic}", topic)
+                ?.slice(0, WHATSAPP_MAX_LENGTH);
+            }
+
+            setAISuggestion(quickReply);
+          }
 
           const uiMessages = result.messages.map((msg) =>
             convertToUIMessage(msg, userId),
@@ -283,6 +312,7 @@ export const useTicketData = (
       daoManager.message,
       db,
       ticketId,
+      aiSuggestion,
       scrollToBottom,
       setAISuggestionLoading,
       setAISuggestion,

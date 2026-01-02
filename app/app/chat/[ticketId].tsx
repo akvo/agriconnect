@@ -91,6 +91,7 @@ const ChatScreen = () => {
     ticketNumber,
     ticketId,
     user?.id,
+    aiSuggestion,
     scrollToBottom,
     setAISuggestionLoading,
     setAISuggestion,

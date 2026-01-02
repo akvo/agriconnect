@@ -128,6 +128,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         id: row.customerId,
         name: row.customer_name,
         phoneNumber: row.customer_phone,
+        language: row?.customer_language,
       },
       message: row.messageId
         ? {
@@ -354,6 +355,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
       `SELECT t.*,
         cu.fullName as customer_name,
         cu.phoneNumber as customer_phone,
+        cu.language as customer_language,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name,
         lm.body as last_message_body, lm.createdAt as last_message_createdAt

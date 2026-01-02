@@ -2,7 +2,7 @@ module.exports = {
   expo: {
     name: "agriconnect",
     slug: "agriconnect",
-    version: "1.2.2",
+    version: "1.2.3",
     owner: "akvo",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
@@ -62,7 +62,7 @@ module.exports = {
       "expo-secure-store",
     ],
     androidNavigationBar: {
-      visible: "sticky-immersive",
+      visible: "overscan",
       barStyle: "light-content",
       backgroundColor: "#000000",
     },
