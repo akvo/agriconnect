@@ -21,6 +21,7 @@ from services.reconnection_service import ReconnectionService
 from services.twilio_status_service import TwilioStatusService
 from services.socketio_service import emit_whisper_created
 from services.socketio_service import emit_playground_response
+from services.openai_service import get_openai_service
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
 logger = logging.getLogger(__name__)
@@ -193,6 +194,27 @@ async def ai_callback(
 
                 # Handle message_type for AI callbacks
                 if payload.callback_params.message_type:
+                    # Translate AI response if needed
+                    customer_lang = (
+                        ai_message.customer.language.value
+                        if ai_message.customer.language
+                        else "en"
+                    )
+                    ai_response_text = ai_message.body
+
+                    if customer_lang == "sw":
+                        openai_service = get_openai_service()
+                        translated_response = await openai_service.translate_text(
+                            text=ai_response_text,
+                            target_language="sw",
+                            source_language="en",
+                        )
+                        if translated_response:
+                            ai_response_text = translated_response
+                            logger.info(
+                                f"[Translation] AI response en → sw for "
+                                f"{ai_message.customer.phone_number}"
+                            )
                     if (
                         payload.callback_params.message_type
                         == MessageType.REPLY
@@ -200,30 +222,6 @@ async def ai_callback(
                         # REPLY mode: Send AI answer to farmer, then send confirmation template
                         try:
                             whatsapp_service = WhatsAppService()
-
-                            # TRANSLATION: Translate AI response if customer uses Swahili (TAC-4)
-                            customer_lang = (
-                                ai_message.customer.language.value
-                                if ai_message.customer.language
-                                else "en"
-                            )
-                            ai_response_text = payload.output.answer
-
-                            if customer_lang == "sw":
-                                from services.openai_service import get_openai_service
-                                openai_service = get_openai_service()
-                                translated_response = await openai_service.translate_text(
-                                    text=ai_response_text,
-                                    target_language="sw",
-                                    source_language="en",
-                                )
-                                if translated_response:
-                                    ai_response_text = translated_response
-                                    logger.info(
-                                        f"[Translation] AI response en → sw for "
-                                        f"{ai_message.customer.phone_number}"
-                                    )
-
                             # CRITICAL: Send to WhatsApp BEFORE committing to database
                             # Step 1: Send AI answer as separate message
                             logger.info(
@@ -304,10 +302,11 @@ async def ai_callback(
                         == MessageType.WHISPER
                     ):
                         # WHISPER mode: Store suggestion for EO (does NOT go to WhatsApp)
-                        # TAC-5: Whisper messages stay in English (internal use by EOs)
-                        # No translation needed - AI response is already in English
                         # Whisper messages don't go to WhatsApp, safe to commit immediately
-                        message_service.commit_message(ai_message)
+                        ai_message = message_service.commit_message(
+                            message=ai_message,
+                            body=ai_response_text,
+                        )
 
                         logger.info(
                             "✓ Whisper suggestion stored for EO review"

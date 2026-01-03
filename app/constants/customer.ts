@@ -10,7 +10,7 @@ export const GENDER = {
   other: "Other",
 };
 
-export const LANGUAGES = {
+export const LANGUAGES: { [key: string]: string } = {
   en: "English",
   sw: "Swahili",
 };

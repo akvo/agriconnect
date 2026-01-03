@@ -56,7 +56,6 @@ const colors = {
   // group icon background
   groupIconBackground: "#ECEFF4",
   groupIconForeground: "#74777A",
-
 };
 
 export default colors;

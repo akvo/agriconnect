@@ -1,11 +1,5 @@
 import React, { useMemo } from "react";
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Text,
-} from "react-native";
+import { View, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api } from "@/services/api";
 import { DAOManager } from "@/database/dao";
@@ -16,12 +10,16 @@ import { useDatabase } from "@/database/context";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import { useNetwork } from "@/contexts/NetworkContext";
-import { WHATSAPP_MAX_LENGTH } from "@/constants/message";
 
 interface TicketData {
   id: number | null;
   ticketNumber?: string;
-  customer?: { id: number; name: string } | null;
+  customer?: {
+    id: number;
+    name: string;
+    phoneNumber: string;
+    language?: string;
+  } | null;
   resolver?: { id: number; name: string } | null;
   resolvedAt?: string | null;
   createdAt?: string | null;
@@ -48,14 +46,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const { isOnline } = useNetwork();
   const db = useDatabase();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
-
-  const [charCount, isOverLimit, isNearLimit] = useMemo(() => {
-    // Calculate character count for the input
-    const charCount = text.length;
-    const isOverLimit = charCount > WHATSAPP_MAX_LENGTH;
-    const isNearLimit = charCount > WHATSAPP_MAX_LENGTH * 0.9; // 90% of limit
-    return [charCount, isOverLimit, isNearLimit];
-  }, [text]);
 
   const handleSend = async () => {
     if (
@@ -187,21 +177,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <View style={styles.inputContainer}>
-      {/* Character Counter */}
-      <View style={styles.charCounterContainer}>
-        <Text
-          style={[
-            typography.caption2,
-            styles.charCounter,
-            isOverLimit && styles.charCounterError,
-            isNearLimit && !isOverLimit && styles.charCounterWarning,
-          ]}
-        >
-          {charCount}/{WHATSAPP_MAX_LENGTH}
-        </Text>
-      </View>
-      <View style={styles.inputRow}>
+    <View style={styles.inputRow}>
+      <View style={styles.textInputContainer}>
         <TextInput
           value={text}
           onChangeText={setText}
@@ -209,24 +186,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             typography.body3,
             styles.textInput,
             { color: themeColors.dark3 },
+            ticket?.customer?.language &&
+              ticket?.customer?.language !== "en" && { paddingRight: 32 },
           ]}
           placeholder="Type a message..."
           placeholderTextColor={themeColors.dark3}
-          editable={isOnline}
-          maxLength={WHATSAPP_MAX_LENGTH}
           multiline
         />
-        <TouchableOpacity
-          onPress={handleSend}
-          style={[
-            styles.sendButton,
-            (!isOnline || isOverLimit) && styles.sendButtonDisabled,
-          ]}
-          disabled={!isOnline || isOverLimit}
-        >
-          <Feathericons name="send" size={20} color={themeColors.white} />
-        </TouchableOpacity>
       </View>
+      <TouchableOpacity
+        onPress={handleSend}
+        style={[styles.sendButton, !isOnline && styles.sendButtonDisabled]}
+        disabled={!isOnline}
+      >
+        <Feathericons name="send" size={20} color={themeColors.white} />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -239,9 +213,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderTopWidth: 0,
     backgroundColor: themeColors.white,
+    position: "relative",
+  },
+  textInputContainer: {
+    flex: 1,
+    position: "relative",
   },
   textInput: {
-    flex: 1,
     minHeight: 48,
     maxHeight: 120,
     paddingVertical: 12,
@@ -266,26 +244,5 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: themeColors.dark4,
     opacity: 0.5,
-  },
-  inputContainer: {
-    borderTopWidth: 0.5,
-    borderTopColor: themeColors.mutedBorder,
-    backgroundColor: themeColors.white,
-  },
-  charCounterContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    alignItems: "flex-start",
-  },
-  charCounter: {
-    color: themeColors.dark3,
-    fontSize: 12,
-  },
-  charCounterWarning: {
-    color: "#FF9800", // Orange
-  },
-  charCounterError: {
-    color: themeColors.error,
-    fontWeight: "600",
   },
 });
