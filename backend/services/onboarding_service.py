@@ -142,10 +142,7 @@ class OnboardingService:
 
         # Special case: full_name uses direct column
         if field_name == "full_name":
-            return (
-                customer.full_name and
-                customer.full_name.strip() != ""
-            )
+            return customer.full_name and customer.full_name.strip() != ""
 
         # Special case: administration uses relationship table
         if field_name == "administration":
@@ -363,7 +360,9 @@ class OnboardingService:
             options.append(f"{i}. {area.name}")
         options_text = "\n".join(options)
         # Add selection instruction
-        instruction = t("onboarding.administration.selection_instruction", lang)
+        instruction = t(
+            "onboarding.administration.selection_instruction", lang
+        )
         return f"{options_text}{instruction}"
 
     def _start_hierarchical_selection(
@@ -1397,9 +1396,7 @@ Birth year must be between 1900 and {current_year}."""
         # Extract value using field-specific extraction method
         if field_config.extraction_method is None:
             # No extraction method defined - save raw message
-            return self._save_field_value(
-                customer, message, field_config
-            )
+            return self._save_field_value(customer, message, field_config)
         try:
             extraction_method = getattr(self, field_config.extraction_method)
             extracted_value = await extraction_method(message)
@@ -1851,9 +1848,7 @@ Birth year must be between 1900 and {current_year}."""
             attempts=0,
         )
 
-    def _generate_profile_summary(
-        self, customer: Customer, lang: str
-    ) -> str:
+    def _generate_profile_summary(self, customer: Customer, lang: str) -> str:
         # field_name: display_value
         f_lang = t("onboarding.language.field_name", lang)
         f_name = t("onboarding.full_name.field_name", lang)
@@ -1864,23 +1859,29 @@ Birth year must be between 1900 and {current_year}."""
 
         c_lang = (
             "English"
-            if customer.language == CustomerLanguage.EN else "Swahili"
+            if customer.language == CustomerLanguage.EN
+            else "Swahili"
         )
         c_name = customer.full_name if customer.full_name else "N/A"
-        c_crop_type = t(
-            f"crops.{customer.crop_type}.name",
-            lang,
-        ) if customer.crop_type else "N/A"
+        c_crop_type = (
+            t(
+                f"crops.{customer.crop_type}.name",
+                lang,
+            )
+            if customer.crop_type
+            else "N/A"
+        )
         c_administration = "N/A"
         if (
             hasattr(customer, "customer_administrative")
             and len(customer.customer_administrative) > 0
         ):
-            c_administration = customer.customer_administrative[0] \
-                .administrative.path
-        c_gender = t(
-            f"gender.{customer.gender}", lang
-        ) if customer.gender else "N/A"
+            c_administration = customer.customer_administrative[
+                0
+            ].administrative.path
+        c_gender = (
+            t(f"gender.{customer.gender}", lang) if customer.gender else "N/A"
+        )
         c_age = customer.age if customer.age else "N/A"
         profile_summary = (
             f"{f_lang}: {c_lang}\n"

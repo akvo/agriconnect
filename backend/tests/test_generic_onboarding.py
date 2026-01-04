@@ -160,9 +160,7 @@ class TestGenericOnboardingService:
             is True
         )
 
-    def test_is_field_complete_crop_type(
-        self, db_session, onboarding_service
-    ):
+    def test_is_field_complete_crop_type(self, db_session, onboarding_service):
         """Test crop type field completion check"""
         from schemas.onboarding_schemas import get_field_config
 
@@ -317,7 +315,7 @@ class TestGenericOnboardingService:
             profile_data={
                 "crop_type": "Cacao",
                 "gender": "male",
-                "birth_year": 1990
+                "birth_year": 1990,
             },
             language=CustomerLanguage.EN,
         )
@@ -350,21 +348,15 @@ class TestGenericOnboardingService:
         db_session.commit()
 
         # Initial attempts should be 0
-        assert (
-            onboarding_service._get_attempts(customer, "crop_type") == 0
-        )
+        assert onboarding_service._get_attempts(customer, "crop_type") == 0
 
         # Increment attempts
         onboarding_service._increment_attempts(customer, "crop_type")
-        assert (
-            onboarding_service._get_attempts(customer, "crop_type") == 1
-        )
+        assert onboarding_service._get_attempts(customer, "crop_type") == 1
 
         # Increment again
         onboarding_service._increment_attempts(customer, "crop_type")
-        assert (
-            onboarding_service._get_attempts(customer, "crop_type") == 2
-        )
+        assert onboarding_service._get_attempts(customer, "crop_type") == 2
 
         # Check JSON structure (already a dict from SQLAlchemy JSON column)
         attempts_dict = customer.onboarding_attempts
@@ -384,9 +376,7 @@ class TestGenericOnboardingService:
 
         # Store crop candidates (strings)
         candidates = ["Cacao", "Avocado", "Mango"]
-        onboarding_service._store_candidates(
-            customer, "crop_type", candidates
-        )
+        onboarding_service._store_candidates(customer, "crop_type", candidates)
 
         # Check JSON structure (already a dict from SQLAlchemy JSON column)
         candidates_dict = customer.onboarding_candidates
@@ -394,9 +384,7 @@ class TestGenericOnboardingService:
 
         # Check awaiting selection
         assert (
-            onboarding_service._is_awaiting_selection(
-                customer, "crop_type"
-            )
+            onboarding_service._is_awaiting_selection(customer, "crop_type")
             is True
         )
 
@@ -422,9 +410,7 @@ class TestGenericOnboardingService:
         # Verify cleared
         assert customer.current_onboarding_field is None
         assert (
-            onboarding_service._is_awaiting_selection(
-                customer, "crop_type"
-            )
+            onboarding_service._is_awaiting_selection(customer, "crop_type")
             is False
         )
 
@@ -440,9 +426,7 @@ class TestGenericOnboardingService:
         # Mock internal crop identification method
         onboarding_service._identify_crop = AsyncMock(
             return_value=CropIdentificationResult(
-                crop_name="Cacao",
-                confidence="high",
-                possible_crops=[]
+                crop_name="Cacao", confidence="high", possible_crops=[]
             )
         )
 
@@ -457,15 +441,11 @@ class TestGenericOnboardingService:
         # Mock internal crop identification method
         onboarding_service._identify_crop = AsyncMock(
             return_value=CropIdentificationResult(
-                crop_name=None,
-                confidence="low",
-                possible_crops=[]
+                crop_name=None, confidence="low", possible_crops=[]
             )
         )
 
-        result = await onboarding_service.extract_crop_type(
-            "I grow something"
-        )
+        result = await onboarding_service.extract_crop_type("I grow something")
         assert result is None
 
     # ========================================================================
@@ -637,7 +617,8 @@ class TestGenericOnboardingService:
         # Should save name and start location selection
         db_session.refresh(customer)
         assert customer.full_name == "John Doe"
-        # Location selection status depends on whether hierarchical flow is active
+        # Location selection status depends on whether
+        # hierarchical flow is active
         assert response.status in ["awaiting_selection", "in_progress"]
         assert "location" in response.message.lower()
         assert customer.current_onboarding_field == "administration"
@@ -795,7 +776,7 @@ class TestGenericOnboardingService:
                 data={
                     "crop_name": "cacao",
                     "confidence": "high",
-                    "possible_crops": []
+                    "possible_crops": [],
                 }
             )
         )
@@ -811,9 +792,7 @@ class TestGenericOnboardingService:
         self, db_session, onboarding_service, mock_openai_service
     ):
         """Test _identify_crop when OpenAI returns None"""
-        mock_openai_service.structured_output = AsyncMock(
-            return_value=None
-        )
+        mock_openai_service.structured_output = AsyncMock(return_value=None)
 
         result = await onboarding_service._identify_crop("Hello")
 
@@ -831,14 +810,14 @@ class TestGenericOnboardingService:
                 data={
                     "crop_name": "Avocado",
                     "confidence": "high",
-                    "possible_crops": []
+                    "possible_crops": [],
                 }
             )
         )
 
         result = await onboarding_service._identify_crop(
             "Yes, that's correct",
-            conversation_context="We were discussing avocado farming"
+            conversation_context="We were discussing avocado farming",
         )
 
         assert result.crop_name == "Avocado"
@@ -881,9 +860,10 @@ class TestGenericOnboardingService:
         """Test crop name normalization when crop not in supported list"""
         # Unknown crop should be returned as-is
         unknown_crop = "UnknownCrop"
-        assert onboarding_service._normalize_crop_name(
-            unknown_crop
-        ) == unknown_crop
+        assert (
+            onboarding_service._normalize_crop_name(unknown_crop)
+            == unknown_crop
+        )
 
     # ========================================================================
     # TEST: Crop Ambiguity Resolution
@@ -895,14 +875,11 @@ class TestGenericOnboardingService:
     ):
         """Test successful crop ambiguity resolution"""
         mock_openai_service.structured_output = AsyncMock(
-            return_value=MagicMock(
-                data={"selected_crop": "Avocado"}
-            )
+            return_value=MagicMock(data={"selected_crop": "Avocado"})
         )
 
         result = await onboarding_service.resolve_crop_ambiguity(
-            "The first one",
-            ["Avocado", "Cacao"]
+            "The first one", ["Avocado", "Cacao"]
         )
 
         assert result == "Avocado"
@@ -912,13 +889,10 @@ class TestGenericOnboardingService:
         self, db_session, onboarding_service, mock_openai_service
     ):
         """Test crop ambiguity resolution when OpenAI returns None"""
-        mock_openai_service.structured_output = AsyncMock(
-            return_value=None
-        )
+        mock_openai_service.structured_output = AsyncMock(return_value=None)
 
         result = await onboarding_service.resolve_crop_ambiguity(
-            "Neither",
-            ["Avocado", "Cacao"]
+            "Neither", ["Avocado", "Cacao"]
         )
 
         assert result is None
@@ -930,14 +904,11 @@ class TestGenericOnboardingService:
         """Test crop ambiguity resolution with invalid selection"""
         # OpenAI returns a crop not in candidates
         mock_openai_service.structured_output = AsyncMock(
-            return_value=MagicMock(
-                data={"selected_crop": "Banana"}
-            )
+            return_value=MagicMock(data={"selected_crop": "Banana"})
         )
 
         result = await onboarding_service.resolve_crop_ambiguity(
-            "Banana",
-            ["Avocado", "Cacao"]
+            "Banana", ["Avocado", "Cacao"]
         )
 
         assert result is None  # Should return None for invalid selection
@@ -952,8 +923,7 @@ class TestGenericOnboardingService:
         )
 
         result = await onboarding_service.resolve_crop_ambiguity(
-            "The first one",
-            ["Avocado", "Cacao"]
+            "The first one", ["Avocado", "Cacao"]
         )
 
         assert result is None
@@ -991,7 +961,7 @@ class TestGenericOnboardingService:
                     "province": None,
                     "district": None,
                     "ward": None,
-                    "full_text": None
+                    "full_text": None,
                 }
             )
         )
@@ -1037,9 +1007,7 @@ class TestGenericOnboardingService:
         self, db_session, onboarding_service, mock_openai_service
     ):
         """Test gender extraction with no response"""
-        mock_openai_service.structured_output = AsyncMock(
-            return_value=None
-        )
+        mock_openai_service.structured_output = AsyncMock(return_value=None)
 
         result = await onboarding_service.extract_gender("Hello")
         assert result is None
@@ -1067,9 +1035,7 @@ class TestGenericOnboardingService:
         self, db_session, onboarding_service, mock_openai_service
     ):
         """Test birth year extraction with no response"""
-        mock_openai_service.structured_output = AsyncMock(
-            return_value=None
-        )
+        mock_openai_service.structured_output = AsyncMock(return_value=None)
 
         result = await onboarding_service.extract_birth_year("Hello")
         assert result is None
@@ -1137,7 +1103,7 @@ class TestGenericOnboardingService:
             profile_data={
                 "crop_type": "Cacao",
                 "gender": "male",
-                "birth_year": 1990
+                "birth_year": 1990,
             },
             language=CustomerLanguage.EN,
         )
@@ -1189,6 +1155,7 @@ class TestGenericOnboardingService:
 # ============================================================================
 # DYNAMIC CROP ONBOARDING TESTS
 # ============================================================================
+
 
 class TestDynamicCropOnboarding:
     """Test cases for dynamic crop listing and fallback storage"""
@@ -1672,8 +1639,12 @@ class TestHierarchicalLocationSelection:
         # Districts in Murang'a: 1.Gatanga 2.Kangema
         # Wards in Gatanga: 1.Ithanga 2.Kariara
         await onboarding_service.process_onboarding_message(customer, "Hello")
-        await onboarding_service.process_onboarding_message(customer, "1")  # Murang'a
-        await onboarding_service.process_onboarding_message(customer, "1")  # Gatanga
+        await onboarding_service.process_onboarding_message(
+            customer, "1"
+        )  # Murang'a
+        await onboarding_service.process_onboarding_message(
+            customer, "1"
+        )  # Gatanga
         response = await onboarding_service.process_onboarding_message(
             customer, "1"
         )  # First ward (Ithanga)
@@ -1706,7 +1677,10 @@ class TestHierarchicalLocationSelection:
         # Should show Swahili message
         assert response.status == "awaiting_selection"
         # Check for Swahili keywords
-        assert "eneo" in response.message.lower() or "kaunti" in response.message.lower()
+        assert (
+            "eneo" in response.message.lower()
+            or "kaunti" in response.message.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_hierarchical_selection_invalid_selection(
