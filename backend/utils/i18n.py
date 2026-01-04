@@ -142,6 +142,65 @@ trans: Dict[str, Any] = {
                     "na kata yako."
                 ),
             },
+            # Hierarchical selection messages
+            "select_region": {
+                "en": (
+                    "Let's find your location step by step.\n\n"
+                    "Which county/region are you from?\n\n{options}"
+                ),
+                "sw": (
+                    "Hebu tupate eneo lako hatua kwa hatua.\n\n"
+                    "Unatoka kaunti/mkoa gani?\n\n{options}"
+                ),
+            },
+            "select_district": {
+                "en": (
+                    "Great! You selected {parent}.\n\n"
+                    "Which sub-county/district are you in?\n\n{options}"
+                ),
+                "sw": (
+                    "Vizuri! Umechagua {parent}.\n\n"
+                    "Uko wilaya gani ndogo?\n\n{options}"
+                ),
+            },
+            "select_ward": {
+                "en": (
+                    "You're in {parent}.\n\n"
+                    "Which ward are you in?\n\n{options}"
+                ),
+                "sw": (
+                    "Uko {parent}.\n\n"
+                    "Uko kata gani?\n\n{options}"
+                ),
+            },
+            "confirm_location": {
+                "en": (
+                    "You selected: {location}\n\n"
+                    "Is this correct?\n"
+                    "1. Yes\n"
+                    "2. No, let me choose again"
+                ),
+                "sw": (
+                    "Umechagua: {location}\n\n"
+                    "Hii ni sahihi?\n"
+                    "1. Ndiyo\n"
+                    "2. Hapana, niruhusu kuchagua tena"
+                ),
+            },
+            "selection_instruction": {
+                "en": "\nReply with the number (e.g., '1', '2', etc.)",
+                "sw": "\nJibu kwa namba (mfano, '1', '2', n.k.)",
+            },
+            "no_children_found": {
+                "en": (
+                    "I couldn't find any sub-areas for {parent}. "
+                    "Let me save your location as {parent}."
+                ),
+                "sw": (
+                    "Sikupata maeneo madogo ya {parent}. "
+                    "Niruhusu kuhifadhi eneo lako kama {parent}."
+                ),
+            },
             "location_saved": {
                 "en": (
                     "Thank you! I've recorded your location as: {value}. How "

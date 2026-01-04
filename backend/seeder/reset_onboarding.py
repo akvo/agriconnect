@@ -39,6 +39,8 @@ def main():
         customer.language = None
         customer.profile_data = None
         customer.onboarding_attempts = None
+        customer.onboarding_candidates = None
+        customer.current_onboarding_field = None
         customer.onboarding_status = OnboardingStatus.NOT_STARTED
         # Delete administrative associations
         db.query(CustomerAdministrative).filter(
