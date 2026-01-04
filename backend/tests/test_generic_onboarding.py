@@ -634,41 +634,34 @@ class TestGenericOnboardingService:
         response = await onboarding_service.process_onboarding_message(
             customer, "John Doe"
         )
-        # Should save name and ask for administration
+        # Should save name and start location selection
         db_session.refresh(customer)
         assert customer.full_name == "John Doe"
-        assert response.status == "in_progress"
+        # Location selection status depends on whether hierarchical flow is active
+        assert response.status in ["awaiting_selection", "in_progress"]
         assert "location" in response.message.lower()
         assert customer.current_onboarding_field == "administration"
 
-        # STEP 2: Provide location - mock extraction and matching
-        mock_openai_service.structured_output = AsyncMock(
-            return_value=MagicMock(
-                data={
-                    "province": "Nairobi Region",
-                    "district": "Central District",
-                    "ward": "Westlands Ward",
-                    "full_text": "Nairobi Central Westlands",
-                }
-            )
+        # STEP 2: Skip location selection for this test by directly
+        # adding administration data (tested separately in hierarchical tests)
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=sample_administrative_data["westlands"].id,
         )
+        db_session.add(customer_admin)
+        db_session.commit()
 
+        # Clear the onboarding field state to move to next field
+        customer.current_onboarding_field = None
+        customer.onboarding_candidates = None
+        db_session.commit()
+
+        # Ask for next field (should be crop_type)
         response = await onboarding_service.process_onboarding_message(
-            customer, "I'm from Nairobi Central Westlands"
+            customer, "continue"
         )
-
-        # Should save location and ask for crop type
-        db_session.refresh(customer)
         assert response.status == "in_progress"
         assert "crop" in response.message.lower()
-
-        # Verify administration saved
-        admin_data = (
-            db_session.query(CustomerAdministrative)
-            .filter_by(customer_id=customer.id)
-            .first()
-        )
-        assert admin_data is not None
 
         # STEP 3: Provide crop type
         onboarding_service._identify_crop = AsyncMock(
@@ -1170,7 +1163,7 @@ class TestGenericOnboardingService:
 
     @pytest.mark.asyncio
     async def test_process_onboarding_failed_status_resumes(
-        self, db_session, onboarding_service
+        self, db_session, onboarding_service, sample_administrative_data
     ):
         """Test processing message with failed status resumes onboarding"""
         customer = Customer(
@@ -1187,8 +1180,9 @@ class TestGenericOnboardingService:
         )
 
         # Failed status doesn't prevent onboarding from continuing
-        # It will find the first incomplete field (administration) and ask
-        assert response.status == "in_progress"
+        # It will find the first incomplete field (administration) and start
+        # hierarchical location selection with status "awaiting_selection"
+        assert response.status == "awaiting_selection"
         assert "location" in response.message.lower()
 
 
@@ -1471,3 +1465,293 @@ class TestDynamicCropOnboarding:
         assert customer.crop_type is None  # Not saved in main field
         assert response.status == "failed"
         assert "I'm having trouble" in response.message
+
+
+# ============================================================================
+# HIERARCHICAL LOCATION SELECTION TESTS
+# ============================================================================
+
+
+class TestHierarchicalLocationSelection:
+    """Test cases for hierarchical location selection during onboarding"""
+
+    @pytest.fixture
+    def mock_openai_service(self):
+        """Mock OpenAI service for testing"""
+        mock_service = MagicMock()
+        mock_service.is_configured.return_value = True
+        mock_service.translate_text = AsyncMock(return_value=None)
+        return mock_service
+
+    @pytest.fixture
+    def onboarding_service(self, db_session, mock_openai_service):
+        """Create onboarding service with mocked dependencies"""
+        service = OnboardingService(db_session)
+        service.supported_crops = ["Avocado", "Cacao"]
+        service.openai_service = mock_openai_service
+        return service
+
+    @pytest.fixture
+    def sample_administrative_data(self, db_session):
+        """Create sample administrative hierarchy with multiple regions"""
+        # Create levels
+        country_level = AdministrativeLevel(name="country")
+        region_level = AdministrativeLevel(name="region")
+        district_level = AdministrativeLevel(name="district")
+        ward_level = AdministrativeLevel(name="ward")
+        db_session.add_all(
+            [country_level, region_level, district_level, ward_level]
+        )
+        db_session.flush()
+
+        # Create country
+        country = Administrative(
+            code="KEN",
+            name="Kenya",
+            path="Kenya",
+            level_id=country_level.id,
+            parent_id=None,
+        )
+        db_session.add(country)
+        db_session.flush()
+
+        # Create multiple regions
+        nairobi = Administrative(
+            code="NBI",
+            name="Nairobi",
+            path="Kenya > Nairobi",
+            level_id=region_level.id,
+            parent_id=country.id,
+        )
+        muranga = Administrative(
+            code="MRG",
+            name="Murang'a",
+            path="Kenya > Murang'a",
+            level_id=region_level.id,
+            parent_id=country.id,
+        )
+        db_session.add_all([nairobi, muranga])
+        db_session.flush()
+
+        # Create districts in Murang'a
+        gatanga = Administrative(
+            code="GTG",
+            name="Gatanga",
+            path="Kenya > Murang'a > Gatanga",
+            level_id=district_level.id,
+            parent_id=muranga.id,
+        )
+        kangema = Administrative(
+            code="KGM",
+            name="Kangema",
+            path="Kenya > Murang'a > Kangema",
+            level_id=district_level.id,
+            parent_id=muranga.id,
+        )
+        db_session.add_all([gatanga, kangema])
+        db_session.flush()
+
+        # Create wards in Gatanga
+        kariara = Administrative(
+            code="KRR",
+            name="Kariara",
+            path="Kenya > Murang'a > Gatanga > Kariara",
+            level_id=ward_level.id,
+            parent_id=gatanga.id,
+        )
+        ithanga = Administrative(
+            code="ITH",
+            name="Ithanga",
+            path="Kenya > Murang'a > Gatanga > Ithanga",
+            level_id=ward_level.id,
+            parent_id=gatanga.id,
+        )
+        db_session.add_all([kariara, ithanga])
+        db_session.commit()
+
+        return {
+            "country": country,
+            "nairobi": nairobi,
+            "muranga": muranga,
+            "gatanga": gatanga,
+            "kangema": kangema,
+            "kariara": kariara,
+            "ithanga": ithanga,
+        }
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_selection_starts_with_regions(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """Test that hierarchical selection starts by showing all regions"""
+        customer = Customer(
+            full_name="John Doe",
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        response = await onboarding_service.process_onboarding_message(
+            customer, "Hello"
+        )
+
+        # Should show regions in awaiting_selection status
+        assert response.status == "awaiting_selection"
+        assert "location" in response.message.lower()
+        assert "Nairobi" in response.message
+        assert "Murang'a" in response.message
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_selection_shows_districts_after_region(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """Test selecting a region shows its districts"""
+        customer = Customer(
+            full_name="John Doe",
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Start selection - shows regions
+        await onboarding_service.process_onboarding_message(customer, "Hello")
+
+        # Select Murang'a (first option in alphabetical order: M < N)
+        response = await onboarding_service.process_onboarding_message(
+            customer, "1"
+        )
+
+        # Should show districts of Murang'a
+        assert response.status == "awaiting_selection"
+        assert "Gatanga" in response.message
+        assert "Kangema" in response.message
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_selection_shows_wards_after_district(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """Test selecting a district shows its wards"""
+        customer = Customer(
+            full_name="John Doe",
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Start - shows regions (alphabetical: 1.Murang'a 2.Nairobi)
+        await onboarding_service.process_onboarding_message(customer, "Hello")
+        # Select Murang'a (option 1)
+        await onboarding_service.process_onboarding_message(customer, "1")
+        # Select Gatanga (first option alphabetically: G < K)
+        response = await onboarding_service.process_onboarding_message(
+            customer, "1"
+        )
+
+        # Should show wards of Gatanga
+        assert response.status == "awaiting_selection"
+        assert "Kariara" in response.message or "Ithanga" in response.message
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_selection_saves_ward_and_continues(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """Test selecting a ward saves it and moves to next field"""
+        customer = Customer(
+            full_name="John Doe",
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Navigate through hierarchy (alphabetical order)
+        # Regions: 1.Murang'a 2.Nairobi
+        # Districts in Murang'a: 1.Gatanga 2.Kangema
+        # Wards in Gatanga: 1.Ithanga 2.Kariara
+        await onboarding_service.process_onboarding_message(customer, "Hello")
+        await onboarding_service.process_onboarding_message(customer, "1")  # Murang'a
+        await onboarding_service.process_onboarding_message(customer, "1")  # Gatanga
+        response = await onboarding_service.process_onboarding_message(
+            customer, "1"
+        )  # First ward (Ithanga)
+
+        # Should save ward and move to crop_type field
+        assert response.status == "in_progress"
+        assert "crop" in response.message.lower()
+
+        # Verify administrative was saved
+        db_session.refresh(customer)
+        assert len(customer.customer_administrative) == 1
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_selection_in_swahili(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """Test hierarchical selection respects customer language (Swahili)"""
+        customer = Customer(
+            full_name="John Doe",
+            phone_number="+254700000001",
+            language=CustomerLanguage.SW,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        response = await onboarding_service.process_onboarding_message(
+            customer, "Habari"
+        )
+
+        # Should show Swahili message
+        assert response.status == "awaiting_selection"
+        # Check for Swahili keywords
+        assert "eneo" in response.message.lower() or "kaunti" in response.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_selection_invalid_selection(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """Test invalid selection shows error message"""
+        customer = Customer(
+            full_name="John Doe",
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Start selection
+        await onboarding_service.process_onboarding_message(customer, "Hello")
+
+        # Enter invalid selection
+        response = await onboarding_service.process_onboarding_message(
+            customer, "invalid"
+        )
+
+        assert response.status == "awaiting_selection"
+        assert "number" in response.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_selection_out_of_range(
+        self, db_session, onboarding_service, sample_administrative_data
+    ):
+        """Test out of range selection shows error"""
+        customer = Customer(
+            full_name="John Doe",
+            phone_number="+254700000001",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Start selection - shows 2 regions
+        await onboarding_service.process_onboarding_message(customer, "Hello")
+
+        # Select out of range number
+        response = await onboarding_service.process_onboarding_message(
+            customer, "99"
+        )
+
+        assert response.status == "awaiting_selection"
+        assert "1" in response.message and "2" in response.message

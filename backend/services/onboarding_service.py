@@ -72,6 +72,10 @@ class OnboardingService:
         self.ambiguity_threshold = 15.0  # Score difference for ambiguity
         self.max_candidates = 5  # Max options to show farmer
 
+        # Administrative level hierarchy (in order of selection)
+        # Skip 'country' as we assume single country
+        self.admin_level_order = ["region", "district", "ward"]
+
     def needs_onboarding(self, customer: Customer) -> bool:
         """
         Check if customer needs onboarding.
@@ -243,6 +247,10 @@ class OnboardingService:
             candidates_dict = customer.onboarding_candidates.copy()
             if field_name in candidates_dict:
                 del candidates_dict[field_name]
+            # Also clear hierarchical state for administration
+            if field_name == "administration":
+                candidates_dict.pop("administration_level", None)
+                candidates_dict.pop("administration_parent_id", None)
             customer.onboarding_candidates = (
                 candidates_dict if candidates_dict else None
             )
@@ -250,6 +258,273 @@ class OnboardingService:
         # Clear current field tracker
         if customer.current_onboarding_field == field_name:
             customer.current_onboarding_field = None
+
+    # ================================================================
+    # HIERARCHICAL LOCATION SELECTION METHODS
+    # ================================================================
+
+    def _get_admin_hierarchy_state(self, customer: Customer) -> dict:
+        """
+        Get current hierarchical selection state from onboarding_candidates.
+
+        Returns dict with:
+        - level: current level being selected (region, district, ward)
+        - parent_id: ID of selected parent, or None for root level
+        - candidates: list of candidate IDs at current level
+        """
+        if not customer.onboarding_candidates:
+            return {"level": None, "parent_id": None, "candidates": []}
+
+        candidates_dict = customer.onboarding_candidates
+        return {
+            "level": candidates_dict.get("administration_level"),
+            "parent_id": candidates_dict.get("administration_parent_id"),
+            "candidates": candidates_dict.get("administration", []),
+        }
+
+    def _set_admin_hierarchy_state(
+        self,
+        customer: Customer,
+        level: str,
+        parent_id: Optional[int],
+        candidates: List[int],
+    ):
+        """
+        Store hierarchical selection state in onboarding_candidates.
+
+        Args:
+            level: Current level being selected (region, district, ward)
+            parent_id: ID of selected parent administrative area
+            candidates: List of administrative area IDs at current level
+        """
+        if not customer.onboarding_candidates:
+            candidates_dict = {}
+        else:
+            candidates_dict = customer.onboarding_candidates.copy()
+
+        candidates_dict["administration"] = candidates
+        candidates_dict["administration_level"] = level
+        candidates_dict["administration_parent_id"] = parent_id
+        customer.onboarding_candidates = candidates_dict
+
+    def _get_children_at_level(
+        self, level_name: str, parent_id: Optional[int] = None
+    ) -> List[Administrative]:
+        """
+        Get all administrative areas at a specific level.
+
+        Args:
+            level_name: Level name (region, district, ward)
+            parent_id: Parent ID to filter by, or None for root level
+
+        Returns:
+            List of Administrative objects sorted by name
+        """
+        from models.administrative import AdministrativeLevel
+
+        query = (
+            self.db.query(Administrative)
+            .join(AdministrativeLevel)
+            .filter(AdministrativeLevel.name == level_name)
+        )
+
+        if parent_id is not None:
+            query = query.filter(Administrative.parent_id == parent_id)
+        else:
+            # For root level (regions), get those under country
+            # Find country first
+            country = (
+                self.db.query(Administrative)
+                .join(AdministrativeLevel)
+                .filter(AdministrativeLevel.name == "country")
+                .first()
+            )
+            if country:
+                query = query.filter(Administrative.parent_id == country.id)
+
+        return query.order_by(Administrative.name).all()
+
+    def _get_next_admin_level(self, current_level: str) -> Optional[str]:
+        """Get the next level in the hierarchy after current level."""
+        try:
+            current_idx = self.admin_level_order.index(current_level)
+            if current_idx + 1 < len(self.admin_level_order):
+                return self.admin_level_order[current_idx + 1]
+        except ValueError:
+            pass
+        return None
+
+    def _build_options_text(
+        self, areas: List[Administrative], lang: str
+    ) -> str:
+        """Build numbered options text for administrative areas."""
+        options = []
+        for i, area in enumerate(areas, 1):
+            options.append(f"{i}. {area.name}")
+        options_text = "\n".join(options)
+        # Add selection instruction
+        instruction = t("onboarding.administration.selection_instruction", lang)
+        return f"{options_text}{instruction}"
+
+    def _start_hierarchical_selection(
+        self, customer: Customer
+    ) -> OnboardingResponse:
+        """
+        Start the hierarchical location selection process.
+
+        Begins at the first level (region) and shows all available options.
+        """
+        lang = customer.language.value if customer.language else "en"
+        first_level = self.admin_level_order[0]
+
+        # Get all areas at first level
+        areas = self._get_children_at_level(first_level, None)
+
+        if not areas:
+            # No regions found - this shouldn't happen in production
+            logger.error("No administrative regions found in database")
+            return OnboardingResponse(
+                message=t("onboarding.common.database_error", lang),
+                status="in_progress",
+                attempts=self._get_attempts(customer, "administration"),
+            )
+
+        # Store state
+        candidate_ids = [area.id for area in areas]
+        self._set_admin_hierarchy_state(
+            customer, first_level, None, candidate_ids
+        )
+        customer.current_onboarding_field = "administration"
+        self.db.commit()
+
+        # Build message
+        options_text = self._build_options_text(areas, lang)
+        message = t(
+            "onboarding.administration.select_region",
+            lang,
+            options=options_text,
+        )
+
+        logger.info(
+            f"Started hierarchical selection for customer {customer.id}, "
+            f"showing {len(areas)} regions"
+        )
+
+        return OnboardingResponse(
+            message=message,
+            status="awaiting_selection",
+            attempts=self._get_attempts(customer, "administration"),
+        )
+
+    def _process_hierarchical_selection(
+        self, customer: Customer, message: str
+    ) -> OnboardingResponse:
+        """
+        Process selection in hierarchical location flow.
+
+        Handles:
+        - Parsing user's selection (number)
+        - Moving to next level or saving final selection
+        - Showing options at each level
+        """
+        lang = customer.language.value if customer.language else "en"
+
+        # Parse selection
+        selection_index = self.parse_selection(message)
+        if selection_index is None:
+            return OnboardingResponse(
+                message=t("onboarding.common.invalid_selection", lang),
+                status="awaiting_selection",
+                attempts=self._get_attempts(customer, "administration"),
+            )
+
+        # Get current state
+        state = self._get_admin_hierarchy_state(customer)
+        candidates = state["candidates"]
+        current_level = state["level"]
+
+        # Validate selection
+        if selection_index >= len(candidates):
+            return OnboardingResponse(
+                message=t(
+                    "onboarding.common.selection_out_of_range",
+                    lang,
+                    max=len(candidates),
+                ),
+                status="awaiting_selection",
+                attempts=self._get_attempts(customer, "administration"),
+            )
+
+        # Get selected administrative area
+        selected_id = candidates[selection_index]
+        selected_admin = (
+            self.db.query(Administrative).filter_by(id=selected_id).first()
+        )
+
+        if not selected_admin:
+            logger.error(f"Administrative {selected_id} not found")
+            return OnboardingResponse(
+                message=t("onboarding.common.database_error", lang),
+                status="in_progress",
+                attempts=self._get_attempts(customer, "administration"),
+            )
+
+        # Check if there's a next level
+        next_level = self._get_next_admin_level(current_level)
+
+        if next_level:
+            # Get children at next level
+            children = self._get_children_at_level(next_level, selected_id)
+
+            if children:
+                # Store new state and show next level options
+                child_ids = [child.id for child in children]
+                self._set_admin_hierarchy_state(
+                    customer, next_level, selected_id, child_ids
+                )
+                self.db.commit()
+
+                options_text = self._build_options_text(children, lang)
+
+                # Choose appropriate message based on level
+                if next_level == "district":
+                    message = t(
+                        "onboarding.administration.select_district",
+                        lang,
+                        parent=selected_admin.name,
+                        options=options_text,
+                    )
+                else:  # ward
+                    message = t(
+                        "onboarding.administration.select_ward",
+                        lang,
+                        parent=selected_admin.name,
+                        options=options_text,
+                    )
+
+                logger.info(
+                    f"Customer {customer.id} selected {selected_admin.name}, "
+                    f"showing {len(children)} {next_level}s"
+                )
+
+                return OnboardingResponse(
+                    message=message,
+                    status="awaiting_selection",
+                    attempts=self._get_attempts(customer, "administration"),
+                )
+            else:
+                # No children - save current selection
+                logger.info(
+                    f"No {next_level}s found for {selected_admin.name}, "
+                    f"saving as final location"
+                )
+
+        # This is the final level (ward) or no children found
+        # Save the selected administrative area
+        from schemas.onboarding_schemas import get_field_config
+
+        field_config = get_field_config("administration")
+        return self._save_field_value(customer, selected_admin, field_config)
 
     # ================================================================
     # FIELD EXTRACTION METHODS
@@ -971,6 +1246,13 @@ Birth year must be between 1900 and {current_year}."""
 
         # Check if we're awaiting selection for this field
         if self._is_awaiting_selection(customer, field_name):
+            # For administration, use hierarchical selection
+            if field_name == "administration":
+                state = self._get_admin_hierarchy_state(customer)
+                if state["level"] is not None:
+                    return self._process_hierarchical_selection(
+                        customer, message
+                    )
             return await self._process_selection(
                 customer, message, next_field_config
             )
@@ -993,7 +1275,20 @@ Birth year must be between 1900 and {current_year}."""
 
         Updates customer state to track current field.
         For optional fields, indicates that user can skip.
+        For administration field, starts hierarchical selection.
         """
+        field_name = field_config.field_name
+
+        # Special case: administration uses hierarchical selection
+        if field_name == "administration":
+            customer.onboarding_status = OnboardingStatus.IN_PROGRESS
+            self.db.commit()
+            logger.info(
+                f"Starting hierarchical location selection "
+                f"for customer {customer.id}"
+            )
+            return self._start_hierarchical_selection(customer)
+
         customer.current_onboarding_field = field_config.field_name
         customer.onboarding_status = OnboardingStatus.IN_PROGRESS
         self.db.commit()
@@ -1005,7 +1300,6 @@ Birth year must be between 1900 and {current_year}."""
 
         # Get customer language
         lang = customer.language.value if customer.language else "en"
-        field_name = field_config.field_name
 
         # Get translated question
         question = t(f"onboarding.{field_name}.question", lang)
@@ -1047,6 +1341,18 @@ Birth year must be between 1900 and {current_year}."""
         - integer: Extract → Validate → Save
         """
         field_name = field_config.field_name
+
+        # Special case: administration uses hierarchical selection
+        # If no hierarchical state exists yet, start hierarchical selection
+        if field_name == "administration":
+            state = self._get_admin_hierarchy_state(customer)
+            if state["level"] is None:
+                # No hierarchical state - start fresh
+                logger.info(
+                    f"Starting hierarchical selection for customer "
+                    f"{customer.id} (from _process_field_value)"
+                )
+                return self._start_hierarchical_selection(customer)
 
         # Check if user wants to skip (only for optional fields)
         if not field_config.required and message.lower().strip() in [
