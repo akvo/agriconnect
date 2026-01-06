@@ -300,7 +300,10 @@ const Inbox: React.FC = () => {
               resolver: null, // No resolver yet for new tickets
               customer: {
                 id: event.customer_id || 0,
-                name: event.customer_name || event.phone_number,
+                name:
+                  event.customer_name ||
+                  event.sender_name ||
+                  event.phone_number,
                 phoneNumber: event.phone_number,
               },
               message: {
