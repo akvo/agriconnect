@@ -18,6 +18,7 @@ interface AISuggestionChipProps {
   onExpand?: (expanded: boolean) => void;
   containerStyle?: object;
   loading?: boolean;
+  isQuickReply?: boolean;
 }
 
 /**
@@ -35,8 +36,9 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
   onExpand,
   containerStyle,
   loading = false,
+  isQuickReply = false,
 }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(!isQuickReply);
   const [text, setText] = useState<string | null>(suggestion);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -59,12 +61,12 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
   const maxHeight = expanded ? screenHeight * 0.66 : 48;
 
   useEffect(() => {
-    if (suggestion !== text) {
+    if (suggestion !== text && !isQuickReply) {
       setText(suggestion);
       setExpanded(true);
       onExpand?.(true);
     }
-  }, [suggestion, text, onExpand]);
+  }, [suggestion, text, onExpand, isQuickReply]);
 
   // Don't render if no suggestion and not loading
   if (!suggestion && !loading) {
@@ -84,11 +86,17 @@ const AISuggestionChip: React.FC<AISuggestionChipProps> = ({
         <View style={styles.whisperHeader}>
           <View style={styles.headerLeft}>
             <Ionicons
-              name="sparkles-outline"
+              name={
+                isQuickReply
+                  ? "chatbubble-ellipses-outline"
+                  : "sparkles-outline"
+              }
               size={18}
               color={themeColors["green-500"]}
             />
-            <Text style={styles.whisperTitle}>AI Suggestion</Text>
+            <Text style={styles.whisperTitle}>
+              {isQuickReply ? "Quick Reply" : "AI Suggestion"}
+            </Text>
           </View>
           <View style={styles.headerRight}>
             <Ionicons

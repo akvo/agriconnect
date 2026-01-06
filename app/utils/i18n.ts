@@ -1,9 +1,5 @@
 export const i18n = {
   quick_reply: {
-    know_more_about_topic: {
-      en: "What would you like to know about:\n{topic}",
-      sw: "Ungependa kujua nini kuhusu:\n{topic}",
-    },
     fallback_no_topic: {
       en: "What would you like to know?",
       sw: "Ungependa kujua nini?",

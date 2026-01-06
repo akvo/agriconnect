@@ -7,7 +7,6 @@ import { MessageWithUsers } from "@/database/dao/types/message";
 import { Message } from "@/utils/chat";
 import { MessageFrom } from "@/constants/messageSource";
 import { trans } from "@/utils/i18n";
-import { WHATSAPP_MAX_LENGTH } from "@/constants/message";
 
 // Helper function to convert MessageWithUsers to Message
 const convertToUIMessage = (
@@ -131,21 +130,11 @@ export const useTicketData = (
             ticketData.customer?.language &&
             result.messages.length < 3
           ) {
-            const topic = ticketData.message?.body || null;
             const customerLang = ticketData.customer.language;
-            let quickReply = trans(
+            const quickReply = trans(
               "quick_reply.fallback_no_topic",
               customerLang as "en" | "sw",
             );
-            if (topic) {
-              quickReply = trans(
-                "quick_reply.know_more_about_topic",
-                customerLang as "en" | "sw",
-              )
-                ?.replace("{topic}", topic)
-                ?.slice(0, WHATSAPP_MAX_LENGTH);
-            }
-
             setAISuggestion(quickReply);
           }
 
