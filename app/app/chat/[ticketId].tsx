@@ -383,6 +383,7 @@ const ChatScreen = () => {
               setText(value);
             }}
             onExpand={onExpandAISuggestion}
+            isQuickReply={messages.length < 3}
           />
         )}
 
