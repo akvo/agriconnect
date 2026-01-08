@@ -168,10 +168,7 @@ trans: Dict[str, Any] = {
                     "You're in {parent}.\n\n"
                     "Which ward are you in?\n\n{options}"
                 ),
-                "sw": (
-                    "Uko {parent}.\n\n"
-                    "Uko kata gani?\n\n{options}"
-                ),
+                "sw": ("Uko {parent}.\n\n" "Uko kata gani?\n\n{options}"),
             },
             "confirm_location": {
                 "en": (
@@ -368,7 +365,7 @@ trans: Dict[str, Any] = {
             "age": {
                 "en": "Age",
                 "sw": "Umri",
-            }
+            },
         },
     },
     "crops": {
@@ -380,7 +377,44 @@ trans: Dict[str, Any] = {
         "male": {"en": "Male", "sw": "Mwanamume"},
         "female": {"en": "Female", "sw": "Mwanamke"},
         "other": {"en": "Other", "sw": "Nyingine"},
-    }
+    },
+    "weather_subscription": {
+        "question": {
+            "en": (
+                "\n\nWould you like to receive daily morning weather updates "
+                "for your area ({area_name})?"
+            ),
+            "sw": (
+                "\n\nJe, ungependa kupokea taarifa za hali ya hewa kila "
+                "asubuhi kwa eneo lako ({area_name})?"
+            ),
+        },
+        "button_yes": {
+            "en": "Yes",
+            "sw": "Ndiyo",
+        },
+        "button_no": {
+            "en": "No",
+            "sw": "Hapana",
+        },
+        "subscribed": {
+            "en": "Great! You will receive daily updates for {area_name}.",
+            "sw": (
+                "Vizuri! Utapokea taarifa za hali ya hewa kila siku "
+                "kwa {area_name}."
+            ),
+        },
+        "declined": {
+            "en": (
+                "No problem! You can subscribe anytime by messaging "
+                "'weather updates'."
+            ),
+            "sw": (
+                "Hakuna shida! Unaweza kujisajili wakati wowote kwa kutuma "
+                "ujumbe 'weather updates'."
+            ),
+        },
+    },
 }
 
 

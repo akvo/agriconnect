@@ -66,8 +66,10 @@ async def whatsapp_webhook(
         # VOICE MESSAGE TRANSCRIPTION
         # ========================================
         is_voice = (
-            NumMedia and NumMedia > 0
-            and MediaContentType0 and "audio" in MediaContentType0
+            NumMedia
+            and NumMedia > 0
+            and MediaContentType0
+            and "audio" in MediaContentType0
         )
         if is_voice:
             logger.info(
@@ -85,8 +87,7 @@ async def whatsapp_webhook(
                 # Download audio to /tmp
                 whatsapp_service = WhatsAppService()
                 downloaded_path = whatsapp_service.download_twilio_media(
-                    media_url=MediaUrl0,
-                    save_path=temp_file
+                    media_url=MediaUrl0, save_path=temp_file
                 )
 
                 if downloaded_path:
@@ -94,7 +95,7 @@ async def whatsapp_webhook(
                     openai_service = get_openai_service()
 
                     # Read audio file as bytes
-                    with open(downloaded_path, 'rb') as f:
+                    with open(downloaded_path, "rb") as f:
                         audio_bytes = f.read()
 
                     transcription = await openai_service.transcribe_audio(
@@ -136,8 +137,7 @@ async def whatsapp_webhook(
                         logger.debug(f"Deleted temp file: {temp_file}")
                     except Exception as e:
                         logger.warning(
-                            f"Failed to delete temp file "
-                            f"{temp_file}: {e}"
+                            f"Failed to delete temp file " f"{temp_file}: {e}"
                         )
 
         # ========================================
@@ -203,8 +203,8 @@ async def whatsapp_webhook(
         onboarding_service = get_onboarding_service(db)
 
         if (
-            onboarding_service.needs_onboarding(customer) and
-            not existing_ticket
+            onboarding_service.needs_onboarding(customer)
+            and not existing_ticket
         ):
             logger.info(
                 f"Customer {phone_number} needs onboarding "
@@ -250,6 +250,44 @@ async def whatsapp_webhook(
                     f"Onboarding completed for {phone_number}, "
                     f"message already handled"
                 )
+
+                # Send weather subscription buttons if needed
+                if (
+                    onboarding_response.requires_weather_buttons
+                    and customer.customer_administrative
+                ):
+                    lang = (
+                        customer.language.value if customer.language else "en"
+                    )
+                    from utils.i18n import t
+
+                    area_name = customer.customer_administrative[
+                        0
+                    ].administrative.name
+                    whatsapp_service.send_interactive_buttons(
+                        to_number=phone_number,
+                        body_text=t(
+                            "weather_subscription.question", lang
+                        ).replace("{area_name}", area_name),
+                        buttons=[
+                            {
+                                "id": settings.weather_yes_payload,
+                                "title": t(
+                                    "weather_subscription.button_yes", lang
+                                ),
+                            },
+                            {
+                                "id": settings.weather_no_payload,
+                                "title": t(
+                                    "weather_subscription.button_no", lang
+                                ),
+                            },
+                        ],
+                    )
+                    logger.info(
+                        f"Weather subscription buttons sent to {phone_number}"
+                    )
+
                 return {
                     "status": "success",
                     "message": "Onboarding completed",
@@ -270,9 +308,7 @@ async def whatsapp_webhook(
         # ========================================
         # FLOW 2A: Handle broadcast confirmation button
         # ========================================
-        if (
-            ButtonPayload == settings.broadcast_confirmation_button_payload
-        ):
+        if ButtonPayload == settings.broadcast_confirmation_button_payload:
             logger.info(
                 f"Customer {phone_number} confirmed broadcast message read"
             )
@@ -289,6 +325,7 @@ async def whatsapp_webhook(
             if recipient:
                 # Get the broadcast message content
                 from models.broadcast import BroadcastMessage
+
                 broadcast = (
                     db.query(BroadcastMessage)
                     .filter(
@@ -320,7 +357,62 @@ async def whatsapp_webhook(
             }
 
         # ========================================
-        # FLOW 2B: Handle "escalate" button response
+        # FLOW 2B: Handle weather subscription button responses
+        # ========================================
+        weather_yes_payload = settings.weather_yes_payload
+        weather_no_payload = settings.weather_no_payload
+
+        # Check for button payload OR text responses
+        is_weather_yes = (
+            ButtonPayload == weather_yes_payload
+            or Body.lower().strip() in ["1", "yes", "ndiyo"]
+        )
+        is_weather_no = (
+            ButtonPayload == weather_no_payload
+            or Body.lower().strip() in ["2", "no", "hapana"]
+        )
+
+        # Only process if customer was asked about weather subscription
+        # and hasn't responded yet
+        if (
+            customer.weather_subscription_asked
+            and customer.weather_subscribed is None
+            and (is_weather_yes or is_weather_no)
+        ):
+            logger.info(
+                f"Customer {phone_number} responded to weather subscription: "
+                f"{'yes' if is_weather_yes else 'no'}"
+            )
+
+            from services.weather_subscription_service import (
+                get_weather_subscription_service,
+            )
+            from utils.i18n import t
+
+            weather_service = get_weather_subscription_service(db)
+            lang = customer.language.value if customer.language else "en"
+
+            if is_weather_yes:
+                weather_service.subscribe(customer)
+                response_msg = weather_service.get_confirmation_message(
+                    customer, subscribed=True, lang=lang
+                )
+            else:
+                weather_service.decline(customer)
+                response_msg = weather_service.get_confirmation_message(
+                    customer, subscribed=False, lang=lang
+                )
+
+            whatsapp_service = WhatsAppService()
+            whatsapp_service.send_message(phone_number, response_msg)
+
+            return {
+                "status": "success",
+                "message": "Weather subscription processed",
+            }
+
+        # ========================================
+        # FLOW 2C: Handle "escalate" button response
         # ========================================
         if ButtonPayload == escalate_payload:
             logger.info(f"Customer {phone_number} clicked 'escalate' button")
@@ -450,7 +542,7 @@ async def whatsapp_webhook(
 
         reconnect_payload = settings.whatsapp_reconnect_button_payload
         # ========================================
-        # FLOW 2C: Handle "reconnect" button response
+        # FLOW 2D: Handle "reconnect" button response
         # ========================================
         if ButtonPayload == reconnect_payload:
             logger.info(f"Customer {phone_number} clicked 'reconnect' button")
@@ -596,8 +688,8 @@ async def whatsapp_webhook(
             )
 
         if (
-            customer.onboarding_status != OnboardingStatus.IN_PROGRESS and
-            not existing_ticket
+            customer.onboarding_status != OnboardingStatus.IN_PROGRESS
+            and not existing_ticket
         ):
             # No existing ticket → REPLY mode (auto-reply to farmer)
             logger.info(
