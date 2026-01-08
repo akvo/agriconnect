@@ -76,5 +76,9 @@
 	"crop_types": [
 		"Avocado",
 		"Potato"
-	]
+	],
+	"contact_info": {
+		"name": "Admin",
+		"phone_number": "+1234567891"
+	}
 }
