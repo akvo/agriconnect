@@ -245,6 +245,12 @@ class Settings(BaseSettings):
         ["Avocado", "Cacao"]
     )
 
+    # Contact info: Name and Phone number
+    contact_name: str = _config.get("contact_info", {}).get("name", "Admin")
+    contact_phone_number: str = _config.get("contact_info", {}).get(
+        "phone_number", "+1234567890"
+    )
+
     @property
     def celery_broker_url(self) -> str:
         """Auto-construct Celery broker URL (like Akvo RAG)"""

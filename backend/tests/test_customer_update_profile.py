@@ -526,10 +526,10 @@ class TestCustomerProfileUpdateEndpoint:
         assert response.status_code == 404
         assert "Customer not found" in response.json()["detail"]
 
-    def test_update_customer_requires_admin(
+    def test_update_customer_by_non_admin(
         self, client: TestClient, auth_headers_factory, customer
     ):
-        """Test that only admin can update customer profiles."""
+        """Test that non-admin users can update customer profiles."""
         # Create EO user (non-admin)
         headers, _ = auth_headers_factory(user_type="eo")
         cust = customer()
@@ -542,7 +542,7 @@ class TestCustomerProfileUpdateEndpoint:
             headers=headers,
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 200
 
     def test_update_customer_unauthorized(
         self, client: TestClient, customer

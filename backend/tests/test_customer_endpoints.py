@@ -1,13 +1,75 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from models.customer import Customer, CustomerLanguage
 from models.message import Message, MessageFrom
 from models.user import User, UserType
+from models.administrative import (
+    Administrative,
+    AdministrativeLevel,
+    UserAdministrative,
+    CustomerAdministrative,
+)
 from utils.auth import create_access_token
 
 
 class TestCustomerEndpoints:
+    @pytest.fixture
+    def sample_administrative_data(self, db_session):
+        """Create sample administrative hierarchy"""
+        # Create levels
+        country_level = AdministrativeLevel(name="country")
+        region_level = AdministrativeLevel(name="region")
+        district_level = AdministrativeLevel(name="district")
+        ward_level = AdministrativeLevel(name="ward")
+        db_session.add_all(
+            [country_level, region_level, district_level, ward_level]
+        )
+        db_session.commit()
+
+        # Create hierarchy
+        kenya = Administrative(
+            code="KEN",
+            name="Kenya",
+            level_id=country_level.id,
+            parent_id=None,
+            path="Kenya",
+        )
+        db_session.add(kenya)
+        db_session.commit()
+
+        nairobi = Administrative(
+            code="NBI",
+            name="Nairobi Region",
+            level_id=region_level.id,
+            parent_id=kenya.id,
+            path="Kenya > Nairobi Region",
+        )
+        db_session.add(nairobi)
+        db_session.commit()
+
+        central = Administrative(
+            code="NRB-C",
+            name="Central District",
+            level_id=district_level.id,
+            parent_id=nairobi.id,
+            path="Kenya > Nairobi Region > Central District",
+        )
+        db_session.add(central)
+        db_session.commit()
+
+        westlands = Administrative(
+            code="NRB-C-1",
+            name="Westlands Ward",
+            level_id=ward_level.id,
+            parent_id=central.id,
+            path="Kenya > Nairobi Region > Central District > Westlands Ward",
+        )
+        db_session.add(westlands)
+        db_session.commit()
+        return westlands
+
     def test_get_all_customers_admin(
         self, client: TestClient, db_session: Session
     ):
@@ -57,8 +119,11 @@ class TestCustomerEndpoints:
             response.status_code == 403
         )  # No token provided, gets 403 from admin_required
 
-    def test_get_all_customers_extension_officer_forbidden(
-        self, client: TestClient, db_session: Session
+    def test_get_all_customers_extension_officer(
+        self,
+        client: TestClient,
+        db_session: Session,
+        sample_administrative_data: Administrative,
     ):
         # Create EO user
         eo = User(
@@ -72,11 +137,36 @@ class TestCustomerEndpoints:
         db_session.add(eo)
         db_session.commit()
 
+        # Add administrative area and link to EO
+        user_admin = UserAdministrative(
+            user_id=eo.id,
+            administrative_id=sample_administrative_data.id,
+        )
+        db_session.add(user_admin)
+        db_session.commit()
+
+        # Add related customers
+        customer1 = Customer(
+            phone_number="+255111111111",
+            full_name="Customer One",
+            language=CustomerLanguage.EN,
+        )
+        customer_admin = CustomerAdministrative(
+            customer=customer1,
+            administrative_id=sample_administrative_data.id
+        )
+        db_session.add_all([customer1, customer_admin])
+        db_session.commit()
+
         token = create_access_token(data={"sub": eo.email})
         headers = {"Authorization": f"Bearer {token}"}
 
         response = client.get("/api/customers/", headers=headers)
-        assert response.status_code == 403
+        assert response.status_code == 200
+        # total customers should be 1
+        customers = response.json()
+        assert len(customers) == 1
+        assert customers[0]["phone_number"] == "+255111111111"
 
     def test_get_customer_by_id(self, client: TestClient, db_session: Session):
         # Create admin and customer

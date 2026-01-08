@@ -365,6 +365,13 @@ trans: Dict[str, Any] = {
                 "sw": "Umri",
             },
         },
+        "ask_edit_profile": {
+            "en": "To edit your profile, please contact support below:",
+            "sw": (
+                "Ili kuhariri profaili yako, "
+                "tafadhali wasiliana na usaidizi hapa chini:"
+            ),
+        },
     },
     "crops": {
         "Avocado": {"name": {"en": "avocado", "sw": "parachichi"}},

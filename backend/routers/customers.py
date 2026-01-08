@@ -81,9 +81,10 @@ async def create_customer(
 
 @router.get("/", response_model=List[CustomerResponse])
 async def get_all_customers(
-    db: Session = Depends(get_db), current_user=Depends(admin_required)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Get all customers (admin only) - Legacy endpoint."""
+    """Get all customers"""
     # Load customers with administrative data
     customers = (
         db.query(Customer)
@@ -92,8 +93,17 @@ async def get_all_customers(
                 CustomerAdministrative.administrative
             )
         )
-        .all()
     )
+    if current_user.user_type != UserType.ADMIN:
+        # filter by EO's assigned administrative areas
+        user_admin_ids = _get_user_administrative_ids(current_user, db)
+        customers = customers.join(
+            Customer.customer_administrative
+        ).filter(
+            CustomerAdministrative.administrative_id.in_(user_admin_ids)
+        )
+
+    customers = customers.all()
 
     # Format response with administrative info
     customer_responses = []
@@ -215,7 +225,7 @@ async def get_customers_list(
 async def get_customer(
     customer_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(admin_required),
+    current_user: User = Depends(get_current_user),
 ):
     """Get specific customer by ID (admin only)."""
     CustomerService(db)
@@ -232,7 +242,7 @@ async def update_customer(
     customer_id: int,
     customer_update: CustomerUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(admin_required),
+    current_user: User = Depends(get_current_user),
 ):
     """Update customer profile (admin only) - Progressive profiling."""
     customer_service = CustomerService(db)

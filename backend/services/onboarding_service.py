@@ -34,6 +34,7 @@ from schemas.onboarding_schemas import (
     get_fields_by_priority,
 )
 from services.openai_service import get_openai_service
+from services.user_service import UserService
 from config import settings
 from utils.i18n import t, get_crop_name_translated
 
@@ -1860,6 +1861,29 @@ Birth year must be between 1900 and {current_year}."""
             customer.weather_subscription_asked = True
             self.db.commit()
             requires_weather_buttons = True
+        # Show users list for customer ask edit their profile
+        customer_adm_id = None
+        if len(customer.customer_administrative) > 0:
+            customer_adm_id = customer\
+                .customer_administrative[0].administrative_id
+        users = UserService.get_users_by_administrative_id(
+            self.db,
+            administrative_id=customer_adm_id
+        )
+        ask_profile_msg = t(
+            "onboarding.ask_edit_profile",
+            lang
+        )
+        message += f"\n\n{ask_profile_msg}\n"
+        if len(users) == 0:
+            contact_name = settings.contact_name
+            contact_phone = settings.contact_phone_number
+            message += f"{contact_name} ( {contact_phone} )"
+        else:
+            for ix, user in enumerate(users):
+                contact_name = user.full_name
+                contact_phone = user.phone_number
+                message += f"{ix + 1}. {contact_name} ( {contact_phone} )\n"
 
         return OnboardingResponse(
             message=message,
