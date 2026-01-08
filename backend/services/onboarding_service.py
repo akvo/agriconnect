@@ -1842,10 +1842,30 @@ Birth year must be between 1900 and {current_year}."""
         message = t("onboarding.common.completion", lang)
         if profile_summary:
             message = message.replace("{profile_summary}", profile_summary)
+
+        # Check if should ask weather subscription
+        requires_weather_buttons = False
+        if (
+            len(customer.customer_administrative) > 0
+            and not customer.weather_subscription_asked
+        ):
+            # Get area name and append weather question
+            area_name = customer.customer_administrative[0].administrative.name
+            weather_question = t("weather_subscription.question", lang)
+            weather_question = weather_question.replace(
+                "{area_name}", area_name
+            )
+
+            # Mark as asked (to never ask again)
+            customer.weather_subscription_asked = True
+            self.db.commit()
+            requires_weather_buttons = True
+
         return OnboardingResponse(
             message=message,
             status="completed",
             attempts=0,
+            requires_weather_buttons=requires_weather_buttons,
         )
 
     def _generate_profile_summary(self, customer: Customer, lang: str) -> str:

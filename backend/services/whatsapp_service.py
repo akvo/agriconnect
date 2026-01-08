@@ -366,6 +366,76 @@ class WhatsAppService:
             # If template fails but answer was sent, return answer response
             return answer_response
 
+    def send_interactive_buttons(
+        self,
+        to_number: str,
+        body_text: str,
+        buttons: list[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        """
+        Send WhatsApp interactive message with quick reply buttons.
+
+        Within the 24-hour session window, this sends a message with
+        numbered options that users can reply to. The webhook handler
+        should handle both button payload responses (if Twilio Content API
+        is configured) and text responses ("1", "Yes", "Ndiyo", etc.).
+
+        Args:
+            to_number: Recipient phone number
+            body_text: Message body text (the question)
+            buttons: List of buttons, each with 'id' and 'title'
+                     e.g., [{"id": "weather_yes", "title": "Yes"}]
+
+        Returns:
+            Twilio message response
+
+        Example:
+            send_interactive_buttons(
+                "+255712345678",
+                "Would you like to receive weather updates?",
+                [
+                    {"id": "weather_yes", "title": "Yes"},
+                    {"id": "weather_no", "title": "No"}
+                ]
+            )
+        """
+        if self.testing_mode:
+            logger.info(
+                f"[TESTING MODE] Mocking interactive buttons to {to_number}: "
+                f"{body_text[:50]}... with {len(buttons)} buttons"
+            )
+            return {"sid": "TESTING_MODE", "status": "sent"}
+
+        # Build the message with button options as numbered list
+        # This provides a text-based fallback that works without
+        # Twilio Content API templates
+        button_options = "\n".join(
+            f"{i+1}. {btn['title']}" for i, btn in enumerate(buttons)
+        )
+        full_message = f"{body_text}\n\n{button_options}"
+
+        try:
+            message = self.client.messages.create(
+                from_=self.whatsapp_number,
+                body=full_message,
+                to=f"whatsapp:{to_number}",
+            )
+
+            logger.info(
+                f"✓ Sent interactive buttons to {to_number}: {message.sid}"
+            )
+
+            return {
+                "sid": message.sid,
+                "status": message.status,
+                "to": message.to,
+                "body": message.body,
+            }
+
+        except Exception as e:
+            logger.error(f"✗ Error sending interactive buttons: {e}")
+            raise Exception(f"Failed to send interactive buttons: {e}")
+
     def download_twilio_media(
         self, media_url: str, save_path: str
     ) -> Optional[str]:

@@ -61,6 +61,10 @@ class OnboardingResponse(BaseModel):
     extracted_location: Optional[LocationData] = Field(
         None, description="Location data extracted from message"
     )
+    requires_weather_buttons: Optional[bool] = Field(
+        None,
+        description="for weather subscription buttons after this response",
+    )
 
 
 class SelectionRequest(BaseModel):
@@ -102,9 +106,11 @@ class CropIdentificationResult(BaseModel):
 # GENERIC ONBOARDING FIELD CONFIGURATIONS
 # ============================================================================
 
+
 @dataclass
 class OnboardingFieldConfig:
     """Configuration for a single onboarding field"""
+
     field_name: str  # Unique identifier for the field
     db_field: str  # Column name in Customer model
     required: bool  # Whether field is required for completion
@@ -133,7 +139,6 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
             "Great! I'll communicate with you in {value}."
         ),
     ),
-
     # PRIORITY 1: Customer Name (REQUIRED)
     OnboardingFieldConfig(
         field_name="full_name",
@@ -146,7 +151,6 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         field_type="string",
         success_message_template="Thank you, {value}!",
     ),
-
     # PRIORITY 2: Administration Location (REQUIRED)
     OnboardingFieldConfig(
         field_name="administration",
@@ -161,7 +165,6 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
             "Perfect! I've noted that you're in {value}."
         ),
     ),
-
     # PRIORITY 3: Crop Type (REQUIRED)
     OnboardingFieldConfig(
         field_name="crop_type",
@@ -172,11 +175,8 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         matching_method="resolve_crop_ambiguity",
         max_attempts=3,
         field_type="string",
-        success_message_template=(
-            "Great! I've noted that you grow {value}."
-        ),
+        success_message_template=("Great! I've noted that you grow {value}."),
     ),
-
     # PRIORITY 4: Gender (OPTIONAL)
     OnboardingFieldConfig(
         field_name="gender",
@@ -189,7 +189,6 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         field_type="enum",
         success_message_template="Thank you for sharing.",
     ),
-
     # PRIORITY 5: Birth Year (OPTIONAL)
     OnboardingFieldConfig(
         field_name="birth_year",

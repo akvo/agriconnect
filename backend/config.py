@@ -96,6 +96,18 @@ class Settings(BaseSettings):
         .get("reconnect", "reconnect")
     )
 
+    # Weather subscription button payloads
+    weather_yes_payload: str = (
+        _config.get("whatsapp", {})
+        .get("button_payloads", {})
+        .get("weather_yes", "weather_yes")
+    )
+    weather_no_payload: str = (
+        _config.get("whatsapp", {})
+        .get("button_payloads", {})
+        .get("weather_no", "weather_no")
+    )
+
     # Retry settings for failed message delivery
     retry_enabled: bool = (
         _config.get("whatsapp", {}).get("retry", {}).get("enabled", True)

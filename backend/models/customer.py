@@ -106,6 +106,7 @@ class Customer(Base):
         if not self.birth_year:
             return None
         from datetime import datetime
+
         current_year = datetime.now().year
         return current_year - self.birth_year
 
@@ -121,6 +122,27 @@ class Customer(Base):
             return "36-50"
         else:
             return "51+"
+
+    # Weather subscription properties
+    @property
+    def weather_subscription_asked(self) -> bool:
+        """Check if weather subscription question was asked."""
+        return self.get_profile_field("weather_subscription_asked", False)
+
+    @weather_subscription_asked.setter
+    def weather_subscription_asked(self, value: bool):
+        self.set_profile_field("weather_subscription_asked", value)
+
+    @property
+    def weather_subscribed(self) -> bool | None:
+        """Weather subscription status:
+        True=subscribed, False=declined, None=not asked.
+        """
+        return self.get_profile_field("weather_subscribed", None)
+
+    @weather_subscribed.setter
+    def weather_subscribed(self, value: bool | None):
+        self.set_profile_field("weather_subscribed", value)
 
     def needs_reconnection_template(self, threshold_hours: int = 24) -> bool:
         """
