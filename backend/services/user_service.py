@@ -602,3 +602,17 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=UPDATE_FAILED,
             )
+
+    @staticmethod
+    def get_users_by_administrative_id(
+        db: Session, administrative_id: int
+    ) -> list[User]:
+        """Get 2 users assigned to a specific administrative location"""
+        user_admins = (
+            db.query(UserAdministrative)
+            .filter(UserAdministrative.administrative_id == administrative_id)
+            .limit(2)
+            .all()
+        )
+        users = [ua.user for ua in user_admins]
+        return users
