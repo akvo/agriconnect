@@ -1855,7 +1855,6 @@ Birth year must be between 1900 and {current_year}."""
             weather_question = weather_question.replace(
                 "{area_name}", area_name
             )
-            message += weather_question
 
             # Mark as asked (to never ask again)
             customer.weather_subscription_asked = True
