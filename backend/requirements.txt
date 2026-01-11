@@ -27,3 +27,4 @@ rapidfuzz>=3.0.0
 celery==5.5.3
 redis==7.0.1
 flower==2.0.1
+akvo-weather-info>=0.1.0

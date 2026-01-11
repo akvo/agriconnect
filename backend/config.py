@@ -251,6 +251,14 @@ class Settings(BaseSettings):
         "phone_number", "+1234567890"
     )
 
+    # Weather Broadcast Configuration
+    # API key for OpenWeatherMap (required by akvo-weather-info library)
+    openweather_api_key: str = os.getenv("OPENWEATHER", "")
+    # Weather broadcast feature flag
+    weather_broadcast_enabled: bool = _config.get("weather", {}).get(
+        "broadcast_enabled", False
+    )
+
     @property
     def celery_broker_url(self) -> str:
         """Auto-construct Celery broker URL (like Akvo RAG)"""
