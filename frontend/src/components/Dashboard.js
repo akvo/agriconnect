@@ -20,28 +20,6 @@ export default function Dashboard() {
   const { user, refreshUser } = useAuth();
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const getUserTypeLabel = (userType) => {
-    switch (userType) {
-      case "admin":
-        return "Administrator";
-      case "eo":
-        return "Extension Officer";
-      default:
-        return userType;
-    }
-  };
-
-  const getUserTypeBadgeColor = (userType) => {
-    switch (userType) {
-      case "admin":
-        return "bg-purple-100 text-purple-800";
-      case "eo":
-        return "bg-blue-100 text-blue-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   const handleProfileClick = () => {
     setShowProfileModal(true);
   };
@@ -81,33 +59,31 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {user?.user_type === "admin" && (
-              <a
-                href="/customers"
-                className="group bg-gradient-to-br from-green-50 to-green-100 p-6 text-left hover:from-green-100 hover:to-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
-                style={{ borderRadius: "5px" }}
-              >
-                <div className="flex items-center mb-4">
-                  <div
-                    className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 mr-3"
-                    style={{ borderRadius: "5px" }}
-                  >
-                    <BuildingStorefrontIcon className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-green-700 font-bold text-lg">
-                    Customer Management
-                  </div>
+            <a
+              href="/customers"
+              className="group bg-gradient-to-br from-green-50 to-green-100 p-6 text-left hover:from-green-100 hover:to-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
+              style={{ borderRadius: "5px" }}
+            >
+              <div className="flex items-center mb-4">
+                <div
+                  className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 mr-3"
+                  style={{ borderRadius: "5px" }}
+                >
+                  <BuildingStorefrontIcon className="w-5 h-5 text-white" />
                 </div>
-                <div className="text-secondary-600 text-sm leading-relaxed">
-                  View and manage customer information, track interactions, and
-                  customer support
+                <div className="text-green-700 font-bold text-lg">
+                  Customer Management
                 </div>
-                <div className="mt-4 flex items-center text-green-600 text-sm font-semibold group-hover:text-green-700">
-                  <span>Manage Customers</span>
-                  <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
-                </div>
-              </a>
-            )}
+              </div>
+              <div className="text-secondary-600 text-sm leading-relaxed">
+                View and manage customer information, track interactions, and
+                customer support
+              </div>
+              <div className="mt-4 flex items-center text-green-600 text-sm font-semibold group-hover:text-green-700">
+                <span>Manage Customers</span>
+                <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
+              </div>
+            </a>
 
             <Link
               href="/knowledge-base"

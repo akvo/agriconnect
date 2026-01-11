@@ -10,6 +10,7 @@ import {
   UsersIcon,
 } from "@heroicons/react/24/outline";
 import DataTable from "../common/DataTable";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function CustomerList({
   customers,
@@ -17,6 +18,8 @@ export default function CustomerList({
   onEditCustomer,
   onDeleteCustomer,
 }) {
+  const { user } = useAuth();
+
   const columns = [
     {
       title: "Customer",
@@ -115,13 +118,15 @@ export default function CustomerList({
             <PencilIcon className="w-4 h-4 mr-1" />
             Edit
           </button>
-          <button
-            onClick={() => onDeleteCustomer(customer)}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
-          >
-            <TrashIcon className="w-4 h-4 mr-1" />
-            Delete
-          </button>
+          {user?.role === "admin" && (
+            <button
+              onClick={() => onDeleteCustomer(customer)}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
+            >
+              <TrashIcon className="w-4 h-4 mr-1" />
+              Delete
+            </button>
+          )}
         </div>
       </td>
     </>
