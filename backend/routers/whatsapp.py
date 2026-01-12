@@ -313,7 +313,47 @@ async def whatsapp_webhook(
                 f"Customer {phone_number} confirmed broadcast message read"
             )
 
-            # Find the broadcast recipient for this customer
+            # FIRST: Check for weather broadcast recipient
+            from models.weather_broadcast import WeatherBroadcastRecipient
+            from tasks.weather_tasks import send_weather_message
+
+            weather_recipient = (
+                db.query(WeatherBroadcastRecipient)
+                .join(
+                    Customer,
+                    Customer.id == WeatherBroadcastRecipient.customer_id
+                )
+                .filter(
+                    Customer.phone_number == phone_number,
+                    WeatherBroadcastRecipient.status == DeliveryStatus.SENT,
+                    WeatherBroadcastRecipient.actual_message_sid.is_(None)
+                )
+                .order_by(WeatherBroadcastRecipient.created_at.desc())
+                .first()
+            )
+
+            if weather_recipient:
+                # This is a weather broadcast confirmation
+                try:
+                    task = send_weather_message.delay(
+                        recipient_id=weather_recipient.id,
+                        phone_number=phone_number,
+                    )
+                    logger.info(
+                        f"Queued weather message to: {phone_number} "
+                        f"(task_id={task.id})"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to queue weather message delivery: {e}"
+                    )
+
+                return {
+                    "status": "success",
+                    "message": "Weather broadcast confirmation processed",
+                }
+
+            # SECOND: Check for regular broadcast recipient
             recipient = (
                 db.query(BroadcastRecipient)
                 .join(Customer, Customer.id == BroadcastRecipient.customer_id)

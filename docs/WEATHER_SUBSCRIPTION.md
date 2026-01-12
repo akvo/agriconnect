@@ -4,7 +4,7 @@
 
 Weather subscription allows farmers to opt-in to receive daily weather forecast messages for their administrative area via WhatsApp.
 
-## Current Status: Phase 1 Complete
+## Current Status: Phase 2 Complete
 
 ### Phase 1: Message Generation (DONE)
 
@@ -70,52 +70,88 @@ Max 1000 characters, WhatsApp-friendly formatting, no technical terms.
 
 ---
 
-### Phase 2: Broadcast to Subscribers (TODO)
+### Phase 2: Broadcast to Subscribers (DONE)
 
-Send weather messages to all subscribed farmers in each administrative area.
+Implemented daily weather broadcasts to subscribed farmers with template confirmation workflow.
 
-#### Required Components
+#### Key Files
 
-1. **Celery Task** (`tasks/weather_tasks.py`)
-   - `send_weather_broadcasts()` - Scheduled task to run daily (e.g., 6 AM)
-   - Query customers where `weather_subscribed = True`
-   - Group by administrative area
-   - Generate message for each area
-   - Send via WhatsApp
+| File | Purpose |
+|------|---------|
+| `models/weather_broadcast.py` | WeatherBroadcast and WeatherBroadcastRecipient models |
+| `tasks/weather_tasks.py` | Celery tasks for broadcasting |
+| `alembic/versions/..._create_weather_broadcast_tables.py` | Database migration |
+| `tests/test_weather_tasks.py` | Task tests (16 tests) |
 
-2. **Integration with Existing Broadcast System**
-   - Option A: Use existing `BroadcastService` to create dynamic groups and send
-   - Option B: Direct WhatsApp sending without broadcast tracking
+#### Database Schema
 
-3. **Scheduling**
-   - Add Celery Beat schedule for daily execution
-   - Configure broadcast time in config.json
+```
+WeatherBroadcast (daily weather broadcast per area)
+├── administrative_id (FK)
+├── location_name
+├── weather_data (JSON)
+├── generated_message_en
+├── generated_message_sw
+├── status (pending, processing, completed, failed)
+├── scheduled_at, started_at, completed_at
 
-#### Database Queries Needed
-
-```python
-# Get all subscribed customers grouped by administrative area
-customers = db.query(Customer).join(
-    CustomerAdministrative
-).filter(
-    Customer.weather_subscribed == True
-).all()
-
-# Group by administrative area
-from collections import defaultdict
-by_area = defaultdict(list)
-for customer in customers:
-    area = customer.customer_administrative[0].administrative
-    by_area[area.name].append(customer)
+WeatherBroadcastRecipient (delivery tracking)
+├── weather_broadcast_id (FK)
+├── customer_id (FK)
+├── status (DeliveryStatus enum)
+├── confirm_message_sid (for webhook callback)
+├── actual_message_sid
+├── retry_count, error_message
+├── sent_at, confirmed_at
 ```
 
-#### Considerations
+#### Workflow
 
-- Rate limiting for WhatsApp API
-- Error handling for failed deliveries
-- Logging/tracking of sent messages
-- Time zone handling for broadcast time
-- Retry mechanism for failed sends
+1. **Daily Task** (`send_weather_broadcasts`) runs at 6 AM UTC via Celery Beat
+2. Queries customers with `weather_subscribed = True` grouped by administrative area
+3. Creates `WeatherBroadcast` record per area
+4. Queues `send_weather_templates` task per area
+
+5. **Template Sending** (`send_weather_templates`):
+   - Fetches weather data via OpenWeatherMap
+   - Generates messages in EN and SW via OpenAI
+   - Sends WhatsApp template (reuses `broadcast` template SID)
+   - Creates `WeatherBroadcastRecipient` with `confirm_message_sid`
+
+6. **User Confirmation**:
+   - User clicks "Yes" button (`read_broadcast` payload)
+   - Webhook checks `WeatherBroadcastRecipient` first (priority over regular broadcasts)
+   - Queues `send_weather_message` task
+
+7. **Actual Message** (`send_weather_message`):
+   - Sends language-specific weather message
+   - Creates `Message` record
+   - Updates recipient with `actual_message_sid`
+
+8. **Retry Mechanism** (`retry_failed_weather_broadcasts`):
+   - Runs every 5 minutes via Celery Beat
+   - Retries failed recipients at intervals [5, 15, 60] minutes
+   - Marks as UNDELIVERED after max retries
+
+#### Celery Beat Schedule
+
+```python
+# celery_app.py
+"send-weather-broadcasts": {
+    "task": "tasks.weather_tasks.send_weather_broadcasts",
+    "schedule": crontab(hour=6, minute=0),  # 6 AM UTC daily
+},
+"retry-failed-weather-broadcasts": {
+    "task": "tasks.weather_tasks.retry_failed_weather_broadcasts",
+    "schedule": crontab(minute="*/5"),  # Every 5 minutes
+},
+```
+
+#### Integration Points
+
+- **Webhook** (`routers/whatsapp.py`): Weather recipients checked before regular broadcasts
+- **Template**: Reuses existing `broadcast` template SID (language-aware)
+- **Button Payload**: Reuses `read_broadcast` payload
 
 ---
 

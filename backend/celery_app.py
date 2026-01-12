@@ -35,6 +35,16 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.broadcast_tasks.retry_failed_broadcasts",
         "schedule": crontab(minute="*/5"),
     },
+    # Weather broadcasts daily at 6 AM UTC
+    "send-weather-broadcasts": {
+        "task": "tasks.weather_tasks.send_weather_broadcasts",
+        "schedule": crontab(hour=6, minute=0),
+    },
+    # Retry failed weather broadcasts every 5 minutes
+    "retry-failed-weather-broadcasts": {
+        "task": "tasks.weather_tasks.retry_failed_weather_broadcasts",
+        "schedule": crontab(minute="*/5"),
+    },
 }
 
 # Auto-discover tasks - Celery will import them when needed
