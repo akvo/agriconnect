@@ -11,7 +11,7 @@ WEATHER DATA:
 OUTPUT REQUIREMENTS:
 - Maximum 1000 characters
 - Simple, farmer-friendly language
-- WhatsApp style (short lines, bullet points)
+- WhatsApp formatting: use single *asterisk* for bold (NOT double **markdown**)
 - Include only essential numbers:
   • total rainfall (mm)
   • temperature range (°C)

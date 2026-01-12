@@ -98,31 +98,34 @@ def send_weather_broadcasts() -> Dict[str, Any]:
                     logger.warning(f"Administrative area {admin_id} not found")
                     continue
 
-                # Find region-level parent for weather lookup
-                # (wards/districts are too granular for weather APIs)
-                weather_location = area.name
+                # Build full location path from administrative hierarchy
+                # Format: "Region, District, Ward" (comma-separated, top-down)
+                # Excludes country level (causes wrong API results)
+                from models.administrative import AdministrativeLevel
+                path_parts = []
                 current = area
-                while current.parent_id:
-                    parent = db.query(Administrative).filter(
+                while current:
+                    # Skip country level - it causes wrong weather API results
+                    # (e.g., "Kenya" matches a city in Congo)
+                    level = db.query(AdministrativeLevel).filter(
+                        AdministrativeLevel.id == current.level_id
+                    ).first()
+                    if level and level.name != 'country':
+                        path_parts.append(current.name)
+                    if not current.parent_id:
+                        break
+                    current = db.query(Administrative).filter(
                         Administrative.id == current.parent_id
                     ).first()
-                    if parent and parent.level_id:
-                        # Use region level (typically county) for weather
-                        from models.administrative import AdministrativeLevel
-                        level = db.query(AdministrativeLevel).filter(
-                            AdministrativeLevel.id == parent.level_id
-                        ).first()
-                        if level and level.name == 'region':
-                            weather_location = parent.name
-                            break
-                    current = parent
-                    if not current:
-                        break
+
+                # Reverse to get top-down order (Region, District, Ward)
+                path_parts.reverse()
+                location_name = ", ".join(path_parts)
 
                 # Create weather broadcast for this area
                 weather_broadcast = WeatherBroadcast(
                     administrative_id=admin_id,
-                    location_name=weather_location,
+                    location_name=location_name,
                     status='pending',
                     scheduled_at=datetime.utcnow(),
                 )
