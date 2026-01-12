@@ -11,6 +11,7 @@ from .message import Message, MessageFrom
 from .service_token import ServiceToken
 from .ticket import Ticket
 from .user import User, UserType
+from .weather_broadcast import WeatherBroadcast, WeatherBroadcastRecipient
 from database import Base
 
 __all__ = [
@@ -28,5 +29,7 @@ __all__ = [
     "AdministrativeLevel",
     "CustomerAdministrative",
     "UserAdministrative",
+    "WeatherBroadcast",
+    "WeatherBroadcastRecipient",
     "Base",
 ]

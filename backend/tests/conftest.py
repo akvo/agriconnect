@@ -133,14 +133,24 @@ def db_session(test_db):
             BroadcastGroup,
         )
 
+        # Import Weather Broadcast models
+        from models.weather_broadcast import (
+            WeatherBroadcast,
+            WeatherBroadcastRecipient,
+        )
+
         # Delete in correct order to respect foreign key constraints
         db.query(UserAdministrative).delete()
         db.query(CustomerAdministrative).delete()
         db.query(Ticket).delete()
+        # Weather broadcast recipients must be deleted BEFORE messages
+        db.query(WeatherBroadcastRecipient).delete()
         # Broadcast recipients must be deleted BEFORE messages (FK: message_id)
         db.query(BroadcastRecipient).delete()
         db.query(Message).delete()
         db.query(PlaygroundMessage).delete()  # Playground messages
+        # Weather broadcasts must be deleted before Administrative
+        db.query(WeatherBroadcast).delete()
         # Broadcast tables must be deleted before Customer and Administrative
         db.query(BroadcastMessageGroup).delete()
         db.query(BroadcastMessage).delete()
