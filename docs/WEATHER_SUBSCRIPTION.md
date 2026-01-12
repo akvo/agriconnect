@@ -155,17 +155,32 @@ WeatherBroadcastRecipient (delivery tracking)
 
 ---
 
-### Phase 3: Admin Management (TODO)
+### Phase 3: Admin Management (Partial)
 
 Admin interface to manage weather broadcasts.
 
-#### Potential Features
+#### Implemented Features
+
+1. **Manual Trigger Endpoint** - Trigger weather broadcasts on-demand
+
+```
+POST /api/admin/weather/trigger-broadcast
+Authorization: Bearer <admin_token>
+
+Response (202 Accepted):
+{
+  "status": "queued",
+  "task_id": "abc123-def456",
+  "message": "Weather broadcast task queued successfully"
+}
+```
+
+#### Remaining Features (TODO)
 
 1. View subscription statistics by area
-2. Manual trigger for weather broadcast
-3. Preview message before sending
-4. View broadcast history/logs
-5. Enable/disable broadcasts per area
+2. Preview message before sending
+3. View broadcast history/logs
+4. Enable/disable broadcasts per area
 
 ---
 

@@ -89,7 +89,7 @@ def send_weather_broadcasts() -> Dict[str, Any]:
 
         for admin_id, customer_ids in by_area.items():
             try:
-                # Get administrative area name
+                # Get administrative area
                 area = db.query(Administrative).filter(
                     Administrative.id == admin_id
                 ).first()
@@ -98,10 +98,31 @@ def send_weather_broadcasts() -> Dict[str, Any]:
                     logger.warning(f"Administrative area {admin_id} not found")
                     continue
 
+                # Find region-level parent for weather lookup
+                # (wards/districts are too granular for weather APIs)
+                weather_location = area.name
+                current = area
+                while current.parent_id:
+                    parent = db.query(Administrative).filter(
+                        Administrative.id == current.parent_id
+                    ).first()
+                    if parent and parent.level_id:
+                        # Use region level (typically county) for weather
+                        from models.administrative import AdministrativeLevel
+                        level = db.query(AdministrativeLevel).filter(
+                            AdministrativeLevel.id == parent.level_id
+                        ).first()
+                        if level and level.name == 'region':
+                            weather_location = parent.name
+                            break
+                    current = parent
+                    if not current:
+                        break
+
                 # Create weather broadcast for this area
                 weather_broadcast = WeatherBroadcast(
                     administrative_id=admin_id,
-                    location_name=area.name,
+                    location_name=weather_location,
                     status='pending',
                     scheduled_at=datetime.utcnow(),
                 )

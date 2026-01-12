@@ -203,3 +203,83 @@ class TestWeatherRouter:
                 location="Nairobi",
                 language="en",
             )
+
+    # Tests for trigger-broadcast endpoint
+
+    def test_trigger_broadcast_requires_auth(self, client):
+        """Test that trigger endpoint requires authentication"""
+        response = client.post("/api/admin/weather/trigger-broadcast")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_trigger_broadcast_requires_admin(self, client, db_session):
+        """Test that trigger endpoint requires admin role"""
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        hashed_password = pwd_context.hash("testpass123")
+
+        eo_user = User(
+            email="eo_trigger@test.com",
+            phone_number="+1234567897",
+            hashed_password=hashed_password,
+            full_name="EO User",
+            user_type=UserType.EXTENSION_OFFICER,
+            is_active=True,
+        )
+        db_session.add(eo_user)
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/auth/login/",
+            json={"email": "eo_trigger@test.com", "password": "testpass123"},
+        )
+        token = login_response.json()["access_token"]
+
+        response = client.post(
+            "/api/admin/weather/trigger-broadcast",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_trigger_broadcast_success(self, client, db_session):
+        """Test successful weather broadcast trigger"""
+        token = self._create_admin_and_login(client, db_session)
+
+        with patch(
+            "routers.weather.get_weather_broadcast_service"
+        ) as mock_service, patch(
+            "routers.weather.send_weather_broadcasts"
+        ) as mock_task:
+            mock_instance = mock_service.return_value
+            mock_instance.is_configured.return_value = True
+
+            mock_task_result = mock_task.delay.return_value
+            mock_task_result.id = "test-task-id-123"
+
+            response = client.post(
+                "/api/admin/weather/trigger-broadcast",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == status.HTTP_202_ACCEPTED
+            data = response.json()
+            assert data["status"] == "queued"
+            assert data["task_id"] == "test-task-id-123"
+            assert "successfully" in data["message"]
+            mock_task.delay.assert_called_once()
+
+    def test_trigger_broadcast_not_configured(self, client, db_session):
+        """Test trigger fails when service not configured"""
+        token = self._create_admin_and_login(client, db_session)
+
+        with patch(
+            "routers.weather.get_weather_broadcast_service"
+        ) as mock_service:
+            mock_instance = mock_service.return_value
+            mock_instance.is_configured.return_value = False
+
+            response = client.post(
+                "/api/admin/weather/trigger-broadcast",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+            assert "not configured" in response.json()["detail"]
