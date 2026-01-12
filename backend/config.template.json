@@ -73,12 +73,12 @@
 			"log_usage": true
 		}
 	},
-	"crop_types": [
-		"Avocado",
-		"Potato"
-	],
+	"crop_types": ["Avocado", "Potato"],
 	"contact_info": {
 		"name": "Admin",
 		"phone_number": "+1234567891"
+	},
+	"weather": {
+		"broadcast_enabled": true
 	}
 }

@@ -191,6 +191,10 @@ Create a `.env` file based on `.env.example` with the following key variables:
 - `BROADCAST_BATCH_SIZE` - Recipients per batch (default: 50)
 - `BROADCAST_RETRY_INTERVALS` - Retry intervals in minutes (default: 5,15,60)
 
+**Weather Broadcast:**
+- `OPENWEATHER_API_KEY` - OpenWeatherMap API key for weather forecasts
+- Enable in `config.json`: `"weather": { "broadcast_enabled": true }`
+
 See `.env.example` for complete configuration options.
 
 ## Documentation
