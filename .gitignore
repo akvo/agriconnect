@@ -33,3 +33,6 @@ backend/storage/
 # Configuration files
 backend/config.json
 backend/config.test.json
+
+# Internal Notes
+notes/

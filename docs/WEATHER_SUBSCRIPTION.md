@@ -4,7 +4,7 @@
 
 Weather subscription allows farmers to opt-in to receive daily weather forecast messages for their administrative area via WhatsApp.
 
-## Current Status: Phase 2 Complete
+## Current Status: Phase 3 In Progress
 
 ### Phase 1: Message Generation (DONE)
 
@@ -33,7 +33,14 @@ Config.json:
 ```json
 {
   "weather": {
-    "broadcast_enabled": true
+    "broadcast_enabled": true,
+    "intent_keywords": [
+      "weather",
+      "forecast",
+      "weather updates",
+      "hali ya hewa",
+      "hali ya anga"
+    ]
   }
 }
 ```
@@ -107,6 +114,35 @@ WeatherBroadcastRecipient (delivery tracking)
 
 #### Workflow
 
+```mermaid
+sequenceDiagram
+    participant CB as Celery Beat
+    participant WT as Weather Tasks
+    participant OW as OpenWeatherMap
+    participant AI as OpenAI
+    participant WA as WhatsApp
+    participant F as Farmer
+
+    Note over CB: 6 AM UTC Daily
+    CB->>WT: send_weather_broadcasts
+    WT->>WT: Query subscribed farmers by area
+    WT->>WT: Create WeatherBroadcast records
+
+    loop Per Area
+        WT->>OW: Fetch weather data
+        OW-->>WT: Raw forecast
+        WT->>AI: Generate message (EN/SW)
+        AI-->>WT: Farmer-friendly message
+        WT->>WA: Send template to subscribers
+        WA-->>F: "New weather update available"
+    end
+
+    F->>WA: Clicks "Yes" button
+    WA->>WT: Webhook callback
+    WT->>WA: Send actual weather message
+    WA-->>F: Weather forecast details
+```
+
 1. **Daily Task** (`send_weather_broadcasts`) runs at 6 AM UTC via Celery Beat
 2. Queries customers with `weather_subscribed = True` grouped by administrative area
 3. Creates `WeatherBroadcast` record per area
@@ -155,6 +191,63 @@ WeatherBroadcastRecipient (delivery tracking)
 
 ---
 
+### Phase 2.5: Weather Intent Detection (DONE)
+
+Implemented on-demand weather message generation when farmers ask about weather.
+
+#### Key Files
+
+| File | Purpose |
+|------|---------|
+| `services/weather_intent_service.py` | Detects weather keywords and generates weather messages |
+| `tests/test_weather_intent.py` | Weather intent tests |
+
+#### How It Works
+
+```mermaid
+flowchart TD
+    A[Farmer sends message] --> B{Contains weather keyword?}
+    B -->|No| C[Continue normal flow]
+    B -->|Yes| D{Onboarding complete?}
+    D -->|No| C
+    D -->|Yes| E{Has admin area?}
+    E -->|No| C
+    E -->|Yes| F{Has open ticket?}
+    F -->|Yes| C
+    F -->|No| G[Build location path]
+    G --> H[Fetch weather from OpenWeatherMap]
+    H --> I[Generate message via OpenAI]
+    I --> J[Send weather message]
+    J --> K{Already subscribed?}
+    K -->|Yes| L[Done]
+    K -->|No| M[Show subscription buttons]
+    M --> L
+```
+
+1. Farmer sends message containing weather keywords (e.g., "weather updates", "hali ya hewa")
+2. `WeatherIntentService.has_weather_intent()` detects keywords from `config.json`
+3. `WeatherIntentService.can_handle()` checks conditions:
+   - Customer has completed onboarding
+   - Customer has an administrative area assigned
+   - No existing escalated ticket
+4. `WeatherIntentService.handle_weather_intent()`:
+   - Builds full location path from administrative hierarchy (Region, District, Ward)
+   - Generates weather message via `WeatherBroadcastService`
+   - Sends weather message to farmer
+   - Shows subscription buttons if farmer is not already subscribed
+
+#### Re-subscription Flow
+
+Farmers who previously declined weather subscription can re-subscribe:
+1. Farmer messages "weather updates" (or any configured keyword)
+2. System sends current weather for their area
+3. System shows subscription buttons again
+4. Farmer can now subscribe by clicking "Yes"
+
+This allows farmers to change their mind without needing admin intervention.
+
+---
+
 ### Phase 3: Admin Management (Partial)
 
 Admin interface to manage weather broadcasts.
@@ -184,9 +277,29 @@ Response (202 Accepted):
 
 ---
 
-## Existing Subscription Flow
+## Subscription Flow
 
-Already implemented in `weather_subscription_service.py`:
+Implemented in `weather_subscription_service.py` and `weather_intent_service.py`:
+
+```mermaid
+flowchart TD
+    A[Farmer completes onboarding] --> B{Has admin area?}
+    B -->|No| C[No weather subscription offered]
+    B -->|Yes| D[Show subscription question]
+    D --> E{Farmer response}
+    E -->|Yes| F[weather_subscribed = true]
+    E -->|No| G[weather_subscribed = false]
+    F --> H[Receive daily broadcasts]
+    G --> I[No broadcasts]
+    I --> J[Farmer messages 'weather updates']
+    J --> K[Send current weather]
+    K --> L[Show subscription buttons again]
+    L --> M{Farmer response}
+    M -->|Yes| F
+    M -->|No| I
+```
+
+### Initial Subscription (After Onboarding)
 
 1. After onboarding completion + admin area assignment
 2. System asks: "Would you like to receive daily weather updates for {area_name}?"
@@ -194,6 +307,15 @@ Already implemented in `weather_subscription_service.py`:
 4. Preference stored in `customer.profile_data`:
    - `weather_subscription_asked: bool`
    - `weather_subscribed: bool | null`
+
+### Re-subscription (After Decline)
+
+Farmers who declined can subscribe later:
+
+1. Farmer sends message with weather keyword (e.g., "weather updates")
+2. System generates and sends current weather for their area
+3. System shows subscription buttons again
+4. Farmer clicks "Yes" to subscribe
 
 Button payloads configured in `config.py`:
 - `weather_yes_payload`: "weather_yes"

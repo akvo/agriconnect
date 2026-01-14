@@ -192,8 +192,17 @@ Create a `.env` file based on `.env.example` with the following key variables:
 - `BROADCAST_RETRY_INTERVALS` - Retry intervals in minutes (default: 5,15,60)
 
 **Weather Broadcast:**
-- `OPENWEATHER_API_KEY` - OpenWeatherMap API key for weather forecasts
-- Enable in `config.json`: `"weather": { "broadcast_enabled": true }`
+- `OPENWEATHER` - OpenWeatherMap API key for weather forecasts
+- Enable in `config.json`:
+  ```json
+  {
+    "weather": {
+      "broadcast_enabled": true,
+      "intent_keywords": ["weather", "forecast", "weather updates", "hali ya hewa", "hali ya anga"]
+    }
+  }
+  ```
+- `intent_keywords` - Keywords that trigger on-demand weather messages from farmers
 
 See `.env.example` for complete configuration options.
 
@@ -203,6 +212,7 @@ Additional documentation is available in the `docs/` directory:
 
 - **[Broadcast API Core Implementation](docs/BROADCAST_API_CORE_IMPLEMENTATION.md)**: Broadcast messaging system architecture and implementation guide
 - **[Broadcast API Twilio Integration](docs/BROADCAST_API_TWILIO_INTEGRATION.md)**: Twilio WhatsApp integration and Celery task queue setup
+- **[Weather Subscription](docs/WEATHER_SUBSCRIPTION.md)**: Weather broadcast feature, subscription flow, and intent detection
 - **[Deployment Pipeline](docs/DEPLOYMENT_PIPELINE.md)**: CI/CD pipeline architecture, Kubernetes deployment, and troubleshooting guide
 - **[Mobile App Deployment](docs/MOBILE_APP_DEPLOYMENT.md)**: Complete guide for building and deploying the mobile app using EAS Build and GitHub Actions
 - **[Push Notifications](docs/PUSH_NOTIFICATIONS.md)**: Push notification setup, architecture, and troubleshooting guide for mobile app
