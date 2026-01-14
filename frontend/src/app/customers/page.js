@@ -202,7 +202,7 @@ export default function CustomersPage() {
                 </p>
               </div>
               <div className="mt-4 sm:mt-0">
-                {user.role === "admin" && (
+                {user.user_type === "admin" && (
                   <button
                     onClick={handleCreateCustomer}
                     className="bg-green-600 text-white px-4 py-2 text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer transition-colors duration-200"

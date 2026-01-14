@@ -118,7 +118,7 @@ export default function CustomerList({
             <PencilIcon className="w-4 h-4 mr-1" />
             Edit
           </button>
-          {user?.role === "admin" && (
+          {user?.user_type === "admin" && (
             <button
               onClick={() => onDeleteCustomer(customer)}
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-[5px] text-sm font-semibold transition-all duration-200 flex items-center cursor-pointer"
