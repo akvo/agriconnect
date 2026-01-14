@@ -10,6 +10,7 @@ from database import SessionLocal
 from models.customer import Customer, OnboardingStatus
 from models.administrative import CustomerAdministrative
 from models.message import Message
+from models.ticket import Ticket
 from models.weather_broadcast import WeatherBroadcastRecipient
 
 
@@ -48,9 +49,13 @@ def main():
         db.query(CustomerAdministrative).filter(
             CustomerAdministrative.customer_id == customer.id
         ).delete()
-        # Delete weather broadcast recipients first (foreign key to messages)
+        # Delete weather broadcast recipients (foreign key to messages)
         db.query(WeatherBroadcastRecipient).filter(
             WeatherBroadcastRecipient.customer_id == customer.id
+        ).delete()
+        # Delete tickets (foreign key to messages)
+        db.query(Ticket).filter(
+            Ticket.customer_id == customer.id
         ).delete()
         # Delete all messages for this customer (makes them "new" again)
         message_count = db.query(Message).filter(
