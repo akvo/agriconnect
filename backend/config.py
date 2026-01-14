@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -257,6 +257,10 @@ class Settings(BaseSettings):
     # Weather broadcast feature flag
     weather_broadcast_enabled: bool = _config.get("weather", {}).get(
         "broadcast_enabled", False
+    )
+    # Keywords for detecting weather-related messages
+    weather_intent_keywords: List[str] = _config.get("weather", {}).get(
+        "intent_keywords", ["weather", "forecast", "hali ya hewa"]
     )
 
     @property

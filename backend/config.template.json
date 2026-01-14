@@ -79,6 +79,13 @@
 		"phone_number": "+1234567891"
 	},
 	"weather": {
-		"broadcast_enabled": true
+		"broadcast_enabled": true,
+		"intent_keywords": [
+			"weather",
+			"forecast",
+			"weather updates",
+			"hali ya hewa",
+			"hali ya anga"
+		]
 	}
 }

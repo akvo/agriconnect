@@ -9,6 +9,8 @@ import argparse
 from database import SessionLocal
 from models.customer import Customer, OnboardingStatus
 from models.administrative import CustomerAdministrative
+from models.message import Message
+from models.weather_broadcast import WeatherBroadcastRecipient
 
 
 def main():
@@ -46,11 +48,20 @@ def main():
         db.query(CustomerAdministrative).filter(
             CustomerAdministrative.customer_id == customer.id
         ).delete()
+        # Delete weather broadcast recipients first (foreign key to messages)
+        db.query(WeatherBroadcastRecipient).filter(
+            WeatherBroadcastRecipient.customer_id == customer.id
+        ).delete()
+        # Delete all messages for this customer (makes them "new" again)
+        message_count = db.query(Message).filter(
+            Message.customer_id == customer.id
+        ).delete()
         db.commit()
         print(
             f"Reset onboarding status for customer "
             f"{phone_number} to 'not_started'."
         )
+        print(f"Deleted {message_count} messages.")
         return
     # If no phone number is provided, print message and exit
     print(
