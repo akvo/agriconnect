@@ -412,11 +412,11 @@ async def whatsapp_webhook(
             or Body.lower().strip() in ["2", "no", "hapana"]
         )
 
-        # Only process if customer was asked about weather subscription
-        # and hasn't responded yet
+        # Process if customer was asked about weather subscription
+        # and is not already subscribed (allows re-subscription after decline)
         if (
             customer.weather_subscription_asked
-            and customer.weather_subscribed is None
+            and customer.weather_subscribed is not True
             and (is_weather_yes or is_weather_no)
         ):
             logger.info(
@@ -445,6 +445,14 @@ async def whatsapp_webhook(
 
             whatsapp_service = WhatsAppService()
             whatsapp_service.send_message(phone_number, response_msg)
+
+            # Send welcome message after weather question (new customers only)
+            # This completes the onboarding flow with a helpful prompt
+            if is_new_customer:
+                try:
+                    whatsapp_service.send_welcome_message(phone_number, lang)
+                except Exception as e:
+                    logger.error(f"Failed to send welcome message: {e}")
 
             return {
                 "status": "success",
@@ -615,6 +623,52 @@ async def whatsapp_webhook(
                 db.commit()
 
         # ========================================
+        # FLOW 2E: Handle weather intent from farmers
+        # If farmer asks about weather and has an admin area,
+        # generate and send weather message directly (no external AI)
+        # ========================================
+        from services.weather_intent_service import get_weather_intent_service
+
+        weather_intent_service = get_weather_intent_service(db)
+
+        has_existing_ticket = bool(existing_ticket)
+        has_weather = weather_intent_service.has_weather_intent(Body)
+        can_handle = weather_intent_service.can_handle(
+            customer, has_existing_ticket
+        )
+        if has_weather and can_handle:
+            logger.info(
+                f"Weather intent detected from {phone_number}: {Body[:50]}..."
+            )
+
+            # Create message record for the farmer's question
+            message = Message(
+                message_sid=MessageSid,
+                customer_id=customer.id,
+                body=Body,
+                from_source=MessageFrom.CUSTOMER,
+                status=MessageStatus.PENDING,
+                media_url=media_url,
+                media_type=media_type,
+            )
+            db.add(message)
+            db.commit()
+            db.refresh(message)
+
+            # Handle weather intent using the service
+            result = await weather_intent_service.handle_weather_intent(
+                customer=customer,
+                phone_number=phone_number,
+            )
+
+            if result.handled:
+                return {
+                    "status": "success",
+                    "message": result.message,
+                }
+            # Fall through to regular message handling if not handled
+
+        # ========================================
         # FLOW 1: Regular message
         # Check if customer has existing unresolved ticket to determine:
         # - Existing ticket → WHISPER (no auto-reply)
@@ -779,7 +833,13 @@ async def whatsapp_webhook(
             # The message will still be stored and accessible via API
 
         # Send welcome message for new customers
-        if is_new_customer:
+        # Only send if customer hasn't completed onboarding yet
+        # (onboarding doesn't create Message records, so is_new_customer
+        # may be True even after onboarding)
+        if (
+            is_new_customer
+            and customer.onboarding_status != OnboardingStatus.COMPLETED
+        ):
             try:
                 whatsapp_service = WhatsAppService()
                 language_code = customer.language.value
