@@ -1081,6 +1081,17 @@ Birth year must be between 1900 and {current_year}."""
             scores.append(province_score)
             weights.append(1)
 
+        # Fallback: if no structured fields, try matching full_text against
+        # ward name directly (handles typos like "Ithnga" -> "Ithanga")
+        if not scores and location.full_text:
+            # Extract just the ward name without suffix for better matching
+            db_ward_name = db_ward.lower().replace(" ward", "").strip()
+            full_text_lower = location.full_text.lower().strip()
+            # Use partial_ratio for better substring/typo matching
+            fallback_score = fuzz.partial_ratio(full_text_lower, db_ward_name)
+            scores.append(fallback_score)
+            weights.append(3)
+
         if not scores:
             return 0.0
 
