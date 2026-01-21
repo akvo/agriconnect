@@ -1091,11 +1091,13 @@ Birth year must be between 1900 and {current_year}."""
 
         return final_score
 
-    def find_matching_wards(
+    def find_lowest_administrative_location(
         self, location: LocationData
     ) -> List[MatchCandidate]:
         """
-        Find matching wards using hierarchical fuzzy matching.
+        Find matching locations at lowest admin level using fuzzy matching.
+
+        Dynamically determines the lowest level from admin_level_order.
 
         Args:
             location: Extracted location data
@@ -1103,26 +1105,29 @@ Birth year must be between 1900 and {current_year}."""
         Returns:
             List of match candidates sorted by score (descending)
         """
-        # Get all wards
-        all_wards = (
+        # Get lowest level dynamically from config
+        lowest_level = self.admin_level_order[-1]
+
+        # Get all areas at lowest level
+        all_areas = (
             self.db.query(Administrative)
             .join(Administrative.level)
-            .filter(Administrative.level.has(name="ward"))
+            .filter(Administrative.level.has(name=lowest_level))
             .all()
         )
 
-        # Calculate scores for each ward
+        # Calculate scores for each area
         candidates = []
-        for ward in all_wards:
-            score = self._calculate_hierarchical_score(location, ward)
+        for area in all_areas:
+            score = self._calculate_hierarchical_score(location, area)
 
             if score >= self.match_threshold:
                 candidates.append(
                     MatchCandidate(
-                        id=ward.id,
-                        name=ward.name,
-                        path=ward.path,
-                        level="ward",
+                        id=area.id,
+                        name=area.name,
+                        path=area.path,
+                        level=lowest_level,
                         score=round(score, 2),
                     )
                 )
@@ -1131,8 +1136,8 @@ Birth year must be between 1900 and {current_year}."""
         candidates.sort(key=lambda c: c.score, reverse=True)
 
         logger.info(
-            f"[OnboardingService] Found {len(candidates)} matching wards "
-            f"(threshold: {self.match_threshold})"
+            f"[OnboardingService] Found {len(candidates)} matching "
+            f"{lowest_level}s (threshold: {self.match_threshold})"
         )
 
         return candidates
@@ -1275,19 +1280,15 @@ Birth year must be between 1900 and {current_year}."""
 
         Updates customer state to track current field.
         For optional fields, indicates that user can skip.
-        For administration field, starts hierarchical selection.
+        For administration field, asks free-text question first
+        (fuzzy match), with hierarchical selection as fallback.
         """
         field_name = field_config.field_name
 
-        # Special case: administration uses hierarchical selection
-        if field_name == "administration":
-            customer.onboarding_status = OnboardingStatus.IN_PROGRESS
-            self.db.commit()
-            logger.info(
-                f"Starting hierarchical location selection "
-                f"for customer {customer.id}"
-            )
-            return self._start_hierarchical_selection(customer)
+        # Note: administration no longer has special handling here.
+        # It uses the normal free-text question flow first.
+        # If fuzzy match fails, _handle_location_field() falls back
+        # to hierarchical selection.
 
         customer.current_onboarding_field = field_config.field_name
         customer.onboarding_status = OnboardingStatus.IN_PROGRESS
@@ -1335,24 +1336,16 @@ Birth year must be between 1900 and {current_year}."""
         Extract and process field value from farmer's message.
 
         Generic handler for any field type:
-        - location: Extract → Fuzzy match → Handle ambiguity/no match
+        - location: Extract → Fuzzy match → Fallback to hierarchical
         - string: Extract → Validate → Save
         - enum: Extract → Validate → Save
         - integer: Extract → Validate → Save
         """
         field_name = field_config.field_name
 
-        # Special case: administration uses hierarchical selection
-        # If no hierarchical state exists yet, start hierarchical selection
-        if field_name == "administration":
-            state = self._get_admin_hierarchy_state(customer)
-            if state["level"] is None:
-                # No hierarchical state - start fresh
-                logger.info(
-                    f"Starting hierarchical selection for customer "
-                    f"{customer.id} (from _process_field_value)"
-                )
-                return self._start_hierarchical_selection(customer)
+        # Note: administration no longer has special early redirect here.
+        # It uses normal extraction flow calling _handle_location_field().
+        # If fuzzy match fails, it starts hierarchical selection as fallback.
 
         # Check if user wants to skip (only for optional fields)
         if not field_config.required and message.lower().strip() in [
@@ -1485,24 +1478,26 @@ Birth year must be between 1900 and {current_year}."""
         location: LocationData,
         field_config: OnboardingFieldConfig,
     ) -> OnboardingResponse:
-        """Handle administration location field with fuzzy matching."""
-        # Get customer language
-        lang = customer.language.value if customer.language else "en"
+        """
+        Handle administration location field with fuzzy matching.
 
-        # Find matching wards
-        candidates = self.find_matching_wards(location)
+        Flow:
+        1. Try fuzzy match at lowest administrative level
+        2. If clear match → save directly
+        3. If ambiguous matches → show options
+        4. If no matches → fall back to hierarchical selection
+        """
+        # Find matching locations at lowest level
+        candidates = self.find_lowest_administrative_location(location)
 
         if not candidates:
-            # No match found
-            return OnboardingResponse(
-                message=t(
-                    "onboarding.administration.no_match",
-                    lang,
-                    input=location.full_text,
-                ),
-                status="in_progress",
-                attempts=self._get_attempts(customer, field_config.field_name),
+            # No match found - fall back to hierarchical selection
+            logger.info(
+                f"No fuzzy match found for '{location.full_text}', "
+                f"falling back to hierarchical selection for customer "
+                f"{customer.id}"
             )
+            return self._start_hierarchical_selection(customer)
 
         # Check for ambiguity
         if self._is_ambiguous(candidates):
@@ -2022,8 +2017,8 @@ Birth year must be between 1900 and {current_year}."""
                 extracted_location=location,
             )
 
-        # Find matching wards
-        candidates = self.find_matching_wards(location)
+        # Find matching locations at lowest level
+        candidates = self.find_lowest_administrative_location(location)
 
         if not candidates:
             # No matches found

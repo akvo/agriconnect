@@ -334,31 +334,35 @@ class TestOnboardingService:
         # Should be 100 since ward matches exactly
         assert score == 100.0
 
-    def test_find_matching_wards(
+    def test_find_lowest_administrative_location(
         self, db_session, onboarding_service, sample_administrative_data
     ):
-        """Test finding matching wards"""
+        """Test finding matching locations at lowest level"""
         location = LocationData(
             province="Nairobi Region",
             district="Central District",
             ward="Westlands Ward",
         )
 
-        candidates = onboarding_service.find_matching_wards(location)
+        candidates = onboarding_service.find_lowest_administrative_location(
+            location
+        )
 
         # Should find at least the exact match
         assert len(candidates) > 0
         assert candidates[0].name == "Westlands Ward"
         assert candidates[0].score == 100.0
 
-    def test_find_matching_wards_ambiguous(
+    def test_find_lowest_administrative_location_ambiguous(
         self, db_session, onboarding_service, sample_administrative_data
     ):
-        """Test finding matching wards with ambiguous input"""
+        """Test finding matching locations with ambiguous input"""
         # Only ward name, no district/province - should match both Westlands
         location = LocationData(ward="Westlands Ward")
 
-        candidates = onboarding_service.find_matching_wards(location)
+        candidates = onboarding_service.find_lowest_administrative_location(
+            location
+        )
 
         # Should find both Westlands wards
         assert len(candidates) >= 2
