@@ -17,6 +17,7 @@ from models.customer import (
 from models.ticket import Ticket
 from models.message import Message
 from models.broadcast import BroadcastGroupContact, BroadcastRecipient
+from models.weather_broadcast import WeatherBroadcastRecipient
 from datetime import datetime, timezone
 
 
@@ -191,7 +192,7 @@ class CustomerService:
         return CustomerLanguage.EN
 
     def delete_customer(self, customer_id: int) -> bool:
-        """Delete a customer and all associated messages."""
+        """Delete a customer and all associated data."""
         customer = (
             self.db.query(Customer).filter(Customer.id == customer_id).first()
         )
@@ -215,11 +216,16 @@ class CustomerService:
             self.db.query(BroadcastGroupContact).filter(
                 BroadcastGroupContact.customer_id == customer_id
             ).delete(synchronize_session=False)
+            # Delete associated WeatherBroadcastRecipients
+            # (must be before Messages due to message_id FK)
+            self.db.query(WeatherBroadcastRecipient).filter(
+                WeatherBroadcastRecipient.customer_id == customer_id
+            ).delete(synchronize_session=False)
             # Delete associated Messages
             self.db.query(Message).filter(
                 Message.customer_id == customer_id
             ).delete(synchronize_session=False)
-            # Delete the customer (messages will be cascaded if configured)
+            # Delete the customer
             self.db.delete(customer)
             self.db.commit()
             return True
