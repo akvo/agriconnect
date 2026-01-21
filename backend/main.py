@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from routers import (
+    admin_analytics,
     admin_users,
     admin_playground,
     administrative,
@@ -93,6 +94,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(auth.router, prefix="/api")
+app.include_router(admin_analytics.router, prefix="/api")
 app.include_router(admin_users.router, prefix="/api")
 app.include_router(admin_playground.router, prefix="/api")
 app.include_router(administrative.router, prefix="/api")

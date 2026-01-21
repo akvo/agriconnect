@@ -1,6 +1,9 @@
+import enum
+
 from sqlalchemy import (
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -8,6 +11,16 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
+
+
+class TicketTag(enum.IntEnum):
+    """Tag categories for ticket classification"""
+    FERTILIZER = 1
+    PEST = 2
+    PRE_PLANTING = 3
+    HARVESTING = 4
+    IRRIGATION = 5
+    OTHER = 6
 
 
 class Ticket(Base):
@@ -28,6 +41,8 @@ class Ticket(Base):
     )
     resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
+    tag = Column(Integer, nullable=True)  # TicketTag enum value
+    tag_confidence = Column(Float, nullable=True)  # AI confidence 0.0-1.0
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
