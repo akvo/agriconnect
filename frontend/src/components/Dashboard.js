@@ -165,8 +165,9 @@ export default function Dashboard() {
               </>
             )}
 
-            <button
-              className="group bg-gradient-to-br from-orange-50 to-orange-100 p-6 text-left hover:from-orange-100 hover:to-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md"
+            <Link
+              href="/analytics"
+              className="group bg-gradient-to-br from-orange-50 to-orange-100 p-6 text-left hover:from-orange-100 hover:to-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-300 block cursor-pointer shadow-sm hover:shadow-md"
               style={{ borderRadius: "5px" }}
             >
               <div className="flex items-center mb-4">
@@ -176,16 +177,18 @@ export default function Dashboard() {
                 >
                   <ChartBarIcon className="w-5 h-5 text-white" />
                 </div>
-                <div className="text-orange-700 font-bold text-lg">Reports</div>
+                <div className="text-orange-700 font-bold text-lg">
+                  Analytics
+                </div>
               </div>
               <div className="text-secondary-600 text-sm leading-relaxed">
-                View detailed activity reports, analytics, and system insights
+                View ticket analytics, category distribution, and support trends
               </div>
               <div className="mt-4 flex items-center text-orange-600 text-sm font-semibold group-hover:text-orange-700">
-                <span>View Reports</span>
+                <span>View Analytics</span>
                 <ChevronRightIcon className="ml-2 w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-200" />
               </div>
-            </button>
+            </Link>
           </div>
         </div>
 
