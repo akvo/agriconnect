@@ -21,6 +21,7 @@ from schemas.ticket import (
 )
 from utils.auth_dependencies import get_current_user
 from services.socketio_service import emit_ticket_resolved
+from services.tagging_service import classify_ticket, get_tag_name
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -117,6 +118,8 @@ def _serialize_ticket(
             ticket.resolved_at.isoformat() if ticket.resolved_at else None
         ),
         "resolver": resolver,
+        "tag": get_tag_name(ticket.tag) if ticket.tag else None,
+        "tag_confidence": ticket.tag_confidence,
     }
 
 
@@ -465,6 +468,34 @@ async def mark_ticket_resolved(
     ticket.resolved_at = resolved_dt
     ticket.resolved_by = current_user.id
     ticket.updated_at = datetime.utcnow()
+
+    # Auto-tag the ticket using AI
+    # Fetch conversation messages for classification
+    ticket_message = ticket.message
+    msgs_query = db.query(Message).filter(
+        Message.customer_id == ticket.customer_id
+    )
+    if ticket_message and ticket_message.created_at:
+        msgs_query = msgs_query.filter(
+            Message.created_at >= ticket_message.created_at,
+        )
+    msgs = msgs_query.order_by(Message.created_at.asc()).limit(50).all()
+
+    # Build message list for tagging
+    messages_for_tagging = [
+        {
+            "body": m.body,
+            "from_source": get_from_source_string(m.from_source),
+        }
+        for m in msgs
+    ]
+
+    # Classify the ticket
+    tagging_result = await classify_ticket(messages_for_tagging)
+    if tagging_result:
+        ticket.tag = tagging_result.tag.value
+        ticket.tag_confidence = tagging_result.confidence
+
     db.commit()
     db.refresh(ticket)
 

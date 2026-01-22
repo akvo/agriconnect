@@ -36,6 +36,8 @@ class TicketModel(BaseModel):
     created_at: Optional[datetime]
     resolved_at: Optional[datetime]
     resolver: Optional[Any]
+    tag: Optional[str] = None
+    tag_confidence: Optional[float] = None
 
 
 class TicketCreate(BaseModel):
