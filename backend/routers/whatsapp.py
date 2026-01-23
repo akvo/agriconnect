@@ -403,13 +403,22 @@ async def whatsapp_webhook(
         weather_no_payload = settings.weather_no_payload
 
         # Check for button payload OR text responses
+        # NOTE: Text responses like "yes"/"no" should only be checked when
+        # ButtonPayload is None to avoid conflicts with other buttons
+        # (e.g., escalate button with "Yes" text triggering weather sub)
         is_weather_yes = (
             ButtonPayload == weather_yes_payload
-            or Body.lower().strip() in ["1", "yes", "ndiyo"]
+            or (
+                ButtonPayload is None
+                and Body.lower().strip() in ["1", "yes", "ndiyo"]
+            )
         )
         is_weather_no = (
             ButtonPayload == weather_no_payload
-            or Body.lower().strip() in ["2", "no", "hapana"]
+            or (
+                ButtonPayload is None
+                and Body.lower().strip() in ["2", "no", "hapana"]
+            )
         )
 
         # Process if customer was asked about weather subscription
