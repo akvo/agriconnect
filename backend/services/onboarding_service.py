@@ -106,10 +106,16 @@ class OnboardingService:
         Find the next field that needs to be collected (by priority order).
 
         Checks all required fields first, then optional fields.
+        If consent was asked but not given, returns None (wait for consent).
 
         Returns:
             OnboardingFieldConfig for next field, or None if all fields done
         """
+        # If consent was asked but not given, don't proceed
+        # (consent response is handled in whatsapp router)
+        if customer.data_consent_asked and not customer.data_consent_given:
+            return None  # Wait for consent
+
         # First check required fields
         for field_config in self.fields_config:
             if field_config.required and not self._is_field_complete(
@@ -1722,6 +1728,22 @@ Birth year must be between 1900 and {current_year}."""
             logger.info(
                 f"Saved {field_name} for customer {customer.id}: {value}"
             )
+
+            # After language is saved, ask for consent if not given
+            if field_name == "language" and not customer.data_consent_given:
+                # Mark consent as asked
+                customer.data_consent_asked = True
+                self.db.commit()
+
+                # Return consent question
+                consent_question = t("consent.data_sharing.question", lang)
+                combined_message = f"{success_msg}\n\n{consent_question}"
+
+                return OnboardingResponse(
+                    message=combined_message,
+                    status="awaiting_consent",
+                    attempts=0,
+                )
 
             # Check if there are more fields
             next_field = self._get_next_incomplete_field(customer)

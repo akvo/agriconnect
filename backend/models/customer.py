@@ -144,6 +144,25 @@ class Customer(Base):
     def weather_subscribed(self, value: bool | None):
         self.set_profile_field("weather_subscribed", value)
 
+    # Data consent properties
+    @property
+    def data_consent_asked(self) -> bool:
+        """Check if data consent question was asked."""
+        return self.get_profile_field("data_consent_asked", False)
+
+    @data_consent_asked.setter
+    def data_consent_asked(self, value: bool):
+        self.set_profile_field("data_consent_asked", value)
+
+    @property
+    def data_consent_given(self) -> bool | None:
+        """Data consent status: True=consented, None=not asked."""
+        return self.get_profile_field("data_consent_given", None)
+
+    @data_consent_given.setter
+    def data_consent_given(self, value: bool | None):
+        self.set_profile_field("data_consent_given", value)
+
     def needs_reconnection_template(self, threshold_hours: int = 24) -> bool:
         """
         Check if customer needs reconnection template.

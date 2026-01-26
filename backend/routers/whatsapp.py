@@ -198,6 +198,49 @@ async def whatsapp_webhook(
         )
 
         # ========================================
+        # DATA CONSENT CHECK (after language, before other fields)
+        # ========================================
+        # Handle consent response if consent was asked (language already set)
+        if (
+            customer.data_consent_asked
+            and not customer.data_consent_given
+            and customer.language is not None
+        ):
+            from utils.i18n import t
+
+            whatsapp_service = WhatsAppService()
+            lang = customer.language.value
+
+            # Check for affirmative response
+            consent_responses = [
+                "yes", "ok", "okay", "ndio", "ndiyo", "sawa", "agree",
+                "i agree", "accepted", "accept", "kubali", "nakubali"
+            ]
+            if Body.lower().strip() in consent_responses:
+                # Consent given - mark and continue to onboarding
+                customer.data_consent_given = True
+                db.commit()
+
+                whatsapp_service.send_message(
+                    phone_number, t("consent.data_sharing.accepted", lang)
+                )
+                # Fall through to continue onboarding
+            else:
+                # Not affirmative - send decline message and DELETE customer
+                whatsapp_service.send_message(
+                    phone_number, t("consent.data_sharing.declined", lang)
+                )
+
+                # Delete customer row (fresh start on next message)
+                db.delete(customer)
+                db.commit()
+
+                return {
+                    "status": "success",
+                    "message": "Consent declined, customer deleted"
+                }
+
+        # ========================================
         # GENERIC ONBOARDING: Collect all required profile fields
         # ========================================
         onboarding_service = get_onboarding_service(db)
@@ -237,6 +280,7 @@ async def whatsapp_webhook(
             if onboarding_response.status in [
                 OnboardingStatus.IN_PROGRESS.value,
                 "awaiting_selection",
+                "awaiting_consent",
             ]:
                 return {
                     "status": "success",
