@@ -420,6 +420,40 @@ trans: Dict[str, Any] = {
             ),
         },
     },
+    "consent": {
+        "data_sharing": {
+            "question": {
+                "en": (
+                    "Your data will be shared with Murang'a County and GODAN "
+                    "for compliance with the ASTGS DTTI storage and program "
+                    "monitoring.\n\n"
+                    "Reply 'Yes' to accept and continue."
+                ),
+                "sw": (
+                    "Data yako itashirikiwa na Kaunti ya Murang'a na GODAN "
+                    "kwa kufuata sheria za ASTGS DTTI na ufuatiliaji wa "
+                    "programu.\n\n"
+                    "Jibu 'Ndiyo' kukubali na kuendelea."
+                ),
+            },
+            "accepted": {
+                "en": "Thank you for your consent!",
+                "sw": "Asante kwa idhini yako!",
+            },
+            "declined": {
+                "en": (
+                    "We understand. Unfortunately, we cannot proceed without "
+                    "your consent to data sharing. If you change your mind, "
+                    "please message us again."
+                ),
+                "sw": (
+                    "Tunaelewa. Kwa bahati mbaya, hatuwezi kuendelea bila "
+                    "idhini yako ya kushiriki data. Ukibadili mawazo, "
+                    "tafadhali tutumie ujumbe tena."
+                ),
+            },
+        },
+    },
 }
 
 
