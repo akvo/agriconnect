@@ -208,6 +208,26 @@ class Settings(BaseSettings):
         .get("enabled", False)
     )
 
+    # Follow-up question settings
+    follow_up_enabled: bool = (
+        _config.get("openai", {})
+        .get("features", {})
+        .get("follow_up", {})
+        .get("enabled", True)
+    )
+    follow_up_temperature: float = (
+        _config.get("openai", {})
+        .get("features", {})
+        .get("follow_up", {})
+        .get("temperature", 0.7)
+    )
+    follow_up_max_tokens: int = (
+        _config.get("openai", {})
+        .get("features", {})
+        .get("follow_up", {})
+        .get("max_tokens", 150)
+    )
+
     # Redis Configuration (for Celery broker)
     redis_host: str = os.getenv("REDIS_HOST", "redis")
     redis_port: int = int(os.getenv("REDIS_PORT", "6379"))

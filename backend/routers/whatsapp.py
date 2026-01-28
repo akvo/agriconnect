@@ -31,6 +31,7 @@ from services.twilio_status_service import TwilioStatusService
 from services.socketio_service import emit_message_received
 from services.onboarding_service import get_onboarding_service
 from services.openai_service import get_openai_service
+from services.follow_up_service import get_follow_up_service
 from schemas.callback import TwilioStatusCallback, TwilioMessageStatus
 from models.broadcast import BroadcastRecipient
 from tasks.broadcast_tasks import send_actual_message
@@ -854,6 +855,32 @@ async def whatsapp_webhook(
                 .limit(reply_history_limit)
                 .all()
             )
+
+            # Check if we should ask a follow-up question first
+            if settings.follow_up_enabled and not os.getenv("TESTING"):
+                follow_up_service = get_follow_up_service(db)
+
+                should_ask = follow_up_service.should_ask_follow_up(
+                    customer, chat_history
+                )
+                if should_ask:
+                    follow_up_message = await follow_up_service.ask_follow_up(
+                        customer=customer,
+                        original_message=message,
+                        phone_number=phone_number,
+                    )
+                    if follow_up_message:
+                        # Update reconnection tracking
+                        if not is_new_customer:
+                            reconnection_service = ReconnectionService(db)
+                            reconnection_service.update_customer_last_message(
+                                customer_id=customer.id,
+                                from_source=MessageFrom.LLM
+                            )
+                        return {
+                            "status": "success",
+                            "message": "Follow-up question sent"
+                        }
 
             # Format chat history
             chats = []
