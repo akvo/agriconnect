@@ -242,6 +242,7 @@ AgriConnect includes a **direct OpenAI API integration** for features that requi
 - **Content moderation** - Check messages for policy violations
 - **Structured data extraction** - Extract information from queries
 - **Text embeddings** - Semantic search and similarity
+- **Follow-up questions** - Generate contextual clarifying questions before external AI
 
 **Configuration:**
 - API key stored in `.env` file (`OPENAI_API_KEY`)
@@ -287,6 +288,33 @@ if moderation.flagged:
 - **Direct API**: OpenAI API calls (not external RAG service)
 - **Configuration**: Environment variable + config.json (not database)
 - **Use Cases**: Speech-to-text, moderation, general AI tasks (not KB-based chat or WHISPER suggestions)
+
+### Follow-Up Question System
+
+Before sending a customer's question to external AI in REPLY mode, the system asks ONE contextual follow-up question using internal OpenAI.
+
+**Purpose:**
+- Gather more context before engaging external AI
+- Improve AI response quality with better information
+- Ask clarifying questions about the specific problem, crop, duration, or steps taken
+
+**How it works:**
+1. Customer sends a question (no existing ticket, onboarding completed)
+2. System generates a follow-up question via internal OpenAI
+3. Follow-up is sent to customer and stored with `MessageType.FOLLOW_UP`
+4. Customer responds → conversation proceeds to external AI
+5. Follow-up asked once per conversation (tracked via MessageType)
+6. After ticket closure, new conversation gets a new follow-up
+
+**Configuration:**
+- Enable/disable via `config.json` → `openai.features.follow_up.enabled`
+- Temperature and max_tokens configurable
+
+**Detection Logic:**
+- No follow-up if `MessageType.FOLLOW_UP` already in history AND no ticket resolved after it
+- New follow-up if ticket was resolved after the last follow-up (new conversation)
+
+**Service Location:** `/backend/services/follow_up_service.py`
 
 ## Development Workflow
 
