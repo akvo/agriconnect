@@ -174,6 +174,19 @@ function MyComponent() {
 - **JWT-based authentication**
 - **Twilio WhatsApp integration** for messaging
 - **Email notification system**
+
+### WhatsApp Customer Commands
+
+Customers can trigger actions by sending specific keywords via WhatsApp:
+
+| Command | Keywords | Description |
+|---------|----------|-------------|
+| Delete Account | `delete`, `futa` | Request account deletion (requires confirmation) |
+| Weather Forecast | `weather`, `hali ya hewa` | Get weather forecast for your area |
+
+See detailed documentation:
+- [Customer Account Deletion](./docs/CUSTOMER_ACCOUNT_DELETION.md)
+- [Weather Subscription](./docs/WEATHER_SUBSCRIPTION.md)
 - **External AI service integration** - service-agnostic, database-driven configuration
 - **Service token management** for external AI services (stored in `service_tokens` table)
 - **Webhook callbacks** for real-time updates (AI/KB callbacks do not require authentication)
