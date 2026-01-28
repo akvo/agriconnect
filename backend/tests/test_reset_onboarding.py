@@ -2,9 +2,8 @@
 Tests for reset_onboarding script.
 
 Tests cover:
-- Resetting specific customer by phone number
-- Clearing all onboarding data fields
-- Deleting administrative associations
+- Deleting specific customer by phone number
+- Deleting all associated data (administrative, messages, tickets, etc.)
 - Error handling for non-existent customers
 - Argument parsing and validation
 """
@@ -19,6 +18,7 @@ from models.administrative import (
     AdministrativeLevel,
     CustomerAdministrative,
 )
+from models.message import Message, MessageFrom, MessageStatus
 from seeder.reset_onboarding import main
 
 
@@ -46,12 +46,20 @@ class TestResetOnboardingScript:
 
         yield customer
 
-        # Cleanup
-        db_session.query(CustomerAdministrative).filter(
-            CustomerAdministrative.customer_id == customer.id
-        ).delete()
-        db_session.query(Customer).filter(Customer.id == customer.id).delete()
-        db_session.commit()
+        # Cleanup (if customer still exists)
+        existing = (
+            db_session.query(Customer)
+            .filter(Customer.id == customer.id)
+            .first()
+        )
+        if existing:
+            db_session.query(CustomerAdministrative).filter(
+                CustomerAdministrative.customer_id == customer.id
+            ).delete()
+            db_session.query(Customer).filter(
+                Customer.id == customer.id
+            ).delete()
+            db_session.commit()
 
     @pytest.fixture
     def administrative_area(self, db_session):
@@ -82,16 +90,12 @@ class TestResetOnboardingScript:
         ).delete()
         db_session.commit()
 
-    def test_reset_specific_customer_clears_all_fields(
-        self, customer, db_session, capsys
-    ):
-        """Test resetting specific customer clears all onboarding fields"""
-        # Verify customer has data before reset
+    def test_delete_specific_customer(self, customer, db_session, capsys):
+        """Test deleting specific customer removes the customer"""
+        customer_id = customer.id
+
+        # Verify customer exists before deletion
         assert customer.full_name == "John Farmer"
-        assert customer.language == CustomerLanguage.EN
-        assert customer.profile_data is not None
-        assert customer.onboarding_attempts == 3
-        assert customer.onboarding_status == OnboardingStatus.COMPLETED
 
         # Mock SessionLocal to return test db_session
         with patch("seeder.reset_onboarding.SessionLocal") as mock_session:
@@ -103,26 +107,25 @@ class TestResetOnboardingScript:
             ):
                 main()
 
-        # Refresh customer from database
-        db_session.refresh(customer)
-
-        # Verify all fields are cleared
-        assert customer.full_name is None
-        assert customer.language is None
-        assert customer.profile_data is None
-        assert customer.onboarding_attempts is None
-        assert customer.onboarding_status == OnboardingStatus.NOT_STARTED
+        # Verify customer is deleted
+        deleted_customer = (
+            db_session.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+        assert deleted_customer is None
 
         # Verify success message
         captured = capsys.readouterr()
-        assert "Reset onboarding status for customer" in captured.out
+        assert "Deleted customer" in captured.out
         assert "+255123456789" in captured.out
-        assert "not_started" in captured.out
 
-    def test_reset_customer_deletes_administrative_associations(
+    def test_delete_customer_removes_administrative_associations(
         self, customer, administrative_area, db_session, capsys
     ):
-        """Test that administrative associations are deleted"""
+        """Test that administrative associations are deleted with customer"""
+        customer_id = customer.id
+
         # Create administrative association
         customer_admin = CustomerAdministrative(
             customer_id=customer.id, administrative_id=administrative_area.id
@@ -138,7 +141,7 @@ class TestResetOnboardingScript:
         )
         assert len(associations) == 1
 
-        # Reset customer
+        # Delete customer
         with patch("seeder.reset_onboarding.SessionLocal") as mock_session:
             mock_session.return_value = db_session
             with patch.object(
@@ -151,44 +154,37 @@ class TestResetOnboardingScript:
         # Verify associations are deleted
         associations = (
             db_session.query(CustomerAdministrative)
-            .filter(CustomerAdministrative.customer_id == customer.id)
+            .filter(CustomerAdministrative.customer_id == customer_id)
             .all()
         )
         assert len(associations) == 0
 
-    def test_reset_customer_with_multiple_administrative_areas(
-        self, customer, administrative_area, db_session, capsys
+    def test_delete_customer_removes_messages(
+        self, customer, db_session, capsys
     ):
-        """Test resetting customer with multiple administrative associations"""
-        # Create second administrative area
-        admin_area2 = Administrative(
-            code="TZ-002",
-            name="Test Ward 2",
-            level_id=administrative_area.level_id,
-            path="TZ.Test Ward 2",
+        """Test that messages are deleted with customer"""
+        customer_id = customer.id
+
+        # Create messages for customer
+        message = Message(
+            message_sid="test_msg_sid_123",
+            customer_id=customer.id,
+            body="Test message",
+            from_source=MessageFrom.CUSTOMER,
+            status=MessageStatus.PENDING,
         )
-        db_session.add(admin_area2)
+        db_session.add(message)
         db_session.commit()
 
-        # Create multiple associations
-        customer_admin1 = CustomerAdministrative(
-            customer_id=customer.id, administrative_id=administrative_area.id
-        )
-        customer_admin2 = CustomerAdministrative(
-            customer_id=customer.id, administrative_id=admin_area2.id
-        )
-        db_session.add_all([customer_admin1, customer_admin2])
-        db_session.commit()
-
-        # Verify associations exist
-        associations = (
-            db_session.query(CustomerAdministrative)
-            .filter(CustomerAdministrative.customer_id == customer.id)
+        # Verify message exists
+        messages = (
+            db_session.query(Message)
+            .filter(Message.customer_id == customer.id)
             .all()
         )
-        assert len(associations) == 2
+        assert len(messages) == 1
 
-        # Reset customer
+        # Delete customer
         with patch("seeder.reset_onboarding.SessionLocal") as mock_session:
             mock_session.return_value = db_session
             with patch.object(
@@ -198,22 +194,16 @@ class TestResetOnboardingScript:
             ):
                 main()
 
-        # Verify all associations are deleted
-        associations = (
-            db_session.query(CustomerAdministrative)
-            .filter(CustomerAdministrative.customer_id == customer.id)
+        # Verify messages are deleted
+        messages = (
+            db_session.query(Message)
+            .filter(Message.customer_id == customer_id)
             .all()
         )
-        assert len(associations) == 0
+        assert len(messages) == 0
 
-        # Cleanup
-        db_session.query(Administrative).filter(
-            Administrative.id == admin_area2.id
-        ).delete()
-        db_session.commit()
-
-    def test_reset_nonexistent_customer_shows_error(self, db_session, capsys):
-        """Test attempting to reset non-existent customer"""
+    def test_delete_nonexistent_customer_shows_error(self, db_session, capsys):
+        """Test attempting to delete non-existent customer"""
         with patch("seeder.reset_onboarding.SessionLocal") as mock_session:
             mock_session.return_value = db_session
             with patch.object(
@@ -236,128 +226,6 @@ class TestResetOnboardingScript:
         assert "Error" in captured.out
         assert "--phone-number argument is required" in captured.out
 
-    def test_reset_customer_with_not_started_status(self, db_session, capsys):
-        """Test resetting customer who hasn't started onboarding"""
-        customer = Customer(
-            phone_number="+255111111111",
-            onboarding_status=OnboardingStatus.NOT_STARTED,
-        )
-        db_session.add(customer)
-        db_session.commit()
-        db_session.refresh(customer)
-
-        with patch("seeder.reset_onboarding.SessionLocal") as mock_session:
-            mock_session.return_value = db_session
-            with patch.object(
-                sys,
-                "argv",
-                ["reset_onboarding.py", "--phone-number=+255111111111"],
-            ):
-                main()
-
-        # Refresh customer
-        db_session.refresh(customer)
-
-        # Should still be NOT_STARTED
-        assert customer.onboarding_status == OnboardingStatus.NOT_STARTED
-        assert customer.full_name is None
-        assert customer.language is None
-
-        captured = capsys.readouterr()
-        assert "Reset onboarding status" in captured.out
-
-        # Cleanup
-        db_session.delete(customer)
-        db_session.commit()
-
-    def test_reset_customer_with_in_progress_status(self, db_session, capsys):
-        """Test resetting customer with in-progress onboarding"""
-        customer = Customer(
-            phone_number="+255222222222",
-            full_name="Jane Doe",
-            language=CustomerLanguage.SW,
-            onboarding_status=OnboardingStatus.IN_PROGRESS,
-            onboarding_attempts=1,
-        )
-        db_session.add(customer)
-        db_session.commit()
-        db_session.refresh(customer)
-
-        with patch("seeder.reset_onboarding.SessionLocal") as mock_session:
-            mock_session.return_value = db_session
-            with patch.object(
-                sys,
-                "argv",
-                ["reset_onboarding.py", "--phone-number=+255222222222"],
-            ):
-                main()
-
-        # Refresh customer
-        db_session.refresh(customer)
-
-        # All fields should be cleared
-        assert customer.onboarding_status == OnboardingStatus.NOT_STARTED
-        assert customer.full_name is None
-        assert customer.language is None
-        assert customer.onboarding_attempts is None
-
-        # Cleanup
-        db_session.delete(customer)
-        db_session.commit()
-
-    def test_reset_customer_preserves_phone_number(
-        self, customer, db_session, capsys
-    ):
-        """Test that phone number is preserved after reset"""
-        original_phone = customer.phone_number
-
-        with patch("seeder.reset_onboarding.SessionLocal") as mock_session:
-            mock_session.return_value = db_session
-            with patch.object(
-                sys,
-                "argv",
-                ["reset_onboarding.py", "--phone-number=+255123456789"],
-            ):
-                main()
-
-        db_session.refresh(customer)
-
-        # Phone number should not change
-        assert customer.phone_number == original_phone
-
-    def test_reset_customer_with_failed_status(self, db_session, capsys):
-        """Test resetting customer with failed onboarding"""
-        customer = Customer(
-            phone_number="+255333333333",
-            full_name="Failed User",
-            language=CustomerLanguage.EN,
-            onboarding_status=OnboardingStatus.FAILED,
-            onboarding_attempts=5,
-        )
-        db_session.add(customer)
-        db_session.commit()
-        db_session.refresh(customer)
-
-        with patch("seeder.reset_onboarding.SessionLocal") as mock_session:
-            mock_session.return_value = db_session
-            with patch.object(
-                sys,
-                "argv",
-                ["reset_onboarding.py", "--phone-number=+255333333333"],
-            ):
-                main()
-
-        db_session.refresh(customer)
-
-        # Should be reset to NOT_STARTED
-        assert customer.onboarding_status == OnboardingStatus.NOT_STARTED
-        assert customer.full_name is None
-        assert customer.onboarding_attempts is None
-
-        # Cleanup
-        db_session.delete(customer)
-        db_session.commit()
-
     def test_phone_number_format_with_equals_sign(
         self, customer, db_session, capsys
     ):
@@ -372,7 +240,7 @@ class TestResetOnboardingScript:
                 main()
 
         captured = capsys.readouterr()
-        assert "Reset onboarding status" in captured.out
+        assert "Deleted customer" in captured.out
         assert "+255123456789" in captured.out
 
     def test_phone_number_format_with_space(
@@ -389,5 +257,5 @@ class TestResetOnboardingScript:
                 main()
 
         captured = capsys.readouterr()
-        assert "Reset onboarding status" in captured.out
+        assert "Deleted customer" in captured.out
         assert "+255123456789" in captured.out
