@@ -199,6 +199,68 @@ async def whatsapp_webhook(
         )
 
         # ========================================
+        # ACCOUNT DELETION FLOW
+        # ========================================
+        from utils.i18n import t
+
+        # Define delete keywords (in supported languages)
+        delete_keywords = ["delete", "futa"]
+        # Define confirmation responses (in supported languages)
+        confirm_responses = [
+            "yes", "ok", "okay", "ndio", "ndiyo", "sawa", "confirm"
+        ]
+
+        body_stripped = Body.strip().lower()
+        lang = customer.language.value if customer.language else "en"
+
+        # Check if customer has pending delete request and is confirming
+        if customer.delete_requested:
+            if body_stripped in confirm_responses:
+                # Send deletion success message BEFORE deleting
+                whatsapp_service = WhatsAppService()
+                whatsapp_service.send_message(
+                    phone_number, t("account.deleted", lang)
+                )
+
+                # Delete customer using existing service method
+                customer_service.delete_customer(customer.id)
+
+                logger.info(
+                    f"Customer {phone_number} confirmed deletion, "
+                    f"account deleted"
+                )
+                return {
+                    "status": "success",
+                    "message": "Account deleted by customer request"
+                }
+            else:
+                # Customer didn't confirm - cancel delete request
+                customer.delete_requested = False
+                db.commit()
+                # Continue with normal message processing
+
+        # Check if customer is requesting deletion
+        if body_stripped in delete_keywords:
+            # Set delete_requested flag and send confirmation
+            customer.delete_requested = True
+            db.commit()
+
+            whatsapp_service = WhatsAppService()
+            whatsapp_service.send_message(
+                phone_number, t("account.delete_confirmation", lang)
+            )
+
+            logger.info(
+                f"Customer {phone_number} requested deletion, "
+                f"confirmation sent"
+            )
+            # Don't record the "delete" message - return early
+            return {
+                "status": "success",
+                "message": "Delete confirmation sent"
+            }
+
+        # ========================================
         # DATA CONSENT CHECK (after language, before other fields)
         # ========================================
         # Handle consent response if consent was asked (language already set)

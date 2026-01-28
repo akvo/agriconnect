@@ -163,6 +163,16 @@ class Customer(Base):
     def data_consent_given(self, value: bool | None):
         self.set_profile_field("data_consent_given", value)
 
+    # Account deletion request tracking
+    @property
+    def delete_requested(self) -> bool:
+        """Check if account deletion was requested and confirmation pending."""
+        return self.get_profile_field("delete_requested", False)
+
+    @delete_requested.setter
+    def delete_requested(self, value: bool):
+        self.set_profile_field("delete_requested", value)
+
     def needs_reconnection_template(self, threshold_hours: int = 24) -> bool:
         """
         Check if customer needs reconnection template.
