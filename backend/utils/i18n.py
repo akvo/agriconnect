@@ -454,6 +454,30 @@ trans: Dict[str, Any] = {
             },
         },
     },
+    "account": {
+        "delete_confirmation": {
+            "en": (
+                "Are you sure you want to delete your account? "
+                "This will permanently remove all your data and messages.\n\n"
+                "Reply 'Yes' to confirm deletion."
+            ),
+            "sw": (
+                "Je, una uhakika unataka kufuta akaunti yako? "
+                "Hii itaondoa data yako yote na ujumbe milele.\n\n"
+                "Jibu 'Ndiyo' kuthibitisha kufuta."
+            ),
+        },
+        "deleted": {
+            "en": (
+                "Your account and all associated data have been deleted. "
+                "If you message us again, a new account will be created."
+            ),
+            "sw": (
+                "Akaunti yako na data zote zinazohusiana zimefutwa. "
+                "Ukitutumia ujumbe tena, akaunti mpya itaundwa."
+            ),
+        },
+    },
 }
 
 
