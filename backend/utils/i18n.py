@@ -17,11 +17,13 @@ trans: Dict[str, Any] = {
         "language": {
             "question": {
                 "en": (
-                    "Welcome to AgriConnect! 🌾\n\nChoose your language / "
+                    "Welcome to AgriConnect! 🌾 Your agricultural advisory "
+                    "companion.\n\nChoose your language / "
                     "Chagua lugha yako:\n1. English\n2. Swahili"
                 ),
                 "sw": (
-                    "Karibu AgriConnect! 🌾\n\nChagua lugha yako / Choose your "
+                    "Karibu AgriConnect! 🌾 Mshauri wako wa kilimo.\n\n"
+                    "Chagua lugha yako / Choose your "
                     "language:\n1. Kiingereza / English\n2. Swahili"
                 ),
             },
@@ -54,12 +56,11 @@ trans: Dict[str, Any] = {
             "question": {
                 "en": (
                     "I need to know your location.\n\n"
-                    "Please tell me: What ward "
-                    "or village are you from?"
+                    "Please tell me: Which ward are you from?"
                 ),
                 "sw": (
                     "Ninahitaji kujua eneo lako.\n\n"
-                    "Tafadhali niambie: Unatoka kata gani au kijiji kipi?"
+                    "Tafadhali niambie: unatoka wodi gani?"
                 ),
             },
             "success": {
@@ -372,6 +373,13 @@ trans: Dict[str, Any] = {
                 "tafadhali wasiliana na usaidizi hapa chini:"
             ),
         },
+        "ask_delete_data": {
+            "en": "To remove yourself from AgriConnect please message *DELETE*.",
+            "sw": (
+                "Ili kujiondoa kwenye AgriConnect tafadhali tuma ujumbe "
+                "*DELETE* au *FUTA*."
+            ),
+        },
     },
     "crops": {
         "Avocado": {"name": {"en": "avocado", "sw": "parachichi"}},
@@ -403,20 +411,28 @@ trans: Dict[str, Any] = {
             "sw": "Hapana",
         },
         "subscribed": {
-            "en": "Great! You will receive daily updates for {area_name}.",
+            "en": (
+                "Great! You will receive daily updates for {area_name}.\n\n"
+                "Please message *weather* to get weather information on-demand."
+            ),
             "sw": (
                 "Vizuri! Utapokea taarifa za hali ya hewa kila siku "
-                "kwa {area_name}."
+                "kwa {area_name}.\n\n"
+                "Tafadhali tuma ujumbe *weather* kupata taarifa za hali ya "
+                "hewa wakati wowote."
             ),
         },
         "declined": {
             "en": (
                 "No problem! You can subscribe anytime by messaging "
-                "'weather updates'."
+                "'weather updates'.\n\n"
+                "Please message *weather* to get weather information on-demand."
             ),
             "sw": (
                 "Hakuna shida! Unaweza kujisajili wakati wowote kwa kutuma "
-                "ujumbe 'weather updates'."
+                "ujumbe 'weather updates'.\n\n"
+                "Tafadhali tuma ujumbe *weather* kupata taarifa za hali ya "
+                "hewa wakati wowote."
             ),
         },
     },

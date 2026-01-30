@@ -1902,6 +1902,10 @@ Birth year must be between 1900 and {current_year}."""
             "onboarding.ask_edit_profile",
             lang
         )
+        ask_delete_msg = t(
+            "onboarding.ask_delete_data",
+            lang
+        )
         message += f"\n\n{ask_profile_msg}\n"
         if len(users) == 0:
             contact_name = settings.contact_name
@@ -1912,6 +1916,7 @@ Birth year must be between 1900 and {current_year}."""
                 contact_name = user.full_name
                 contact_phone = user.phone_number
                 message += f"{ix + 1}. {contact_name} ( {contact_phone} )\n"
+        message += f"\n{ask_delete_msg}"
 
         return OnboardingResponse(
             message=message,
