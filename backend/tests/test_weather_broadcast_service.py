@@ -247,6 +247,76 @@ class TestWeatherBroadcastService:
             assert result == "Weather message"
 
     @pytest.mark.asyncio
+    async def test_generate_message_with_farmer_crop(
+        self, weather_service, mock_openai_service
+    ):
+        """Test message generation with farmer_crop parameter"""
+        mock_forecast = {"current": {"temp": 25}}
+        template_content = (
+            "Location: {{ location }}\n"
+            "Crop: {{ farmer_crop }}\n"
+            "Weather: {{ weather_data }}"
+        )
+
+        with patch.object(
+            weather_service,
+            "_load_prompt_template",
+            return_value=template_content,
+        ):
+            mock_response = MagicMock()
+            mock_response.content = "Avocado-specific weather advice"
+            mock_openai_service.chat_completion = AsyncMock(
+                return_value=mock_response
+            )
+
+            result = await weather_service.generate_message(
+                location="Kiru, Mathioya",
+                language="en",
+                weather_data=mock_forecast,
+                farmer_crop="Avocado",
+            )
+
+            assert result == "Avocado-specific weather advice"
+            # Verify the prompt includes the farmer_crop
+            call_args = mock_openai_service.chat_completion.call_args
+            prompt = call_args[1]["messages"][1]["content"]
+            assert "Avocado" in prompt
+
+    @pytest.mark.asyncio
+    async def test_generate_message_without_farmer_crop_defaults(
+        self, weather_service, mock_openai_service
+    ):
+        """Test message generation without farmer_crop uses default"""
+        mock_forecast = {"current": {"temp": 25}}
+        template_content = (
+            "Location: {{ location }}\n"
+            "Crop: {{ farmer_crop }}"
+        )
+
+        with patch.object(
+            weather_service,
+            "_load_prompt_template",
+            return_value=template_content,
+        ):
+            mock_response = MagicMock()
+            mock_response.content = "General weather advice"
+            mock_openai_service.chat_completion = AsyncMock(
+                return_value=mock_response
+            )
+
+            result = await weather_service.generate_message(
+                location="Nairobi",
+                language="en",
+                weather_data=mock_forecast,
+            )
+
+            assert result == "General weather advice"
+            # Verify the prompt includes "Not specified" as default
+            call_args = mock_openai_service.chat_completion.call_args
+            prompt = call_args[1]["messages"][1]["content"]
+            assert "Not specified" in prompt
+
+    @pytest.mark.asyncio
     async def test_generate_message_no_template(
         self, weather_service, mock_openai_service
     ):
@@ -372,3 +442,95 @@ class TestWeatherBroadcastService:
         service2 = get_weather_broadcast_service()
 
         assert service1 is service2
+
+    def test_get_weather_data_uses_api_30_when_configured(
+        self, weather_service, mock_settings
+    ):
+        """Test get_weather_data uses OneCall 3.0 when config is 3.0"""
+        mock_settings.weather_api_version = "3.0"
+        mock_current = {"current": {"temp": 25}}
+
+        with patch.object(
+            weather_service, "get_current_raw", return_value=mock_current
+        ) as mock_current_raw:
+            with patch.object(
+                weather_service, "get_forecast_raw"
+            ) as mock_forecast_raw:
+                result = weather_service.get_weather_data(
+                    location="Nairobi",
+                    lat=-1.29,
+                    lon=36.82,
+                )
+
+                assert result == mock_current
+                mock_current_raw.assert_called_once_with(lat=-1.29, lon=36.82)
+                mock_forecast_raw.assert_not_called()
+
+    def test_get_weather_data_uses_api_25_when_configured(
+        self, weather_service, mock_settings
+    ):
+        """Test get_weather_data uses API 2.5 when config is 2.5"""
+        mock_settings.weather_api_version = "2.5"
+        mock_forecast = {"city": {"name": "Nairobi"}}
+
+        with patch.object(
+            weather_service, "get_current_raw"
+        ) as mock_current_raw:
+            with patch.object(
+                weather_service, "get_forecast_raw", return_value=mock_forecast
+            ) as mock_forecast_raw:
+                result = weather_service.get_weather_data(
+                    location="Nairobi",
+                    lat=-1.29,
+                    lon=36.82,
+                )
+
+                assert result == mock_forecast
+                mock_current_raw.assert_not_called()
+                mock_forecast_raw.assert_called_once_with("Nairobi")
+
+    def test_get_weather_data_fallback_when_no_coordinates(
+        self, weather_service, mock_settings
+    ):
+        """Test get_weather_data falls back to 2.5 when no coordinates"""
+        mock_settings.weather_api_version = "3.0"
+        mock_forecast = {"city": {"name": "Nairobi"}}
+
+        with patch.object(
+            weather_service, "get_current_raw"
+        ) as mock_current_raw:
+            with patch.object(
+                weather_service, "get_forecast_raw", return_value=mock_forecast
+            ) as mock_forecast_raw:
+                result = weather_service.get_weather_data(
+                    location="Nairobi",
+                    lat=None,
+                    lon=None,
+                )
+
+                assert result == mock_forecast
+                mock_current_raw.assert_not_called()
+                mock_forecast_raw.assert_called_once_with("Nairobi")
+
+    def test_get_weather_data_fallback_when_onecall_fails(
+        self, weather_service, mock_settings
+    ):
+        """Test get_weather_data falls back to 2.5 when OneCall fails"""
+        mock_settings.weather_api_version = "3.0"
+        mock_forecast = {"city": {"name": "Nairobi"}}
+
+        with patch.object(
+            weather_service, "get_current_raw", return_value=None
+        ) as mock_current_raw:
+            with patch.object(
+                weather_service, "get_forecast_raw", return_value=mock_forecast
+            ) as mock_forecast_raw:
+                result = weather_service.get_weather_data(
+                    location="Nairobi",
+                    lat=-1.29,
+                    lon=36.82,
+                )
+
+                assert result == mock_forecast
+                mock_current_raw.assert_called_once_with(lat=-1.29, lon=36.82)
+                mock_forecast_raw.assert_called_once_with("Nairobi")

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -27,6 +27,8 @@ class Administrative(Base):
     )
     parent_id = Column(Integer, ForeignKey("administrative.id"), nullable=True)
     path = Column(Text, nullable=False)
+    long = Column(Float, nullable=True)
+    lat = Column(Float, nullable=True)
 
     # Relationships
     level = relationship(

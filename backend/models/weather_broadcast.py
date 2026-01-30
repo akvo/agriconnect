@@ -28,6 +28,7 @@ class WeatherBroadcast(Base):
         nullable=False,
         index=True
     )
+    crop_type = Column(String(100), nullable=True, index=True)
     location_name = Column(String(255), nullable=False)
     weather_data = Column(JSON, nullable=True)  # Raw API response
     generated_message_en = Column(Text, nullable=True)

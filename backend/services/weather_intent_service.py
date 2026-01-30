@@ -95,14 +95,15 @@ class WeatherIntentService:
         """
         Build full location path from administrative hierarchy.
 
-        Format: "Region, District, Ward" (comma-separated, top-down)
+        Format: "Ward, District, Region" (comma-separated, bottom-up)
+        So farmer sees their local area first.
         Excludes country level (causes wrong API results).
 
         Args:
             admin_area: The administrative area object
 
         Returns:
-            str: Full location path for weather API
+            str: Full location path for weather message
         """
         path_parts = []
         current = admin_area
@@ -120,8 +121,8 @@ class WeatherIntentService:
                 Administrative.id == current.parent_id
             ).first()
 
-        # Reverse to get top-down order (Region, District, Ward)
-        path_parts.reverse()
+        # Keep bottom-up order (Ward, District, Region)
+        # So farmer sees their local area first
         return ", ".join(path_parts)
 
     async def handle_weather_intent(
@@ -157,11 +158,20 @@ class WeatherIntentService:
         # Get customer's language
         lang = customer.language.value if customer.language else "en"
 
-        # Generate weather message
+        # Get weather data using centralized method (respects config)
         weather_svc = self.weather_broadcast_service
+        weather_data = weather_svc.get_weather_data(
+            location=location,
+            lat=admin_area.lat,
+            lon=admin_area.long,
+        )
+
+        # Generate weather message with customer's crop type
         weather_message = await weather_svc.generate_message(
             location=location,
             language=lang,
+            weather_data=weather_data,
+            farmer_crop=customer.crop_type,
         )
 
         if not weather_message:

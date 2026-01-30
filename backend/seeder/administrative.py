@@ -158,19 +158,32 @@ def seed_administrative_data(db: Session, rows: list) -> dict:
                     )
                     continue
 
+            # Parse lat/long if present
+            long_val = row.get("longitude")
+            lat_val = row.get("latitude")
+            long_float = float(long_val) if long_val else None
+            lat_float = float(lat_val) if lat_val else None
+
             # Check if administrative already exists
             existing = get_administrative_by_code(db, code, level.id)
 
             if existing:
                 # Update existing
-                if existing.name != name or existing.parent_id != (
-                    parent.id if parent else None
-                ):
+                needs_update = (
+                    existing.name != name
+                    or existing.parent_id != (parent.id if parent else None)
+                    or existing.long != long_float
+                    or existing.lat != lat_float
+                )
+                if needs_update:
                     existing.name = name
                     existing.parent_id = parent.id if parent else None
                     existing.path = build_human_readable_path(
                         parent.path if parent else "", name
                     )
+                    existing.long = long_float
+                    existing.lat = lat_float
+                    db.commit()
                     stats["updated"] += 1
                 else:
                     stats["skipped"] += 1
@@ -185,6 +198,8 @@ def seed_administrative_data(db: Session, rows: list) -> dict:
                     level_id=level.id,
                     parent_id=parent.id if parent else None,
                     path=path,
+                    long=long_float,
+                    lat=lat_float,
                 )
                 db.add(admin)
                 db.commit()

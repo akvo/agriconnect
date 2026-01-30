@@ -80,6 +80,7 @@
 	},
 	"weather": {
 		"broadcast_enabled": true,
+		"api_version": "3.0",
 		"intent_keywords": [
 			"weather",
 			"forecast",

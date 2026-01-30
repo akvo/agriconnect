@@ -34,6 +34,7 @@ Config.json:
 {
   "weather": {
     "broadcast_enabled": true,
+    "api_version": "3.0",
     "intent_keywords": [
       "weather",
       "forecast",
@@ -45,10 +46,17 @@ Config.json:
 }
 ```
 
+API version options:
+- `"3.0"` - Uses OneCall API 3.0 with lat/lon coordinates (requires paid subscription). Falls back to 2.5 if coordinates not available or API fails.
+- `"2.5"` - Uses location-based API (free tier). Default if not specified.
+
 #### How It Works
 
-1. `WeatherBroadcastService.get_forecast_raw(location)` - Fetches raw weather data from OpenWeatherMap using `akvo-weather-info` library
-2. `WeatherBroadcastService.generate_message(location, language, weather_data)` - Uses OpenAI to generate a farmer-friendly message based on the prompt template
+1. `WeatherBroadcastService.get_weather_data(location, lat, lon)` - Fetches weather data using configured API version:
+   - API 3.0: Uses `get_current_raw(lat, lon)` with OneCall API
+   - API 2.5: Uses `get_forecast_raw(location)` with location-based API
+   - Falls back to 2.5 if coordinates not provided or 3.0 fails
+2. `WeatherBroadcastService.generate_message(location, language, weather_data, farmer_crop)` - Uses OpenAI to generate a farmer-friendly message based on the prompt template, with crop-specific suggestions if `farmer_crop` is provided
 
 #### Test Endpoint
 
@@ -58,12 +66,15 @@ Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
-  "location": "Nairobi",
-  "language": "en"  // or "sw" for Swahili
+  "location": "Kiru, Mathioya, Murang'a",
+  "lat": -0.85,          // Optional: for OneCall 3.0 API
+  "lon": 36.95,          // Optional: for OneCall 3.0 API
+  "crop_type": "Avocado", // Optional: for crop-specific advice
+  "language": "en"       // or "sw" for Swahili
 }
 ```
 
-Returns plain text message.
+Returns plain text message with crop-specific weather suggestions if `crop_type` is provided.
 
 #### Message Format
 
@@ -93,8 +104,9 @@ Implemented daily weather broadcasts to subscribed farmers with template confirm
 #### Database Schema
 
 ```
-WeatherBroadcast (daily weather broadcast per area)
+WeatherBroadcast (daily weather broadcast per area+crop)
 ├── administrative_id (FK)
+├── crop_type (VARCHAR 100, indexed)
 ├── location_name
 ├── weather_data (JSON)
 ├── generated_message_en
@@ -112,6 +124,8 @@ WeatherBroadcastRecipient (delivery tracking)
 ├── sent_at, confirmed_at
 ```
 
+Note: Broadcasts are grouped by (administrative_id, crop_type) to provide crop-specific weather advice. An index on `(administrative_id, crop_type)` supports efficient grouping.
+
 #### Workflow
 
 ```mermaid
@@ -125,14 +139,14 @@ sequenceDiagram
 
     Note over CB: 6 AM UTC Daily
     CB->>WT: send_weather_broadcasts
-    WT->>WT: Query subscribed farmers by area
+    WT->>WT: Query subscribed farmers by (area, crop_type)
     WT->>WT: Create WeatherBroadcast records
 
-    loop Per Area
-        WT->>OW: Fetch weather data
-        OW-->>WT: Raw forecast
-        WT->>AI: Generate message (EN/SW)
-        AI-->>WT: Farmer-friendly message
+    loop Per Area+Crop Group
+        WT->>OW: Fetch weather data (using lat/lon if available)
+        OW-->>WT: Raw weather data
+        WT->>AI: Generate crop-specific message (EN/SW)
+        AI-->>WT: Farmer-friendly message with crop advice
         WT->>WA: Send template to subscribers
         WA-->>F: "New weather update available"
     end
@@ -140,17 +154,18 @@ sequenceDiagram
     F->>WA: Clicks "Yes" button
     WA->>WT: Webhook callback
     WT->>WA: Send actual weather message
-    WA-->>F: Weather forecast details
+    WA-->>F: Crop-specific weather forecast
 ```
 
 1. **Daily Task** (`send_weather_broadcasts`) runs at 6 AM UTC via Celery Beat
-2. Queries customers with `weather_subscribed = True` grouped by administrative area
-3. Creates `WeatherBroadcast` record per area
-4. Queues `send_weather_templates` task per area
+2. Queries customers with `weather_subscribed = True` grouped by (administrative area, crop_type)
+3. Creates `WeatherBroadcast` record per area+crop combination
+4. Queues `send_weather_templates` task per area+crop
 
 5. **Template Sending** (`send_weather_templates`):
-   - Fetches weather data via OpenWeatherMap
-   - Generates messages in EN and SW via OpenAI
+   - Fetches weather data via OpenWeatherMap (using lat/lon for OneCall 3.0 if configured)
+   - Generates crop-specific messages in EN and SW via OpenAI
+   - Filters subscribers by matching crop_type
    - Sends WhatsApp template (reuses `broadcast` template SID)
    - Creates `WeatherBroadcastRecipient` with `confirm_message_sid`
 
@@ -325,6 +340,34 @@ Button payloads configured in `config.py`:
 
 ## Dependencies
 
-- `akvo-weather-info>=0.1.0` - OpenWeatherMap API wrapper
+- `akvo-weather-info>=0.2.0` - OpenWeatherMap API wrapper (supports OneCall 3.0)
 - OpenAI API - Message generation
 - Existing services: `openai_service.py`, `whatsapp_service.py`, `broadcast_service.py`
+
+---
+
+## Crop-Specific Weather Broadcasts
+
+Weather broadcasts are now tailored per crop type:
+
+### How It Works
+
+1. Subscribers are grouped by (administrative area + crop_type)
+2. Each group receives crop-specific weather advice
+3. The prompt template includes `{{ farmer_crop }}` placeholder
+4. OpenAI generates advice specific to each crop's needs
+
+### Example
+
+For Avocado farmers in Kiru:
+- Message includes avocado-specific tips (e.g., "Avoid spraying fungicides today due to rain")
+- Temperature recommendations relevant to avocado cultivation
+- Irrigation advice based on soil moisture needs
+
+For Maize farmers in the same area:
+- Different advice relevant to maize growing stage
+- Recommendations for maize-specific pests and diseases
+
+### Configuration
+
+Customer's crop_type is stored in `profile_data.crop_type` (set during onboarding). If crop_type is not set, subscribers are grouped as "unknown" and receive generic weather advice.

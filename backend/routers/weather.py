@@ -27,12 +27,22 @@ async def test_weather_message(
     Generate a test weather broadcast message (Admin only).
 
     For internal testing via Swagger.
+    Uses API version from config (weather.api_version).
     """
     service = get_weather_broadcast_service()
+
+    # Get weather data using centralized method (respects config)
+    weather_data = service.get_weather_data(
+        location=request.location,
+        lat=request.lat,
+        lon=request.lon,
+    )
 
     message = await service.generate_message(
         location=request.location,
         language=request.language.value,
+        weather_data=weather_data,
+        farmer_crop=request.crop_type,
     )
 
     if message is None:

@@ -8,9 +8,13 @@ CONTEXT:
 WEATHER DATA:
 {{ weather_data }}
 
+FARMER CROP:
+{{ farmer_crop }}
+
 OUTPUT REQUIREMENTS:
 - Maximum 1000 characters
 - Simple, farmer-friendly language
+- Use the COMPLETE location name in the title (e.g., "Kariara, Gatanga, Murang'a" not just "Murang'a")
 - WhatsApp formatting: use single *asterisk* for bold (NOT double **markdown**)
 - Include only essential numbers:
   • total rainfall (mm)

@@ -32,13 +32,38 @@ class WeatherBroadcastService:
         self._weather_service = None
         self._prompt_template = None
 
-    def _get_weather_service(self):
+    def _get_weather_service(self, api_version: str = "2.5"):
         """
         Lazy-load the weather service.
+
+        Args:
+            api_version: API version ("2.5" or "3.0"). Defaults to "2.5".
 
         Returns:
             OpenWeatherMapService instance or None if not configured
         """
+        # For 3.0, always create a new instance (different from cached 2.5)
+        if api_version == "3.0":
+            if not settings.openweather_api_key:
+                logger.warning(
+                    "[WeatherBroadcastService] OPENWEATHER API key not set"
+                )
+                return None
+            try:
+                from weather.services import OpenWeatherMapService
+
+                return OpenWeatherMapService(api_version="3.0")
+            except ImportError:
+                logger.error(
+                    "✗ akvo-weather-info not installed. "
+                    "Run: pip install akvo-weather-info"
+                )
+                return None
+            except Exception as e:
+                logger.error(f"✗ Failed to initialize weather service: {e}")
+                return None
+
+        # For 2.5, use cached instance
         if self._weather_service is None:
             if not settings.openweather_api_key:
                 logger.warning(
@@ -136,11 +161,91 @@ class WeatherBroadcastService:
             logger.error(f"✗ Failed to get forecast for {location}: {e}")
             return None
 
+    def get_current_raw(
+        self, lat: float, lon: float
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get current weather data using OneCall API 3.0 with coordinates.
+
+        Uses OneCall 3.0 with exclude=["minutely", "hourly", "daily", "alerts"]
+        to only fetch current weather (cheaper API call).
+
+        Args:
+            lat: Latitude of the location
+            lon: Longitude of the location
+
+        Returns:
+            Raw current weather data dict or None if error
+        """
+        weather_service = self._get_weather_service(api_version="3.0")
+        if weather_service is None:
+            return None
+
+        try:
+            weather_data = weather_service.get_onecall_raw(
+                lat=lat,
+                lon=lon,
+                exclude=["minutely", "hourly", "daily", "alerts"]
+            )
+            logger.info(f"✓ Retrieved current weather for ({lat}, {lon})")
+            return weather_data
+        except Exception as e:
+            logger.error(
+                f"✗ Failed to get current weather for ({lat}, {lon}): {e}"
+            )
+            return None
+
+    def get_weather_data(
+        self,
+        location: str,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get weather data using the configured API version.
+
+        Decision logic based on settings.weather_api_version:
+        - "3.0": Use OneCall API with lat/lon if coordinates provided
+        - "2.5": Always use location-based API (default)
+
+        Falls back to API 2.5 if:
+        - Config is "3.0" but no coordinates provided
+        - OneCall API fails
+
+        Args:
+            location: Location name for fallback/2.5 API
+            lat: Latitude (optional, for 3.0 API)
+            lon: Longitude (optional, for 3.0 API)
+
+        Returns:
+            Raw weather data dict or None if error
+        """
+        api_version = settings.weather_api_version
+
+        # Use OneCall 3.0 if configured and coordinates available
+        if api_version == "3.0" and lat is not None and lon is not None:
+            weather_data = self.get_current_raw(lat=lat, lon=lon)
+            if weather_data:
+                logger.info(
+                    f"Using OneCall 3.0 for {location} ({lat}, {lon})"
+                )
+                return weather_data
+            # Fall through to 2.5 on failure
+            logger.warning(
+                f"OneCall 3.0 failed for ({lat}, {lon}), "
+                f"falling back to API 2.5"
+            )
+
+        # Use API 2.5 (location-based)
+        logger.info(f"Using API 2.5 for {location}")
+        return self.get_forecast_raw(location)
+
     async def generate_message(
         self,
         location: str,
         language: str = "en",
         weather_data: Optional[Dict[str, Any]] = None,
+        farmer_crop: Optional[str] = None,
     ) -> Optional[str]:
         """
         Generate a weather broadcast message for farmers.
@@ -149,6 +254,7 @@ class WeatherBroadcastService:
             location: Location name for the forecast
             language: Language code ("en" or "sw")
             weather_data: Optional pre-fetched weather data
+            farmer_crop: Optional crop type for specific suggestions
 
         Returns:
             Generated message string or None if error
@@ -173,6 +279,7 @@ class WeatherBroadcastService:
             location=location,
             language=language,
             weather_data=json.dumps(weather_data, indent=2),
+            farmer_crop=farmer_crop or "Not specified",
         )
 
         # Generate message using OpenAI

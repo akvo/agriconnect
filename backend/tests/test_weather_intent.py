@@ -523,3 +523,76 @@ class TestWeatherIntentService:
 
         # Should not handle: onboarding not complete
         assert not service.can_handle(customer, has_existing_ticket=False)
+
+    @pytest.mark.asyncio
+    async def test_handle_weather_intent_passes_crop_type(
+        self, db_session: Session
+    ):
+        """Test that handle_weather_intent passes customer's crop_type"""
+        from services.weather_intent_service import WeatherIntentService
+
+        # Create admin area
+        rows = [
+            {
+                "code": "CROP_AREA",
+                "name": "Crop Test Area",
+                "level": "Ward",
+                "parent_code": "",
+            }
+        ]
+        seed_administrative_data(db_session, rows)
+
+        admin = (
+            db_session.query(Administrative)
+            .filter(Administrative.code == "CROP_AREA")
+            .first()
+        )
+
+        # Create customer with crop_type
+        customer = Customer(
+            phone_number="+255777666555",
+            language=CustomerLanguage.EN,
+            onboarding_status=OnboardingStatus.COMPLETED,
+            profile_data={"crop_type": "Avocado"},
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=admin.id,
+        )
+        db_session.add(customer_admin)
+        db_session.commit()
+        db_session.refresh(customer)
+
+        with (
+            patch(
+                "services.weather_intent_service.get_weather_broadcast_service"
+            ) as mock_weather_svc,
+            patch(
+                "services.weather_intent_service.WhatsAppService"
+            ) as mock_wa,
+        ):
+            mock_weather_instance = Mock()
+            mock_weather_instance.is_configured.return_value = True
+            mock_weather_instance.get_weather_data.return_value = {"temp": 25}
+            mock_weather_instance.generate_message = AsyncMock(
+                return_value="Weather for Avocado farmers"
+            )
+            mock_weather_svc.return_value = mock_weather_instance
+
+            mock_wa_instance = Mock()
+            mock_wa.return_value = mock_wa_instance
+
+            service = WeatherIntentService(db=db_session)
+            result = await service.handle_weather_intent(
+                customer=customer,
+                phone_number=customer.phone_number,
+            )
+
+            assert result.handled is True
+            # Verify crop_type was passed to generate_message
+            mock_weather_instance.generate_message.assert_called_once()
+            call_kwargs = mock_weather_instance.generate_message.call_args[1]
+            assert call_kwargs.get("farmer_crop") == "Avocado"

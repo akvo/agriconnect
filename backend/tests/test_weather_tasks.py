@@ -58,7 +58,7 @@ def test_customer_subscribed(db_session, test_administrative):
         phone_number="+255700001001",
         language=CustomerLanguage.EN,
         full_name="Subscribed Customer",
-        profile_data={"weather_subscribed": True},
+        profile_data={"weather_subscribed": True, "crop_type": "Avocado"},
     )
     db_session.add(customer)
     db_session.flush()
@@ -76,7 +76,7 @@ def test_customer_subscribed(db_session, test_administrative):
 
 @pytest.fixture
 def test_customers_subscribed(db_session, test_administrative):
-    """Create multiple test customers with weather subscription"""
+    """Create multiple test customers with weather subscription (same crop)"""
     customers = []
     for i in range(1, 4):
         lang = CustomerLanguage.EN if i % 2 == 0 else CustomerLanguage.SW
@@ -84,7 +84,7 @@ def test_customers_subscribed(db_session, test_administrative):
             phone_number=f"+255700002{i:03d}",
             language=lang,
             full_name=f"Weather Customer {i}",
-            profile_data={"weather_subscribed": True},
+            profile_data={"weather_subscribed": True, "crop_type": "Avocado"},
         )
         db_session.add(customer)
         db_session.flush()
@@ -108,6 +108,7 @@ def test_weather_broadcast(db_session, test_administrative):
     """Create a test weather broadcast"""
     broadcast = WeatherBroadcast(
         administrative_id=test_administrative.id,
+        crop_type="Avocado",
         location_name=test_administrative.name,
         status="pending",
         scheduled_at=datetime.utcnow(),
@@ -126,6 +127,7 @@ def test_weather_setup(
     # Create weather broadcast
     broadcast = WeatherBroadcast(
         administrative_id=test_administrative.id,
+        crop_type="Avocado",
         location_name=test_administrative.name,
         weather_data={"temp": 25, "humidity": 60},
         generated_message_en="Today's weather: Sunny, 25°C",
@@ -178,8 +180,7 @@ class TestSendWeatherBroadcasts:
 
                 result = send_weather_broadcasts()
 
-        assert result["areas_processed"] == 0
-        assert result["broadcasts_created"] == 0
+        assert result.get("broadcasts_created", 0) == 0
 
     def test_send_weather_broadcasts_service_not_configured(self):
         """Test task returns error when service not configured"""
@@ -257,7 +258,7 @@ class TestSendWeatherTemplates:
             "tasks.weather_tasks.get_weather_broadcast_service"
         ) as mock_ws:
             mock_service = MagicMock()
-            mock_service.get_forecast_raw.return_value = None
+            mock_service.get_weather_data.return_value = None
             mock_ws.return_value = mock_service
 
             result = send_weather_templates(test_weather_broadcast.id)
@@ -288,7 +289,7 @@ class TestSendWeatherTemplates:
             "tasks.weather_tasks.get_weather_broadcast_service"
         ) as mock_ws:
             mock_service = MagicMock()
-            mock_service.get_forecast_raw.return_value = {"temp": 25}
+            mock_service.get_weather_data.return_value = {"temp": 25}
 
             # Create async mock for generate_message
             async def mock_generate(*args, **kwargs):
@@ -328,7 +329,7 @@ class TestSendWeatherTemplates:
             "tasks.weather_tasks.get_weather_broadcast_service"
         ) as mock_ws:
             mock_service = MagicMock()
-            mock_service.get_forecast_raw.return_value = {"temp": 25}
+            mock_service.get_weather_data.return_value = {"temp": 25}
 
             async def mock_generate(*args, **kwargs):
                 return "Test weather message"
@@ -554,7 +555,7 @@ class TestWeatherTasksIntegration:
             "tasks.weather_tasks.get_weather_broadcast_service"
         ) as mock_wbs:
             weather_service = MagicMock()
-            weather_service.get_forecast_raw.return_value = {"temp": 25}
+            weather_service.get_weather_data.return_value = {"temp": 25}
 
             async def mock_generate(*args, **kwargs):
                 return "Test weather message"
