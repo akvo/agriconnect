@@ -71,6 +71,7 @@ class OnboardingService:
         # Configuration (can be overridden per field)
         self.match_threshold = 60.0  # Minimum score for consideration
         self.ambiguity_threshold = 15.0  # Score difference for ambiguity
+        self.high_confidence_threshold = 90.0  # Auto-select without candidates
         self.max_candidates = 5  # Max options to show farmer
 
         # Administrative level hierarchy (in order of selection)
@@ -1093,8 +1094,8 @@ Birth year must be between 1900 and {current_year}."""
             # Extract just the ward name without suffix for better matching
             db_ward_name = db_ward.lower().replace(" ward", "").strip()
             full_text_lower = location.full_text.lower().strip()
-            # Use partial_ratio for better substring/typo matching
-            fallback_score = fuzz.partial_ratio(full_text_lower, db_ward_name)
+            # Use fuzz.ratio for accurate typo detection (92% for small typos)
+            fallback_score = fuzz.ratio(full_text_lower, db_ward_name)
             scores.append(fallback_score)
             weights.append(3)
 
@@ -1163,12 +1164,18 @@ Birth year must be between 1900 and {current_year}."""
         """
         Check if top matches are ambiguous (within threshold).
 
-        Returns True if multiple candidates are within ambiguity_threshold
+        Returns True if multiple candidates are within ambiguity_threshold,
+        unless the top match has a high confidence score (e.g., small typo).
         """
         if len(candidates) < 2:
             return False
 
         top_score = candidates[0].score
+
+        # High confidence match - auto-select (e.g., "Ithnga" -> "Ithanga")
+        if top_score >= self.high_confidence_threshold:
+            return False
+
         second_score = candidates[1].score
 
         return (top_score - second_score) <= self.ambiguity_threshold
