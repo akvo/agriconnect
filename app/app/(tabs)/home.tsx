@@ -96,7 +96,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                85%
+                XX%
               </Text>
             </View>
             <View>
@@ -113,7 +113,7 @@ export default function HomeScreen() {
                   },
                 ]}
               >
-                Your goal is to reach 1000 farmers per month
+                Your goal is to reach XXX farmers per month
               </Text>
             </View>
           </View>
@@ -247,7 +247,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                2410
+                XXX
               </Text>
               <Feathericons
                 name="user-plus"
@@ -274,7 +274,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                125
+                XXX
               </Text>
               <Feathericons
                 name="check-circle"
@@ -301,7 +301,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                5032
+                XXX
               </Text>
               <Feathericons
                 name="message-circle"
@@ -328,7 +328,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                15 min
+                XX min
               </Text>
               <Feathericons
                 name="clock"

@@ -53,7 +53,9 @@ class Ticket(Base):
 
     customer = relationship("Customer", back_populates="tickets")
     message = relationship("Message", foreign_keys=[message_id])
-    context_message = relationship("Message", foreign_keys=[context_message_id])
+    context_message = relationship(
+        "Message", foreign_keys=[context_message_id]
+    )
     resolver = relationship("User")
     ticket_administrative = relationship(
         "Administrative", back_populates="tickets"
