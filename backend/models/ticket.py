@@ -39,6 +39,9 @@ class Ticket(Base):
     message_id = Column(
         Integer, ForeignKey("messages.id"), nullable=False
     )
+    context_message_id = Column(
+        Integer, ForeignKey("messages.id"), nullable=True
+    )
     resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     tag = Column(Integer, nullable=True)  # TicketTag enum value
@@ -49,7 +52,10 @@ class Ticket(Base):
     )
 
     customer = relationship("Customer", back_populates="tickets")
-    message = relationship("Message")
+    message = relationship("Message", foreign_keys=[message_id])
+    context_message = relationship(
+        "Message", foreign_keys=[context_message_id]
+    )
     resolver = relationship("User")
     ticket_administrative = relationship(
         "Administrative", back_populates="tickets"

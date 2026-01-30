@@ -20,7 +20,12 @@ const TicketItem: React.FC<{
 }) => {
   // Compute display values from API response
   const isUnread = ticket.unreadCount ?? 0;
-  const messageContent = ticket.lastMessage?.body || ticket.message?.body || "";
+  // Use contextMessage (original question) for preview - shows what the ticket is about
+  // Fallback to message (escalation message) if no context available
+  const messageContent =
+    ticket.contextMessage?.body ||
+    ticket.message?.body ||
+    "";
   const messageTimestamp =
     ticket.lastMessage?.timestamp ||
     ticket.message?.timestamp ||

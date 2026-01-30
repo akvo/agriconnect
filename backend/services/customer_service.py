@@ -16,6 +16,7 @@ from models.customer import (
 )
 from models.ticket import Ticket
 from models.message import Message
+from schemas.callback import MessageType
 from models.broadcast import BroadcastGroupContact, BroadcastRecipient
 from models.weather_broadcast import WeatherBroadcastRecipient
 from datetime import datetime, timezone
@@ -475,6 +476,38 @@ class CustomerService:
         # Skip if admin_id is still None
         if admin_id is None:
             return None
+
+        # Find the original question (context message)
+        # Look for FOLLOW_UP message before ticket message, then get
+        # the customer question that triggered the follow-up
+        context_message_id = None
+        ticket_message = self.db.query(Message).get(message_id)
+        if ticket_message:
+            # Find most recent FOLLOW_UP before ticket message
+            follow_up = (
+                self.db.query(Message)
+                .filter(
+                    Message.customer_id == customer.id,
+                    Message.message_type == MessageType.FOLLOW_UP,
+                    Message.created_at <= ticket_message.created_at,
+                )
+                .order_by(Message.created_at.desc())
+                .first()
+            )
+            if follow_up:
+                # Find message just before the FOLLOW_UP (original question)
+                original_question = (
+                    self.db.query(Message)
+                    .filter(
+                        Message.customer_id == customer.id,
+                        Message.created_at < follow_up.created_at,
+                    )
+                    .order_by(Message.created_at.desc())
+                    .first()
+                )
+                if original_question:
+                    context_message_id = original_question.id
+
         now = datetime.now(timezone.utc)
         ticket_number = now.strftime("%Y%m%d%H%M%S")
         ticket = Ticket(
@@ -482,6 +515,7 @@ class CustomerService:
             administrative_id=admin_id,
             customer_id=customer.id,
             message_id=message_id,
+            context_message_id=context_message_id,
         )
         self.db.add(ticket)
         self.db.commit()

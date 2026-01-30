@@ -94,6 +94,12 @@ class TicketSyncService {
         await this.syncTicketsToLocal(db, apiTickets, userId);
       }
 
+      // Clean up orphaned local tickets (exist locally but not on backend)
+      // Only do this on page 1 to avoid repeated cleanup
+      if (page === 1) {
+        await this.cleanupOrphanedTickets(db, status, apiTickets);
+      }
+
       // Return fresh data from local database to ensure consistency
       const localResult = dao.ticket.findByStatus(db, status, page, pageSize);
 
@@ -134,10 +140,17 @@ class TicketSyncService {
         }
 
         // 2. Sync initial message if available
-
         if (apiTicket.message) {
           await this.syncMessage(db, {
             ...apiTicket.message,
+            customer_id: customerId,
+          });
+        }
+
+        // 2b. Sync context message (original question) if available
+        if (apiTicket.context_message) {
+          await this.syncMessage(db, {
+            ...apiTicket.context_message,
             customer_id: customerId,
           });
         }
@@ -163,6 +176,7 @@ class TicketSyncService {
           await this.syncTicket(db, {
             ...apiTicket,
             messageId: apiTicket.message.id,
+            contextMessageId: apiTicket.context_message?.id || null,
             customerId,
           });
         } else {
@@ -305,11 +319,23 @@ class TicketSyncService {
         ticketNumber: ticketData.ticketNumber || ticketData.ticket_number,
         customerId: ticketData.customerId,
         messageId: ticketData.messageId,
+        contextMessageId: ticketData.contextMessageId || null,
         status: status, // Use derived status, not API status
         resolvedAt: resolvedAt,
         resolvedBy: ticketData?.resolver?.id || null,
         unreadCount: unreadCount, // Use preserved value
       });
+
+      // When a ticket is resolved, mark WHISPERs created before resolution as used
+      // This prevents old suggestions from showing up in new tickets
+      // Only marks WHISPERs created before or at the resolvedAt time
+      if (resolvedAt && ticketData.customerId) {
+        dao.message.markWhispersAsUsedBefore(
+          db,
+          ticketData.customerId,
+          resolvedAt,
+        );
+      }
     } catch (error) {
       console.error("Error syncing ticket:", error);
       throw error;
@@ -333,6 +359,15 @@ class TicketSyncService {
 
       if (!apiTicket) {
         console.warn(`[TicketSync] Ticket ${ticketId} not found in API`);
+        // Delete local ticket if it exists but not on backend
+        const dao = new DAOManager(db);
+        const localTicket = dao.ticket.findById(db, ticketId);
+        if (localTicket) {
+          console.log(
+            `[TicketSync] Deleting orphaned local ticket ${ticketId}`,
+          );
+          dao.ticket.delete(db, ticketId);
+        }
         return false;
       }
 
@@ -392,6 +427,49 @@ class TicketSyncService {
     } catch (error) {
       console.error(`[TicketSync] Error getting ticket ${ticketId}:`, error);
       return null;
+    }
+  }
+  /**
+   * Clean up local tickets that no longer exist on the backend
+   * This ensures the mobile app stays in sync with the server
+   */
+  private static async cleanupOrphanedTickets(
+    db: SQLiteDatabase,
+    status: "open" | "resolved",
+    apiTickets: any[],
+  ): Promise<void> {
+    try {
+      const dao = new DAOManager(db);
+
+      // Get all local tickets for this status
+      const localResult = dao.ticket.findByStatus(db, status, 1, 1000);
+      const localTickets = localResult.tickets;
+
+      // Create a set of API ticket IDs for fast lookup
+      const apiTicketIds = new Set(apiTickets.map((t) => t.id));
+
+      // Find tickets that exist locally but not on the backend
+      const orphanedTickets = localTickets.filter(
+        (local) => !apiTicketIds.has(local.id),
+      );
+
+      if (orphanedTickets.length > 0) {
+        console.log(
+          `[TicketSync] Cleaning up ${orphanedTickets.length} orphaned ${status} tickets`,
+        );
+
+        for (const orphan of orphanedTickets) {
+          console.log(
+            `[TicketSync] Deleting orphaned ticket: ${orphan.ticketNumber}`,
+          );
+          dao.ticket.delete(db, orphan.id);
+        }
+
+        console.log("[TicketSync] Orphaned tickets cleanup complete");
+      }
+    } catch (error) {
+      console.error("[TicketSync] Error cleaning up orphaned tickets:", error);
+      // Don't throw - cleanup failure shouldn't break the sync
     }
   }
 }
