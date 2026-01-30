@@ -374,7 +374,9 @@ trans: Dict[str, Any] = {
             ),
         },
         "ask_delete_data": {
-            "en": "To remove yourself from AgriConnect please message *DELETE*.",
+            "en": (
+                "To remove yourself from AgriConnect please message *DELETE*."
+            ),
             "sw": (
                 "Ili kujiondoa kwenye AgriConnect tafadhali tuma ujumbe "
                 "*DELETE* au *FUTA*."
@@ -413,7 +415,8 @@ trans: Dict[str, Any] = {
         "subscribed": {
             "en": (
                 "Great! You will receive daily updates for {area_name}.\n\n"
-                "Please message *weather* to get weather information on-demand."
+                "Please message *weather* to get weather information "
+                "on-demand."
             ),
             "sw": (
                 "Vizuri! Utapokea taarifa za hali ya hewa kila siku "
@@ -426,7 +429,8 @@ trans: Dict[str, Any] = {
             "en": (
                 "No problem! You can subscribe anytime by messaging "
                 "'weather updates'.\n\n"
-                "Please message *weather* to get weather information on-demand."
+                "Please message *weather* to get weather information "
+                "on-demand."
             ),
             "sw": (
                 "Hakuna shida! Unaweza kujisajili wakati wowote kwa kutuma "
