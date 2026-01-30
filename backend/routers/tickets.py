@@ -3,13 +3,14 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, or_
 from datetime import datetime, timezone
 
 from database import get_db
 from models.ticket import Ticket
 from models.customer import Customer
 from models.message import Message, MessageFrom
+from schemas.callback import MessageType
 from models.user import User, UserType
 from models.administrative import UserAdministrative, Administrative
 from schemas.ticket import (
@@ -352,8 +353,13 @@ async def get_ticket_conversation(
     # 2. Messages from ALL users (from_source = USER)
     # 3. Messages from LLM (from_source = LLM)
     # This allows all agents to see the full conversation history
+    # Exclude BROADCAST messages (e.g., weather broadcasts) from ticket view
     msgs_query = db.query(Message).filter(
-        Message.customer_id == ticket.customer_id
+        Message.customer_id == ticket.customer_id,
+        or_(
+            Message.message_type.is_(None),
+            Message.message_type != MessageType.BROADCAST,
+        ),
     )
 
     if before_ts:
