@@ -372,9 +372,36 @@ class TestOnboardingService:
         assert len(westlands_names) == 2
 
     def test_is_ambiguous_true(self, db_session, onboarding_service):
-        """Test ambiguity detection when scores are close"""
+        """Test ambiguity when scores are close but below high confidence"""
         from schemas.onboarding_schemas import MatchCandidate
 
+        # Scores below high_confidence_threshold (90) but within ambiguity (15)
+        candidates = [
+            MatchCandidate(
+                id=1,
+                name="Ward 1",
+                path="Path 1",
+                level="ward",
+                score=85.0,
+            ),
+            MatchCandidate(
+                id=2,
+                name="Ward 2",
+                path="Path 2",
+                level="ward",
+                score=80.0,
+            ),  # Within 15 points
+        ]
+
+        assert onboarding_service._is_ambiguous(candidates) is True
+
+    def test_is_ambiguous_false_high_confidence(
+        self, db_session, onboarding_service
+    ):
+        """Test high confidence scores auto-select without candidates"""
+        from schemas.onboarding_schemas import MatchCandidate
+
+        # Score >= 90 should auto-select even if second is within 15 points
         candidates = [
             MatchCandidate(
                 id=1,
@@ -389,10 +416,10 @@ class TestOnboardingService:
                 path="Path 2",
                 level="ward",
                 score=92.0,
-            ),  # Within 15 points
+            ),  # Within 15 points but top is high confidence
         ]
 
-        assert onboarding_service._is_ambiguous(candidates) is True
+        assert onboarding_service._is_ambiguous(candidates) is False
 
     def test_is_ambiguous_false(self, db_session, onboarding_service):
         """Test ambiguity detection when scores are far apart"""
