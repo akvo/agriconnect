@@ -8,8 +8,8 @@ CONTEXT:
 WEATHER DATA:
 {{ weather_data }}
 
-FARMER PROFILE:
-{{ farmer_profile }}
+FARMER CROP:
+{{ farmer_crop }}
 
 OUTPUT REQUIREMENTS:
 - Maximum 1000 characters

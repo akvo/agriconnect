@@ -166,11 +166,12 @@ class WeatherIntentService:
             lon=admin_area.long,
         )
 
-        # Generate weather message
+        # Generate weather message with customer's crop type
         weather_message = await weather_svc.generate_message(
             location=location,
             language=lang,
             weather_data=weather_data,
+            farmer_crop=customer.crop_type,
         )
 
         if not weather_message:

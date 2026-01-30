@@ -39,6 +39,12 @@ class WeatherMessageRequest(BaseModel):
         description="Longitude for OneCall 3.0 API (optional)",
         json_schema_extra={"example": 36.8219},
     )
+    crop_type: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="Crop type for specific weather suggestions",
+        json_schema_extra={"example": "Avocado"},
+    )
     language: LanguageEnum = Field(
         default=LanguageEnum.ENGLISH,
         description="Language for the generated message",

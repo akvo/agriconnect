@@ -245,6 +245,7 @@ class WeatherBroadcastService:
         location: str,
         language: str = "en",
         weather_data: Optional[Dict[str, Any]] = None,
+        farmer_crop: Optional[str] = None,
     ) -> Optional[str]:
         """
         Generate a weather broadcast message for farmers.
@@ -253,6 +254,7 @@ class WeatherBroadcastService:
             location: Location name for the forecast
             language: Language code ("en" or "sw")
             weather_data: Optional pre-fetched weather data
+            farmer_crop: Optional crop type for specific suggestions
 
         Returns:
             Generated message string or None if error
@@ -277,6 +279,7 @@ class WeatherBroadcastService:
             location=location,
             language=language,
             weather_data=json.dumps(weather_data, indent=2),
+            farmer_crop=farmer_crop or "Not specified",
         )
 
         # Generate message using OpenAI

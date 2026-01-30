@@ -68,26 +68,27 @@ def send_weather_broadcasts() -> Dict[str, Any]:
 
         for customer, admin_id in customers_with_areas:
             if customer.weather_subscribed is True:
-                all_subscribed.append((customer.id, admin_id))
+                crop = customer.crop_type or "unknown"
+                all_subscribed.append((customer.id, admin_id, crop))
 
         if not all_subscribed:
             logger.info("No customers with weather subscription")
             return {"areas_processed": 0, "broadcasts_created": 0}
 
-        # Group by administrative area
+        # Group by (administrative area, crop_type)
         from collections import defaultdict
-        by_area = defaultdict(list)
-        for customer_id, admin_id in all_subscribed:
-            by_area[admin_id].append(customer_id)
+        by_area_crop = defaultdict(list)
+        for customer_id, admin_id, crop in all_subscribed:
+            by_area_crop[(admin_id, crop)].append(customer_id)
 
         logger.info(
-            f"Found {len(by_area)} areas with subscribed customers"
+            f"Found {len(by_area_crop)} area+crop groups with subscribers"
         )
 
         broadcasts_created = 0
         errors = []
 
-        for admin_id, customer_ids in by_area.items():
+        for (admin_id, crop_type), customer_ids in by_area_crop.items():
             try:
                 # Get administrative area
                 area = db.query(Administrative).filter(
@@ -122,9 +123,10 @@ def send_weather_broadcasts() -> Dict[str, Any]:
                 # So farmer sees their local area first
                 location_name = ", ".join(path_parts)
 
-                # Create weather broadcast for this area
+                # Create weather broadcast for this area+crop
                 weather_broadcast = WeatherBroadcast(
                     administrative_id=admin_id,
+                    crop_type=crop_type,
                     location_name=location_name,
                     status='pending',
                     scheduled_at=datetime.utcnow(),
@@ -140,14 +142,20 @@ def send_weather_broadcasts() -> Dict[str, Any]:
 
                 logger.info(
                     f"Created weather broadcast {weather_broadcast.id} "
-                    f"for area {area.name} ({len(customer_ids)} subscribers)"
+                    f"for area {area.name}, crop {crop_type} "
+                    f"({len(customer_ids)} subscribers)"
                 )
 
             except Exception as e:
                 logger.error(
-                    f"Failed to create broadcast for area {admin_id}: {e}"
+                    f"Failed to create broadcast for area {admin_id}, "
+                    f"crop {crop_type}: {e}"
                 )
-                errors.append({"area_id": admin_id, "error": str(e)})
+                errors.append({
+                    "area_id": admin_id,
+                    "crop_type": crop_type,
+                    "error": str(e)
+                })
                 db.rollback()
 
         logger.info(
@@ -156,7 +164,7 @@ def send_weather_broadcasts() -> Dict[str, Any]:
         )
 
         return {
-            "areas_processed": len(by_area),
+            "groups_processed": len(by_area_crop),
             "broadcasts_created": broadcasts_created,
             "errors": errors if errors else None
         }
@@ -215,7 +223,7 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
 
         broadcast.weather_data = weather_data
 
-        # Generate messages in both languages
+        # Generate messages in both languages with crop-specific advice
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -223,14 +231,16 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
                 weather_service.generate_message(
                     location=broadcast.location_name,
                     language="en",
-                    weather_data=weather_data
+                    weather_data=weather_data,
+                    farmer_crop=broadcast.crop_type,
                 )
             )
             message_sw = loop.run_until_complete(
                 weather_service.generate_message(
                     location=broadcast.location_name,
                     language="sw",
-                    weather_data=weather_data
+                    weather_data=weather_data,
+                    farmer_crop=broadcast.crop_type,
                 )
             )
         finally:
@@ -246,7 +256,7 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
         broadcast.generated_message_sw = message_sw or message_en
         db.commit()
 
-        # Get subscribed customers for this area
+        # Get subscribed customers for this area with matching crop_type
         customers_in_area = (
             db.query(Customer)
             .join(
@@ -260,8 +270,12 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
             .all()
         )
 
-        # Filter for subscribed customers
-        subscribers = [c for c in customers_in_area if c.weather_subscribed]
+        # Filter for subscribed customers with matching crop_type
+        subscribers = [
+            c for c in customers_in_area
+            if c.weather_subscribed
+            and (c.crop_type or "unknown") == broadcast.crop_type
+        ]
 
         if not subscribers:
             broadcast.status = 'completed'

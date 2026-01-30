@@ -247,6 +247,76 @@ class TestWeatherBroadcastService:
             assert result == "Weather message"
 
     @pytest.mark.asyncio
+    async def test_generate_message_with_farmer_crop(
+        self, weather_service, mock_openai_service
+    ):
+        """Test message generation with farmer_crop parameter"""
+        mock_forecast = {"current": {"temp": 25}}
+        template_content = (
+            "Location: {{ location }}\n"
+            "Crop: {{ farmer_crop }}\n"
+            "Weather: {{ weather_data }}"
+        )
+
+        with patch.object(
+            weather_service,
+            "_load_prompt_template",
+            return_value=template_content,
+        ):
+            mock_response = MagicMock()
+            mock_response.content = "Avocado-specific weather advice"
+            mock_openai_service.chat_completion = AsyncMock(
+                return_value=mock_response
+            )
+
+            result = await weather_service.generate_message(
+                location="Kiru, Mathioya",
+                language="en",
+                weather_data=mock_forecast,
+                farmer_crop="Avocado",
+            )
+
+            assert result == "Avocado-specific weather advice"
+            # Verify the prompt includes the farmer_crop
+            call_args = mock_openai_service.chat_completion.call_args
+            prompt = call_args[1]["messages"][1]["content"]
+            assert "Avocado" in prompt
+
+    @pytest.mark.asyncio
+    async def test_generate_message_without_farmer_crop_defaults(
+        self, weather_service, mock_openai_service
+    ):
+        """Test message generation without farmer_crop uses default"""
+        mock_forecast = {"current": {"temp": 25}}
+        template_content = (
+            "Location: {{ location }}\n"
+            "Crop: {{ farmer_crop }}"
+        )
+
+        with patch.object(
+            weather_service,
+            "_load_prompt_template",
+            return_value=template_content,
+        ):
+            mock_response = MagicMock()
+            mock_response.content = "General weather advice"
+            mock_openai_service.chat_completion = AsyncMock(
+                return_value=mock_response
+            )
+
+            result = await weather_service.generate_message(
+                location="Nairobi",
+                language="en",
+                weather_data=mock_forecast,
+            )
+
+            assert result == "General weather advice"
+            # Verify the prompt includes "Not specified" as default
+            call_args = mock_openai_service.chat_completion.call_args
+            prompt = call_args[1]["messages"][1]["content"]
+            assert "Not specified" in prompt
+
+    @pytest.mark.asyncio
     async def test_generate_message_no_template(
         self, weather_service, mock_openai_service
     ):

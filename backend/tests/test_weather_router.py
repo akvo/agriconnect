@@ -103,6 +103,7 @@ class TestWeatherRouter:
                 location="Nairobi",
                 language="en",
                 weather_data={"temp": 25},
+                farmer_crop=None,
             )
 
     def test_test_message_swahili(self, client, db_session):
@@ -135,6 +136,7 @@ class TestWeatherRouter:
                 location="Dar es Salaam",
                 language="sw",
                 weather_data={"temp": 28},
+                farmer_crop=None,
             )
 
     def test_test_message_service_failure(self, client, db_session):
@@ -223,6 +225,7 @@ class TestWeatherRouter:
                 location="Nairobi",
                 language="en",
                 weather_data={"temp": 22},
+                farmer_crop=None,
             )
 
     # Tests for trigger-broadcast endpoint
@@ -304,3 +307,42 @@ class TestWeatherRouter:
 
             assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
             assert "not configured" in response.json()["detail"]
+
+    def test_test_message_with_crop_type(self, client, db_session):
+        """Test weather message generation with crop_type"""
+        token = self._create_admin_and_login(client, db_session)
+
+        with patch(
+            "routers.weather.get_weather_broadcast_service"
+        ) as mock_service:
+            mock_instance = mock_service.return_value
+            mock_instance.get_weather_data.return_value = {"temp": 25}
+            mock_instance.generate_message = AsyncMock(
+                return_value="Avocado weather tips: Avoid spraying today."
+            )
+
+            response = client.post(
+                "/api/admin/weather/test-message",
+                json={
+                    "location": "Kiru, Mathioya",
+                    "lat": -0.85,
+                    "lon": 36.95,
+                    "crop_type": "Avocado",
+                    "language": "en",
+                },
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == status.HTTP_200_OK
+            assert "Avocado" in response.text
+            mock_instance.get_weather_data.assert_called_once_with(
+                location="Kiru, Mathioya",
+                lat=-0.85,
+                lon=36.95,
+            )
+            mock_instance.generate_message.assert_called_once_with(
+                location="Kiru, Mathioya",
+                language="en",
+                weather_data={"temp": 25},
+                farmer_crop="Avocado",
+            )
