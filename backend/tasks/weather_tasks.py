@@ -118,8 +118,8 @@ def send_weather_broadcasts() -> Dict[str, Any]:
                         Administrative.id == current.parent_id
                     ).first()
 
-                # Reverse to get top-down order (Region, District, Ward)
-                path_parts.reverse()
+                # Keep bottom-up order (Ward, District, Region)
+                # So farmer sees their local area first
                 location_name = ", ".join(path_parts)
 
                 # Create weather broadcast for this area
@@ -197,9 +197,14 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
         # Generate weather messages (EN and SW)
         weather_service = get_weather_broadcast_service()
 
-        # Get weather data
-        location = broadcast.location_name
-        weather_data = weather_service.get_forecast_raw(location)
+        # Get weather data using centralized method (respects config)
+        area = broadcast.administrative
+        weather_data = weather_service.get_weather_data(
+            location=broadcast.location_name,
+            lat=area.lat if area else None,
+            lon=area.long if area else None,
+        )
+
         if not weather_data:
             broadcast.status = 'failed'
             db.commit()

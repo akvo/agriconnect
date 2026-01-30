@@ -278,6 +278,10 @@ class Settings(BaseSettings):
     weather_broadcast_enabled: bool = _config.get("weather", {}).get(
         "broadcast_enabled", False
     )
+    # Weather API version: "2.5" (location-based) or "3.0" (OneCall, lat/lon)
+    weather_api_version: str = _config.get("weather", {}).get(
+        "api_version", "2.5"
+    )
     # Keywords for detecting weather-related messages
     weather_intent_keywords: List[str] = _config.get("weather", {}).get(
         "intent_keywords", ["weather", "forecast", "hali ya hewa"]

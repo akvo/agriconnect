@@ -257,7 +257,7 @@ class TestSendWeatherTemplates:
             "tasks.weather_tasks.get_weather_broadcast_service"
         ) as mock_ws:
             mock_service = MagicMock()
-            mock_service.get_forecast_raw.return_value = None
+            mock_service.get_weather_data.return_value = None
             mock_ws.return_value = mock_service
 
             result = send_weather_templates(test_weather_broadcast.id)
@@ -288,7 +288,7 @@ class TestSendWeatherTemplates:
             "tasks.weather_tasks.get_weather_broadcast_service"
         ) as mock_ws:
             mock_service = MagicMock()
-            mock_service.get_forecast_raw.return_value = {"temp": 25}
+            mock_service.get_weather_data.return_value = {"temp": 25}
 
             # Create async mock for generate_message
             async def mock_generate(*args, **kwargs):
@@ -328,7 +328,7 @@ class TestSendWeatherTemplates:
             "tasks.weather_tasks.get_weather_broadcast_service"
         ) as mock_ws:
             mock_service = MagicMock()
-            mock_service.get_forecast_raw.return_value = {"temp": 25}
+            mock_service.get_weather_data.return_value = {"temp": 25}
 
             async def mock_generate(*args, **kwargs):
                 return "Test weather message"
@@ -554,7 +554,7 @@ class TestWeatherTasksIntegration:
             "tasks.weather_tasks.get_weather_broadcast_service"
         ) as mock_wbs:
             weather_service = MagicMock()
-            weather_service.get_forecast_raw.return_value = {"temp": 25}
+            weather_service.get_weather_data.return_value = {"temp": 25}
 
             async def mock_generate(*args, **kwargs):
                 return "Test weather message"

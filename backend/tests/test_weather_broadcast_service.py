@@ -372,3 +372,95 @@ class TestWeatherBroadcastService:
         service2 = get_weather_broadcast_service()
 
         assert service1 is service2
+
+    def test_get_weather_data_uses_api_30_when_configured(
+        self, weather_service, mock_settings
+    ):
+        """Test get_weather_data uses OneCall 3.0 when config is 3.0"""
+        mock_settings.weather_api_version = "3.0"
+        mock_current = {"current": {"temp": 25}}
+
+        with patch.object(
+            weather_service, "get_current_raw", return_value=mock_current
+        ) as mock_current_raw:
+            with patch.object(
+                weather_service, "get_forecast_raw"
+            ) as mock_forecast_raw:
+                result = weather_service.get_weather_data(
+                    location="Nairobi",
+                    lat=-1.29,
+                    lon=36.82,
+                )
+
+                assert result == mock_current
+                mock_current_raw.assert_called_once_with(lat=-1.29, lon=36.82)
+                mock_forecast_raw.assert_not_called()
+
+    def test_get_weather_data_uses_api_25_when_configured(
+        self, weather_service, mock_settings
+    ):
+        """Test get_weather_data uses API 2.5 when config is 2.5"""
+        mock_settings.weather_api_version = "2.5"
+        mock_forecast = {"city": {"name": "Nairobi"}}
+
+        with patch.object(
+            weather_service, "get_current_raw"
+        ) as mock_current_raw:
+            with patch.object(
+                weather_service, "get_forecast_raw", return_value=mock_forecast
+            ) as mock_forecast_raw:
+                result = weather_service.get_weather_data(
+                    location="Nairobi",
+                    lat=-1.29,
+                    lon=36.82,
+                )
+
+                assert result == mock_forecast
+                mock_current_raw.assert_not_called()
+                mock_forecast_raw.assert_called_once_with("Nairobi")
+
+    def test_get_weather_data_fallback_when_no_coordinates(
+        self, weather_service, mock_settings
+    ):
+        """Test get_weather_data falls back to 2.5 when no coordinates"""
+        mock_settings.weather_api_version = "3.0"
+        mock_forecast = {"city": {"name": "Nairobi"}}
+
+        with patch.object(
+            weather_service, "get_current_raw"
+        ) as mock_current_raw:
+            with patch.object(
+                weather_service, "get_forecast_raw", return_value=mock_forecast
+            ) as mock_forecast_raw:
+                result = weather_service.get_weather_data(
+                    location="Nairobi",
+                    lat=None,
+                    lon=None,
+                )
+
+                assert result == mock_forecast
+                mock_current_raw.assert_not_called()
+                mock_forecast_raw.assert_called_once_with("Nairobi")
+
+    def test_get_weather_data_fallback_when_onecall_fails(
+        self, weather_service, mock_settings
+    ):
+        """Test get_weather_data falls back to 2.5 when OneCall fails"""
+        mock_settings.weather_api_version = "3.0"
+        mock_forecast = {"city": {"name": "Nairobi"}}
+
+        with patch.object(
+            weather_service, "get_current_raw", return_value=None
+        ) as mock_current_raw:
+            with patch.object(
+                weather_service, "get_forecast_raw", return_value=mock_forecast
+            ) as mock_forecast_raw:
+                result = weather_service.get_weather_data(
+                    location="Nairobi",
+                    lat=-1.29,
+                    lon=36.82,
+                )
+
+                assert result == mock_forecast
+                mock_current_raw.assert_called_once_with(lat=-1.29, lon=36.82)
+                mock_forecast_raw.assert_called_once_with("Nairobi")

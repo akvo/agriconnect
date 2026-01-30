@@ -81,6 +81,7 @@ class TestWeatherRouter:
             "routers.weather.get_weather_broadcast_service"
         ) as mock_service:
             mock_instance = mock_service.return_value
+            mock_instance.get_weather_data.return_value = {"temp": 25}
             mock_instance.generate_message = AsyncMock(
                 return_value="Good morning! Sunny day ahead."
             )
@@ -93,9 +94,15 @@ class TestWeatherRouter:
 
             assert response.status_code == status.HTTP_200_OK
             assert response.text == "Good morning! Sunny day ahead."
+            mock_instance.get_weather_data.assert_called_once_with(
+                location="Nairobi",
+                lat=None,
+                lon=None,
+            )
             mock_instance.generate_message.assert_called_once_with(
                 location="Nairobi",
                 language="en",
+                weather_data={"temp": 25},
             )
 
     def test_test_message_swahili(self, client, db_session):
@@ -106,6 +113,7 @@ class TestWeatherRouter:
             "routers.weather.get_weather_broadcast_service"
         ) as mock_service:
             mock_instance = mock_service.return_value
+            mock_instance.get_weather_data.return_value = {"temp": 28}
             mock_instance.generate_message = AsyncMock(
                 return_value="Habari za asubuhi! Siku ya jua."
             )
@@ -118,9 +126,15 @@ class TestWeatherRouter:
 
             assert response.status_code == status.HTTP_200_OK
             assert response.text == "Habari za asubuhi! Siku ya jua."
+            mock_instance.get_weather_data.assert_called_once_with(
+                location="Dar es Salaam",
+                lat=None,
+                lon=None,
+            )
             mock_instance.generate_message.assert_called_once_with(
                 location="Dar es Salaam",
                 language="sw",
+                weather_data={"temp": 28},
             )
 
     def test_test_message_service_failure(self, client, db_session):
@@ -188,6 +202,7 @@ class TestWeatherRouter:
             "routers.weather.get_weather_broadcast_service"
         ) as mock_service:
             mock_instance = mock_service.return_value
+            mock_instance.get_weather_data.return_value = {"temp": 22}
             mock_instance.generate_message = AsyncMock(
                 return_value="Weather message"
             )
@@ -199,9 +214,15 @@ class TestWeatherRouter:
             )
 
             assert response.status_code == status.HTTP_200_OK
+            mock_instance.get_weather_data.assert_called_once_with(
+                location="Nairobi",
+                lat=None,
+                lon=None,
+            )
             mock_instance.generate_message.assert_called_once_with(
                 location="Nairobi",
                 language="en",
+                weather_data={"temp": 22},
             )
 
     # Tests for trigger-broadcast endpoint

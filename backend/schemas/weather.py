@@ -25,6 +25,20 @@ class WeatherMessageRequest(BaseModel):
         description="Location name (e.g., 'Nairobi', 'Dar es Salaam')",
         json_schema_extra={"example": "Nairobi"},
     )
+    lat: Optional[float] = Field(
+        default=None,
+        ge=-90,
+        le=90,
+        description="Latitude for OneCall 3.0 API (optional)",
+        json_schema_extra={"example": -1.2921},
+    )
+    lon: Optional[float] = Field(
+        default=None,
+        ge=-180,
+        le=180,
+        description="Longitude for OneCall 3.0 API (optional)",
+        json_schema_extra={"example": 36.8219},
+    )
     language: LanguageEnum = Field(
         default=LanguageEnum.ENGLISH,
         description="Language for the generated message",
