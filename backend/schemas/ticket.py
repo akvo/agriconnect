@@ -32,6 +32,7 @@ class TicketModel(BaseModel):
     ticket_number: Optional[str]
     customer: Optional[TicketCustomer]
     message: Optional[TicketMessage]
+    context_message: Optional[TicketMessage] = None
     status: Optional[str]
     created_at: Optional[datetime]
     resolved_at: Optional[datetime]

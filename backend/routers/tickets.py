@@ -80,6 +80,7 @@ def _serialize_ticket(
 
     customer = ticket.customer
     message = ticket.message
+    context_message = ticket.context_message
 
     ward = None
     if (
@@ -112,6 +113,14 @@ def _serialize_ticket(
                 "message_sid": message.message_sid,
                 "created_at": message.created_at.isoformat()
             } if message else None
+        ),
+        "context_message": (
+            {
+                "id": context_message.id,
+                "body": context_message.body,
+                "message_sid": context_message.message_sid,
+                "created_at": context_message.created_at.isoformat()
+            } if context_message else None
         ),
         "status": "resolved" if ticket.resolved_at else "open",
         "created_at": ticket.created_at.isoformat(),
@@ -379,12 +388,49 @@ async def get_ticket_conversation(
             # ignore invalid before_ts, return from ticket start
             pass
     else:
-        # Default: start from ticket's escalation message onwards
-        # and before next ticket's escalation message
+        # Default: include context before ticket's escalation message
+        # Look for FOLLOW_UP and the original question that triggered it
+        start_time = None
         if ticket_message and ticket_message.created_at:
-            msgs_query = msgs_query.filter(
-                Message.created_at >= ticket_message.created_at,
+            # Look for the most recent FOLLOW_UP before (or at) ticket time
+            follow_up_msg = (
+                db.query(Message)
+                .filter(
+                    Message.customer_id == ticket.customer_id,
+                    Message.message_type == MessageType.FOLLOW_UP,
+                    Message.created_at <= ticket_message.created_at,
+                )
+                .order_by(Message.created_at.desc())
+                .first()
             )
+
+            if follow_up_msg:
+                # Find the message just before FOLLOW_UP (original question)
+                original_question = (
+                    db.query(Message)
+                    .filter(
+                        Message.customer_id == ticket.customer_id,
+                        Message.created_at < follow_up_msg.created_at,
+                    )
+                    .order_by(Message.created_at.desc())
+                    .first()
+                )
+                if original_question:
+                    start_time = original_question.created_at
+                else:
+                    start_time = follow_up_msg.created_at
+            else:
+                start_time = ticket_message.created_at
+
+            # Respect previous ticket boundary
+            if previous_ticket:
+                prev_msg = previous_ticket.message
+                if prev_msg and prev_msg.created_at:
+                    if prev_msg.created_at > start_time:
+                        start_time = prev_msg.created_at
+
+            msgs_query = msgs_query.filter(Message.created_at >= start_time)
+
         # Use next ticket's message creation time as upper boundary
         # This ensures we stop BEFORE the next ticket's escalation message
         if next_ticket:

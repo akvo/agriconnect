@@ -43,6 +43,7 @@ interface TicketData {
   resolvedAt?: string | null;
   createdAt?: string | null;
   messageId?: number;
+  contextMessage?: { id: number; body: string; timestamp: string } | null;
 }
 
 interface UseTicketDataReturn {
@@ -106,6 +107,7 @@ export const useTicketData = (
             resolvedAt: ticketData.resolvedAt,
             createdAt: ticketData.createdAt,
             messageId: ticketData.message?.id,
+            contextMessage: ticketData.contextMessage || null,
             unreadCount: 0,
           });
 
@@ -176,7 +178,7 @@ export const useTicketData = (
               }
 
               const dbAiSuggestion =
-                await daoManager.message.getLastAISuggestionByCustomerId(
+                daoManager.message.getLastAISuggestionByCustomerId(
                   db,
                   ticketData.customer?.id || 0,
                 );
@@ -227,6 +229,8 @@ export const useTicketData = (
                     resolver: retryTicketData.resolver,
                     resolvedAt: retryTicketData.resolvedAt,
                     createdAt: retryTicketData.createdAt,
+                    messageId: retryTicketData.message?.id,
+                    contextMessage: retryTicketData.contextMessage || null,
                     unreadCount: 0,
                   });
 
@@ -244,7 +248,7 @@ export const useTicketData = (
 
                   // Fetch AI suggestion for the customer
                   const dbAiSuggestion =
-                    await daoManager.message.getLastAISuggestionByCustomerId(
+                    daoManager.message.getLastAISuggestionByCustomerId(
                       db,
                       retryTicketData.customer?.id || 0,
                     );

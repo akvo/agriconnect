@@ -258,19 +258,23 @@ const ChatScreen = () => {
     }
   }, [loadTicketAndMessages, isOnline]);
 
-  // Handle sticky message from messageId parameter
+  // Handle sticky message - prefer contextMessage (original question) over escalation message
   useEffect(() => {
-    if (ticket?.messageId && !loading && ticket?.customer?.id) {
-      const dbMessage = daoManager.message.findById(db, ticket.messageId);
-      if (dbMessage?.body) {
-        setStickyMessage({
-          id: dbMessage.id,
-          message_sid: dbMessage.message_sid,
-          name: dbMessage.customer_name,
-          text: dbMessage.body,
-          sender: "customer",
-          timestamp: dbMessage.createdAt,
-        });
+    if (!loading && ticket?.customer?.id) {
+      // Use contextMessage if available, otherwise fall back to messageId
+      const messageIdToUse = ticket?.contextMessage?.id || ticket?.messageId;
+      if (messageIdToUse) {
+        const dbMessage = daoManager.message.findById(db, messageIdToUse);
+        if (dbMessage?.body) {
+          setStickyMessage({
+            id: dbMessage.id,
+            message_sid: dbMessage.message_sid,
+            name: dbMessage.customer_name,
+            text: dbMessage.body,
+            sender: "customer",
+            timestamp: dbMessage.createdAt,
+          });
+        }
       }
     }
   }, [
@@ -278,6 +282,7 @@ const ChatScreen = () => {
     daoManager.message,
     loading,
     ticket?.customer?.id,
+    ticket?.contextMessage?.id,
     ticket?.messageId,
   ]);
 

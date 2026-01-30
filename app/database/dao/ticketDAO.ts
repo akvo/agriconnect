@@ -22,13 +22,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
     const stmt = hasId
       ? db.prepareSync(
           `INSERT INTO tickets (
-            id, customerId, messageId, status, ticketNumber, unreadCount, createdAt, resolvedAt, resolvedBy
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            id, customerId, messageId, contextMessageId, status, ticketNumber, unreadCount, createdAt, resolvedAt, resolvedBy
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
       : db.prepareSync(
           `INSERT INTO tickets (
-            customerId, messageId, status, ticketNumber, unreadCount, createdAt, resolvedAt, resolvedBy
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            customerId, messageId, contextMessageId, status, ticketNumber, unreadCount, createdAt, resolvedAt, resolvedBy
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         );
 
     try {
@@ -38,6 +38,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
             data.id,
             data.customerId,
             data.messageId,
+            data.contextMessageId || null,
             data.status,
             data.ticketNumber,
             data.unreadCount || 0,
@@ -48,6 +49,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         : [
             data.customerId,
             data.messageId,
+            data.contextMessageId || null,
             data.status,
             data.ticketNumber,
             data.unreadCount || 0,
@@ -97,6 +99,10 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         updates.push("lastMessageId = ?");
         values.push(data.lastMessageId);
       }
+      if (data.contextMessageId !== undefined) {
+        updates.push("contextMessageId = ?");
+        values.push(data.contextMessageId);
+      }
       if (updates.length === 0) {
         return false;
       }
@@ -137,6 +143,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
             timestamp: row.message_createdAt,
           }
         : null,
+      contextMessage: row.context_message_id
+        ? {
+            id: row.context_message_id,
+            body: row.context_message_body,
+            timestamp: row.context_message_createdAt,
+          }
+        : undefined,
       status: row.status,
       resolvedAt: row.resolvedAt || null,
       resolver: row.resolvedBy
@@ -163,11 +176,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         cu.fullName as customer_name,
         cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+        cm.id as context_message_id, cm.body as context_message_body, cm.createdAt as context_message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name,
         lm.body as last_message_body, lm.createdAt as last_message_createdAt
       FROM tickets t
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
+      LEFT JOIN messages cm ON t.contextMessageId = cm.id
       LEFT JOIN users r ON t.resolvedBy = r.id
       LEFT JOIN messages lm ON t.lastMessageId = lm.id
       WHERE t.id = ?`,
@@ -194,11 +209,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         cu.fullName as customer_name,
         cu.phoneNumber as customer_phone,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+        cm.id as context_message_id, cm.body as context_message_body, cm.createdAt as context_message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name,
         lm.body as last_message_body, lm.createdAt as last_message_createdAt
       FROM tickets t
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
+      LEFT JOIN messages cm ON t.contextMessageId = cm.id
       LEFT JOIN users r ON t.resolvedBy = r.id
       LEFT JOIN messages lm ON t.lastMessageId = lm.id
       ORDER BY t.id DESC`,
@@ -255,11 +272,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           cu.fullName as customer_name,
           cu.phoneNumber as customer_phone,
           m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+          cm.id as context_message_id, cm.body as context_message_body, cm.createdAt as context_message_createdAt,
           r.id as resolver_id, r.fullName as resolver_name,
           lm.body as last_message_body, lm.createdAt as last_message_createdAt
         FROM tickets t
         LEFT JOIN customer_users cu ON t.customerId = cu.id
         LEFT JOIN messages m ON t.messageId = m.id
+        LEFT JOIN messages cm ON t.contextMessageId = cm.id
         LEFT JOIN users r ON t.resolvedBy = r.id
         LEFT JOIN messages lm ON t.lastMessageId = lm.id
         WHERE ${whereClause}
@@ -314,6 +333,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           cu.fullName as customer_name,
           cu.phoneNumber as customer_phone,
           m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+          cm.id as context_message_id, cm.body as context_message_body, cm.createdAt as context_message_createdAt,
           r.id as resolver_id, r.fullName as resolver_name,
           lm.body as last_message_body, lm.createdAt as last_message_createdAt
         FROM tickets t
@@ -325,6 +345,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         ) selected ON t.id = selected.selected_ticket_id
         LEFT JOIN customer_users cu ON t.customerId = cu.id
         LEFT JOIN messages m ON t.messageId = m.id
+        LEFT JOIN messages cm ON t.contextMessageId = cm.id
         LEFT JOIN users r ON t.resolvedBy = r.id
         LEFT JOIN messages lm ON t.lastMessageId = lm.id
         ORDER BY t.unreadCount DESC, t.updatedAt DESC, t.createdAt DESC
@@ -357,11 +378,13 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
         cu.phoneNumber as customer_phone,
         cu.language as customer_language,
         m.id as messageId, m.body as message_body, m.createdAt as message_createdAt,
+        cm.id as context_message_id, cm.body as context_message_body, cm.createdAt as context_message_createdAt,
         r.id as resolver_id, r.fullName as resolver_name,
         lm.body as last_message_body, lm.createdAt as last_message_createdAt
       FROM tickets t
       LEFT JOIN customer_users cu ON t.customerId = cu.id
       LEFT JOIN messages m ON t.messageId = m.id
+      LEFT JOIN messages cm ON t.contextMessageId = cm.id
       LEFT JOIN users r ON t.resolvedBy = r.id
       LEFT JOIN messages lm ON t.lastMessageId = lm.id
       WHERE t.ticketNumber = ?`,
@@ -395,6 +418,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           resolvedAt: ticketData.resolvedAt,
           unreadCount: ticketData.unreadCount,
           resolvedBy: ticketData.resolvedBy,
+          contextMessageId: ticketData.contextMessageId || null,
         };
 
         this.update(db, existing.id, updateData);
@@ -405,6 +429,7 @@ export class TicketDAO extends BaseDAOImpl<Ticket> {
           id: ticketData.id, // Include API id
           customerId: ticketData.customerId,
           messageId: ticketData.messageId,
+          contextMessageId: ticketData.contextMessageId || null,
           status: ticketData.status,
           ticketNumber: ticketData.ticketNumber,
           unreadCount: ticketData.unreadCount,

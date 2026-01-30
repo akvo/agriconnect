@@ -11,6 +11,7 @@ export type Ticket = {
   id: number;
   customer: Customer;
   message: Message;
+  contextMessage?: Message;
   status: string;
   createdAt: string;
   resolver: User;
@@ -27,6 +28,7 @@ export interface CreateTicketData {
   id?: number;
   customerId: number;
   messageId: number;
+  contextMessageId?: number | null;
   status: string;
   ticketNumber: string;
   unreadCount?: number;
@@ -40,4 +42,5 @@ export interface UpdateTicketData {
   resolvedBy?: number | null;
   unreadCount?: number;
   lastMessageId?: number | null;
+  contextMessageId?: number | null;
 }

@@ -250,27 +250,30 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     limit: number = 10,
     beforeTimestamp?: string, // For pagination: load older messages
   ): MessageWithUsers[] {
-    // Get the ticket with its message timestamp (ticket escalation point)
+    // Get the ticket with its message timestamp (ticket escalation point) and resolvedAt
     const ticketStmt = db.prepareSync(
-      `SELECT t.customerId, t.createdAt as ticket_createdAt, m.createdAt as message_createdAt
+      `SELECT t.customerId, t.createdAt as ticket_createdAt, t.resolvedAt, m.createdAt as message_createdAt
        FROM tickets t
        LEFT JOIN messages m ON t.messageId = m.id
        WHERE t.id = ?`,
     );
     let customerId: number | null = null;
     let ticketMessageCreatedAt: string | null = null;
+    let ticketResolvedAt: string | null = null;
 
     try {
       const ticketResult = ticketStmt.executeSync<{
         customerId: number;
         ticket_createdAt: string;
         message_createdAt: string;
+        resolvedAt: string | null;
       }>([ticketId]);
       const ticket = ticketResult.getFirstSync();
       customerId = ticket?.customerId || null;
       // Use message creation time as the starting point (escalation point)
       ticketMessageCreatedAt =
         ticket?.message_createdAt || ticket?.ticket_createdAt || null;
+      ticketResolvedAt = ticket?.resolvedAt || null;
     } catch (error) {
       console.error("Error getting ticket info:", error);
       return [];
@@ -285,8 +288,9 @@ export class MessageDAO extends BaseDAOImpl<Message> {
 
     // Get next ticket's message creation time for upper boundary
     // This ensures we stop BEFORE the next ticket's escalation message
+    // Use ticket createdAt as fallback if messageId is null
     const nextTicketStmt = db.prepareSync(
-      `SELECT m.createdAt as message_createdAt
+      `SELECT t.createdAt as ticket_createdAt, m.createdAt as message_createdAt
        FROM tickets t
        LEFT JOIN messages m ON t.messageId = m.id
        WHERE t.customerId = ? AND t.id > ?
@@ -297,10 +301,15 @@ export class MessageDAO extends BaseDAOImpl<Message> {
 
     try {
       const nextResult = nextTicketStmt.executeSync<{
+        ticket_createdAt: string;
         message_createdAt: string;
       }>([customerId, ticketId]);
       const nextTicket = nextResult.getFirstSync();
-      nextTicketMessageCreatedAt = nextTicket?.message_createdAt || null;
+      // Use message createdAt if available, otherwise fall back to ticket createdAt
+      nextTicketMessageCreatedAt =
+        nextTicket?.message_createdAt ||
+        nextTicket?.ticket_createdAt ||
+        null;
     } catch (error) {
       console.error("Error getting next ticket:", error);
     } finally {
@@ -309,10 +318,11 @@ export class MessageDAO extends BaseDAOImpl<Message> {
 
     // Get previous ticket's message creation time for lower boundary (when paginating)
     // This ensures we only show messages after the previous ticket's escalation message
+    // Use ticket createdAt as fallback if messageId is null
     let previousTicketMessageCreatedAt: string | null = null;
     if (beforeTimestamp) {
       const prevTicketStmt = db.prepareSync(
-        `SELECT m.createdAt as message_createdAt
+        `SELECT t.createdAt as ticket_createdAt, m.createdAt as message_createdAt
          FROM tickets t
          LEFT JOIN messages m ON t.messageId = m.id
          WHERE t.customerId = ? AND t.id < ?
@@ -322,10 +332,15 @@ export class MessageDAO extends BaseDAOImpl<Message> {
 
       try {
         const prevResult = prevTicketStmt.executeSync<{
+          ticket_createdAt: string;
           message_createdAt: string;
         }>([customerId, ticketId]);
         const prevTicket = prevResult.getFirstSync();
-        previousTicketMessageCreatedAt = prevTicket?.message_createdAt || null;
+        // Use message createdAt if available, otherwise fall back to ticket createdAt
+        previousTicketMessageCreatedAt =
+          prevTicket?.message_createdAt ||
+          prevTicket?.ticket_createdAt ||
+          null;
       } catch (error) {
         console.error("Error getting previous ticket:", error);
       } finally {
@@ -334,9 +349,10 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     }
 
     // Build query with boundaries
+    // Exclude WHISPER (AI suggestions) and BROADCAST (weather broadcasts)
     let whereConditions = [
       "m.customer_id = ?",
-      "m.message_type IS NOT 'WHISPER'",
+      "(m.message_type IS NULL OR m.message_type NOT IN ('WHISPER', 'BROADCAST'))",
       "m.delivery_status NOT IN (?, ?)",
     ];
     let queryParams: any[] = [
@@ -356,14 +372,66 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         queryParams.push(previousTicketMessageCreatedAt);
       }
     } else {
-      // Initial load: get messages from ticket's message onwards
+      // Initial load: include context before ticket's escalation message
+      // Look for FOLLOW_UP and the original question that triggered it
+      let startTime = ticketMessageCreatedAt;
+
       if (ticketMessageCreatedAt) {
+        // Look for the most recent FOLLOW_UP before (or at) ticket time
+        const followUpStmt = db.prepareSync(
+          `SELECT createdAt FROM messages
+           WHERE customer_id = ?
+           AND message_type = 'FOLLOW_UP'
+           AND createdAt <= ?
+           ORDER BY createdAt DESC
+           LIMIT 1`,
+        );
+        try {
+          const followUpResult = followUpStmt.executeSync<{
+            createdAt: string;
+          }>([customerId, ticketMessageCreatedAt]);
+          const followUp = followUpResult.getFirstSync();
+
+          if (followUp) {
+            // Find the message just before FOLLOW_UP (original question)
+            const origQuestionStmt = db.prepareSync(
+              `SELECT createdAt FROM messages
+               WHERE customer_id = ?
+               AND createdAt < ?
+               ORDER BY createdAt DESC
+               LIMIT 1`,
+            );
+            try {
+              const origResult = origQuestionStmt.executeSync<{
+                createdAt: string;
+              }>([customerId, followUp.createdAt]);
+              const origQuestion = origResult.getFirstSync();
+              if (origQuestion) {
+                startTime = origQuestion.createdAt;
+              } else {
+                startTime = followUp.createdAt;
+              }
+            } finally {
+              origQuestionStmt.finalizeSync();
+            }
+          }
+        } finally {
+          followUpStmt.finalizeSync();
+        }
+
         whereConditions.push("m.createdAt >= ?");
-        queryParams.push(ticketMessageCreatedAt);
+        queryParams.push(startTime);
       }
 
-      // And before next ticket's escalation message (if exists)
-      if (nextTicketMessageCreatedAt) {
+      // Upper boundary for messages:
+      // - For resolved tickets: use resolvedAt (messages stop when ticket was resolved)
+      // - For open tickets: use next ticket's time (if exists)
+      if (ticketResolvedAt) {
+        // Resolved ticket: show messages up to when it was resolved
+        whereConditions.push("m.createdAt <= ?");
+        queryParams.push(ticketResolvedAt);
+      } else if (nextTicketMessageCreatedAt) {
+        // Open ticket with next ticket: stop before next ticket starts
         whereConditions.push("m.createdAt < ?");
         queryParams.push(nextTicketMessageCreatedAt);
       }
@@ -404,7 +472,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     db: SQLiteDatabase,
     customerId: number,
   ): Message | null {
-    // Get the last AI suggestion message for that customer and message type
+    // Get the last unused AI suggestion message for that customer
     const stmt = db.prepareSync(
       `SELECT * FROM messages m1
       WHERE m1.customer_id = ?
@@ -417,6 +485,7 @@ export class MessageDAO extends BaseDAOImpl<Message> {
         WHERE m2.customer_id = m1.customer_id
           AND m2.from_source = m1.from_source
           AND m2.message_type = 'WHISPER'
+          AND m2.is_used = 0
       )`,
     );
     try {
@@ -457,6 +526,48 @@ export class MessageDAO extends BaseDAOImpl<Message> {
     } catch (error) {
       console.error(
         `[MessageDAO] Error marking WHISPER as used for customer ${customerId}:`,
+        error,
+      );
+      return false;
+    }
+  }
+
+  // Mark WHISPER messages as used for a customer up to a certain time
+  // Called when a ticket is resolved to prevent old suggestions from showing in new tickets
+  // Only marks WHISPERs created before or at the resolvedAt time
+  markWhispersAsUsedBefore(
+    db: SQLiteDatabase,
+    customerId: number,
+    beforeOrAtTime: string,
+  ): boolean {
+    try {
+      const stmt = db.prepareSync(
+        `UPDATE messages
+         SET is_used = 1
+         WHERE customer_id = ?
+         AND from_source = ?
+         AND message_type = 'WHISPER'
+         AND is_used = 0
+         AND createdAt <= ?`,
+      );
+      try {
+        const result = stmt.executeSync([
+          customerId,
+          MessageFrom.LLM,
+          beforeOrAtTime,
+        ]);
+        if (result.changes > 0) {
+          console.log(
+            `[MessageDAO] Marked ${result.changes} WHISPER messages as used for customer ${customerId} (before ${beforeOrAtTime})`,
+          );
+        }
+        return result.changes > 0;
+      } finally {
+        stmt.finalizeSync();
+      }
+    } catch (error) {
+      console.error(
+        `[MessageDAO] Error marking WHISPERs as used for customer ${customerId}:`,
         error,
       );
       return false;
