@@ -18,7 +18,10 @@ export default function QRPage() {
           </p>
         </div>
 
-        <div className="bg-white p-6 shadow-lg inline-block" style={{ borderRadius: "12px" }}>
+        <div
+          className="bg-white p-6 shadow-lg inline-block"
+          style={{ borderRadius: "12px" }}
+        >
           <Image
             src="/wa-qr-code.png"
             alt="WhatsApp QR Code"
