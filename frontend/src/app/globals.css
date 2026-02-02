@@ -112,6 +112,16 @@ body {
   );
 }
 
+@media (prefers-color-scheme: dark) {
+  .bg-gradient-brand {
+    background: linear-gradient(
+      135deg,
+      rgb(var(--color-primary-900)),
+      rgb(var(--color-accent-900))
+    );
+  }
+}
+
 .bg-gradient-primary {
   background: linear-gradient(
     135deg,
