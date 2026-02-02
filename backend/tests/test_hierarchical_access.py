@@ -56,7 +56,7 @@ def administrative_hierarchy(db_session):
         name="Kenya",
         level_id=country_level.id,
         parent_id=None,
-        path="KEN",
+        path="Kenya",
     )
     db_session.add(kenya)
     db_session.commit()
@@ -67,14 +67,14 @@ def administrative_hierarchy(db_session):
         name="Nairobi Region",
         level_id=region_level.id,
         parent_id=kenya.id,
-        path="KEN.NAI",
+        path="Kenya > Nairobi Region",
     )
     coast = Administrative(
         code="CST",
         name="Coast Region",
         level_id=region_level.id,
         parent_id=kenya.id,
-        path="KEN.CST",
+        path="Kenya > Coast Region",
     )
     db_session.add_all([nairobi, coast])
     db_session.commit()
@@ -85,21 +85,21 @@ def administrative_hierarchy(db_session):
         name="Central District",
         level_id=district_level.id,
         parent_id=nairobi.id,
-        path="KEN.NAI.CEN",
+        path="Kenya > Nairobi Region > Central District",
     )
     eastern = Administrative(
         code="EST",
         name="Eastern District",
         level_id=district_level.id,
         parent_id=nairobi.id,
-        path="KEN.NAI.EST",
+        path="Kenya > Nairobi Region > Eastern District",
     )
     mombasa = Administrative(
         code="MBS",
         name="Mombasa District",
         level_id=district_level.id,
         parent_id=coast.id,
-        path="KEN.CST.MBS",
+        path="Kenya > Coast Region > Mombasa District",
     )
     db_session.add_all([central, eastern, mombasa])
     db_session.commit()
@@ -110,28 +110,28 @@ def administrative_hierarchy(db_session):
         name="Westlands Ward",
         level_id=ward_level.id,
         parent_id=central.id,
-        path="KEN.NAI.CEN.WST",
+        path="Kenya > Nairobi Region > Central District > Westlands Ward",
     )
     kilimani = Administrative(
         code="KIL",
         name="Kilimani Ward",
         level_id=ward_level.id,
         parent_id=central.id,
-        path="KEN.NAI.CEN.KIL",
+        path="Kenya > Nairobi Region > Central District > Kilimani Ward",
     )
     kasarani = Administrative(
         code="KAS",
         name="Kasarani Ward",
         level_id=ward_level.id,
         parent_id=eastern.id,
-        path="KEN.NAI.EST.KAS",
+        path="Kenya > Nairobi Region > Eastern District > Kasarani Ward",
     )
     nyali = Administrative(
         code="NYL",
         name="Nyali Ward",
         level_id=ward_level.id,
         parent_id=mombasa.id,
-        path="KEN.CST.MBS.NYL",
+        path="Kenya > Coast Region > Mombasa District > Nyali Ward",
     )
     db_session.add_all([westlands, kilimani, kasarani, nyali])
     db_session.commit()

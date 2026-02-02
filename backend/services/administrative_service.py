@@ -250,12 +250,12 @@ class AdministrativeService:
             return [administrative_id]
 
         # Find all wards whose path starts with this admin's path
-        # Path format: "KE.NAI.CEN.WARD" (dot-separated codes)
+        # Path format: "Kenya > Murang'a > Kiharu > Ward" (human-readable)
         descendant_wards = (
             db.query(Administrative.id)
             .join(AdministrativeLevel)
             .filter(
-                Administrative.path.like(f"{admin.path}.%"),
+                Administrative.path.like(f"{admin.path} > %"),
                 AdministrativeLevel.name == "ward"
             )
             .all()
