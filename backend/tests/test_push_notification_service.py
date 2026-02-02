@@ -257,8 +257,8 @@ class TestSendNotification:
         self, mock_send_expo, push_service
     ):
         """Test batch sending with more than MAX_BATCH_SIZE tokens."""
-        # Create 150 tokens (should be split into 2 batches)
-        tokens = [f"ExponentPushToken[token{i}]" for i in range(150)]
+        # Create 105 tokens (should be split into 2 batches: 100 + 5)
+        tokens = [f"ExponentPushToken[token{i}]" for i in range(105)]
 
         mock_send_expo.return_value = {"data": [{"status": "ok"}] * 100}
 
@@ -272,11 +272,22 @@ class TestSendNotification:
         assert mock_send_expo.call_count == 2
 
 
+ANCESTOR_IDS_PATH = (
+    "services.administrative_service.AdministrativeService.get_ancestor_ids"
+)
+
+
 class TestGetWardUserTokens:
     """Tests for get_ward_user_tokens method."""
 
-    def test_get_ward_user_tokens_success(self, push_service, mock_db):
+    @patch(ANCESTOR_IDS_PATH)
+    def test_get_ward_user_tokens_success(
+        self, mock_get_ancestors, push_service, mock_db
+    ):
         """Test fetching tokens for ward users."""
+        # Mock ancestor lookup to return empty (no upper-level EOs)
+        mock_get_ancestors.return_value = []
+
         # Mock database query chain
         mock_query = Mock()
         mock_db.query.return_value = mock_query
@@ -299,8 +310,14 @@ class TestGetWardUserTokens:
         assert "ExponentPushToken[user1]" in tokens
         assert "ExponentPushToken[user2]" in tokens
 
-    def test_get_ward_user_tokens_with_exclusions(self, push_service, mock_db):
+    @patch(ANCESTOR_IDS_PATH)
+    def test_get_ward_user_tokens_with_exclusions(
+        self, mock_get_ancestors, push_service, mock_db
+    ):
         """Test fetching tokens excluding specific users."""
+        # Mock ancestor lookup to return empty
+        mock_get_ancestors.return_value = []
+
         mock_query = Mock()
         mock_db.query.return_value = mock_query
         mock_query.filter.return_value = mock_query
