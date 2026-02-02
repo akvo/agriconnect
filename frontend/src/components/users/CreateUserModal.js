@@ -495,6 +495,22 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                             No administrative locations available
                           </div>
                         )}
+
+                      {/* Show current assignment level indicator */}
+                      {formData.administrative_id && (
+                        <div
+                          className="mt-3 p-3 bg-green-50 border border-green-200"
+                          style={{ borderRadius: "5px" }}
+                        >
+                          <p className="text-sm text-green-800">
+                            <strong>Assignment Level:</strong>{" "}
+                            {getLevelName(Object.keys(selectedLocation).length)}
+                          </p>
+                          <p className="text-xs text-green-600 mt-1">
+                            This user will have access to all subordinate areas.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

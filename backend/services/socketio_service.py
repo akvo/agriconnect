@@ -79,14 +79,33 @@ def remove_user_connection(user_id: int, sid: str):
 
 
 def get_user_wards(user: User, db: Session) -> list[int]:
+    """Get all ward IDs accessible by user (including descendants).
+
+    For upper-level EOs (assigned to region/district), this returns
+    all descendant ward IDs so they receive events for subordinate areas.
+    """
+    from services.administrative_service import AdministrativeService
+
     if user.user_type == UserType.ADMIN:
-        return []
+        return []  # Admin receives all events (handled in emit logic)
+
     user_admins = (
         db.query(UserAdministrative)
         .filter(UserAdministrative.user_id == user.id)
         .all()
     )
-    return [ua.administrative_id for ua in user_admins]
+
+    all_ward_ids = set()
+    for ua in user_admins:
+        # Add the assigned area itself
+        all_ward_ids.add(ua.administrative_id)
+        # Add all descendant wards
+        descendant_ids = AdministrativeService.get_descendant_ward_ids(
+            db, ua.administrative_id
+        )
+        all_ward_ids.update(descendant_ids)
+
+    return list(all_ward_ids)
 
 
 def check_rate_limit(sid: str, action: str) -> bool:

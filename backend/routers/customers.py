@@ -25,6 +25,9 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 def _get_user_administrative_ids(user: User, db: Session) -> List[int]:
     """Get list of administrative IDs accessible by the user.
 
+    For upper-level EOs (assigned to region/district), this returns
+    all descendant ward IDs so they can access customers in subordinate areas.
+
     Args:
         user: The current authenticated user
         db: Database session
@@ -32,18 +35,31 @@ def _get_user_administrative_ids(user: User, db: Session) -> List[int]:
     Returns:
         Empty list for ADMIN (can access all), list of ward IDs for EO
     """
+    from services.administrative_service import AdministrativeService
+
     if user.user_type == UserType.ADMIN:
         # Admin can access all customers
         return []
 
-    # EO can only access customers in their assigned administrative areas
+    # EO can access customers in their assigned areas and all descendant wards
     user_admins = (
         db.query(UserAdministrative)
         .filter(UserAdministrative.user_id == user.id)
         .all()
     )
 
-    return [ua.administrative_id for ua in user_admins]
+    # Collect all accessible ward IDs (including descendants)
+    all_ward_ids = set()
+    for ua in user_admins:
+        # Add the assigned area itself
+        all_ward_ids.add(ua.administrative_id)
+        # Add all descendant wards
+        descendant_ids = AdministrativeService.get_descendant_ward_ids(
+            db, ua.administrative_id
+        )
+        all_ward_ids.update(descendant_ids)
+
+    return list(all_ward_ids)
 
 
 @router.post("/", response_model=CustomerResponse)

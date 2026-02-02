@@ -255,9 +255,12 @@ class PushNotificationService:
         exclude_user_ids: Optional[List[int]] = None,
     ) -> List[str]:
         """
-        Get all active push tokens for devices in a ward.
+        Get all active push tokens for devices that should receive
+        notifications for this ward.
 
-        Now properly excludes specific users (e.g., message sender).
+        Includes:
+        1. Devices registered directly to this ward
+        2. Devices of users assigned to ancestor areas (region/district)
 
         Args:
             administrative_id: Ward (administrative) ID
@@ -266,7 +269,10 @@ class PushNotificationService:
         Returns:
             List of active push tokens
         """
-        # Get all devices registered to this ward
+        from models.administrative import UserAdministrative
+        from services.administrative_service import AdministrativeService
+
+        # 1. Get devices registered to this exact ward (existing behavior)
         query = (
             self.db.query(Device.push_token)
             .filter(
@@ -279,8 +285,38 @@ class PushNotificationService:
         if exclude_user_ids:
             query = query.filter(Device.user_id.notin_(exclude_user_ids))
 
-        devices = query.all()
-        return [device.push_token for device in devices]
+        ward_tokens = [d.push_token for d in query.all()]
+
+        # 2. Get ancestor administrative IDs (region, district)
+        ancestor_ids = AdministrativeService.get_ancestor_ids(
+            self.db, administrative_id
+        )
+
+        # 3. Get devices for users assigned to any ancestor area
+        if ancestor_ids:
+            ancestor_user_query = (
+                self.db.query(Device.push_token)
+                .join(User, Device.user_id == User.id)
+                .filter(
+                    Device.is_active == True,  # noqa: E712
+                    User.is_active == True,  # noqa: E712
+                    Device.user_id.in_(
+                        self.db.query(UserAdministrative.user_id).filter(
+                            UserAdministrative.administrative_id.in_(
+                                ancestor_ids
+                            )
+                        )
+                    )
+                )
+            )
+            if exclude_user_ids:
+                ancestor_user_query = ancestor_user_query.filter(
+                    Device.user_id.notin_(exclude_user_ids)
+                )
+            ancestor_tokens = [d.push_token for d in ancestor_user_query.all()]
+            ward_tokens.extend(ancestor_tokens)
+
+        return list(set(ward_tokens))  # Remove duplicates
 
     def get_admin_user_tokens(
         self, exclude_user_ids: Optional[List[int]] = None

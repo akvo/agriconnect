@@ -212,3 +212,95 @@ class AdministrativeService:
             .filter(UserAdministrative.user_id == user_id)
             .all()
         )
+
+    @staticmethod
+    def get_descendant_ward_ids(
+        db: Session, administrative_id: int
+    ) -> List[int]:
+        """
+        Get all ward IDs that are descendants of the given administrative area.
+        Uses path-based LIKE query for efficient traversal.
+
+        Args:
+            db: Database session
+            administrative_id: ID of the administrative area
+
+        Returns:
+            List of ward IDs that are descendants of the given area.
+            If the area is already a ward, returns just itself.
+        """
+        # Get the administrative area
+        admin = (
+            db.query(Administrative)
+            .filter(Administrative.id == administrative_id)
+            .first()
+        )
+        if not admin:
+            return [administrative_id]
+
+        # Get the ward level
+        ward_level = (
+            db.query(AdministrativeLevel)
+            .filter(AdministrativeLevel.name == "ward")
+            .first()
+        )
+
+        # If this is already a ward (lowest level), return just itself
+        if ward_level and admin.level_id == ward_level.id:
+            return [administrative_id]
+
+        # Find all wards whose path starts with this admin's path
+        # Path format: "KE.NAI.CEN.WARD" (dot-separated codes)
+        descendant_wards = (
+            db.query(Administrative.id)
+            .join(AdministrativeLevel)
+            .filter(
+                Administrative.path.like(f"{admin.path}.%"),
+                AdministrativeLevel.name == "ward"
+            )
+            .all()
+        )
+
+        return [w.id for w in descendant_wards]
+
+    @staticmethod
+    def get_ancestor_ids(
+        db: Session, administrative_id: int
+    ) -> List[int]:
+        """
+        Get all ancestor administrative IDs for a given area.
+        Traverses parent_id chain upward (excluding country level).
+
+        Args:
+            db: Database session
+            administrative_id: ID of the administrative area
+
+        Returns:
+            List of ancestor IDs (region, district) excluding country level.
+        """
+        ancestors = []
+        current = (
+            db.query(Administrative)
+            .filter(Administrative.id == administrative_id)
+            .first()
+        )
+
+        if not current:
+            return ancestors
+
+        # Walk up the parent chain
+        while current.parent_id:
+            parent = (
+                db.query(Administrative)
+                .filter(Administrative.id == current.parent_id)
+                .first()
+            )
+            if parent:
+                # Skip country level (country has no parent_id)
+                if parent.parent_id is not None:
+                    ancestors.append(parent.id)
+                current = parent
+            else:
+                break
+
+        return ancestors
