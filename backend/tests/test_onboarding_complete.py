@@ -309,8 +309,8 @@ class TestOnboardingComplete:
         # Check for Swahili translations in the message
         assert result.message is not None
         # Check for Swahili words from i18n.py
-        assert "Bora!" in result.message  # "Perfect!"
-        assert "profaili" in result.message.lower()  # "profile"
+        assert "Sawa!" in result.message  # "Perfect!/Great!"
+        assert "wasifu" in result.message.lower()  # "profile"
         assert "muhtasari" in result.message.lower()  # "summary"
 
     def test_onboarding_complete_with_incomplete_profile(

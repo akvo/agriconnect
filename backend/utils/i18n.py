@@ -17,21 +17,23 @@ trans: Dict[str, Any] = {
         "language": {
             "question": {
                 "en": (
-                    "Welcome to AgriConnect! 🌾 Your agricultural advisory "
-                    "companion.\n\nChoose your language / "
-                    "Chagua lugha yako:\n1. English\n2. Swahili"
+                    "Welcome to AgriConnect! 🌱 Your agricultural advisory "
+                    "companion.\n"
+                    "Karibu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\n"
+                    "Choose your language / Chagua lugha yako:\n"
+                    "1. English / Kiingereza\n2. Swahili / Kiswahili"
                 ),
                 "sw": (
-                    "Karibu AgriConnect! 🌾 Mshauri wako wa kilimo.\n\n"
-                    "Chagua lugha yako / Choose your "
-                    "language:\n1. Kiingereza / English\n2. Swahili"
+                    "Karibu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\n"
+                    "Chagua lugha yako:\n"
+                    "1. Kiingereza\n2. Kiswahili"
                 ),
             },
             "success": {
                 "en": (
-                    "Great! Your language preference has been set to {value}."
+                    "Great! Your language preference has been set to English."
                 ),
-                "sw": "Vizuri! Lugha yako imewekwa kuwa {value}.",
+                "sw": "Vizuri! Lugha uliyopendelea imewekwa kuwa Kiswahili.",
             },
             "field_name": {"en": "Language", "sw": "Lugha"},
         },
@@ -42,7 +44,7 @@ trans: Dict[str, Any] = {
                     "Please tell me: What is your full name?"
                 ),
                 "sw": (
-                    "Ili kuanza, ninahitaji kujua jina lako kamili.\n\n"
+                    "Kuanza, nahitaji majina yako kamili.\n\n"
                     "Tafadhali niambie: Jina lako kamili ni nani?"
                 ),
             },
@@ -60,7 +62,7 @@ trans: Dict[str, Any] = {
                 ),
                 "sw": (
                     "Ninahitaji kujua eneo lako.\n\n"
-                    "Tafadhali niambie: unatoka wodi gani?"
+                    "Tafadhali niambie: Unatoka wadi gani?"
                 ),
             },
             "success": {
@@ -226,7 +228,7 @@ trans: Dict[str, Any] = {
                 "en": "Primary crops recorded: {value}.",
                 "sw": "Mazao makuu yamerekodiwa: {value}.",
             },
-            "field_name": {"en": "Primary Crops", "sw": "Mazao Makuu"},
+            "field_name": {"en": "Primary Crops", "sw": "Mazao ya msingi"},
             "extraction_failed_retry": {
                 "en": (
                     "I still couldn't identify that information. Please "
@@ -266,9 +268,8 @@ trans: Dict[str, Any] = {
                 ),
                 "sw": (
                     "Ulizaliwa mwaka gani? "
-                    "Unaweza pia kuniambia umri wako ikiwa "
-                    "ni rahisi zaidi.\n\n"
-                    "Mfano: '1980' au 'Nina miaka 45'"
+                    "Ama unaweza pia kuniambia umri wako.\n\n"
+                    "Kwa mfano: '1980' au 'Nina miaka 45'"
                 ),
             },
             "success": {
@@ -346,8 +347,7 @@ trans: Dict[str, Any] = {
                     "\n\n{profile_summary}"
                 ),
                 "sw": (
-                    "Bora! Profaili yako imewekwa kikamilifu. "
-                    "Hapa kuna muhtasari:"
+                    "Sawa! Wasifu wako uko tayari. Huu hapa muhtasari:"
                     "\n\n{profile_summary}"
                 ),
             },
@@ -368,28 +368,22 @@ trans: Dict[str, Any] = {
         },
         "ask_edit_profile": {
             "en": "To edit your profile, please contact support below:",
-            "sw": (
-                "Ili kuhariri profaili yako, "
-                "tafadhali wasiliana na usaidizi hapa chini:"
-            ),
+            "sw": "Ili kuhariri wasifu wako, tafadhali wasiliana:",
         },
         "ask_delete_data": {
             "en": (
                 "To remove yourself from AgriConnect please message *DELETE*."
             ),
-            "sw": (
-                "Ili kujiondoa kwenye AgriConnect tafadhali tuma ujumbe "
-                "*DELETE* au *FUTA*."
-            ),
+            "sw": "Ili kuondoa usajili, tuma ujumbe *FUTA*.",
         },
     },
     "crops": {
-        "Avocado": {"name": {"en": "avocado", "sw": "parachichi"}},
+        "Avocado": {"name": {"en": "Avocado", "sw": "Parachichi"}},
         "Cacao": {"name": {"en": "cacao", "sw": "kakao"}},
         "Potato": {"name": {"en": "potato", "sw": "viazi"}},
     },
     "gender": {
-        "male": {"en": "Male", "sw": "Mwanamume"},
+        "male": {"en": "Male", "sw": "Mwanaume"},
         "female": {"en": "Female", "sw": "Mwanamke"},
         "other": {"en": "Other", "sw": "Nyingine"},
     },
@@ -400,8 +394,8 @@ trans: Dict[str, Any] = {
                 "for your area ({area_name})?"
             ),
             "sw": (
-                "\n\nJe, ungependa kupokea taarifa za hali ya hewa kila "
-                "asubuhi kwa eneo lako ({area_name})?"
+                "\n\nJe, ungependa kupokea taarifa za hali ya anga kila "
+                "siku asubuhi kwa eneo lako ({area_name})?"
             ),
         },
         "button_yes": {
@@ -434,9 +428,9 @@ trans: Dict[str, Any] = {
             ),
             "sw": (
                 "Hakuna shida! Unaweza kujisajili wakati wowote kwa kutuma "
-                "ujumbe 'weather updates'.\n\n"
-                "Tafadhali tuma ujumbe *weather* kupata taarifa za hali ya "
-                "hewa wakati wowote."
+                "ujumbe *hali ya anga*.\n\n"
+                "Tafadhali tuma ujumbe *hali ya anga* iliupokee taarifa "
+                "unapozihitaji."
             ),
         },
     },
@@ -451,14 +445,14 @@ trans: Dict[str, Any] = {
                 ),
                 "sw": (
                     "Data yako itashirikiwa na Kaunti ya Murang'a na GODAN "
-                    "kwa kufuata sheria za ASTGS DTTI na ufuatiliaji wa "
-                    "programu.\n\n"
-                    "Jibu 'Ndiyo' kukubali na kuendelea."
+                    "kwa mujibu wa ASTGS DTTI kwa uhifadhi na ufuatiliaji "
+                    "wa programu.\n\n"
+                    "Jibu *Ndiyo* kukubali na kuendelea."
                 ),
             },
             "accepted": {
                 "en": "Thank you for your consent!",
-                "sw": "Asante kwa idhini yako!",
+                "sw": "Asante kwa kukubali.",
             },
             "declined": {
                 "en": (

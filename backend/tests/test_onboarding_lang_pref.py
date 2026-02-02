@@ -193,7 +193,7 @@ class TestLanguageOnboardingFlow:
         db_session.refresh(customer)
 
         assert customer.language == CustomerLanguage.SW
-        assert "lugha yako imewekwa" in response.message.lower()
+        assert "lugha uliyopendelea imewekwa" in response.message.lower()
 
     @pytest.mark.asyncio
     async def test_subsequent_messages_in_selected_language(
@@ -285,12 +285,12 @@ class TestLanguageSuccessMessage:
 
     def test_success_message_english(self):
         """Test success message in English"""
-        message = t("onboarding.language.success", "en", value="English")
+        message = t("onboarding.language.success", "en")
         assert "language preference" in message.lower()
         assert "English" in message
 
     def test_success_message_swahili(self):
         """Test success message in Swahili"""
-        message = t("onboarding.language.success", "sw", value="Swahili")
+        message = t("onboarding.language.success", "sw")
         assert "lugha" in message.lower()
-        assert "Swahili" in message
+        assert "Kiswahili" in message

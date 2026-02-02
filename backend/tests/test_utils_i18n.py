@@ -43,8 +43,8 @@ class TestTranslationFunction:
 
     def test_translation_with_formatting(self):
         """Test translation with string formatting"""
-        result = t("onboarding.language.success", "en", value="English")
-        assert "Your language preference has been set to English" in result
+        result = t("onboarding.full_name.success", "en", value="John")
+        assert "Thank you, John" in result
 
     def test_translation_with_formatting_swahili(self):
         """Test translation formatting in Swahili"""
@@ -59,7 +59,7 @@ class TestTranslationFunction:
     def test_formatting_with_missing_kwargs(self):
         """Test that missing kwargs in formatting are handled gracefully"""
         # Translation expects {value} but we don't provide it
-        result = t("onboarding.language.success", "en")
+        result = t("onboarding.full_name.success", "en")
         # Should return unformatted string (with {value} still in it)
         assert "{value}" in result
 
@@ -81,10 +81,10 @@ class TestTranslationFunction:
     def test_crop_translations(self):
         """Test crop name translations"""
         result = t("crops.Avocado.name", "en")
-        assert result == "avocado"
+        assert result == "Avocado"
 
         result = t("crops.Avocado.name", "sw")
-        assert result == "parachichi"
+        assert result == "Parachichi"
 
 
 class TestCropNameTranslation:
@@ -93,12 +93,12 @@ class TestCropNameTranslation:
     def test_avocado_english(self):
         """Test avocado translation in English"""
         result = get_crop_name_translated("Avocado", "en")
-        assert result == "avocado"
+        assert result == "Avocado"
 
     def test_avocado_swahili(self):
         """Test avocado translation in Swahili"""
         result = get_crop_name_translated("Avocado", "sw")
-        assert result == "parachichi"
+        assert result == "Parachichi"
 
     def test_cacao_english(self):
         """Test cacao translation in English"""
@@ -113,7 +113,7 @@ class TestCropNameTranslation:
     def test_default_language_english(self):
         """Test default language is English"""
         result = get_crop_name_translated("Avocado")
-        assert result == "avocado"
+        assert result == "Avocado"
 
     def test_invalid_crop_returns_path(self):
         """Test that invalid crop name returns path"""
@@ -224,7 +224,7 @@ class TestEdgeCases:
         """Test translations with special characters"""
         result = t("onboarding.language.question", "en")
         # Check emoji is preserved
-        assert "🌾" in result
+        assert "🌱" in result
 
     def test_newlines_in_translation(self):
         """Test translations with newlines"""

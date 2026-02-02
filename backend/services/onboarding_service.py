@@ -1662,15 +1662,7 @@ Birth year must be between 1900 and {current_year}."""
             if field_name == "language":
                 customer.language = value
                 lang = value.value
-                language_name = (
-                    "English" if value == CustomerLanguage.EN else "Swahili"
-                )
-                success_msg = t(
-                    f"onboarding.{field_name}.success",
-                    lang,
-                    value=language_name,
-                )
-                print(f"success_msg: {success_msg}", f"lang: {lang}")
+                success_msg = t(f"onboarding.{field_name}.success", lang)
             # Special case: "full_name" uses direct column
             elif field_name == "full_name":
                 customer.full_name = value
