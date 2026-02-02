@@ -517,7 +517,7 @@ async def whatsapp_webhook(
             ButtonPayload == weather_yes_payload
             or (
                 ButtonPayload is None
-                and Body.lower().strip() in ["1", "yes", "ndiyo"]
+                and Body.lower().strip() in ["1", "yes", "ndio", "ndiyo"]
             )
         )
         is_weather_no = (
