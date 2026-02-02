@@ -142,6 +142,24 @@ Admin B: Waits 1 hour → Token auto-refreshes → Continues working ✅
 4. **Easier Debugging:** Clear message path: event → `user:{user_id}` → all user's devices
 5. **Future-Proof:** Per-user customization already structured if needed later
 
+#### Hierarchical Access for Upper-Level Officers
+
+**Added in Feature #124:** Extension Officers assigned to higher administrative levels (region/district) now receive events for all descendant wards.
+
+**Implementation:**
+- `get_user_wards()` function computes accessible ward IDs at connection time
+- For ward-level EOs: Returns only their directly assigned ward(s)
+- For region/district-level EOs: Returns all descendant ward IDs via `AdministrativeService.get_descendant_ward_ids()`
+- Admin users receive all events regardless of ward assignment
+
+**Example:**
+```
+EO assigned to "Kiharu District":
+  - get_user_wards() returns [ward1_id, ward2_id, ward3_id, ...]
+  - All wards under Kiharu District are included
+  - EO receives WebSocket events for tickets in any of these wards
+```
+
 **Performance Analysis:**
 
 | Metric | Ward Rooms (ward:admin) | User Rooms (user:{id}) | Impact |
@@ -205,7 +223,8 @@ Admin B: Waits 1 hour → Token auto-refreshes → Continues working ✅
 │  Customer sends message from Ward 5:                           │
 │    1. Query: Which users should receive this?                  │
 │       - All ADMIN users (user_type = ADMIN)                    │
-│       - EO users assigned to Ward 5                            │
+│       - EO users with Ward 5 in their ward_ids                 │
+│         (includes EOs assigned to parent region/district)      │
 │    2. Broadcast:                                               │
 │       emit("message_received", data, room="user:1")  // Admin A│
 │       emit("message_received", data, room="user:2")  // Admin B│
@@ -565,7 +584,7 @@ async def emit_message_received(
         # All ADMIN users receive all messages
         if user_type == UserType.ADMIN.value:
             target_users.add(user_id)
-        # EO users only receive messages from their assigned wards
+        # EO users receive messages from their assigned wards (includes descendants)
         elif administrative_id and administrative_id in ward_ids:
             target_users.add(user_id)
 
@@ -628,7 +647,7 @@ async def emit_whisper_created(
         # All ADMIN users receive all whispers
         if user_type == UserType.ADMIN.value:
             target_users.add(user_id)
-        # EO users only receive whispers from their assigned wards
+        # EO users receive whispers from their assigned wards (includes descendants)
         elif administrative_id and administrative_id in ward_ids:
             target_users.add(user_id)
 
@@ -671,7 +690,7 @@ async def emit_ticket_resolved(
         # All ADMIN users receive all ticket resolutions
         if user_type == UserType.ADMIN.value:
             target_users.add(user_id)
-        # EO users only receive resolutions from their assigned wards
+        # EO users receive resolutions from their assigned wards (includes descendants)
         elif administrative_id and administrative_id in ward_ids:
             target_users.add(user_id)
 
