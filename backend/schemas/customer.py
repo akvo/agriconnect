@@ -28,6 +28,13 @@ class CustomerUpdate(BaseModel):
     ward_id: Optional[int] = None
 
 
+class AdministrativeLevelInfo(BaseModel):
+    """Administrative level information."""
+
+    id: int
+    name: str
+
+
 class CustomerAdministrativeInfo(BaseModel):
     """Administrative area information for a customer."""
 
@@ -35,6 +42,7 @@ class CustomerAdministrativeInfo(BaseModel):
     name: Optional[str] = None
     parent_id: Optional[int] = None
     path: Optional[str] = None
+    level: Optional[AdministrativeLevelInfo] = None
 
 
 class CustomerResponse(CustomerBase):

@@ -134,6 +134,10 @@ async def get_all_customers(
                     "name": admin.name,
                     "parent_id": admin.parent_id,
                     "path": admin.path,
+                    "level": {
+                        "id": admin.level.id,
+                        "name": admin.level.name,
+                    } if admin.level else None,
                 }
         customer_dict = {
             "id": customer.id,
