@@ -315,7 +315,17 @@ async def ai_callback(
                         # Find ticket and emit WebSocket event
                         ticket_id = payload.callback_params.ticket_id
                         administrative_id = None
-                        if not ticket_id:
+
+                        if ticket_id:
+                            # Fetch ticket to get administrative_id
+                            ticket = (
+                                db.query(Ticket)
+                                .filter(Ticket.id == ticket_id)
+                                .first()
+                            )
+                            if ticket:
+                                administrative_id = ticket.administrative_id
+                        else:
                             # Find open ticket for customer
                             ticket = (
                                 db.query(Ticket)

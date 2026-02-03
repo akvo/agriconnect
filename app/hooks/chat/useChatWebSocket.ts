@@ -69,13 +69,21 @@ export const useChatWebSocket = ({
       console.log("[Chat] Received new message:", event);
 
       try {
-        if (event.from_source === MessageFrom.CUSTOMER) {
+        // Check if message already exists (to avoid clearing suggestion on duplicates)
+        const existingMessage = daoManager.message.findById(db, event.message_id);
+        const isNewMessage = !existingMessage;
+
+        if (event.from_source === MessageFrom.CUSTOMER && isNewMessage) {
           console.log(
-            "[Chat] Customer message received, waiting for AI suggestion...",
+            "[Chat] NEW customer message received, waiting for AI suggestion...",
           );
           setAISuggestionLoading(true);
           setAISuggestionUsed(false);
           setAISuggestion(null);
+        } else if (existingMessage) {
+          console.log(
+            `[Chat] Message ${event.message_id} already exists, skipping suggestion reset`,
+          );
         }
 
         // Save message to SQLite
