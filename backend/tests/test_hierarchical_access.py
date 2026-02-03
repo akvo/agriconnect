@@ -641,3 +641,264 @@ class TestPushNotificationRouting:
         # The region EO should be found
         user_ids = [ua.user_id for ua in users_in_ancestors]
         assert user.id in user_ids
+
+
+class TestMessageReplyHierarchicalAccess:
+    """Test that upper-level EOs can reply to tickets in subordinate areas."""
+
+    def test_region_eo_can_reply_to_ward_ticket(
+        self, client, db_session, administrative_hierarchy,
+        auth_headers_factory
+    ):
+        """Region EO can reply to tickets in subordinate wards."""
+        nairobi = administrative_hierarchy["regions"]["nairobi"]
+        westlands = administrative_hierarchy["wards"]["westlands"]
+
+        # Create EO assigned to Nairobi region
+        auth_headers, eo_user = auth_headers_factory(
+            user_type="eo",
+            email="region_eo_reply@example.com",
+            administrative_ids=[nairobi.id],
+        )
+
+        # Create a customer in Westlands ward
+        customer = Customer(
+            phone_number="+255999000100",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=westlands.id,
+        )
+        db_session.add(customer_admin)
+        db_session.commit()
+
+        # Create a message
+        message = Message(
+            customer_id=customer.id,
+            message_sid="MSG100",
+            body="Test message",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(message)
+        db_session.commit()
+
+        # Create a ticket in Westlands ward
+        ticket = Ticket(
+            ticket_number="202401010100",
+            customer_id=customer.id,
+            message_id=message.id,
+            administrative_id=westlands.id,
+        )
+        db_session.add(ticket)
+        db_session.commit()
+
+        # Region EO should be able to reply to this ticket
+        url = "/api/messages"
+        response = client.post(
+            url,
+            headers=auth_headers,
+            json={
+                "ticket_id": ticket.id,
+                "body": "Reply from region EO",
+                "from_source": MessageFrom.USER,
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["body"] == "Reply from region EO"
+
+    def test_district_eo_can_reply_to_ward_ticket(
+        self, client, db_session, administrative_hierarchy,
+        auth_headers_factory
+    ):
+        """District EO can reply to tickets in subordinate wards."""
+        central = administrative_hierarchy["districts"]["central"]
+        kilimani = administrative_hierarchy["wards"]["kilimani"]
+
+        # Create EO assigned to Central district
+        auth_headers, eo_user = auth_headers_factory(
+            user_type="eo",
+            email="district_eo_reply@example.com",
+            administrative_ids=[central.id],
+        )
+
+        # Create a customer in Kilimani ward
+        customer = Customer(
+            phone_number="+255999000101",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=kilimani.id,
+        )
+        db_session.add(customer_admin)
+        db_session.commit()
+
+        # Create a message
+        message = Message(
+            customer_id=customer.id,
+            message_sid="MSG101",
+            body="Test message",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(message)
+        db_session.commit()
+
+        # Create a ticket in Kilimani ward
+        ticket = Ticket(
+            ticket_number="202401010101",
+            customer_id=customer.id,
+            message_id=message.id,
+            administrative_id=kilimani.id,
+        )
+        db_session.add(ticket)
+        db_session.commit()
+
+        # District EO should be able to reply to this ticket
+        url = "/api/messages"
+        response = client.post(
+            url,
+            headers=auth_headers,
+            json={
+                "ticket_id": ticket.id,
+                "body": "Reply from district EO",
+                "from_source": MessageFrom.USER,
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["body"] == "Reply from district EO"
+
+    def test_ward_eo_cannot_reply_to_other_ward_ticket(
+        self, client, db_session, administrative_hierarchy,
+        auth_headers_factory
+    ):
+        """Ward EO cannot reply to tickets in another ward."""
+        westlands = administrative_hierarchy["wards"]["westlands"]
+        kilimani = administrative_hierarchy["wards"]["kilimani"]
+
+        # Create EO assigned to Westlands ward only
+        auth_headers, eo_user = auth_headers_factory(
+            user_type="eo",
+            email="ward_eo_noaccess@example.com",
+            administrative_ids=[westlands.id],
+        )
+
+        # Create a customer in Kilimani ward
+        customer = Customer(
+            phone_number="+255999000102",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=kilimani.id,
+        )
+        db_session.add(customer_admin)
+        db_session.commit()
+
+        # Create a message
+        message = Message(
+            customer_id=customer.id,
+            message_sid="MSG102",
+            body="Test message",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(message)
+        db_session.commit()
+
+        # Create a ticket in Kilimani ward
+        ticket = Ticket(
+            ticket_number="202401010102",
+            customer_id=customer.id,
+            message_id=message.id,
+            administrative_id=kilimani.id,
+        )
+        db_session.add(ticket)
+        db_session.commit()
+
+        # Westlands ward EO should NOT be able to reply to Kilimani ticket
+        url = "/api/messages"
+        response = client.post(
+            url,
+            headers=auth_headers,
+            json={
+                "ticket_id": ticket.id,
+                "body": "Reply from wrong ward EO",
+                "from_source": MessageFrom.USER,
+            },
+        )
+        assert response.status_code == 403
+        assert "outside your administrative area" in response.json()["detail"]
+
+    def test_district_eo_cannot_reply_to_other_district_ticket(
+        self, client, db_session, administrative_hierarchy,
+        auth_headers_factory
+    ):
+        """District EO cannot reply to tickets in another district."""
+        central = administrative_hierarchy["districts"]["central"]
+        # Nyali is in Mombasa district, not Central
+        nyali = administrative_hierarchy["wards"]["nyali"]
+
+        # Create EO assigned to Central district
+        auth_headers, eo_user = auth_headers_factory(
+            user_type="eo",
+            email="district_eo_noaccess@example.com",
+            administrative_ids=[central.id],
+        )
+
+        # Create a customer in Nyali ward (Mombasa district)
+        customer = Customer(
+            phone_number="+255999000103",
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        customer_admin = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=nyali.id,
+        )
+        db_session.add(customer_admin)
+        db_session.commit()
+
+        # Create a message
+        message = Message(
+            customer_id=customer.id,
+            message_sid="MSG103",
+            body="Test message",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(message)
+        db_session.commit()
+
+        # Create a ticket in Nyali ward
+        ticket = Ticket(
+            ticket_number="202401010103",
+            customer_id=customer.id,
+            message_id=message.id,
+            administrative_id=nyali.id,
+        )
+        db_session.add(ticket)
+        db_session.commit()
+
+        # Central district EO should NOT be able to reply to Nyali ticket
+        url = "/api/messages"
+        response = client.post(
+            url,
+            headers=auth_headers,
+            json={
+                "ticket_id": ticket.id,
+                "body": "Reply from wrong district EO",
+                "from_source": MessageFrom.USER,
+            },
+        )
+        assert response.status_code == 403
+        assert "outside your administrative area" in response.json()["detail"]

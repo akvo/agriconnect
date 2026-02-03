@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 from database import get_db
 from models.message import Message, MessageFrom, MessageStatus
@@ -10,6 +10,7 @@ from models.ticket import Ticket
 from models.user import User, UserType
 from models.administrative import UserAdministrative
 from utils.auth_dependencies import get_current_user
+from services.administrative_service import AdministrativeService
 from services.whatsapp_service import WhatsAppService
 from services.socketio_service import (
     emit_message_received,
@@ -17,6 +18,37 @@ from services.socketio_service import (
 )
 
 router = APIRouter(prefix="/messages", tags=["messages"])
+
+
+def _get_user_administrative_ids(user: User, db: Session) -> List[int]:
+    """Get list of administrative IDs accessible by the user.
+
+    For upper-level EOs (assigned to region/district), this returns
+    all descendant ward IDs so they can access messages in subordinate areas.
+    """
+    if user.user_type == UserType.ADMIN:
+        # Admin can access all messages
+        return []
+
+    # EO can access messages in their assigned areas and all descendant wards
+    user_admins = (
+        db.query(UserAdministrative)
+        .filter(UserAdministrative.user_id == user.id)
+        .all()
+    )
+
+    # Collect all accessible ward IDs (including descendants)
+    all_ward_ids = set()
+    for ua in user_admins:
+        # Add the assigned area itself
+        all_ward_ids.add(ua.administrative_id)
+        # Add all descendant wards
+        descendant_ids = AdministrativeService.get_descendant_ward_ids(
+            db, ua.administrative_id
+        )
+        all_ward_ids.update(descendant_ids)
+
+    return list(all_ward_ids)
 
 
 # Schemas
@@ -62,14 +94,9 @@ def _check_message_access(message: Message, user: User, db: Session) -> None:
         # Admin has access to all messages
         return
 
-    # User can only access messages in their assigned administrative areas
-    user_admins = (
-        db.query(UserAdministrative)
-        .filter(UserAdministrative.user_id == user.id)
-        .all()
-    )
-    admin_ids = [ua.administrative_id for ua in user_admins]
-
+    # EO can only access messages in their administrative area
+    # (including descendant wards for upper-level officers)
+    admin_ids = _get_user_administrative_ids(user, db)
     if ticket.administrative_id not in admin_ids:
         raise HTTPException(
             status_code=403,
@@ -188,14 +215,9 @@ async def create_message(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    # Check access
+    # Check access (including descendant wards for upper-level officers)
     if current_user.user_type != UserType.ADMIN:
-        user_admins = (
-            db.query(UserAdministrative)
-            .filter(UserAdministrative.user_id == current_user.id)
-            .all()
-        )
-        admin_ids = [ua.administrative_id for ua in user_admins]
+        admin_ids = _get_user_administrative_ids(current_user, db)
 
         if ticket.administrative_id not in admin_ids:
             raise HTTPException(
