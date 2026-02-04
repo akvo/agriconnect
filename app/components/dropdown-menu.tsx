@@ -14,23 +14,37 @@ type MenuItemProps = {
   onPress: () => void;
   children: ReactNode;
   destructive?: boolean;
+  disabled?: boolean;
+  solid?: boolean;
+  icon?: ReactNode;
 };
 
 export const MenuItem: React.FC<MenuItemProps> = ({
   onPress,
   children,
   destructive = false,
+  disabled = false,
+  solid = false,
+  icon,
 }: MenuItemProps) => {
   return (
     <TouchableOpacity
-      style={styles.menuItem}
-      onPress={onPress}
-      activeOpacity={0.7}
+      style={[
+        styles.menuItem,
+        solid && styles.menuItemSolid,
+        disabled && styles.menuItemDisabled,
+      ]}
+      onPress={disabled ? undefined : onPress}
+      activeOpacity={disabled ? 1 : 0.7}
+      disabled={disabled}
     >
+      {icon && <View style={styles.menuItemIcon}>{icon}</View>}
       <Text
         style={[
           styles.menuItemText,
+          solid && styles.menuItemTextSolid,
           destructive && styles.menuItemTextDestructive,
+          disabled && styles.menuItemTextDisabled,
         ]}
       >
         {children}
@@ -176,15 +190,36 @@ const styles = StyleSheet.create({
     }),
   },
   menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
+  },
+  menuItemSolid: {
+    backgroundColor: themeColors["green-500"],
+    marginHorizontal: 8,
+    marginVertical: 4,
+    borderRadius: 8,
+  },
+  menuItemIcon: {
+    marginRight: 10,
   },
   menuItemText: {
     ...typography.body,
     fontSize: 16,
     color: themeColors.textPrimary,
   },
+  menuItemTextSolid: {
+    color: themeColors.white,
+    fontWeight: "600",
+  },
   menuItemTextDestructive: {
     color: "#dc2626", // red-600 for destructive actions
+  },
+  menuItemDisabled: {
+    opacity: 0.5,
+  },
+  menuItemTextDisabled: {
+    color: themeColors.dark3,
   },
 });

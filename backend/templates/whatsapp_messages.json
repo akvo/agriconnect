@@ -2,5 +2,9 @@
   "welcome_messages": {
     "en": "Welcome to AgriConnect! We're here to help you with agricultural information and support. How can we assist you today?",
     "sw": "Karibu AgriConnect! Tuko hapa kukusaidia kwa taarifa na msaada wa kilimo. Tunaweza kukusaidiaje leo?"
+  },
+  "ticket_closed": {
+    "en": "Your conversation with the extension officer has concluded. Send a new message to start another conversation.",
+    "sw": "Mawasiliano yako na afisa yamefungwa. Tuma ujumbe mpya kuendelea."
   }
 }

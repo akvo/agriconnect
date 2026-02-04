@@ -45,7 +45,7 @@ export const StickyMessageBubble: React.FC<StickyMessageBubbleProps> = ({
       </View>
       {!ticket?.resolvedAt && (
         <TouchableOpacity onPress={onClose} style={styles.stickyBubbleClose}>
-          <Feathericons name="x" size={16} color={themeColors.dark3} />
+          <Feathericons name="x" size={14} color={themeColors.dark6} />
         </TouchableOpacity>
       )}
     </View>
@@ -59,19 +59,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: themeColors.background,
+    backgroundColor: themeColors.white,
     borderBottomWidth: 1,
     borderBottomColor: themeColors.mutedBorder,
   },
   stickyBubble: {
     flexDirection: "row",
-    backgroundColor: themeColors.white,
-    borderRadius: 8,
-    borderColor: themeColors.mutedBorder,
-    borderWidth: 1,
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -79,13 +73,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stickyBubbleLabel: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   stickyBubbleText: {
     color: themeColors.textPrimary,
   },
   stickyBubbleClose: {
-    marginLeft: 8,
-    padding: 4,
+    marginLeft: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: themeColors.light3,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
