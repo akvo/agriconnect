@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../../lib/api";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import PhoneInput from "../common/PhoneInput";
 
 export default function EditUserModal({
   user,
@@ -513,19 +514,10 @@ export default function EditUserModal({
                 >
                   Phone Number
                 </label>
-                <input
-                  type="tel"
-                  id="phone_number"
-                  name="phone_number"
+                <PhoneInput
                   value={formData.phone_number}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
-                  style={{ borderRadius: "5px" }}
-                  placeholder="+1234567890"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Must start with + and be at least 10 characters
-                </p>
               </div>
 
               <div>

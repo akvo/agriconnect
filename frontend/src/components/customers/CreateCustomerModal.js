@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { XMarkIcon, UserPlusIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import api from "../../lib/api";
+import PhoneInput from "../common/PhoneInput";
 
 export default function CreateCustomerModal({ onClose, onCustomerCreated }) {
   const [formData, setFormData] = useState({
@@ -83,16 +84,10 @@ export default function CreateCustomerModal({ onClose, onCustomerCreated }) {
               >
                 Phone Number *
               </label>
-              <input
-                type="tel"
-                id="phone_number"
-                name="phone_number"
-                required
+              <PhoneInput
                 value={formData.phone_number}
                 onChange={handleChange}
-                placeholder="+255123456789"
-                className="mt-1 block w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
-                style={{ borderRadius: "5px" }}
+                required
               />
             </div>
 
