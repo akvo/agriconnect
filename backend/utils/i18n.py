@@ -215,13 +215,16 @@ trans: Dict[str, Any] = {
         "crop_type": {
             "question": {
                 "en": (
-                    "What crops do you grow?\n\nWe currently support: "
-                    "{available_crops}\n\nPlease tell me which crop you grow."
+                    "What crops do you grow?\n\n"
+                    "Please select from the list below:\n"
+                    "{available_crops}\n\n"
+                    "Reply with the number (e.g., '1', '2', etc.)"
                 ),
                 "sw": (
                     "Unalima mazao gani?\n\n"
-                    "Kwa sasa tunasaidia: {available_crops}"
-                    "\n\nTafadhali niambie zao unalolima."
+                    "Tafadhali chagua kutoka orodha hapa chini:\n"
+                    "{available_crops}\n\n"
+                    "Jibu kwa namba (mfano, '1', '2', n.k.)"
                 ),
             },
             "success": {
@@ -231,12 +234,14 @@ trans: Dict[str, Any] = {
             "field_name": {"en": "Primary Crops", "sw": "Mazao ya msingi"},
             "extraction_failed_retry": {
                 "en": (
-                    "I still couldn't identify that information. Please "
-                    "specify one of these crops: {available_crops}"
+                    "I still couldn't identify that. Please select from "
+                    "the list:\n{available_crops}\n\n"
+                    "Reply with the number (e.g., '1', '2', etc.)"
                 ),
                 "sw": (
-                    "Bado sikuweza kutambua taarifa hiyo. Tafadhali bainisha "
-                    "moja ya mazao haya: {available_crops}"
+                    "Bado sikuweza kutambua. Tafadhali chagua kutoka "
+                    "orodha:\n{available_crops}\n\n"
+                    "Jibu kwa namba (mfano, '1', '2', n.k.)"
                 ),
             },
         },
@@ -438,13 +443,13 @@ trans: Dict[str, Any] = {
         "data_sharing": {
             "question": {
                 "en": (
-                    "Your data will be shared with Murang'a County and GODAN "
+                    "Your data will be shared with Murang'a County "
                     "for compliance with the ASTGS DTTI storage and program "
                     "monitoring.\n\n"
                     "Reply 'Yes' to accept and continue."
                 ),
                 "sw": (
-                    "Data yako itashirikiwa na Kaunti ya Murang'a na GODAN "
+                    "Data yako itashirikiwa na Kaunti ya Murang'a "
                     "kwa mujibu wa ASTGS DTTI kwa uhifadhi na ufuatiliaji "
                     "wa programu.\n\n"
                     "Jibu *Ndiyo* kukubali na kuendelea."

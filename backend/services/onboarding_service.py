@@ -78,6 +78,40 @@ class OnboardingService:
         # Skip 'country' as we assume single country
         self.admin_level_order = ["region", "district", "ward"]
 
+    def _format_crops_numbered(self, lang: str = "en") -> str:
+        """
+        Format supported crops as a numbered list.
+
+        Args:
+            lang: Language code ("en" or "sw")
+
+        Returns:
+            Numbered list string, e.g.:
+            1. Avocado
+            2. Cacao
+            3. Potato
+        """
+        lines = []
+        for i, crop in enumerate(self.supported_crops, start=1):
+            translated_name = get_crop_name_translated(crop, lang)
+            lines.append(f"{i}. {translated_name}")
+        return "\n".join(lines)
+
+    def _get_crop_by_number(self, number: int) -> Optional[str]:
+        """
+        Get crop name by its number (1-based index).
+
+        Args:
+            number: 1-based index from user selection
+
+        Returns:
+            Crop name string or None if invalid number
+        """
+        index = number - 1
+        if 0 <= index < len(self.supported_crops):
+            return self.supported_crops[index]
+        return None
+
     def needs_onboarding(self, customer: Customer) -> bool:
         """
         Check if customer needs onboarding.
@@ -1330,14 +1364,9 @@ Birth year must be between 1900 and {current_year}."""
         question = t(f"onboarding.{field_name}.question", lang)
 
         # Replace {available_crops}
-        # for crop_type field with translated crop names
+        # for crop_type field with numbered list
         if field_name == "crop_type":
-            crops_formatted = ", ".join(
-                [
-                    get_crop_name_translated(crop, lang)
-                    for crop in self.supported_crops
-                ]
-            )
+            crops_formatted = self._format_crops_numbered(lang)
             question = question.format(available_crops=crops_formatted)
 
         # Add skip instruction for optional fields
@@ -1411,6 +1440,28 @@ Birth year must be between 1900 and {current_year}."""
         # Get customer language
         lang = customer.language.value if customer.language else "en"
 
+        # Handle crop_type number selection
+        if field_name == "crop_type":
+            selection_index = self.parse_selection(message)
+            if selection_index is not None:
+                crop = self._get_crop_by_number(selection_index + 1)
+                if crop:
+                    logger.info(
+                        f"[OnboardingService] Crop selected by number: {crop}"
+                    )
+                    return self._save_field_value(customer, crop, field_config)
+                else:
+                    # Invalid number, show error with valid range
+                    return OnboardingResponse(
+                        message=t(
+                            "onboarding.common.selection_out_of_range",
+                            lang,
+                            max=len(self.supported_crops),
+                        ),
+                        status="in_progress",
+                        attempts=new_attempts,
+                    )
+
         # Extract value using field-specific extraction method
         if field_config.extraction_method is None:
             # No extraction method defined - save raw message
@@ -1424,12 +1475,7 @@ Birth year must be between 1900 and {current_year}."""
             )
             question = t(f"onboarding.{field_name}.question", lang)
             if field_name == "crop_type":
-                crops_formatted = ", ".join(
-                    [
-                        get_crop_name_translated(crop, lang)
-                        for crop in self.supported_crops
-                    ]
-                )
+                crops_formatted = self._format_crops_numbered(lang)
                 question = question.format(available_crops=crops_formatted)
 
             return OnboardingResponse(
@@ -1446,12 +1492,7 @@ Birth year must be between 1900 and {current_year}."""
         if extracted_value is None:
             # Build progressive error message for crop_type
             if field_name == "crop_type":
-                crops_formatted = ", ".join(
-                    [
-                        get_crop_name_translated(crop, lang)
-                        for crop in self.supported_crops
-                    ]
-                )
+                crops_formatted = self._format_crops_numbered(lang)
 
                 if current_attempts == 0:
                     # First attempt: Generic message with full question
@@ -1753,14 +1794,9 @@ Birth year must be between 1900 and {current_year}."""
                     f"onboarding.{next_field.field_name}.question", lang
                 )
 
-                # Handle crop_type field with translated crop names
+                # Handle crop_type field with numbered list
                 if next_field.field_name == "crop_type":
-                    crops_formatted = ", ".join(
-                        [
-                            get_crop_name_translated(crop, lang)
-                            for crop in self.supported_crops
-                        ]
-                    )
+                    crops_formatted = self._format_crops_numbered(lang)
                     next_question = next_question.format(
                         available_crops=crops_formatted
                     )

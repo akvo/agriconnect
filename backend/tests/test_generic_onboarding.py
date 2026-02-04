@@ -1284,10 +1284,10 @@ class TestDynamicCropOnboarding:
             customer, "Rice", get_field_config("crop_type")
         )
 
-        # First attempt should show full question
+        # First attempt should show full question with numbered list
         assert "I couldn't identify that information" in response.message
-        assert "We currently support:" in response.message
-        assert "avocado" in response.message.lower()
+        assert "Please select from the list below:" in response.message
+        assert "1. avocado" in response.message.lower()
 
     @pytest.mark.asyncio
     async def test_progressive_error_second_attempt(
@@ -1315,10 +1315,10 @@ class TestDynamicCropOnboarding:
             customer, "Rice", get_field_config("crop_type")
         )
 
-        # Second attempt should be more specific
+        # Second attempt should show retry message with numbered list
         assert "I still couldn't identify" in response.message
-        assert "Please specify one of these crops:" in response.message
-        assert "avocado, cacao" in response.message.lower()
+        assert "Please select from the list:" in response.message
+        assert "1. avocado" in response.message.lower()
 
     @pytest.mark.asyncio
     async def test_max_attempts_saves_invalid_crop_and_continues(
