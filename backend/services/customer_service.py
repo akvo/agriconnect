@@ -258,9 +258,9 @@ class CustomerService:
         """
         # Base query with eager loading of relationships
         query = self.db.query(Customer).options(
-            joinedload(Customer.customer_administrative).joinedload(
-                CustomerAdministrative.administrative
-            ),
+            joinedload(Customer.customer_administrative)
+            .joinedload(CustomerAdministrative.administrative)
+            .joinedload(Administrative.level),
         )
 
         # Filter by administrative areas (wards) if provided
@@ -300,7 +300,9 @@ class CustomerService:
         customer_data = []
         for customer in customers:
             # Get administrative info (ward)
-            admin_info = {"id": None, "name": None, "path": None}
+            admin_info = {
+                "id": None, "name": None, "path": None, "level": None
+            }
             if customer.customer_administrative:
                 # Get the first administrative assignment
                 # (assuming one ward per customer)
@@ -311,6 +313,10 @@ class CustomerService:
                         "id": admin.id,
                         "name": admin.name,
                         "path": self._build_administrative_path(admin.id),
+                        "level": {
+                            "id": admin.level.id,
+                            "name": admin.level.name,
+                        } if admin.level else None,
                     }
 
             customer_dict = {

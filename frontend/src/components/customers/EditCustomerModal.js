@@ -52,26 +52,37 @@ export default function EditCustomerModal({
   }, []);
 
   const loadCustomerAdministrativeHierarchy = useCallback(
-    async (administrativeId) => {
+    async (administrativeId, levels) => {
       try {
         // Get the ward administrative details first
         const response = await api.get(`/administrative/${administrativeId}`);
         const wardAdmin = response.data;
 
+        // Find level index by name (e.g., "ward" -> 3, "district" -> 2)
+        const getLevelIndex = (levelName) => {
+          return levels.findIndex(
+            (l) => l.toLowerCase() === levelName.toLowerCase()
+          );
+        };
+
         // Set the ward level selection
         let currentId = wardAdmin.parent_id;
+        const wardLevelIndex = getLevelIndex(wardAdmin.level.name);
 
         // Collect all ancestors up to country level
         const selectedAdmins = {
-          [wardAdmin.level.id - 1]: wardAdmin.id,
+          [wardLevelIndex]: wardAdmin.id,
         };
         while (currentId) {
           const ancestorResponse = await api.get(
             `/administrative/${currentId}`
           );
           const ancestor = ancestorResponse.data;
-          const levelIndex = ancestor.level.id - 1;
-          await loadChildLocations(ancestor.id, ancestor.level.id);
+          const levelIndex = getLevelIndex(ancestor.level.name);
+          // Load children at the next level (levelIndex + 1)
+          if (levelIndex + 1 < levels.length) {
+            await loadChildLocations(ancestor.id, levelIndex + 1);
+          }
           selectedAdmins[levelIndex] = ancestor.id;
           currentId = ancestor.parent_id;
         }
@@ -97,7 +108,10 @@ export default function EditCustomerModal({
       }
 
       if (customer.administrative?.id) {
-        await loadCustomerAdministrativeHierarchy(customer.administrative.id);
+        await loadCustomerAdministrativeHierarchy(
+          customer.administrative.id,
+          response.data
+        );
       }
     } catch (err) {
       console.error("Error loading administrative levels:", err);

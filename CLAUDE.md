@@ -91,7 +91,7 @@ Create `.env` file based on `.env.example`:
 - **FastAPI** framework with SQLAlchemy ORM
 - **Alembic** for database migrations
 - **JWT authentication** system
-- **Modular routers**: `auth.py`, `customers.py`, `admin_users.py`, `knowledge_base.py`, `document.py`,`whatsapp.py`, `devices.py`, `ws.py`
+- **Modular routers**: `auth.py`, `customers.py`, `admin_users.py`, `knowledge_base.py`, `document.py`, `whatsapp.py`, `devices.py`, `tickets.py`, `ws.py`
 - **Services layer** for business logic (including push notification service)
 - **Tests** in `/tests/` directory
 
@@ -193,6 +193,29 @@ See detailed documentation:
 - **WebSocket (Socket.IO)** for real-time chat communication
 - **Push notifications** via Expo Push Notification service
 - **Device registration** associated with administrative areas (wards)
+- **Hierarchical administrative access** - upper-level officers can access subordinate areas
+
+### Hierarchical Administrative Access
+
+Extension officers can be assigned to any administrative level (region, district, or ward). Officers assigned to upper levels automatically have access to all subordinate areas.
+
+**How it works:**
+- EO assigned to a **region** → can access all districts and wards within that region
+- EO assigned to a **district** → can access all wards within that district
+- EO assigned to a **ward** → can only access that specific ward
+
+**Affected resources:**
+- **Customers**: EOs see customers in their assigned area and all descendant wards
+- **Tickets**: EOs see tickets from their assigned area and all descendant wards
+- **Devices**: EOs see devices registered in their assigned area and all descendant wards
+- **Push notifications**: Notifications are routed to EOs in ancestor areas (region/district)
+- **Socket.IO events**: Real-time events are sent to EOs in ancestor areas
+
+**Key service methods:**
+- `AdministrativeService.get_descendant_ward_ids(db, admin_id)` - Get all ward IDs under an area
+- `AdministrativeService.get_ancestor_ids(db, admin_id)` - Get region/district IDs above a ward
+
+**Path format:** Administrative paths use ` > ` separator (e.g., `Kenya > Murang'a > Kiharu > Wangu`)
 
 ### External AI Service Integration
 

@@ -153,8 +153,11 @@ def list_user_devices(
     """
     List all devices in administrative areas assigned to current user.
 
-    Returns devices from all wards where the user has access.
+    Returns devices from all wards where the user has access,
+    including descendant wards for upper-level EOs.
     """
+    from services.administrative_service import AdministrativeService
+
     # Get all administrative IDs for current user
     user_admin_ids = (
         db.query(UserAdministrative.administrative_id)
@@ -162,14 +165,21 @@ def list_user_devices(
         .all()
     )
 
-    admin_ids = [ua.administrative_id for ua in user_admin_ids]
+    # Collect all accessible ward IDs (including descendants)
+    all_admin_ids = set()
+    for ua in user_admin_ids:
+        all_admin_ids.add(ua.administrative_id)
+        descendant_ids = AdministrativeService.get_descendant_ward_ids(
+            db, ua.administrative_id
+        )
+        all_admin_ids.update(descendant_ids)
 
-    if not admin_ids:
+    if not all_admin_ids:
         return []
 
     devices = (
         db.query(Device)
-        .filter(Device.administrative_id.in_(admin_ids))
+        .filter(Device.administrative_id.in_(list(all_admin_ids)))
         .order_by(Device.created_at.desc())
         .all()
     )

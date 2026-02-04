@@ -161,11 +161,18 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
       return;
     }
 
-    // Ensure admin users don't have administrative_id set
-    const submitData = { ...formData };
-    if (submitData.user_type === "admin") {
-      submitData.administrative_id = null;
-    }
+    // Convert administrative_id to administrative_ids array for API
+    // Admin users get empty array, EOs get their assigned location
+    const submitData = {
+      full_name: formData.full_name,
+      email: formData.email,
+      phone_number: formData.phone_number,
+      user_type: formData.user_type,
+      administrative_ids:
+        formData.user_type === "admin" || !formData.administrative_id
+          ? []
+          : [formData.administrative_id],
+    };
 
     try {
       const response = await api.post("/admin/users/", submitData);
@@ -495,6 +502,22 @@ export default function CreateUserModal({ onClose, onUserCreated }) {
                             No administrative locations available
                           </div>
                         )}
+
+                      {/* Show current assignment level indicator */}
+                      {formData.administrative_id && (
+                        <div
+                          className="mt-3 p-3 bg-green-50 border border-green-200"
+                          style={{ borderRadius: "5px" }}
+                        >
+                          <p className="text-sm text-green-800">
+                            <strong>Assignment Level:</strong>{" "}
+                            {getLevelName(Object.keys(selectedLocation).length)}
+                          </p>
+                          <p className="text-xs text-green-600 mt-1">
+                            This user will have access to all subordinate areas.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

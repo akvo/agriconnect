@@ -74,38 +74,55 @@ export default function EditUserModal({
   }, []);
 
   const loadUserAdministrativeHierarchy = useCallback(
-    async (administrativeId) => {
+    async (administrativeId, levels) => {
       try {
-        // Get the administrative area details to understand the hierarchy
-        const response = await api.get(`/administrative/${administrativeId}`);
-        const adminArea = response.data;
+        // Build hierarchy by traversing up the parent_id chain
+        const hierarchy = [];
+        let currentId = administrativeId;
 
-        if (adminArea.path) {
-          const pathParts = adminArea.path.split(".");
-          // Load each level in the hierarchy
-          for (let i = 1; i < pathParts.length; i++) {
-            // Skip country (index 0)
-            if (i < administrativeLevels.length) {
-              // Find parent ID for this level
-              const parentPath = pathParts.slice(0, i).join(".");
-              const parentResponse = await api.get(
-                `/administrative/?path=${parentPath}`
-              );
-              if (parentResponse.data.administrative?.length > 0) {
-                const parentId = parentResponse.data.administrative[0].id;
-                loadChildLocations(parentId, i);
+        while (currentId) {
+          const response = await api.get(`/administrative/${currentId}`);
+          const adminArea = response.data;
+          hierarchy.unshift(adminArea); // Add to beginning
+          currentId = adminArea.parent_id;
+        }
 
-                // Set the selected location
-                if (pathParts[i] === adminArea.code) {
-                  setSelectedLocation((prev) => ({
-                    ...prev,
-                    [i]: administrativeId,
-                  }));
-                }
-              }
+        // Skip country (first element) and set up the dropdowns
+        const newSelectedLocation = {};
+        const levelsToUse = levels || administrativeLevels;
+
+        for (let i = 1; i < hierarchy.length; i++) {
+          const area = hierarchy[i];
+          // Find the level index for this area
+          const levelIndex = levelsToUse.findIndex(
+            (l) => l.toLowerCase() === area.level?.name?.toLowerCase()
+          );
+
+          if (levelIndex >= 0) {
+            newSelectedLocation[levelIndex] = area.id;
+
+            // Load sibling locations for this level
+            if (hierarchy[i - 1]) {
+              await loadChildLocations(hierarchy[i - 1].id, levelIndex);
             }
           }
         }
+
+        // Load children of the assigned area (for next level dropdown)
+        const assignedArea = hierarchy[hierarchy.length - 1];
+        if (assignedArea) {
+          const assignedLevelIndex = levelsToUse.findIndex(
+            (l) => l.toLowerCase() === assignedArea.level?.name?.toLowerCase()
+          );
+          if (
+            assignedLevelIndex >= 0 &&
+            assignedLevelIndex + 1 < levelsToUse.length
+          ) {
+            await loadChildLocations(assignedArea.id, assignedLevelIndex + 1);
+          }
+        }
+
+        setSelectedLocation(newSelectedLocation);
       } catch (err) {
         console.error("Error loading user administrative hierarchy:", err);
       }
@@ -120,16 +137,20 @@ export default function EditUserModal({
       setAdministrativeLevels(response.data);
       setIsDataLoaded(true);
 
-      // Load starting locations (skip country level)
-      const startIndex = 1; // Start from level after country (index 0)
-      if (startIndex < response.data.length) {
-        const startLevel = response.data[startIndex];
-        loadStartingLocations(startLevel, startIndex);
-      }
-
-      // If user has existing administrative location, load the hierarchy
+      // If user has existing administrative location, load the hierarchy first
+      // This ensures dropdowns show with correct values from the start
       if (user.administrative_location?.id) {
-        loadUserAdministrativeHierarchy(user.administrative_location.id);
+        await loadUserAdministrativeHierarchy(
+          user.administrative_location.id,
+          response.data
+        );
+      } else {
+        // Only load starting locations if no existing assignment
+        const startIndex = 1; // Start from level after country (index 0)
+        if (startIndex < response.data.length) {
+          const startLevel = response.data[startIndex];
+          await loadStartingLocations(startLevel, startIndex);
+        }
       }
     } catch (err) {
       console.error("Error loading administrative levels:", err);
@@ -644,6 +665,25 @@ export default function EditUserModal({
                               No administrative locations available
                             </div>
                           )}
+
+                        {/* Show current assignment level indicator */}
+                        {formData.administrative_id && (
+                          <div
+                            className="mt-3 p-3 bg-green-50 border border-green-200"
+                            style={{ borderRadius: "5px" }}
+                          >
+                            <p className="text-sm text-green-800">
+                              <strong>Assignment Level:</strong>{" "}
+                              {getLevelName(
+                                Object.keys(selectedLocation).length
+                              )}
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">
+                              This user will have access to all subordinate
+                              areas.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

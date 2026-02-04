@@ -157,10 +157,20 @@ const ChatScreen = () => {
       try {
         console.log("[ChatScreen] Processing ticketEmitter message:", event);
 
-        // Set AI suggestion loading for customer messages
-        setAISuggestionLoading(true);
-        setAISuggestionUsed(false);
-        setAISuggestion(null);
+        // Check if message already exists (to avoid clearing suggestion on duplicates)
+        const existingMessage = daoManager.message.findById(db, event.message_id);
+        const isNewMessage = !existingMessage;
+
+        // Only reset AI suggestion for NEW customer messages
+        if (isNewMessage) {
+          setAISuggestionLoading(true);
+          setAISuggestionUsed(false);
+          setAISuggestion(null);
+        } else {
+          console.log(
+            `[ChatScreen] Message ${event.message_id} already exists, skipping suggestion reset`,
+          );
+        }
 
         // Save message to SQLite
         const savedMessage = daoManager.message.upsert(db, {
