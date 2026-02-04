@@ -472,9 +472,19 @@ const Inbox: React.FC = () => {
         </View>
       )}
       {!loading && (
-        <Text style={[typography.body3, { color: themeColors.dark3 }]}>
-          No tickets available
-        </Text>
+        <>
+          <Text style={[typography.body3, { color: themeColors.dark3 }]}>
+            No tickets available
+          </Text>
+          <Text
+            style={[
+              typography.caption1,
+              { color: themeColors.dark2, marginTop: 8 },
+            ]}
+          >
+            Pull down to refresh
+          </Text>
+        </>
       )}
     </View>
   );
@@ -516,7 +526,7 @@ const Inbox: React.FC = () => {
           <TicketItem ticket={item} onPress={onPressTicket} />
         )}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, flexGrow: 1 }}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           // debounce rapid calls
@@ -601,7 +611,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 32,
   },
   footer: {
     paddingVertical: 16,

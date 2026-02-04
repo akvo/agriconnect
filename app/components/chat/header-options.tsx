@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { View, Alert, ToastAndroid, Platform } from "react-native";
+import { View, Alert, ActivityIndicator } from "react-native";
+import Toast from "react-native-toast-message";
 import { useDatabase } from "@/database/context";
 import { useRouter } from "expo-router";
 import Feathericons from "@expo/vector-icons/Feather";
@@ -57,10 +58,14 @@ const HeaderOptions = ({ ticketID }: Props) => {
       }
       // Update unread count in database
       await dao.ticket.update(db, ticket.id, { unreadCount: 0 });
-      // Show toast on Android
-      if (Platform.OS === "android") {
-        ToastAndroid.show("Ticket closed", ToastAndroid.SHORT);
-      }
+      // Show toast notification
+      Toast.show({
+        type: "success",
+        text1: "Ticket closed",
+        text2: "Customer has been notified via WhatsApp",
+        position: "top",
+        visibilityTime: 5000,
+      });
       // Redirect to inbox after closing with active tab as 'open' (pending)
       router.replace("/inbox?initTab=open");
     } catch (error) {
@@ -85,15 +90,17 @@ const HeaderOptions = ({ ticketID }: Props) => {
   return (
     <View style={{ paddingHorizontal: 8, paddingVertical: 6 }}>
       {!ticket?.resolvedAt && (
-        <DropdownMenu
-          trigger={
-            <Feathericons name="more-vertical" size={22} color="black" />
-          }
-        >
-          <MenuItem onPress={onCloseTicket} disabled={isClosing}>
-            {isClosing ? "Closing..." : "Close Ticket"}
-          </MenuItem>
-        </DropdownMenu>
+        isClosing ? (
+          <ActivityIndicator size="small" color="black" />
+        ) : (
+          <DropdownMenu
+            trigger={
+              <Feathericons name="more-vertical" size={22} color="black" />
+            }
+          >
+            <MenuItem onPress={onCloseTicket}>Close Ticket</MenuItem>
+          </DropdownMenu>
+        )
       )}
     </View>
   );
