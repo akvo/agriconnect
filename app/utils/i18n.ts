@@ -5,6 +5,24 @@ export const i18n = {
       sw: "Ungependa kujua nini?",
     },
   },
+  ticket: {
+    closing: {
+      en: "Closing...",
+      sw: "Inafungwa...",
+    },
+    ticket_closed: {
+      en: "Ticket closed",
+      sw: "Tiketi imefungwa",
+    },
+    closed_by: {
+      en: "Closed by:",
+      sw: "Imefungwa na:",
+    },
+    responded_by: {
+      en: "Responded by:",
+      sw: "Imejibiwa na:",
+    },
+  },
 } as const;
 
 export type I18n = typeof i18n;

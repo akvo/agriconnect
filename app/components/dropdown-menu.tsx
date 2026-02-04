@@ -14,23 +14,27 @@ type MenuItemProps = {
   onPress: () => void;
   children: ReactNode;
   destructive?: boolean;
+  disabled?: boolean;
 };
 
 export const MenuItem: React.FC<MenuItemProps> = ({
   onPress,
   children,
   destructive = false,
+  disabled = false,
 }: MenuItemProps) => {
   return (
     <TouchableOpacity
-      style={styles.menuItem}
-      onPress={onPress}
-      activeOpacity={0.7}
+      style={[styles.menuItem, disabled && styles.menuItemDisabled]}
+      onPress={disabled ? undefined : onPress}
+      activeOpacity={disabled ? 1 : 0.7}
+      disabled={disabled}
     >
       <Text
         style={[
           styles.menuItemText,
           destructive && styles.menuItemTextDestructive,
+          disabled && styles.menuItemTextDisabled,
         ]}
       >
         {children}
@@ -186,5 +190,11 @@ const styles = StyleSheet.create({
   },
   menuItemTextDestructive: {
     color: "#dc2626", // red-600 for destructive actions
+  },
+  menuItemDisabled: {
+    opacity: 0.5,
+  },
+  menuItemTextDisabled: {
+    color: themeColors.dark3,
   },
 });

@@ -16,6 +16,8 @@ const TicketRespondedStatus = ({
   resolvedAt,
   containerStyle,
 }: TicketRespondedStatusProps) => {
+  const label = resolvedAt ? "Closed by:" : "Responded by:";
+
   return (
     <View style={[styles.container, containerStyle]}>
       <Text style={[typography.caption1, { color: themeColors.dark3 }]}>
@@ -30,7 +32,7 @@ const TicketRespondedStatus = ({
           }}
         >
           <Text style={[typography.body4, { color: themeColors.textPrimary }]}>
-            Responded by:
+            {label}
           </Text>
 
           <Text

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -25,6 +26,7 @@ from services.socketio_service import emit_ticket_resolved
 from services.tagging_service import classify_ticket, get_tag_name
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
+logger = logging.getLogger(__name__)
 
 
 def _get_user_administrative_ids(user: User, db: Session) -> List[int]:
@@ -567,6 +569,31 @@ async def mark_ticket_resolved(
 
     db.commit()
     db.refresh(ticket)
+
+    # Send WhatsApp notification to customer
+    try:
+        from services.whatsapp_service import (
+            WhatsAppService,
+            WHATSAPP_MESSAGES,
+        )
+
+        whatsapp = WhatsAppService()
+        customer = ticket.customer
+
+        if customer and customer.phone_number:
+            language = customer.language or "en"
+            ticket_closed_msg = WHATSAPP_MESSAGES.get("ticket_closed", {})
+            message_template = ticket_closed_msg.get(
+                language, ticket_closed_msg.get("en", "")
+            )
+
+            if message_template:
+                message = message_template.replace(
+                    "{ticket_number}", ticket.ticket_number
+                )
+                whatsapp.send_message(customer.phone_number, message)
+    except Exception as e:
+        logger.error(f"Failed to send ticket closure WhatsApp: {e}")
 
     # Emit WebSocket event for ticket resolution
     asyncio.create_task(

@@ -2,5 +2,9 @@
   "welcome_messages": {
     "en": "Welcome to AgriConnect! We're here to help you with agricultural information and support. How can we assist you today?",
     "sw": "Karibu AgriConnect! Tuko hapa kukusaidia kwa taarifa na msaada wa kilimo. Tunaweza kukusaidiaje leo?"
+  },
+  "ticket_closed": {
+    "en": "Your inquiry (Ticket #{ticket_number}) has been resolved. Thank you for using AgriConnect! If you have more questions, feel free to send us a message anytime.",
+    "sw": "Swali lako (Tiketi #{ticket_number}) limeshughulikiwa. Asante kwa kutumia AgriConnect! Ukiwa na maswali zaidi, tuma ujumbe wakati wowote."
   }
 }

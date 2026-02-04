@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { View, Alert } from "react-native";
+import { View, Alert, ToastAndroid, Platform } from "react-native";
 import { useDatabase } from "@/database/context";
 import { useRouter } from "expo-router";
 import Feathericons from "@expo/vector-icons/Feather";
@@ -16,6 +16,7 @@ type Props = {
 
 const HeaderOptions = ({ ticketID }: Props) => {
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
   const { user } = useAuth();
   const { updateTicket } = useTicket();
   const db = useDatabase();
@@ -39,6 +40,7 @@ const HeaderOptions = ({ ticketID }: Props) => {
   }, [fetchTicket]);
 
   const handleCloseTicket = async () => {
+    setIsClosing(true);
     try {
       if (!ticket?.id) {
         throw new Error("Ticket not found");
@@ -55,10 +57,16 @@ const HeaderOptions = ({ ticketID }: Props) => {
       }
       // Update unread count in database
       await dao.ticket.update(db, ticket.id, { unreadCount: 0 });
-      // Redirect to inbox after closing with active tab as 'resolved'
-      router.replace("/inbox?initTab=resolved");
+      // Show toast on Android
+      if (Platform.OS === "android") {
+        ToastAndroid.show("Ticket closed", ToastAndroid.SHORT);
+      }
+      // Redirect to inbox after closing with active tab as 'open' (pending)
+      router.replace("/inbox?initTab=open");
     } catch (error) {
       console.error("Error closing ticket:", error);
+    } finally {
+      setIsClosing(false);
     }
   };
 
@@ -82,7 +90,9 @@ const HeaderOptions = ({ ticketID }: Props) => {
             <Feathericons name="more-vertical" size={22} color="black" />
           }
         >
-          <MenuItem onPress={onCloseTicket}>Close Ticket</MenuItem>
+          <MenuItem onPress={onCloseTicket} disabled={isClosing}>
+            {isClosing ? "Closing..." : "Close Ticket"}
+          </MenuItem>
         </DropdownMenu>
       )}
     </View>
