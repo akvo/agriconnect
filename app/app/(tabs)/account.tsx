@@ -21,7 +21,8 @@ import { initialsFromName } from "@/utils/string";
 import typography from "@/styles/typography";
 import { api } from "@/services/api";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
+// Remove /api suffix from the URL for storage downloads
+const API_BASE_URL = (process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "").replace(/\/api$/, "");
 
 const Account: React.FC = () => {
   const [isConfirmLogoutVisible, setIsConfirmLogoutVisible] =
@@ -51,7 +52,6 @@ const Account: React.FC = () => {
     setIsCheckingUpdate(true);
     try {
       const result = await api.checkAppVersion(currentVersion);
-      console.log("[Account] Version check result:", result);
       setUpdateInfo({
         available: result.update_available,
         version: result.latest_version,
@@ -70,29 +70,16 @@ const Account: React.FC = () => {
   };
 
   const handleDownload = async () => {
-    if (updateInfo?.downloadUrl) {
-      // Remove /api from base URL since storage is at root
-      const baseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
-      const fullUrl = `${baseUrl}${updateInfo.downloadUrl}`;
+    if (!updateInfo?.downloadUrl) {
+      Alert.alert("Error", "Download URL not available");
+      return;
+    }
 
-      try {
-        const supported = await Linking.canOpenURL(fullUrl);
-        if (supported) {
-          await Linking.openURL(fullUrl);
-        } else {
-          // Fallback: show URL to user
-          Alert.alert(
-            "Download Update",
-            `Open this link in your browser to download:\n\n${fullUrl}`,
-          );
-        }
-      } catch {
-        // Fallback: show URL to user
-        Alert.alert(
-          "Download Update",
-          `Open this link in your browser to download:\n\n${fullUrl}`,
-        );
-      }
+    const fullUrl = `${API_BASE_URL}${updateInfo.downloadUrl}`;
+    try {
+      await Linking.openURL(fullUrl);
+    } catch (error) {
+      Alert.alert("Error", "Failed to open download link");
     }
   };
 
@@ -215,17 +202,26 @@ const Account: React.FC = () => {
       </Text>
 
       <View style={styles.updateContainer}>
-        {updateInfo?.available ? (
+        {updateInfo !== null && updateInfo.available === true && (
           <TouchableOpacity
-            style={styles.updateButton}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              paddingVertical: 12,
+              paddingHorizontal: 20,
+              borderRadius: 20,
+              backgroundColor: "#027E5D",
+            }}
             onPress={handleDownload}
           >
             <Feathericons name="download" size={16} color="#FFFFFF" />
-            <Text style={styles.updateButtonText}>
+            <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "500" }}>
               Download v{updateInfo.version}
             </Text>
           </TouchableOpacity>
-        ) : (
+        )}
+        {(updateInfo === null || updateInfo.available === false) && (
           <TouchableOpacity
             style={[
               styles.checkUpdateButton,
