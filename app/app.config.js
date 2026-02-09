@@ -60,6 +60,7 @@ module.exports = {
         },
       ],
       "expo-secure-store",
+      "./plugins/withProguard",
     ],
     androidNavigationBar: {
       visible: "overscan",

@@ -1,8 +1,11 @@
 import os
+import re
 from fastapi import APIRouter, File, UploadFile, Header, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Tuple
+
+from pydantic import BaseModel
 
 router = APIRouter(tags=["storage"])
 
@@ -144,3 +147,85 @@ async def upload_file(
         raise HTTPException(
             status_code=500, detail=f"Failed to save file: {str(e)}"
         )
+
+
+class VersionCheckResponse(BaseModel):
+    current_version: str
+    latest_version: Optional[str] = None
+    update_available: bool
+    download_url: Optional[str] = None
+
+
+def parse_version(version_str: str) -> Tuple[int, ...]:
+    """Parse version string into tuple of integers for comparison."""
+    try:
+        return tuple(int(x) for x in version_str.split("."))
+    except (ValueError, AttributeError):
+        return (0,)
+
+
+def find_latest_apk_version() -> Optional[Tuple[str, str]]:
+    """Scan storage directory for APK files and return latest version.
+
+    Returns:
+        Tuple of (version, filename) or None if no APK found
+    """
+    storage_path = "storage"
+    if not os.path.exists(storage_path):
+        return None
+
+    # Pattern: agriconnect-X.Y.Z.apk
+    pattern = re.compile(r"^agriconnect-(\d+\.\d+\.\d+)\.apk$")
+    versions: List[Tuple[Tuple[int, ...], str, str]] = []
+
+    for filename in os.listdir(storage_path):
+        match = pattern.match(filename)
+        if match:
+            version_str = match.group(1)
+            version_tuple = parse_version(version_str)
+            versions.append((version_tuple, version_str, filename))
+
+    if not versions:
+        return None
+
+    # Sort by version tuple (highest first) and return latest
+    versions.sort(reverse=True)
+    _, latest_version, latest_filename = versions[0]
+    return (latest_version, latest_filename)
+
+
+@router.get("/api/app/version", response_model=VersionCheckResponse)
+def check_app_version(current_version: str):
+    """Check if a newer version of the app is available.
+
+    Scans the storage directory for APK files and compares versions.
+
+    Args:
+        current_version: The current app version (e.g., "1.2.7")
+
+    Returns:
+        Version check result with update availability and download URL
+    """
+    result = find_latest_apk_version()
+
+    if not result:
+        return VersionCheckResponse(
+            current_version=current_version,
+            latest_version=None,
+            update_available=False,
+            download_url=None,
+        )
+
+    latest_version, latest_filename = result
+    current_tuple = parse_version(current_version)
+    latest_tuple = parse_version(latest_version)
+    update_available = latest_tuple > current_tuple
+
+    return VersionCheckResponse(
+        current_version=current_version,
+        latest_version=latest_version,
+        update_available=update_available,
+        download_url=(
+            f"/storage/{latest_filename}" if update_available else None
+        ),
+    )

@@ -886,6 +886,31 @@ class ApiClient {
     }
     return response.json();
   }
+
+  /**
+   * Check if a newer app version is available
+   */
+  async checkAppVersion(currentVersion: string): Promise<{
+    current_version: string;
+    latest_version: string | null;
+    update_available: boolean;
+    download_url: string | null;
+  }> {
+    const response = await this.fetchWithRetry(
+      `${this.baseUrl}/app/version?current_version=${currentVersion}`,
+      {},
+      true, // isPublicEndpoint = true
+    );
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to check app version" }));
+      throw new Error(error.detail || "Failed to check app version");
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();
