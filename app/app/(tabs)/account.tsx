@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   StyleSheet,
   Text,
@@ -7,19 +8,93 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  ActivityIndicator,
+  Alert,
+  Linking,
 } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
+import Constants from "expo-constants";
 import themeColors from "@/styles/colors";
 import Avatar from "@/components/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { initialsFromName } from "@/utils/string";
 import typography from "@/styles/typography";
+import { api } from "@/services/api";
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
 
 const Account: React.FC = () => {
   const [isConfirmLogoutVisible, setIsConfirmLogoutVisible] =
     useState<boolean>(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
+  const [updateInfo, setUpdateInfo] = useState<{
+    available: boolean;
+    version: string | null;
+    downloadUrl: string | null;
+  } | null>(null);
 
   const { user, isEditUser, setIsEditUser, signOut, setUser } = useAuth();
+
+  const currentVersion = Constants.expoConfig?.version || "0.0.0";
+
+  // Reset update status when navigating away and back
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setUpdateInfo(null);
+        setIsCheckingUpdate(false);
+      };
+    }, []),
+  );
+
+  const checkForUpdate = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const result = await api.checkAppVersion(currentVersion);
+      console.log("[Account] Version check result:", result);
+      setUpdateInfo({
+        available: result.update_available,
+        version: result.latest_version,
+        downloadUrl: result.download_url,
+      });
+    } catch (error: any) {
+      console.error("[Account] Failed to check for updates:", error);
+      Alert.alert(
+        "Update Check Failed",
+        error?.message || "Unable to check for updates",
+      );
+      setUpdateInfo(null);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (updateInfo?.downloadUrl) {
+      // Remove /api from base URL since storage is at root
+      const baseUrl = API_BASE_URL.replace(/\/api\/?$/, "");
+      const fullUrl = `${baseUrl}${updateInfo.downloadUrl}`;
+
+      try {
+        const supported = await Linking.canOpenURL(fullUrl);
+        if (supported) {
+          await Linking.openURL(fullUrl);
+        } else {
+          // Fallback: show URL to user
+          Alert.alert(
+            "Download Update",
+            `Open this link in your browser to download:\n\n${fullUrl}`,
+          );
+        }
+      } catch {
+        // Fallback: show URL to user
+        Alert.alert(
+          "Download Update",
+          `Open this link in your browser to download:\n\n${fullUrl}`,
+        );
+      }
+    }
+  };
 
   const onLogout = async () => {
     try {
@@ -134,6 +209,51 @@ const Account: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      <Text style={styles.versionText}>
+        <Text style={styles.appName}>Agriconnect App{"\n"}</Text>
+        Version {currentVersion}
+      </Text>
+
+      <View style={styles.updateContainer}>
+        {updateInfo?.available ? (
+          <TouchableOpacity
+            style={styles.updateButton}
+            onPress={handleDownload}
+          >
+            <Feathericons name="download" size={16} color="#FFFFFF" />
+            <Text style={styles.updateButtonText}>
+              Download v{updateInfo.version}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.checkUpdateButton,
+              isCheckingUpdate && styles.checkUpdateButtonDisabled,
+            ]}
+            onPress={checkForUpdate}
+            disabled={isCheckingUpdate}
+          >
+            {isCheckingUpdate ? (
+              <ActivityIndicator size="small" color={themeColors.textSecondary} />
+            ) : (
+              <>
+                <Feathericons
+                  name="refresh-cw"
+                  size={16}
+                  color={themeColors.textSecondary}
+                />
+                <Text style={styles.checkUpdateButtonText}>
+                  {updateInfo === null
+                    ? "Check for updates"
+                    : "You're up to date"}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
       <Modal
         visible={isConfirmLogoutVisible}
         animationType="fade"
@@ -228,7 +348,7 @@ const styles = StyleSheet.create({
   buttonsCard: {
     flexDirection: "column",
     gap: 12,
-    marginBottom: 124,
+    marginBottom: 16,
   },
   switchContainer: {
     flexDirection: "row",
@@ -328,6 +448,52 @@ const styles = StyleSheet.create({
     color: themeColors.textSecondary,
     fontSize: 16,
     fontWeight: 600,
+  },
+  versionText: {
+    textAlign: "center",
+    color: themeColors.textSecondary,
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  appName: {
+    fontWeight: "600",
+  },
+  updateContainer: {
+    alignItems: "center",
+    marginBottom: 124,
+  },
+  checkUpdateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: themeColors.mutedBorder,
+    backgroundColor: "#FFFFFF",
+  },
+  checkUpdateButtonDisabled: {
+    opacity: 0.6,
+  },
+  checkUpdateButtonText: {
+    color: themeColors.textSecondary,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  updateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: themeColors.primary,
+  },
+  updateButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
 
