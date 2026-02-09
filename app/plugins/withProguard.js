@@ -1,10 +1,14 @@
-const { withGradleProperties, withDangerousMod } = require("expo/config-plugins");
+const {
+  withGradleProperties,
+  withDangerousMod,
+  withAppBuildGradle,
+} = require("expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
 
 /**
- * Config plugin to enable R8/ProGuard minification for release builds.
- * This reduces APK size by ~30-40%.
+ * Config plugin to enable R8/ProGuard minification and ABI filtering for release builds.
+ * This reduces APK size by ~60% (from ~137MB to ~55-65MB).
  */
 function withProguard(config) {
   // Add gradle properties for minification
@@ -21,6 +25,35 @@ function withProguard(config) {
         value: "true",
       }
     );
+    return config;
+  });
+
+  // Add ABI filter for arm64-v8a only (reduces APK size by ~40-50%)
+  config = withAppBuildGradle(config, (config) => {
+    const buildGradle = config.modResults.contents;
+
+    // Check if abiFilters is already configured
+    if (buildGradle.includes("abiFilters")) {
+      return config;
+    }
+
+    // Find defaultConfig block and add ndk abiFilters
+    const defaultConfigRegex = /(defaultConfig\s*\{[^}]*)(})/;
+    const match = buildGradle.match(defaultConfigRegex);
+
+    if (match) {
+      const abiFilterConfig = `
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    `;
+
+      config.modResults.contents = buildGradle.replace(
+        defaultConfigRegex,
+        `$1${abiFilterConfig}$2`
+      );
+    }
+
     return config;
   });
 
