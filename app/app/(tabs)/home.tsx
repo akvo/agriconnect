@@ -1,9 +1,17 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNetwork } from "@/contexts/NetworkContext";
+import { useDatabase } from "@/database";
+import { DAOManager, UserStats } from "@/database/dao";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
@@ -15,6 +23,41 @@ export default function HomeScreen() {
   const router = useRouter();
   const { signOut, user } = useAuth();
   const { isOnline } = useNetwork();
+  const db = useDatabase();
+  const dao = useMemo(() => new DAOManager(db), [db]);
+
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    setIsLoadingStats(true);
+    try {
+      if (isOnline) {
+        // Fetch from API
+        const apiStats = await api.getUserStats();
+        // Save to SQLite for offline access
+        dao.userStats.saveFromApi(db, apiStats);
+        // Update state with fresh data
+        const cachedStats = dao.userStats.get(db);
+        setStats(cachedStats);
+      } else {
+        // Load from SQLite cache
+        const cachedStats = dao.userStats.get(db);
+        setStats(cachedStats);
+      }
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      // Fall back to cached data
+      const cachedStats = dao.userStats.get(db);
+      setStats(cachedStats);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [isOnline, dao, db]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   const handleLogout = async () => {
     try {
@@ -227,12 +270,39 @@ export default function HomeScreen() {
             alignItems: "center",
           }}
         >
-          <Text
-            style={[typography.label1, typography.bold, typography.textPrimary]}
-          >
-            Your progress
-          </Text>
-          <TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text
+              style={[
+                typography.label1,
+                typography.bold,
+                typography.textPrimary,
+              ]}
+            >
+              Your progress
+            </Text>
+            <TouchableOpacity
+              onPress={fetchStats}
+              disabled={isLoadingStats}
+              style={{
+                padding: 4,
+                opacity: isLoadingStats ? 0.5 : 1,
+              }}
+            >
+              {isLoadingStats ? (
+                <ActivityIndicator
+                  size="small"
+                  color={themeColors["green-500"]}
+                />
+              ) : (
+                <Feathericons
+                  name="refresh-cw"
+                  size={16}
+                  color={themeColors["green-500"]}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={() => router.navigate("/stats")}>
             <Text style={[typography.body3]}>See all</Text>
           </TouchableOpacity>
         </View>
@@ -247,7 +317,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                XXX
+                {stats?.farmersReachedAll ?? 0}
               </Text>
               <Feathericons
                 name="user-plus"
@@ -274,7 +344,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                XXX
+                {stats?.conversationsResolvedAll ?? 0}
               </Text>
               <Feathericons
                 name="check-circle"
@@ -301,7 +371,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                XXX
+                {stats?.messagesSentAll ?? 0}
               </Text>
               <Feathericons
                 name="message-circle"
@@ -328,7 +398,7 @@ export default function HomeScreen() {
                   typography.textGreen500,
                 ]}
               >
-                XX min
+                --
               </Text>
               <Feathericons
                 name="clock"
