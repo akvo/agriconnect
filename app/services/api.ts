@@ -911,6 +911,30 @@ class ApiClient {
 
     return response.json();
   }
+
+  /**
+   * Get user statistics (farmers reached, conversations resolved, messages sent)
+   */
+  async getUserStats(): Promise<{
+    farmers_reached: { this_week: number; this_month: number; all_time: number };
+    conversations_resolved: {
+      this_week: number;
+      this_month: number;
+      all_time: number;
+    };
+    messages_sent: { this_week: number; this_month: number; all_time: number };
+  }> {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/user/stats`);
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to fetch user stats" }));
+      throw new Error(error.detail || "Failed to fetch user stats");
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();

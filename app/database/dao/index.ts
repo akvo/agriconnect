@@ -4,6 +4,7 @@ import { CustomerUserDAO } from "./customerUserDAO";
 import { MessageDAO } from "./messageDAO";
 import { ProfileDAO } from "./profileDAO";
 import { TicketDAO } from "./ticketDAO";
+import { UserStatsDAO } from "./userStatsDAO";
 
 /**
  * DAO Manager - Central access point for all database operations
@@ -23,6 +24,7 @@ export class DAOManager {
   public readonly message: MessageDAO;
   public readonly profile: ProfileDAO;
   public readonly ticket: TicketDAO;
+  public readonly userStats: UserStatsDAO;
 
   constructor(db: SQLiteDatabase) {
     // Verify database is properly initialized
@@ -38,6 +40,7 @@ export class DAOManager {
     this.message = new MessageDAO(this.db);
     this.profile = new ProfileDAO(this.db);
     this.ticket = new TicketDAO(this.db);
+    this.userStats = new UserStatsDAO();
   }
 
   /**
