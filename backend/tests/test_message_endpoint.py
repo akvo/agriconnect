@@ -497,16 +497,61 @@ class TestMessageEndpoints:
 
         assert response.status_code == 201
 
-        # Verify WhatsApp service was called
+        # Verify WhatsApp service was called with EO name in italic
         mock_whatsapp_service.assert_called_once()
+        expected_body = f"{payload['body']}\n\n— _{self.eo_user.full_name}_"
         mock_service_instance.send_message.assert_called_once_with(
             to_number=self.customer.phone_number,
-            message_body=payload["body"],
+            message_body=expected_body,
         )
 
         # Verify message_sid was updated with Twilio SID
         data = response.json()
         assert data["message_sid"] == "SM1234567890"
+
+    @patch("routers.messages.WhatsAppService")
+    def test_create_message_includes_eo_name_in_whatsapp(
+        self, mock_whatsapp_service
+    ):
+        """Test that WhatsApp message includes EO name in italic below body"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message.return_value = {
+            "sid": "SM9876543210",
+            "status": "queued",
+        }
+        mock_whatsapp_service.return_value = mock_service_instance
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "Hello, how can I help you?",
+            "from_source": MessageFrom.USER,
+        }
+
+        response = self.client.post(
+            "/api/messages",
+            json=payload,
+            headers=headers,
+        )
+
+        assert response.status_code == 201
+
+        # Verify the message body sent to WhatsApp includes EO name
+        call_args = mock_service_instance.send_message.call_args
+        sent_body = call_args.kwargs["message_body"]
+
+        # Message should end with EO name in italic format
+        assert sent_body.endswith(f"— _{self.eo_user.full_name}_")
+        # Original message body should be at the start
+        assert sent_body.startswith(payload["body"])
+        # Should have newlines separating body from name
+        assert "\n\n— _" in sent_body
+
+        # Database should store original body without EO name
+        data = response.json()
+        assert data["body"] == payload["body"]
+        assert self.eo_user.full_name not in data["body"]
 
     @patch("routers.messages.WhatsAppService")
     def test_create_message_llm_does_not_send_whatsapp(

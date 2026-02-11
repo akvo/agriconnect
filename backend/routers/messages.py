@@ -277,9 +277,14 @@ async def create_message(
             # Send WhatsApp message
             whatsapp_service = WhatsAppService()
 
+            # Format message with EO's name below in italic (not stored in DB)
+            formatted_body = (
+                f"{new_message.body}\n\n— _{current_user.full_name}_"
+            )
+
             response = whatsapp_service.send_message(
                 to_number=customer_phone,
-                message_body=new_message.body,
+                message_body=formatted_body,
             )
 
             print(
