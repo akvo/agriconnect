@@ -1,6 +1,6 @@
 # APK Size Optimization
 
-This document describes the APK size optimization implemented for the AgriConnect mobile app, reducing the APK size from ~137MB to ~44MB (68% reduction).
+This document describes the APK size optimization implemented for the AgriConnect mobile app, reducing the APK size from ~137MB to ~75MB (45% reduction) while supporting both 32-bit and 64-bit ARM devices.
 
 ## Problem
 
@@ -21,12 +21,13 @@ R8 is Android's code shrinker that:
 - Optimizes bytecode
 - Shrinks resources (removes unused resources)
 
-### 2. Single ABI Filter (arm64-v8a)
+### 2. Dual ABI Filter (armeabi-v7a + arm64-v8a)
 
-Instead of bundling all four CPU architectures, we now only include `arm64-v8a`:
-- Most modern Android devices (2015+) use 64-bit ARM processors
-- Removes ~75% of native library size
-- Users with older 32-bit devices can still use older APK versions
+Instead of bundling all four CPU architectures, we include both ARM architectures:
+- **arm64-v8a**: 64-bit ARM for modern devices (2015+)
+- **armeabi-v7a**: 32-bit ARM for older devices and some Android 12/14 devices
+- Removes x86/x86_64 architectures (emulator-only, ~50% native library reduction)
+- Supports virtually all physical Android devices
 
 ## Implementation
 
@@ -65,7 +66,7 @@ function withProguard(config) {
       {
         type: "property",
         key: "reactNativeArchitectures",
-        value: "arm64-v8a",
+        value: "armeabi-v7a,arm64-v8a",
       }
     );
     return config;
@@ -155,10 +156,11 @@ The custom ProGuard rules prevent critical classes from being stripped:
 |---------|------|-------|
 | 1.2.7 | 138MB | Before optimization |
 | 1.2.8 | 128MB | R8/ProGuard only (all ABIs) |
-| 1.2.9 | 44MB | R8/ProGuard + Single ABI |
-| 1.3.0 | 44MB | Current version |
+| 1.2.9 | 44MB | R8/ProGuard + arm64-v8a only |
+| 1.3.0 | 44MB | arm64-v8a only |
+| 1.3.3 | ~75MB | R8/ProGuard + Dual ABI (armeabi-v7a + arm64-v8a) |
 
-**Total reduction: 68% (138MB → 44MB)**
+**Total reduction: ~45% (138MB → ~75MB)** with full device compatibility
 
 ## Building the Optimized APK
 
@@ -190,9 +192,11 @@ kubectl exec -n agriconnect2-namespace <pod-name> -c backend -- \
 
 ### Device Compatibility
 
-- **arm64-v8a only**: Supports 64-bit ARM devices (most devices since 2015)
-- Older 32-bit devices (armeabi-v7a) are not supported with optimized APKs
-- If 32-bit support is needed, build with `reactNativeArchitectures=armeabi-v7a,arm64-v8a`
+- **armeabi-v7a + arm64-v8a**: Supports virtually all physical Android devices
+- **arm64-v8a**: 64-bit ARM devices (most devices since 2015)
+- **armeabi-v7a**: 32-bit ARM devices and some older devices running Android 12/14
+- **x86/x86_64**: Not included (emulator-only architectures)
+- If you need emulator support for testing, temporarily add x86_64 to the architectures
 
 ### Troubleshooting
 

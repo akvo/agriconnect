@@ -2,7 +2,7 @@ module.exports = {
   expo: {
     name: "agriconnect",
     slug: "agriconnect",
-    version: "1.3.2",
+    version: "1.3.3",
     owner: "akvo",
     orientation: "portrait",
     icon: "./assets/images/icon.png",

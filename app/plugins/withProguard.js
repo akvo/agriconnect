@@ -32,7 +32,7 @@ function withProguard(config) {
       {
         type: "property",
         key: "reactNativeArchitectures",
-        value: "arm64-v8a",
+        value: "armeabi-v7a,arm64-v8a",
       }
     );
     return config;
