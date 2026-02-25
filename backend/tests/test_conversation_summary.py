@@ -3,7 +3,7 @@ Unit tests for conversation_summary utility
 
 Tests the implementation of:
 - Merging farmer questions before/after FOLLOW_UP messages
-- Customer context extraction (phone, location, crop)
+- Customer context extraction (farmer_id, ward, crop, gender, age_group)
 - Time threshold filtering
 - DataFrame output format
 """
@@ -120,12 +120,16 @@ class TestGetCustomerContext:
         db_session.add(admin)
         db_session.commit()
 
-        # Create customer with profile data
+        # Create customer with profile data (birth_year 1990 = "36-50")
         customer = Customer(
             phone_number="+254712345678",
             full_name="Test Farmer",
             language=CustomerLanguage.EN,
-            profile_data={"crop_type": "Maize", "gender": "male"},
+            profile_data={
+                "crop_type": "Maize",
+                "gender": "male",
+                "birth_year": 1990,
+            },
             onboarding_status=OnboardingStatus.COMPLETED,
         )
         db_session.add(customer)
@@ -141,12 +145,14 @@ class TestGetCustomerContext:
 
         result = get_customer_context(db_session, customer.id)
 
-        assert result["phone_number"] == "+254712345678"
-        assert result["location"] == "Kenya > Murang'a > Kiharu > Test Ward"
+        assert result["farmer_id"] == customer.id
+        assert result["ward"] == "Test Ward"
         assert result["crop"] == "Maize"
+        assert result["gender"] == "male"
+        assert result["age_group"] == "36-50"
 
     def test_get_context_with_minimal_data(self, db_session: Session):
-        """Test getting context when only phone exists"""
+        """Test getting context when only basic data exists"""
         customer = Customer(
             phone_number="+254712345679",
             language=CustomerLanguage.EN,
@@ -157,17 +163,21 @@ class TestGetCustomerContext:
 
         result = get_customer_context(db_session, customer.id)
 
-        assert result["phone_number"] == "+254712345679"
-        assert result["location"] is None
+        assert result["farmer_id"] == customer.id
+        assert result["ward"] is None
         assert result["crop"] is None
+        assert result["gender"] is None
+        assert result["age_group"] is None
 
     def test_get_context_nonexistent_customer(self, db_session: Session):
         """Test getting context for nonexistent customer"""
         result = get_customer_context(db_session, 99999)
 
-        assert result["phone_number"] is None
-        assert result["location"] is None
+        assert result["farmer_id"] == 99999
+        assert result["ward"] is None
         assert result["crop"] is None
+        assert result["gender"] is None
+        assert result["age_group"] is None
 
 
 class TestGetFollowUpConversations:
@@ -207,7 +217,8 @@ class TestGetFollowUpConversations:
 
         assert df.empty
         assert list(df.columns) == [
-            "phone_number", "location", "crop", "question", "created_at"
+            "farmer_id", "ward", "crop", "gender", "age_group",
+            "query_text", "date"
         ]
 
     def test_merges_messages_within_threshold(self, db_session: Session):
@@ -228,12 +239,16 @@ class TestGetFollowUpConversations:
         db_session.add(admin)
         db_session.commit()
 
-        # Create customer
+        # Create customer with full profile
         customer = Customer(
             phone_number="+254712345681",
             full_name="Farmer One",
             language=CustomerLanguage.EN,
-            profile_data={"crop_type": "Coffee"},
+            profile_data={
+                "crop_type": "Coffee",
+                "gender": "female",
+                "birth_year": 2000,  # age ~26 = "20-35"
+            },
             onboarding_status=OnboardingStatus.COMPLETED,
         )
         db_session.add(customer)
@@ -311,11 +326,13 @@ class TestGetFollowUpConversations:
 
         assert len(df) == 1
         row = df.iloc[0]
-        assert row["phone_number"] == "+254712345681"
-        assert row["location"] == "Kenya > Test > Ward2"
+        assert row["farmer_id"] == customer.id
+        assert row["ward"] == "Test Ward 2"
         assert row["crop"] == "Coffee"
-        assert "yellow leaves" in row["question"]
-        assert "two weeks ago" in row["question"]
+        assert row["gender"] == "female"
+        assert row["age_group"] == "20-35"
+        assert "yellow leaves" in row["query_text"]
+        assert "two weeks ago" in row["query_text"]
 
     def test_excludes_messages_outside_threshold(self, db_session: Session):
         """Test that messages outside threshold are excluded"""
@@ -437,7 +454,7 @@ class TestGetFollowUpConversations:
             db_session, time_threshold_minutes=10
         )
         assert len(df_10min) == 1
-        assert "maize" in df_10min.iloc[0]["question"]
+        assert "maize" in df_10min.iloc[0]["query_text"]
 
     def test_handles_multiple_follow_ups(self, db_session: Session):
         """Test handling multiple FOLLOW_UP messages"""
@@ -527,7 +544,7 @@ class TestGetFollowUpConversations:
         df = get_follow_up_conversations(db_session, time_threshold_minutes=5)
 
         assert len(df) == 2
-        questions = df["question"].tolist()
+        questions = df["query_text"].tolist()
         assert any("First question" in q for q in questions)
         assert any("Second question" in q for q in questions)
 
@@ -604,7 +621,7 @@ class TestGetFollowUpConversations:
         df = get_follow_up_conversations(db_session, time_threshold_minutes=5)
 
         assert len(df) == 1
-        question = df.iloc[0]["question"]
+        question = df.iloc[0]["query_text"]
         # Should contain customer messages
         assert "Customer question here" in question
         assert "Customer response here" in question

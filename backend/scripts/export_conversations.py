@@ -3,7 +3,10 @@
 CLI script to export conversation summaries to CSV.
 
 Exports merged farmer questions (before + after FOLLOW_UP messages)
-with customer context (phone, location, crop).
+with anonymized customer context (farmer_id, ward, crop, gender, age_group).
+
+Data Governance compliant - see:
+https://docs.google.com/document/d/1vCFRkks-T3chVueEfP0dVJR16pG1BXco
 
 Usage:
     # From backend container
@@ -74,13 +77,15 @@ def main():
 
         # Show first few rows
         for idx, row in df.head(3).iterrows():
-            print(f"Phone: {row['phone_number']}")
-            print(f"Location: {row['location']}")
+            print(f"Farmer ID: {row['farmer_id']}")
+            print(f"Ward: {row['ward']}")
             print(f"Crop: {row['crop']}")
-            question_preview = row['question'][:80] + "..." \
-                if len(row['question']) > 80 else row['question']
-            print(f"Question: {question_preview}")
-            print(f"Created: {row['created_at']}")
+            print(f"Gender: {row['gender']}")
+            print(f"Age Group: {row['age_group']}")
+            query_preview = row['query_text'][:80] + "..." \
+                if len(row['query_text']) > 80 else row['query_text']
+            print(f"Query: {query_preview}")
+            print(f"Date: {row['date']}")
             print("-" * 60)
 
         print(f"\nTotal: {len(df)} conversations exported")

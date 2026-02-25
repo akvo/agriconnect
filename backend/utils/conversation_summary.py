@@ -22,25 +22,27 @@ from schemas.callback import MessageType
 
 def get_customer_context(db: Session, customer_id: int) -> dict:
     """
-    Get customer's phone, location path, and crop type.
+    Get customer context for data governance compliant export.
 
     Args:
         db: Database session
         customer_id: Customer ID
 
     Returns:
-        dict with phone_number, location, and crop
+        dict with farmer_id, ward, crop, gender, age_group
     """
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if not customer:
         return {
-            "phone_number": None,
-            "location": None,
+            "farmer_id": customer_id,
+            "ward": None,
             "crop": None,
+            "gender": None,
+            "age_group": None,
         }
 
-    # Get location from customer_administrative -> administrative.path
-    location = None
+    # Get ward name from customer_administrative -> administrative.name
+    ward = None
     customer_admin = (
         db.query(CustomerAdministrative)
         .filter(CustomerAdministrative.customer_id == customer_id)
@@ -53,7 +55,7 @@ def get_customer_context(db: Session, customer_id: int) -> dict:
             .first()
         )
         if admin:
-            location = admin.path
+            ward = admin.name
 
     # Get crop from profile_data
     crop = None
@@ -61,9 +63,11 @@ def get_customer_context(db: Session, customer_id: int) -> dict:
         crop = customer.profile_data.get("crop_type")
 
     return {
-        "phone_number": customer.phone_number,
-        "location": location,
+        "farmer_id": customer_id,
+        "ward": ward,
         "crop": crop,
+        "gender": customer.gender,
+        "age_group": customer.age_group,
     }
 
 
@@ -105,7 +109,8 @@ def get_follow_up_conversations(
         time_threshold_minutes: Max time gap for merging messages (default: 5)
 
     Returns:
-        DataFrame with: phone_number, location, crop, question, created_at
+        DataFrame with columns: farmer_id, ward, crop, gender,
+        age_group, query_text, date
     """
     # Query all FOLLOW_UP messages
     follow_up_messages = (
@@ -177,18 +182,20 @@ def get_follow_up_conversations(
         # Get customer context
         context = get_customer_context(db, customer_id)
 
-        # Determine created_at (use earliest message time)
+        # Determine date (use earliest message time)
         if before_msg:
-            created_at = before_msg.created_at
+            date = before_msg.created_at
         else:
-            created_at = after_msg.created_at
+            date = after_msg.created_at
 
         results.append({
-            "phone_number": context["phone_number"],
-            "location": context["location"],
+            "farmer_id": context["farmer_id"],
+            "ward": context["ward"],
             "crop": context["crop"],
-            "question": merged_question,
-            "created_at": created_at,
+            "gender": context["gender"],
+            "age_group": context["age_group"],
+            "query_text": merged_question,
+            "date": date,
         })
 
     # Create DataFrame
@@ -197,7 +204,8 @@ def get_follow_up_conversations(
     # Ensure columns exist even if empty
     if df.empty:
         df = pd.DataFrame(columns=[
-            "phone_number", "location", "crop", "question", "created_at"
+            "farmer_id", "ward", "crop", "gender", "age_group",
+            "query_text", "date"
         ])
 
     return df
