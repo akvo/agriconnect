@@ -28,3 +28,4 @@ celery==5.5.3
 redis==7.0.1
 flower==2.0.1
 akvo-weather-info>=0.2.0
+pandas>=2.0.0
