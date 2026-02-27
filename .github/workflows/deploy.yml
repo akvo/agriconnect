@@ -63,8 +63,7 @@ jobs:
       - name: Build Android APK
         working-directory: app
         run: |
-          eas build --platform android --profile test --non-interactive > output.txt
-          cat output.txt
+          eas build --platform android --profile test --non-interactive 2>&1 | tee output.txt
           echo "APK_URL=$(tail -n 1 output.txt)" >> "$GITHUB_ENV"
 
       - name: Get app version
