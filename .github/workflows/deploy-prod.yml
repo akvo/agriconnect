@@ -61,7 +61,26 @@ jobs:
 
       - name: Build Android APK
         working-directory: app
-        run: eas build --platform android --profile production --non-interactive --no-wait
+        run: |
+          eas build --platform android --profile production --non-interactive > output.txt
+          cat output.txt
+          echo "APK_URL=$(tail -n 1 output.txt)" >> "$GITHUB_ENV"
+
+      - name: Get app version
+        run: |
+          VERSION=$(node -e "const c = require('./app/app.config.js'); console.log(c.expo.version)")
+          echo "APK_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Download APK
+        run: curl -L -o agriconnect.apk "$APK_URL"
+
+      - name: Upload APK to storage
+        run: |
+          curl -X POST \
+            -H "X-Storage-Secret: ${{ secrets.STORAGE_SECRET }}" \
+            -F "file=@agriconnect.apk" \
+            -F "filename=agriconnect-${APK_VERSION}.apk" \
+            ${{ secrets.STORAGE_UPLOAD_URL }}
 
   build-push:
     name: Build and Push to Registry

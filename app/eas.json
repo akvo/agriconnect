@@ -12,8 +12,10 @@
         "autoIncrement": true
       }
     },
-    "preview": {
-      "distribution": "internal",
+    "test": {
+      "env": {
+        "APP_VARIANT": "test"
+      },
       "android": {
         "buildType": "apk",
         "autoIncrement": true

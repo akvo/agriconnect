@@ -1,6 +1,18 @@
+const IS_TEST = process.env.APP_VARIANT === "test";
+
+const getPackageName = () => {
+  if (IS_TEST) return "com.akvo.agriconnect.test";
+  return "com.akvo.agriconnect";
+};
+
+const getAppName = () => {
+  if (IS_TEST) return "AgriConnect (Test)";
+  return "AgriConnect";
+};
+
 module.exports = {
   expo: {
-    name: "agriconnect",
+    name: getAppName(),
     slug: "agriconnect",
     version: "1.3.3",
     owner: "akvo",
@@ -10,7 +22,7 @@ module.exports = {
     userInterfaceStyle: "light",
     newArchEnabled: true,
     android: {
-      package: "com.akvo.agriconnect",
+      package: getPackageName(),
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
