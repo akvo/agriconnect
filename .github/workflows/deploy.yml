@@ -65,7 +65,9 @@ jobs:
         working-directory: app
         run: |
           eas build --platform android --profile test --non-interactive 2>&1 | tee output.txt
-          echo "APK_URL=$(tail -n 1 output.txt)" >> "$GITHUB_ENV"
+          BUILD_ID=$(grep -oP '(?<=builds/)[a-f0-9-]+' output.txt | tail -1)
+          APK_URL=$(eas build:view "$BUILD_ID" --json 2>/dev/null | jq -r '.artifacts.buildUrl')
+          echo "APK_URL=$APK_URL" >> "$GITHUB_ENV"
 
       - name: Get app version
         run: |
