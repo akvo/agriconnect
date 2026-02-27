@@ -1,0 +1,245 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: deploy-to-production
+  cancel-in-progress: false
+
+jobs:
+  run-tests:
+    name: Run Tests
+    uses: ./.github/workflows/test-reusable.yml # Calls the reusable test workflow
+    secrets: inherit
+
+  check-app-changes:
+    name: Check for App Changes
+    runs-on: ubuntu-latest
+    environment: Production
+    outputs:
+      app-changed: ${{ steps.filter.outputs.app }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'app/**'
+
+  build-mobile:
+    name: Build Mobile App (APK)
+    runs-on: ubuntu-latest
+    environment: Production
+    needs: [run-tests, check-app-changes]
+    if: needs.check-app-changes.outputs.app-changed == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "yarn"
+          cache-dependency-path: app/yarn.lock
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: app
+        run: yarn install --frozen-lockfile
+
+      - name: Build Android APK
+        working-directory: app
+        run: eas build --platform android --profile production --non-interactive --no-wait
+
+  build-push:
+    name: Build and Push to Registry
+    runs-on: ubuntu-latest
+    environment: Production
+    needs: [run-tests]
+    if: always() && needs.run-tests.result == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Checkout Akvo composite actions
+        uses: actions/checkout@v4
+        with:
+          repository: akvo/composite-actions
+          token: ${{ secrets.GH_PAT }}
+          path: composite-actions
+          ref: 0.0.10
+
+      - name: Prepare Frontend Build
+        run: |
+          mv src/frontend/next.config.prod.mjs src/frontend/next.config.mjs
+          echo 'WEBDOMAIN=${{ secrets.WEBDOMAIN }}' >> src/frontend/.env
+        shell: bash
+
+      - name: Node Operations
+        uses: ./composite-actions/.github/actions/node-operation
+        with:
+          node-version: "20"
+          node-command: "yarn install --no-progress --frozen-lock && yarn build"
+
+      - name: Docker Build Nginx
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "agriconnect2"
+          service-name: "nginx"
+          dockerfile-location: "nginx"
+          cluster-name: "production"
+
+      - name: Docker Build Frontend
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "agriconnect2"
+          service-name: "frontend"
+          dockerfile-location: "frontend"
+          cluster-name: "production"
+
+      - name: Docker Build Backend
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "agriconnect2"
+          service-name: "backend"
+          dockerfile-location: "backend/Dockerfile"
+          cluster-name: "production"
+
+      - name: Docker Build Celery Worker
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "agriconnect2"
+          service-name: "celery-worker"
+          dockerfile-location: "backend/Dockerfile"
+          cluster-name: "production"
+
+      - name: Docker Build Celery Beat
+        uses: ./composite-actions/.github/actions/docker-build
+        with:
+          app-name: "agriconnect2"
+          service-name: "celery-beat"
+          dockerfile-location: "backend/Dockerfile"
+          cluster-name: "production"
+
+      - name: Docker Push Nginx
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "agriconnect2"
+          service-name: "nginx"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "production"
+
+      - name: Docker Push Frontend
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "agriconnect2"
+          service-name: "frontend"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "production"
+
+      - name: Docker Push Backend
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "agriconnect2"
+          service-name: "backend"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "production"
+
+      - name: Docker Push Celery Worker
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "agriconnect2"
+          service-name: "celery-worker"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "production"
+
+      - name: Docker Push Celery Beat
+        uses: ./composite-actions/.github/actions/docker-push
+        with:
+          app-name: "agriconnect2"
+          service-name: "celery-beat"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
+          cluster-name: "production"
+
+  rollout:
+    name: Rollout to the server
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Checkout Akvo composite actions
+        uses: actions/checkout@v4
+        with:
+          repository: akvo/composite-actions
+          token: ${{ secrets.GH_PAT }}
+          path: composite-actions
+          ref: 0.0.10
+
+      - name: Rollout Nginx
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "agriconnect2"
+          deployment-name: "nginx-deployment"
+          container-name: "nginx"
+          cluster-name: "production"
+          namespace-name: "agriconnect2-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Backend
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "agriconnect2"
+          deployment-name: "backend-deployment"
+          container-name: "backend"
+          cluster-name: "production"
+          namespace-name: "agriconnect2-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Celery Worker
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "agriconnect2"
+          deployment-name: "celery-worker-deployment"
+          container-name: "celery-worker"
+          cluster-name: "production"
+          namespace-name: "agriconnect2-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Celery Beat
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "agriconnect2"
+          deployment-name: "celery-beat-deployment"
+          container-name: "celery-beat"
+          cluster-name: "production"
+          namespace-name: "agriconnect2-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
+
+      - name: Rollout Frontend
+        uses: ./composite-actions/.github/actions/k8s-rollout
+        with:
+          app-name: "agriconnect2"
+          deployment-name: "frontend-deployment"
+          container-name: "frontend"
+          cluster-name: "production"
+          namespace-name: "agriconnect2-namespace"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
