@@ -3,6 +3,7 @@ name: Deploy to Production
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 concurrency:
   group: deploy-to-production
@@ -37,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Production
     needs: [run-tests, check-app-changes]
-    if: needs.check-app-changes.outputs.app-changed == 'true'
+    if: needs.check-app-changes.outputs.app-changed == 'true' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
