@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: deploy-to-test
@@ -38,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Test
     needs: [run-tests, check-app-changes]
-    if: needs.check-app-changes.outputs.app-changed == 'true'
+    if: needs.check-app-changes.outputs.app-changed == 'true' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
