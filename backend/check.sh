@@ -20,13 +20,13 @@ echo "Running tests"
 export TEST=true
 COVERAGE_PROCESS_START=./.coveragerc \
   coverage run --parallel-mode --concurrency=thread,gevent --rcfile=./.coveragerc \
-  --omit='patches/*' \
+  --omit='patches/*,scripts/*' \
   /usr/local/bin/pytest -vvv -rP
 
 echo "Coverage"
 coverage combine --rcfile=./.coveragerc
-coverage report -m --rcfile=./.coveragerc --omit='patches/*'
-coverage xml --rcfile=./.coveragerc --omit='patches/*'
+coverage report -m --rcfile=./.coveragerc --omit='patches/*,scripts/*'
+coverage xml --rcfile=./.coveragerc --omit='patches/*,scripts/*'
 
 if [[ -n "${COVERALLS_REPO_TOKEN:-}" ]]; then
   cd /app/backend && COVERALLS_SERVICE_NAME=github-actions coveralls
