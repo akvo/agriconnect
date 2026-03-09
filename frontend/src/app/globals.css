@@ -78,18 +78,6 @@
   --color-accent-950: 23 37 84;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --card: 3 7 18;
-    --popover: 3 7 18;
-    --border: 39 39 42;
-    --input: 39 39 42;
-    --muted: 24 24 27;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
@@ -112,15 +100,6 @@ body {
   );
 }
 
-@media (prefers-color-scheme: dark) {
-  .bg-gradient-brand {
-    background: linear-gradient(
-      135deg,
-      rgb(var(--color-primary-900)),
-      rgb(var(--color-accent-900))
-    );
-  }
-}
 
 .bg-gradient-primary {
   background: linear-gradient(

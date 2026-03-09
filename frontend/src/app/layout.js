@@ -16,6 +16,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <meta name="color-scheme" content="light only" />
+      </head>
       <body
         className={`${figtree.variable} antialiased bg-gradient-brand min-h-screen`}
       >
