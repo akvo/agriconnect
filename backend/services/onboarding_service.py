@@ -1908,9 +1908,11 @@ Birth year must be between 1900 and {current_year}."""
             message = message.replace("{profile_summary}", profile_summary)
 
         # Check if should ask weather subscription
+        # Skip if weather broadcast is disabled
         requires_weather_buttons = False
         if (
-            len(customer.customer_administrative) > 0
+            settings.weather_broadcast_enabled
+            and len(customer.customer_administrative) > 0
             and not customer.weather_subscription_asked
         ):
             # Get area name and append weather question
