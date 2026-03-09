@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from "react-native";
 import Constants from "expo-constants";
 import Feathericons from "@expo/vector-icons/Feather";
@@ -17,6 +18,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import themeColors from "@/styles/colors";
 import { useNotifications } from "@/contexts/NotificationContext";
 
+// Remove /api suffix from the URL for web pages
+const WEB_BASE_URL = (
+  process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || ""
+).replace(/\/api$/, "");
+
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,6 +30,11 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
   const { expoPushToken } = useNotifications();
+
+  const handleForgotPassword = () => {
+    const url = `${WEB_BASE_URL}/forgot-password`;
+    Linking.openURL(url);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -123,6 +134,12 @@ export default function LoginScreen() {
             />
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          onPress={handleForgotPassword}
+          style={styles.forgotPasswordButton}
+        >
+          <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -204,5 +221,14 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  forgotPasswordButton: {
+    alignSelf: "flex-end",
+    marginTop: 8,
+  },
+  forgotPasswordText: {
+    color: "#2d6e3e",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

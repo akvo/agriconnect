@@ -188,6 +188,57 @@ class EmailService:
             )
             return False
 
+    async def send_password_reset_whatsapp(
+        self, phone_number: str, full_name: str, reset_token: str
+    ) -> bool:
+        """
+        Send password reset link via WhatsApp
+
+        Args:
+            phone_number: User's phone number (E.164 format)
+            full_name: User's full name
+            reset_token: Password reset token
+
+        Returns:
+            bool: True if message sent successfully, False otherwise
+        """
+        try:
+            from services.whatsapp_service import WhatsAppService
+
+            reset_url = "{}://{}/reset-password/{}".format(
+                self.protocol, self.web_domain, reset_token
+            )
+
+            message = (
+                f"Hi {full_name},\n\n"
+                f"We received a request to reset your "
+                f"AgriConnect password.\n\n"
+                f"Click this link to reset your password:\n{reset_url}\n\n"
+                f"This link will expire in 1 hour.\n\n"
+                f"If you didn't request this, please ignore this message."
+            )
+
+            if self.disable_sending:
+                logger.info(
+                    f"WhatsApp disabled in test/CI; "
+                    f"skipping pwd reset to {phone_number}"
+                )
+                return True
+
+            whatsapp_service = WhatsAppService()
+            whatsapp_service.send_message(phone_number, message)
+            logger.info(
+                f"Password reset WhatsApp sent successfully to {phone_number}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to send password reset WhatsApp "
+                f"to {phone_number}: {str(e)}"
+            )
+            return False
+
 
 # Global email service instance
 email_service = EmailService()

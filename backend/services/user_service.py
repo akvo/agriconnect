@@ -616,3 +616,140 @@ class UserService:
         )
         users = [ua.user for ua in user_admins]
         return users
+
+    @staticmethod
+    async def request_password_reset(
+        db: Session,
+        email: str = None,
+        phone_number: str = None
+    ) -> bool:
+        """
+        Request password reset for a user via email or WhatsApp.
+        Always returns True to prevent enumeration attacks.
+
+        Args:
+            db: Database session
+            email: User's email (optional, use this OR phone_number)
+            phone_number: User's phone number (optional, use this OR email)
+
+        Returns:
+            bool: Always True to prevent enumeration
+        """
+        # Find user by email or phone number
+        if email:
+            user = db.query(User).filter(User.email == email).first()
+        elif phone_number:
+            user = db.query(User).filter(
+                User.phone_number == phone_number
+            ).first()
+        else:
+            return True
+
+        # If user doesn't exist or is not active, return True (no message sent)
+        # This prevents enumeration attacks
+        if not user or not user.is_active:
+            return True
+
+        try:
+            # Generate reset token (1 hour expiration)
+            reset_token = UserService.generate_invitation_token()
+            reset_expires_at = datetime.utcnow() + timedelta(hours=1)
+
+            # Store token in database
+            user.password_reset_token = reset_token
+            user.password_reset_token_expires_at = reset_expires_at
+
+            db.commit()
+            db.refresh(user)
+
+            # Send password reset via appropriate channel
+            if email:
+                await email_service.send_password_reset_email(
+                    email=user.email,
+                    full_name=user.full_name,
+                    reset_token=reset_token,
+                )
+            elif phone_number:
+                await email_service.send_password_reset_whatsapp(
+                    phone_number=user.phone_number,
+                    full_name=user.full_name,
+                    reset_token=reset_token,
+                )
+
+            return True
+
+        except Exception:
+            db.rollback()
+            # Return True even on error to prevent enumeration
+            return True
+
+    @staticmethod
+    def verify_password_reset_token(
+        db: Session, reset_token: str
+    ) -> tuple[bool, bool, User]:
+        """
+        Verify password reset token validity and expiration
+
+        Returns:
+            tuple: (is_valid, is_expired, user_or_none)
+        """
+        user = (
+            db.query(User)
+            .filter(User.password_reset_token == reset_token)
+            .first()
+        )
+
+        if not user:
+            return False, False, None
+
+        # User must be active to reset password
+        if not user.is_active:
+            return False, False, None
+
+        # Handle timezone-aware comparison
+        current_time = datetime.utcnow()
+        if user.password_reset_token_expires_at.tzinfo is not None:
+            from datetime import timezone
+            current_time = current_time.replace(tzinfo=timezone.utc)
+
+        is_expired = current_time > user.password_reset_token_expires_at
+        return True, is_expired, user
+
+    @staticmethod
+    def reset_password(
+        db: Session, reset_token: str, new_password: str
+    ) -> User:
+        """Reset password using valid token"""
+        is_valid, is_expired, user = UserService.verify_password_reset_token(
+            db, reset_token
+        )
+
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid password reset token",
+            )
+
+        if is_expired:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password reset token has expired",
+            )
+
+        try:
+            # Set new password and clear token
+            user.hashed_password = get_password_hash(new_password)
+            user.password_set_at = datetime.utcnow()
+            user.password_reset_token = None
+            user.password_reset_token_expires_at = None
+
+            db.commit()
+            db.refresh(user)
+            return user
+
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to reset password",
+            )

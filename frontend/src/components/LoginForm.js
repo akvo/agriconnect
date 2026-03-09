@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
 import {
   UserIcon,
@@ -120,6 +121,14 @@ export default function LoginForm({ onSuccess }) {
               placeholder="••••••••"
             />
             <LockClosedIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-secondary-400" />
+          </div>
+          <div className="text-right mt-1">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+            >
+              Forgot your password?
+            </Link>
           </div>
         </div>
 
