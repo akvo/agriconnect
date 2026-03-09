@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 from models.user import UserType
 from utils.validators import validate_phone_number
@@ -183,3 +183,46 @@ class AdminUserCreateResponse(BaseModel):
     user: UserResponse
     invitation_sent: bool
     invitation_url: Optional[str] = None
+
+
+# Password reset schemas
+class ForgotPasswordRequest(BaseModel):
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number_field(cls, v):
+        if v:
+            return validate_phone_number(v)
+        return v
+
+    @model_validator(mode="after")
+    def validate_email_or_phone(self):
+        if not self.email and not self.phone_number:
+            raise ValueError(
+                "Either email or phone_number must be provided"
+            )
+        if self.email and self.phone_number:
+            raise ValueError(
+                "Provide only one: email or phone_number, not both"
+            )
+        return self
+
+
+class ResetPasswordRequest(BaseModel):
+    reset_token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+
+class ResetTokenStatusResponse(BaseModel):
+    valid: bool
+    expired: bool
+    user_email: Optional[str] = None

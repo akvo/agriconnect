@@ -9,8 +9,11 @@ from models.user import User, UserType
 from models.administrative import Administrative
 from schemas.user import (
     AcceptInvitationRequest,
+    ForgotPasswordRequest,
     InvitationStatusResponse,
     LoginRequest,
+    ResetPasswordRequest,
+    ResetTokenStatusResponse,
     SelfUpdateRequest,
     TokenResponse,
     UserResponse,
@@ -276,3 +279,71 @@ def accept_invitation(
     return TokenResponse(
         access_token=access_token, user=user_response
     )
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest, db: Session = Depends(get_db)
+):
+    """
+    Request password reset via email or WhatsApp.
+    Always returns success to prevent enumeration attacks.
+    """
+    await UserService.request_password_reset(
+        db,
+        email=request.email,
+        phone_number=request.phone_number
+    )
+
+    if request.email:
+        message = (
+            "If an account exists with this email, "
+            "a password reset link will be sent."
+        )
+    else:
+        message = (
+            "If an account exists with this phone number, "
+            "a password reset link will be sent via WhatsApp."
+        )
+
+    return {"message": message}
+
+
+@router.get(
+    "/verify-reset-token/{reset_token}",
+    response_model=ResetTokenStatusResponse,
+)
+def verify_reset_token(reset_token: str, db: Session = Depends(get_db)):
+    """Verify password reset token validity"""
+    is_valid, is_expired, user = UserService.verify_password_reset_token(
+        db, reset_token
+    )
+
+    if not is_valid:
+        return ResetTokenStatusResponse(
+            valid=False,
+            expired=False,
+            user_email=None,
+        )
+
+    if is_expired:
+        return ResetTokenStatusResponse(
+            valid=False,
+            expired=True,
+            user_email=None,
+        )
+
+    return ResetTokenStatusResponse(
+        valid=True,
+        expired=False,
+        user_email=user.email,
+    )
+
+
+@router.post("/reset-password")
+def reset_password(
+    request: ResetPasswordRequest, db: Session = Depends(get_db)
+):
+    """Reset password using valid token"""
+    UserService.reset_password(db, request.reset_token, request.password)
+    return {"message": "Password has been reset successfully."}

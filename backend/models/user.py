@@ -26,6 +26,10 @@ class User(Base):
     invitation_sent_at = Column(DateTime(timezone=True), nullable=True)
     invitation_expires_at = Column(DateTime(timezone=True), nullable=True)
     password_set_at = Column(DateTime(timezone=True), nullable=True)
+    password_reset_token = Column(String, unique=True, nullable=True)
+    password_reset_token_expires_at = Column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
