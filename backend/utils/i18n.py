@@ -392,6 +392,12 @@ trans: Dict[str, Any] = {
         "female": {"en": "Female", "sw": "Mwanamke"},
         "other": {"en": "Other", "sw": "Nyingine"},
     },
+    "weather": {
+        "service_unavailable": {
+            "en": "Weather service is currently unavailable.",
+            "sw": "Huduma ya hali ya hewa haipatikani kwa sasa.",
+        },
+    },
     "weather_subscription": {
         "question": {
             "en": (

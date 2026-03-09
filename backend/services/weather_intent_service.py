@@ -140,6 +140,21 @@ class WeatherIntentService:
         Returns:
             WeatherIntentResult with status and any generated message
         """
+        # Check if weather intent is enabled
+        # TODO: Remove this check when weather service accuracy is fixed
+        if not settings.weather_intent_enabled:
+            lang = customer.language.value if customer.language else "en"
+            unavailable_msg = t("weather.service_unavailable", lang)
+            self.whatsapp_service.send_message(phone_number, unavailable_msg)
+            logger.info(
+                f"Weather intent disabled, sent unavailable message to "
+                f"{phone_number}"
+            )
+            return WeatherIntentResult(
+                handled=True,
+                message="Weather intent disabled",
+            )
+
         # Check if weather service is configured
         if not self.weather_broadcast_service.is_configured():
             logger.warning(

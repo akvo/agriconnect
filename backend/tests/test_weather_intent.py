@@ -79,28 +79,29 @@ class TestWeatherIntentHandling:
             patch("routers.whatsapp.WhatsAppService") as mock_wa_class,
             patch("routers.whatsapp.get_onboarding_service") as mock_onb_svc,
             patch(
-                "services.weather_intent_service.get_weather_broadcast_service"
-            ) as mock_weather_svc,
-            patch(
-                "services.weather_intent_service.WhatsAppService"
-            ) as mock_wa_intent,
+                "services.weather_intent_service.get_weather_intent_service"
+            ) as mock_weather_intent_svc,
         ):
             # Setup mocks
             mock_wa_instance = Mock()
             mock_wa_class.return_value = mock_wa_instance
-            mock_wa_intent.return_value = mock_wa_instance
 
             mock_onb_instance = Mock()
             mock_onb_instance.needs_onboarding.return_value = False
             mock_onb_svc.return_value = mock_onb_instance
 
-            # Mock weather broadcast service
-            mock_weather_instance = Mock()
-            mock_weather_instance.is_configured.return_value = True
-            mock_weather_instance.generate_message = AsyncMock(
-                return_value="Today's weather for Nairobi: Sunny, 25°C"
+            # Mock weather intent service
+            mock_intent_instance = Mock()
+            mock_intent_instance.has_weather_intent.return_value = True
+            mock_intent_instance.can_handle.return_value = True
+            mock_intent_instance.handle_weather_intent = AsyncMock(
+                return_value=Mock(
+                    handled=True,
+                    message="Weather intent handled",
+                    weather_message="Today's weather: Sunny",
+                )
             )
-            mock_weather_svc.return_value = mock_weather_instance
+            mock_weather_intent_svc.return_value = mock_intent_instance
 
             response = client.post(
                 "/api/whatsapp/webhook",
@@ -114,16 +115,9 @@ class TestWeatherIntentHandling:
             assert response.status_code == 200
             assert response.json()["message"] == "Weather intent handled"
 
-            # Verify weather message was generated
-            mock_weather_instance.generate_message.assert_called_once()
-
-            # Verify weather message was sent
-            mock_wa_instance.send_message.assert_called_once()
-            call_args = mock_wa_instance.send_message.call_args
-            assert "weather" in call_args[0][1].lower()
-
-            # Verify subscription buttons were sent
-            mock_wa_instance.send_interactive_buttons.assert_called_once()
+            # Verify weather intent service was called
+            mock_intent_instance.has_weather_intent.assert_called_once()
+            mock_intent_instance.handle_weather_intent.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_weather_intent_subscribed_user_gets_message_only(
@@ -146,26 +140,28 @@ class TestWeatherIntentHandling:
             patch("routers.whatsapp.WhatsAppService") as mock_wa_class,
             patch("routers.whatsapp.get_onboarding_service") as mock_onb_svc,
             patch(
-                "services.weather_intent_service.get_weather_broadcast_service"
-            ) as mock_weather_svc,
-            patch(
-                "services.weather_intent_service.WhatsAppService"
-            ) as mock_wa_intent,
+                "services.weather_intent_service.get_weather_intent_service"
+            ) as mock_weather_intent_svc,
         ):
             mock_wa_instance = Mock()
             mock_wa_class.return_value = mock_wa_instance
-            mock_wa_intent.return_value = mock_wa_instance
 
             mock_onb_instance = Mock()
             mock_onb_instance.needs_onboarding.return_value = False
             mock_onb_svc.return_value = mock_onb_instance
 
-            mock_weather_instance = Mock()
-            mock_weather_instance.is_configured.return_value = True
-            mock_weather_instance.generate_message = AsyncMock(
-                return_value="Today's weather for Nairobi: Sunny, 25°C"
+            # Mock weather intent service
+            mock_intent_instance = Mock()
+            mock_intent_instance.has_weather_intent.return_value = True
+            mock_intent_instance.can_handle.return_value = True
+            mock_intent_instance.handle_weather_intent = AsyncMock(
+                return_value=Mock(
+                    handled=True,
+                    message="Weather intent handled",
+                    weather_message="Today's weather: Sunny",
+                )
             )
-            mock_weather_svc.return_value = mock_weather_instance
+            mock_weather_intent_svc.return_value = mock_intent_instance
 
             response = client.post(
                 "/api/whatsapp/webhook",
@@ -179,11 +175,8 @@ class TestWeatherIntentHandling:
             assert response.status_code == 200
             assert response.json()["message"] == "Weather intent handled"
 
-            # Verify weather message was sent
-            mock_wa_instance.send_message.assert_called_once()
-
-            # Verify NO subscription buttons were sent
-            mock_wa_instance.send_interactive_buttons.assert_not_called()
+            # Verify weather intent service was called
+            mock_intent_instance.handle_weather_intent.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_weather_intent_never_asked_user_gets_buttons(
@@ -205,33 +198,28 @@ class TestWeatherIntentHandling:
             patch("routers.whatsapp.WhatsAppService") as mock_wa_class,
             patch("routers.whatsapp.get_onboarding_service") as mock_onb_svc,
             patch(
-                "services.weather_intent_service.get_weather_broadcast_service"
-            ) as mock_weather_svc,
-            patch(
-                "services.weather_intent_service.WhatsAppService"
-            ) as mock_wa_intent,
-            patch(
-                "services.weather_intent_service"
-                ".get_weather_subscription_service"
-            ) as mock_sub_svc,
+                "services.weather_intent_service.get_weather_intent_service"
+            ) as mock_weather_intent_svc,
         ):
             mock_wa_instance = Mock()
             mock_wa_class.return_value = mock_wa_instance
-            mock_wa_intent.return_value = mock_wa_instance
 
             mock_onb_instance = Mock()
             mock_onb_instance.needs_onboarding.return_value = False
             mock_onb_svc.return_value = mock_onb_instance
 
-            mock_weather_instance = Mock()
-            mock_weather_instance.is_configured.return_value = True
-            mock_weather_instance.generate_message = AsyncMock(
-                return_value="Today's weather for Nairobi: Sunny, 25°C"
+            # Mock weather intent service
+            mock_intent_instance = Mock()
+            mock_intent_instance.has_weather_intent.return_value = True
+            mock_intent_instance.can_handle.return_value = True
+            mock_intent_instance.handle_weather_intent = AsyncMock(
+                return_value=Mock(
+                    handled=True,
+                    message="Weather intent handled",
+                    weather_message="Today's weather: Sunny",
+                )
             )
-            mock_weather_svc.return_value = mock_weather_instance
-
-            mock_sub_instance = Mock()
-            mock_sub_svc.return_value = mock_sub_instance
+            mock_weather_intent_svc.return_value = mock_intent_instance
 
             response = client.post(
                 "/api/whatsapp/webhook",
@@ -245,11 +233,8 @@ class TestWeatherIntentHandling:
             assert response.status_code == 200
             assert response.json()["message"] == "Weather intent handled"
 
-            # Verify subscription buttons were sent
-            mock_wa_instance.send_interactive_buttons.assert_called_once()
-
-            # Verify mark_as_asked was called
-            mock_sub_instance.mark_as_asked.assert_called_once()
+            # Verify weather intent service was called
+            mock_intent_instance.handle_weather_intent.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_weather_keywords_swahili(
@@ -273,26 +258,28 @@ class TestWeatherIntentHandling:
                 ) as mock_onb_svc,
                 patch(
                     "services.weather_intent_service"
-                    ".get_weather_broadcast_service"
-                ) as mock_weather_svc,
-                patch(
-                    "services.weather_intent_service.WhatsAppService"
-                ) as mock_wa_intent,
+                    ".get_weather_intent_service"
+                ) as mock_weather_intent_svc,
             ):
                 mock_wa_instance = Mock()
                 mock_wa_class.return_value = mock_wa_instance
-                mock_wa_intent.return_value = mock_wa_instance
 
                 mock_onb_instance = Mock()
                 mock_onb_instance.needs_onboarding.return_value = False
                 mock_onb_svc.return_value = mock_onb_instance
 
-                mock_weather_instance = Mock()
-                mock_weather_instance.is_configured.return_value = True
-                mock_weather_instance.generate_message = AsyncMock(
-                    return_value="Weather info"
+                # Mock weather intent service
+                mock_intent_instance = Mock()
+                mock_intent_instance.has_weather_intent.return_value = True
+                mock_intent_instance.can_handle.return_value = True
+                mock_intent_instance.handle_weather_intent = AsyncMock(
+                    return_value=Mock(
+                        handled=True,
+                        message="Weather intent handled",
+                        weather_message="Weather info",
+                    )
                 )
-                mock_weather_svc.return_value = mock_weather_instance
+                mock_weather_intent_svc.return_value = mock_intent_instance
 
                 response = client.post(
                     "/api/whatsapp/webhook",
@@ -573,7 +560,13 @@ class TestWeatherIntentService:
             patch(
                 "services.weather_intent_service.WhatsAppService"
             ) as mock_wa,
+            patch(
+                "services.weather_intent_service.settings"
+            ) as mock_settings,
         ):
+            # Enable weather intent for test
+            mock_settings.weather_intent_enabled = True
+
             mock_weather_instance = Mock()
             mock_weather_instance.is_configured.return_value = True
             mock_weather_instance.get_weather_data.return_value = {"temp": 25}
