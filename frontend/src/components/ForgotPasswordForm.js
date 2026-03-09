@@ -142,7 +142,10 @@ export default function ForgotPasswordForm() {
       )}
 
       {/* Method Toggle */}
-      <div className="flex mb-6 bg-gray-100 p-1" style={{ borderRadius: "5px" }}>
+      <div
+        className="flex mb-6 bg-gray-100 p-1"
+        style={{ borderRadius: "5px" }}
+      >
         <button
           type="button"
           onClick={() => setResetMethod("email")}

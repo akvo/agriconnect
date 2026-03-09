@@ -4,10 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import ForgotPasswordForm from "../../components/ForgotPasswordForm";
-import {
-  ArrowPathIcon,
-  EnvelopeIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowPathIcon, EnvelopeIcon } from "@heroicons/react/24/outline";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
