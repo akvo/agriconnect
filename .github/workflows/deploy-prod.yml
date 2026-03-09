@@ -20,18 +20,30 @@ jobs:
     runs-on: ubuntu-latest
     environment: Production
     outputs:
-      app-changed: ${{ steps.filter.outputs.app }}
+      app-changed: ${{ steps.check.outputs.app }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Check paths
-        uses: dorny/paths-filter@v3
-        id: filter
         with:
-          filters: |
-            app:
-              - 'app/**'
+          fetch-depth: 0
+
+      - name: Check for app changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            # For releases, compare against previous tag
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [ -n "$PREV_TAG" ]; then
+              CHANGED=$(git diff --name-only "$PREV_TAG" HEAD -- app/ | wc -l)
+            else
+              # No previous tag, assume changes exist
+              CHANGED=1
+            fi
+            echo "app=$([[ $CHANGED -gt 0 ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          else
+            # For workflow_dispatch, always build
+            echo "app=true" >> $GITHUB_OUTPUT
+          fi
 
   build-mobile:
     name: Build Mobile App (APK)
