@@ -394,8 +394,14 @@ trans: Dict[str, Any] = {
     },
     "weather": {
         "service_unavailable": {
-            "en": "Weather service is currently unavailable.",
-            "sw": "Huduma ya hali ya hewa haipatikani kwa sasa.",
+            "en": (
+                "Weather service is currently unavailable. "
+                "It will be back soon."
+            ),
+            "sw": (
+                "Huduma ya hali ya hewa haipatikani kwa sasa. "
+                "Itarudi hivi karibuni."
+            ),
         },
     },
     "weather_subscription": {
