@@ -4,7 +4,6 @@ Weather API Comparison Script for Murang'a Districts.
 
 Compares weather data from:
 - OpenWeatherMap (via akvo-weather-info library)
-- Windy Point Forecast API
 - Google Weather API
 
 Usage:
@@ -15,7 +14,6 @@ Output:
 """
 
 import csv
-import math
 import os
 import requests
 from datetime import datetime
@@ -31,7 +29,6 @@ load_dotenv(env_file)
 
 # API Keys
 OPENWEATHER_KEY = os.getenv("OPENWEATHER")
-WINDY_KEY = os.getenv("WINDYCOM")
 GOOGLE_WEATHER_KEY = os.getenv("GOOGLE_WEATHER_API_KEY")
 
 # Administrative data path
@@ -115,55 +112,6 @@ def get_openweather_data(lat: float, lon: float) -> dict:
         return {"condition": f"Error: {str(e)}", "rain_mm": None}
 
 
-def get_windy_data(lat: float, lon: float) -> dict:
-    """Get weather data from Windy Point Forecast API."""
-    if not WINDY_KEY:
-        return {"condition": "API key missing", "rain_mm": None}
-
-    try:
-        url = "https://api.windy.com/api/point-forecast/v2"
-        payload = {
-            "lat": lat,
-            "lon": lon,
-            "model": "gfs",
-            "parameters": ["temp", "precip", "rh", "wind"],
-            "levels": ["surface"],
-            "key": WINDY_KEY,
-        }
-        response = requests.post(url, json=payload, timeout=10)
-        data = response.json()
-
-        if "error" in data:
-            return {"condition": f"Error: {data.get('error')}", "rain_mm": None}
-
-        # Get first forecast values
-        precip_m = data.get("past3hprecip-surface", [0])[0]
-        precip_mm = precip_m * 1000 if precip_m else 0
-
-        temp_k = data.get("temp-surface", [0])[0]
-        temp_c = temp_k - 273.15 if temp_k else 0
-
-        rh = data.get("rh-surface", [0])[0]
-
-        # Derive condition from data (Windy doesn't provide descriptions)
-        if precip_mm > 5:
-            condition = "Heavy Rain"
-        elif precip_mm > 1:
-            condition = "Light Rain"
-        elif precip_mm > 0:
-            condition = "Drizzle"
-        elif rh > 85:
-            condition = "Overcast/Humid"
-        elif rh > 60:
-            condition = "Partly Cloudy"
-        else:
-            condition = "Clear"
-
-        return {"condition": condition, "rain_mm": round(precip_mm, 2)}
-    except Exception as e:
-        return {"condition": f"Error: {str(e)}", "rain_mm": None}
-
-
 def get_google_weather_data(lat: float, lon: float) -> dict:
     """Get weather data from Google Weather API."""
     if not GOOGLE_WEATHER_KEY:
@@ -204,7 +152,6 @@ def main():
     # Check API keys
     print("\nAPI Key Status:")
     print(f"  OpenWeatherMap: {'✓' if OPENWEATHER_KEY else '✗'}")
-    print(f"  Windy:          {'✓' if WINDY_KEY else '✗'}")
     print(f"  Google Weather: {'✓' if GOOGLE_WEATHER_KEY else '✗'}")
     print()
 
@@ -218,15 +165,12 @@ def main():
         print(f"Fetching data for {ward['name']}...")
 
         owm = get_openweather_data(ward["lat"], ward["lon"])
-        windy = get_windy_data(ward["lat"], ward["lon"])
         google = get_google_weather_data(ward["lat"], ward["lon"])
 
         results.append({
             "Location": ward["name"],
             "OWM_Condition": owm["condition"],
             "OWM_Rain_MM": owm["rain_mm"],
-            "Windy_Condition": windy["condition"],
-            "Windy_Rain_MM": windy["rain_mm"],
             "Google_Condition": google["condition"],
             "Google_Rain_MM": google["rain_mm"],
         })
