@@ -1,29 +1,32 @@
 # Weather API Comparison
 
-Comparison between OpenWeatherMap (current implementation) and Windy Point Forecast API.
+Comparison between OpenWeatherMap (current implementation), Windy Point Forecast API, and Google Weather API.
 
 ## API Overview
 
-| Feature | OpenWeatherMap (Current) | Windy Point Forecast |
-|---------|-------------------------|---------------------|
-| **Endpoint** | `api.openweathermap.org` | `api.windy.com/api/point-forecast/v2` |
-| **Method** | GET | POST |
-| **Auth** | Query param `appid` | Request body `key` |
-| **Forecast Range** | 5 days (40 data points, 3h intervals) | ~10 days (80 data points, 3h intervals) |
-| **Models** | Single model | Multiple (gfs, iconEu, arome, etc.) |
-| **Coverage** | Global | Global (gfs), Regional for others |
-| **Pricing** | Free tier (API 2.5), Paid (API 3.0) | Free tier available |
+| Feature | OpenWeatherMap (Current) | Windy Point Forecast | Google Weather API |
+|---------|-------------------------|---------------------|-------------------|
+| **Endpoint** | `api.openweathermap.org` | `api.windy.com/api/point-forecast/v2` | `weather.googleapis.com/v1` |
+| **Method** | GET | POST | GET |
+| **Auth** | Query param `appid` | Request body `key` | Query param `key` |
+| **Forecast Range** | 5 days (40 data points, 3h intervals) | ~10 days (80 data points, 3h intervals) | 10 days (hourly: 240h, daily: 10d) |
+| **Models** | Single model | Multiple (gfs, iconEu, arome, etc.) | Single model |
+| **Coverage** | Global | Global (gfs), Regional for others | Global |
+| **Pricing** | Free tier (API 2.5), Paid (API 3.0) | Free tier available | Pay-as-you-go (Google Cloud) |
 
 ## Data Format Differences
 
-| Data | OpenWeatherMap | Windy |
-|------|----------------|-------|
-| **Temperature** | Celsius (direct) | Kelvin (subtract 273.15) |
-| **Precipitation** | mm per 3h | meters (multiply by 1000) |
-| **Wind** | speed (m/s) + direction (deg) | u/v components in m/s |
-| **Humidity** | % | % |
-| **Pressure** | hPa | Pa (divide by 100) |
-| **Clouds** | % coverage | Low/Mid/High layers separate |
+| Data | OpenWeatherMap | Windy | Google Weather |
+|------|----------------|-------|----------------|
+| **Temperature** | Celsius (direct) | Kelvin (subtract 273.15) | Celsius (direct) |
+| **Precipitation** | mm per 3h | meters (multiply by 1000) | mm (direct) |
+| **Wind** | speed (m/s) + direction (deg) | u/v components in m/s | speed (m/s) + direction (deg + cardinal) |
+| **Humidity** | % | % | % |
+| **Pressure** | hPa | Pa (divide by 100) | hPa/millibars (direct) |
+| **Clouds** | % coverage | Low/Mid/High layers separate | % coverage |
+| **Visibility** | Not in forecast | Not available | km |
+| **UV Index** | Not in free tier | Not available | Available |
+| **Thunderstorm** | Via weather type | Via precip type | Probability % |
 
 ## Response Structure
 
@@ -87,6 +90,113 @@ Comparison between OpenWeatherMap (current implementation) and Windy Point Forec
 }
 ```
 
+### Google Weather API - Current Conditions
+
+```json
+{
+  "currentTime": "2024-03-13T10:00:00Z",
+  "timeZone": {
+    "id": "Africa/Nairobi"
+  },
+  "isDaytime": true,
+  "weatherCondition": {
+    "iconBaseUri": "https://...",
+    "description": { "text": "Partly cloudy", "languageCode": "en" },
+    "type": "PARTLY_CLOUDY"
+  },
+  "temperature": { "degrees": 24.5, "unit": "CELSIUS" },
+  "feelsLikeTemperature": { "degrees": 25.1, "unit": "CELSIUS" },
+  "dewPoint": { "degrees": 18.2, "unit": "CELSIUS" },
+  "heatIndex": { "degrees": 25.3, "unit": "CELSIUS" },
+  "relativeHumidity": 68,
+  "uvIndex": 7,
+  "precipitation": {
+    "probability": { "percent": 20, "type": "RAIN" },
+    "qpf": { "quantity": 0.5, "unit": "MILLIMETERS" }
+  },
+  "thunderstormProbability": 10,
+  "airPressure": { "meanSeaLevelMillibars": 1015.2 },
+  "wind": {
+    "direction": { "degrees": 135, "cardinal": "SE" },
+    "speed": { "value": 3.5, "unit": "METERS_PER_SECOND" },
+    "gust": { "value": 5.2, "unit": "METERS_PER_SECOND" }
+  },
+  "visibility": { "distance": 10, "unit": "KILOMETERS" },
+  "cloudCover": 45
+}
+```
+
+### Google Weather API - Hourly Forecast
+
+```json
+{
+  "forecastHours": [
+    {
+      "interval": {
+        "startTime": "2024-03-13T10:00:00Z",
+        "endTime": "2024-03-13T11:00:00Z"
+      },
+      "displayDateTime": {
+        "year": 2024, "month": 3, "day": 13, "hours": 13,
+        "utcOffset": "+03:00"
+      },
+      "isDaytime": true,
+      "weatherCondition": {
+        "description": { "text": "Sunny", "languageCode": "en" },
+        "type": "SUNNY"
+      },
+      "temperature": { "degrees": 26.0, "unit": "CELSIUS" },
+      "feelsLikeTemperature": { "degrees": 27.2, "unit": "CELSIUS" },
+      "relativeHumidity": 55,
+      "uvIndex": 8,
+      "precipitation": {
+        "probability": { "percent": 5, "type": "NONE" }
+      },
+      "wind": {
+        "direction": { "degrees": 180, "cardinal": "S" },
+        "speed": { "value": 4.0, "unit": "METERS_PER_SECOND" }
+      }
+    }
+  ],
+  "timeZone": { "id": "Africa/Nairobi" }
+}
+```
+
+### Google Weather API - Daily Forecast
+
+```json
+{
+  "forecastDays": [
+    {
+      "interval": {
+        "startTime": "2024-03-13T00:00:00Z",
+        "endTime": "2024-03-14T00:00:00Z"
+      },
+      "displayDate": { "year": 2024, "month": 3, "day": 13 },
+      "daytimeForecast": {
+        "weatherCondition": {
+          "description": { "text": "Partly cloudy", "languageCode": "en" },
+          "type": "PARTLY_CLOUDY"
+        },
+        "precipitation": { "probability": { "percent": 30, "type": "RAIN" } }
+      },
+      "nighttimeForecast": {
+        "weatherCondition": {
+          "description": { "text": "Clear", "languageCode": "en" },
+          "type": "CLEAR"
+        }
+      },
+      "maxTemperature": { "degrees": 28.0, "unit": "CELSIUS" },
+      "minTemperature": { "degrees": 16.0, "unit": "CELSIUS" },
+      "sunrise": "06:32:00",
+      "sunset": "18:45:00",
+      "moonPhase": "WAXING_CRESCENT"
+    }
+  ],
+  "timeZone": { "id": "Africa/Nairobi" }
+}
+```
+
 ## Unit Conversions for Windy
 
 ```python
@@ -104,6 +214,15 @@ import math
 wind_speed = math.sqrt(wind_u**2 + wind_v**2)
 wind_direction = (math.degrees(math.atan2(-wind_u, -wind_v)) + 360) % 360
 ```
+
+## Google Weather API - No Conversions Needed
+
+Google Weather API returns data in standard units:
+- Temperature: Celsius
+- Precipitation: Millimeters
+- Pressure: Millibars (hPa)
+- Wind: m/s with direction in degrees and cardinal
+- Visibility: Kilometers
 
 ## Available Windy Models
 
@@ -128,6 +247,15 @@ wind_direction = (math.degrees(math.atan2(-wind_u, -wind_v)) + 360) % 360
 - `mclouds` - Medium clouds
 - `hclouds` - High clouds
 - `ptype` - Precipitation type
+
+## Google Weather API Endpoints
+
+| Endpoint | URL | Description |
+|----------|-----|-------------|
+| Current Conditions | `/v1/currentConditions:lookup` | Real-time weather data |
+| Hourly Forecast | `/v1/forecast/hours:lookup` | Up to 240 hours (10 days) |
+| Daily Forecast | `/v1/forecast/days:lookup` | Up to 10 days |
+| Hourly History | `/v1/history/hours:lookup` | Past 24 hours (cached) |
 
 ## Pros and Cons
 
@@ -159,20 +287,50 @@ wind_direction = (math.degrees(math.atan2(-wind_u, -wind_v)) + 360) % 360
 - Test API returns shuffled data (production key needed)
 - No city name resolution
 
+### Google Weather API
+
+**Pros:**
+- No unit conversions needed (metric by default)
+- Rich weather descriptions with icons
+- Up to 10-day forecasts (hourly and daily)
+- UV Index included (important for agriculture)
+- Thunderstorm probability (useful for farming alerts)
+- Sunrise/sunset/moon phase data
+- Cardinal wind directions included
+- Well-structured JSON responses
+- Part of Google Cloud ecosystem
+
+**Cons:**
+- Pay-as-you-go pricing (no permanent free tier)
+- Single forecast model
+- Requires Google Cloud project setup
+- Relatively new API (may have fewer third-party integrations)
+
 ## Recommendations for Agriculture
 
 For agricultural weather broadcasts, consider:
 
-1. **Keep OpenWeatherMap** for general forecasts and weather descriptions
+1. **Keep OpenWeatherMap** for general forecasts and weather descriptions (free tier)
 2. **Add Windy** for:
    - Extended forecasts (7-10 days for crop planning)
    - Detailed wind data (spraying decisions)
    - Multiple model comparison for critical decisions
+3. **Consider Google Weather API** for:
+   - UV Index data (crop protection, worker safety)
+   - Thunderstorm probability (urgent farming alerts)
+   - Sunrise/sunset times (irrigation scheduling)
+   - Clean, ready-to-use data without conversions
+   - When budget allows for pay-as-you-go pricing
 
 ## Testing
 
-Run the Windy API test:
+Run the API tests:
 ```bash
-./scripts/test_windy_api.sh              # Nairobi (default)
-./scripts/test_windy_api.sh -0.4 36.9    # Custom coordinates
+# Windy API
+./scripts/weather_api/test_windy_api.sh              # Nairobi (default)
+./scripts/weather_api/test_windy_api.sh -0.4 36.9    # Custom coordinates
+
+# Google Weather API
+./scripts/weather_api/test_google_weather_api.sh              # Nairobi (default)
+./scripts/weather_api/test_google_weather_api.sh -0.4 36.9    # Custom coordinates
 ```
