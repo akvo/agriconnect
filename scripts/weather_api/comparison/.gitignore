@@ -1,2 +1,2 @@
 # Ignore generated comparison CSV files
-*-muranga.csv
+*.csv
