@@ -245,32 +245,45 @@ async def ai_callback(
                                 f"✓ AI answer sent successfully: {answer_response['sid']}"
                             )
 
-                            # Step 2: Send confirmation template (non-critical)
-                            # Select template based on customer's language
-                            customer_lang = (
-                                ai_message.customer.language.value
-                                if ai_message.customer.language
-                                else "en"
+                            # Step 2: Send confirmation template only if citations exist
+                            # Citations indicate the response is from knowledge base
+                            # (relevant agricultural content worth escalating)
+                            has_citations = (
+                                payload.output
+                                and payload.output.citations
+                                and len(payload.output.citations) > 0
                             )
-                            template_sid = whatsapp_service.get_template_sid(
-                                template_type="confirmation",
-                                customer_language=customer_lang
-                            )
-                            if template_sid:
-                                try:
-                                    template_response = whatsapp_service.send_template_message(
-                                        to=ai_message.customer.phone_number,
-                                        content_sid=template_sid,
-                                        content_variables={},
-                                    )
-                                    logger.info(
-                                        f"✓ Confirmation template sent: {template_response['sid']}"
-                                    )
-                                except Exception as e:
-                                    logger.warning(
-                                        f"Failed to send confirmation template (non-critical): {e}"
-                                    )
-                                    # Template failure is non-fatal
+
+                            if has_citations:
+                                # Select template based on customer's language
+                                customer_lang = (
+                                    ai_message.customer.language.value
+                                    if ai_message.customer.language
+                                    else "en"
+                                )
+                                template_sid = whatsapp_service.get_template_sid(
+                                    template_type="confirmation",
+                                    customer_language=customer_lang
+                                )
+                                if template_sid:
+                                    try:
+                                        template_response = whatsapp_service.send_template_message(
+                                            to=ai_message.customer.phone_number,
+                                            content_sid=template_sid,
+                                            content_variables={},
+                                        )
+                                        logger.info(
+                                            f"✓ Confirmation template sent: {template_response['sid']}"
+                                        )
+                                    except Exception as e:
+                                        logger.warning(
+                                            f"Failed to send confirmation template (non-critical): {e}"
+                                        )
+                                        # Template failure is non-fatal
+                            else:
+                                logger.info(
+                                    "Skipping confirmation template: no citations in AI response"
+                                )
 
                             # CRITICAL: Only commit if WhatsApp send succeeded
                             message_service.commit_message(ai_message)
