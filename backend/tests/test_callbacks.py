@@ -725,3 +725,225 @@ def test_kb_callback_exception_raises_http_exception(
     response = client.post("/api/callback/kb", json=payload)
 
     assert response.status_code == 500
+
+
+class TestConfirmationTemplateWithCitations:
+    """Test confirmation template is only sent when citations exist"""
+
+    @pytest.fixture
+    def reply_customer(self, db_session: Session):
+        """Create a customer for REPLY mode tests"""
+        customer = Customer(
+            phone_number="+255111222333",
+            language=CustomerLanguage.EN,
+            full_name="Reply Test Customer",
+        )
+        db_session.add(customer)
+        db_session.commit()
+        db_session.refresh(customer)
+        return customer
+
+    @pytest.fixture
+    def reply_message(self, db_session: Session, reply_customer):
+        """Create a message for REPLY mode tests"""
+        message = Message(
+            message_sid="reply_test_msg_001",
+            customer_id=reply_customer.id,
+            body="How do I plant maize?",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(message)
+        db_session.commit()
+        db_session.refresh(message)
+        return message
+
+    def test_reply_with_citations_sends_confirmation_template(
+        self,
+        client: TestClient,
+        reply_message,
+        db_session: Session,
+        monkeypatch,
+    ):
+        """Test REPLY mode with citations sends confirmation template"""
+        template_sent = {"called": False}
+
+        # Mock WhatsAppService methods
+        class MockWhatsAppService:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def send_message_with_tracking(self, *args, **kwargs):
+                return {"sid": "SM_test_answer", "status": "sent"}
+
+            def get_template_sid(self, template_type, customer_language):
+                return "HX_confirmation_template"
+
+            def send_template_message(
+                self, to, content_sid, content_variables
+            ):
+                template_sent["called"] = True
+                template_sent["to"] = to
+                template_sent["content_sid"] = content_sid
+                return {"sid": "SM_template_sent"}
+
+            @staticmethod
+            def sanitize_whatsapp_content(text):
+                import re
+                return re.sub(r"\[citation:\d+\]", "", text)
+
+        monkeypatch.setattr(
+            "routers.callbacks.WhatsAppService", MockWhatsAppService
+        )
+
+        payload = {
+            "job_id": "reply_with_citations_001",
+            "status": "completed",
+            "output": {
+                "answer": "Plant maize during rainy season[citation:1].",
+                "citations": [
+                    {
+                        "document": "Maize Farming Guide",
+                        "chunk": "Maize should be planted at onset of rain",
+                        "page": "5",
+                    }
+                ],
+            },
+            "error": None,
+            "callback_params": (
+                f'{{"message_id": {reply_message.id}, "message_type": 1, '
+                f'"customer_id": {reply_message.customer_id}}}'
+            ),
+            "trace_id": "trace_reply_citations",
+            "job": "chat",
+        }
+
+        response = client.post("/api/callback/ai", json=payload)
+
+        assert response.status_code == 200
+        assert template_sent["called"] is True
+        assert template_sent["to"] == "+255111222333"
+        assert template_sent["content_sid"] == "HX_confirmation_template"
+
+    def test_reply_without_citations_skips_confirmation_template(
+        self,
+        client: TestClient,
+        reply_message,
+        db_session: Session,
+        monkeypatch,
+    ):
+        """Test REPLY mode without citations skips confirmation template"""
+        template_sent = {"called": False}
+
+        # Mock WhatsAppService methods
+        class MockWhatsAppService:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def send_message_with_tracking(self, *args, **kwargs):
+                return {"sid": "SM_test_answer_no_cite", "status": "sent"}
+
+            def get_template_sid(self, template_type, customer_language):
+                return "HX_confirmation_template"
+
+            def send_template_message(
+                self, to, content_sid, content_variables
+            ):
+                template_sent["called"] = True
+                return {"sid": "SM_template_sent"}
+
+            @staticmethod
+            def sanitize_whatsapp_content(text):
+                return text
+
+        monkeypatch.setattr(
+            "routers.callbacks.WhatsAppService", MockWhatsAppService
+        )
+
+        payload = {
+            "job_id": "reply_no_citations_001",
+            "status": "completed",
+            "output": {
+                "answer": "I can help you with general farming questions.",
+                "citations": [],  # Empty citations
+            },
+            "error": None,
+            "callback_params": (
+                f'{{"message_id": {reply_message.id}, "message_type": 1, '
+                f'"customer_id": {reply_message.customer_id}}}'
+            ),
+            "trace_id": "trace_reply_no_citations",
+            "job": "chat",
+        }
+
+        response = client.post("/api/callback/ai", json=payload)
+
+        assert response.status_code == 200
+        # Confirmation template should NOT be called
+        assert template_sent["called"] is False
+
+    def test_reply_with_null_citations_skips_confirmation_template(
+        self,
+        client: TestClient,
+        reply_message,
+        db_session: Session,
+        monkeypatch,
+    ):
+        """Test REPLY mode with null/missing citations skips template"""
+        template_sent = {"called": False}
+
+        class MockWhatsAppService:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def send_message_with_tracking(self, *args, **kwargs):
+                return {"sid": "SM_test_answer_null", "status": "sent"}
+
+            def get_template_sid(self, template_type, customer_language):
+                return "HX_confirmation_template"
+
+            def send_template_message(
+                self, to, content_sid, content_variables
+            ):
+                template_sent["called"] = True
+                return {"sid": "SM_template_sent"}
+
+            @staticmethod
+            def sanitize_whatsapp_content(text):
+                return text
+
+        monkeypatch.setattr(
+            "routers.callbacks.WhatsAppService", MockWhatsAppService
+        )
+
+        # Create new message for this test to avoid conflicts
+        new_message = Message(
+            message_sid="reply_test_msg_null_cite",
+            customer_id=reply_message.customer_id,
+            body="What is the weather?",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(new_message)
+        db_session.commit()
+        db_session.refresh(new_message)
+
+        payload = {
+            "job_id": "reply_null_citations_001",
+            "status": "completed",
+            "output": {
+                "answer": "I don't have weather information.",
+                # citations defaults to empty list in schema
+            },
+            "error": None,
+            "callback_params": (
+                f'{{"message_id": {new_message.id}, "message_type": 1, '
+                f'"customer_id": {new_message.customer_id}}}'
+            ),
+            "trace_id": "trace_reply_null_citations",
+            "job": "chat",
+        }
+
+        response = client.post("/api/callback/ai", json=payload)
+
+        assert response.status_code == 200
+        # Confirmation template should NOT be called
+        assert template_sent["called"] is False
