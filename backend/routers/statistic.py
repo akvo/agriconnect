@@ -17,7 +17,7 @@ from schemas.statistic import (
     RegistrationChartResponse,
     EOStatsResponse,
     EOStatsByEOResponse,
-    EOCountByDistrictResponse,
+    EOCountResponse,
     EOListResponse,
     FarmerStatsFilters,
     EOStatsFilters,
@@ -41,8 +41,10 @@ async def get_farmer_statistics(
     end_date: Optional[str] = Query(
         None, description="Filter end date (ISO 8601 format)"
     ),
-    ward_id: Optional[int] = Query(
-        None, description="Filter by specific ward ID"
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter by administrative area ID (region, district, "
+        "or ward). Aggregates data from all descendant areas."
     ),
     phone_prefix: Optional[str] = Query(
         None, description="Filter by phone number prefix (e.g., '+254')"
@@ -58,13 +60,18 @@ async def get_farmer_statistics(
     Returns onboarding progress, activity metrics, feature usage,
     and escalation statistics.
 
+    The administrative_id parameter accepts any administrative level:
+    - Region ID: Aggregates stats from all districts and wards in the region
+    - District ID: Aggregates stats from all wards in the district
+    - Ward ID: Returns stats for that specific ward
+
     Authentication: Bearer token required (STATISTIC_API_TOKEN)
     """
     service = StatisticService(db)
     stats = service.get_farmer_stats(
         start_date=start_date,
         end_date=end_date,
-        ward_id=ward_id,
+        administrative_id=administrative_id,
         phone_prefix=phone_prefix,
         active_days=active_days,
     )
@@ -77,7 +84,7 @@ async def get_farmer_statistics(
         filters=FarmerStatsFilters(
             start_date=start_date,
             end_date=end_date,
-            ward_id=ward_id,
+            administrative_id=administrative_id,
             phone_prefix=phone_prefix,
             active_days=active_days,
         ),
@@ -92,6 +99,11 @@ async def get_farmer_statistics_by_ward(
     end_date: Optional[str] = Query(
         None, description="Filter end date (ISO 8601 format)"
     ),
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter to wards under this administrative area. "
+        "If region/district ID, shows all wards under that area."
+    ),
     phone_prefix: Optional[str] = Query(
         None, description="Filter by phone number prefix (e.g., '+254')"
     ),
@@ -102,6 +114,11 @@ async def get_farmer_statistics_by_ward(
 
     Returns registration, question, and escalation counts per ward.
 
+    The administrative_id parameter filters which wards are included:
+    - Region ID: Returns stats for all wards in the region
+    - District ID: Returns stats for all wards in the district
+    - Ward ID: Returns stats for that specific ward only
+
     Authentication: Bearer token required (STATISTIC_API_TOKEN)
     """
     service = StatisticService(db)
@@ -109,6 +126,7 @@ async def get_farmer_statistics_by_ward(
         start_date=start_date,
         end_date=end_date,
         phone_prefix=phone_prefix,
+        administrative_id=administrative_id,
     )
 
     return FarmerStatsByWardResponse(
@@ -116,6 +134,7 @@ async def get_farmer_statistics_by_ward(
         filters=FarmerStatsFilters(
             start_date=start_date,
             end_date=end_date,
+            administrative_id=administrative_id,
             phone_prefix=phone_prefix,
         ),
     )
@@ -129,8 +148,10 @@ async def get_registration_chart_data(
     end_date: Optional[str] = Query(
         None, description="Filter end date (ISO 8601 format)"
     ),
-    ward_id: Optional[int] = Query(
-        None, description="Filter by specific ward ID"
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter by administrative area ID (region, district, "
+        "or ward). Aggregates data from all descendant areas."
     ),
     phone_prefix: Optional[str] = Query(
         None, description="Filter by phone number prefix (e.g., '+254')"
@@ -146,6 +167,11 @@ async def get_registration_chart_data(
     Returns time series data of farmer registrations grouped by
     day, week, or month.
 
+    The administrative_id parameter accepts any administrative level:
+    - Region ID: Aggregates registrations from all wards in the region
+    - District ID: Aggregates registrations from all wards in the district
+    - Ward ID: Returns registrations for that specific ward
+
     Authentication: Bearer token required (STATISTIC_API_TOKEN)
     """
     # Validate group_by
@@ -156,7 +182,7 @@ async def get_registration_chart_data(
     data, total = service.get_registration_chart_data(
         start_date=start_date,
         end_date=end_date,
-        ward_id=ward_id,
+        administrative_id=administrative_id,
         phone_prefix=phone_prefix,
         group_by=group_by,
     )
@@ -167,7 +193,7 @@ async def get_registration_chart_data(
         filters=RegistrationFilters(
             start_date=start_date,
             end_date=end_date,
-            ward_id=ward_id,
+            administrative_id=administrative_id,
             phone_prefix=phone_prefix,
             group_by=group_by,
         ),
@@ -185,12 +211,22 @@ async def get_eo_statistics(
     eo_id: Optional[int] = Query(
         None, description="Filter by specific EO ID"
     ),
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter by administrative area ID. Filters tickets "
+        "by customers in that area."
+    ),
     db: Session = Depends(get_db),
 ):
     """
     Get EO (Extension Officer) statistics.
 
     Returns ticket handling metrics and bulk message counts.
+
+    The administrative_id parameter filters tickets by customer location:
+    - Region ID: Includes tickets from customers in all wards of the region
+    - District ID: Includes tickets from customers in all wards of the district
+    - Ward ID: Includes tickets from customers in that specific ward
 
     Authentication: Bearer token required (STATISTIC_API_TOKEN)
     """
@@ -199,6 +235,7 @@ async def get_eo_statistics(
         start_date=start_date,
         end_date=end_date,
         eo_id=eo_id,
+        administrative_id=administrative_id,
     )
 
     return EOStatsResponse(
@@ -208,6 +245,7 @@ async def get_eo_statistics(
             start_date=start_date,
             end_date=end_date,
             eo_id=eo_id,
+            administrative_id=administrative_id,
         ),
     )
 
@@ -220,6 +258,11 @@ async def get_eo_statistics_by_eo(
     end_date: Optional[str] = Query(
         None, description="Filter end date (ISO 8601 format)"
     ),
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter to EOs assigned to this area or its "
+        "descendant areas."
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -227,12 +270,20 @@ async def get_eo_statistics_by_eo(
 
     Returns reply counts and tickets closed per EO.
 
+    The administrative_id parameter filters which EOs are included:
+    - Region ID: Returns stats for EOs assigned to that region or any
+      district/ward within it
+    - District ID: Returns stats for EOs assigned to that district or any
+      ward within it
+    - Ward ID: Returns stats for EOs assigned to that specific ward
+
     Authentication: Bearer token required (STATISTIC_API_TOKEN)
     """
     service = StatisticService(db)
     data = service.get_eo_stats_by_eo(
         start_date=start_date,
         end_date=end_date,
+        administrative_id=administrative_id,
     )
 
     return EOStatsByEOResponse(
@@ -240,25 +291,40 @@ async def get_eo_statistics_by_eo(
         filters=EOStatsFilters(
             start_date=start_date,
             end_date=end_date,
+            administrative_id=administrative_id,
         ),
     )
 
 
-@router.get("/eo/count-by-district", response_model=EOCountByDistrictResponse)
-async def get_eo_count_by_district(
+@router.get("/eo/count", response_model=EOCountResponse)
+async def get_eo_count(
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter to EOs in this administrative area. "
+        "Works with any level (region, district, ward)."
+    ),
     db: Session = Depends(get_db),
 ):
     """
-    Get EO counts grouped by district (sub-county).
+    Get count of active EOs.
 
-    Returns the number of active EOs per district.
+    Returns the total number of active Extension Officers.
+
+    The administrative_id parameter filters by area:
+    - No filter: Returns total count of all active EOs
+    - Region ID: Returns count of EOs in that region (includes districts/wards)
+    - District ID: Returns count of EOs in that district (includes wards)
+    - Ward ID: Returns count of EOs assigned to that specific ward
 
     Authentication: Bearer token required (STATISTIC_API_TOKEN)
     """
     service = StatisticService(db)
-    data = service.get_eo_count_by_district()
+    count = service.get_eo_count(administrative_id=administrative_id)
 
-    return EOCountByDistrictResponse(data=data)
+    return EOCountResponse(
+        count=count,
+        administrative_id=administrative_id,
+    )
 
 
 @router.get("/eo/list", response_model=EOListResponse)

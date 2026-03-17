@@ -682,13 +682,13 @@ class TestEOStatsByEO:
                 assert eo1_stats["eo_name"] == "EO One"
 
 
-class TestEOCountByDistrict:
-    """Test EO count by district endpoint."""
+class TestEOCount:
+    """Test EO count endpoint."""
 
-    def test_eo_count_by_district(
+    def test_eo_count_total(
         self, client, db_session, administrative_data
     ):
-        """Test EO count grouped by district."""
+        """Test total EO count without filter."""
         # Create EOs and assign to district
         eo1 = User(
             email="eo_dist1@test.com",
@@ -709,7 +709,7 @@ class TestEOCountByDistrict:
         db_session.add_all([eo1, eo2])
         db_session.commit()
 
-        # Assign to district
+        # Assign to district and ward
         ua1 = UserAdministrative(
             user_id=eo1.id,
             administrative_id=administrative_data["district"].id,
@@ -725,21 +725,82 @@ class TestEOCountByDistrict:
             "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
         ):
             headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+
+            # Test total count (no filter)
             response = client.get(
-                "/api/statistic/eo/count-by-district", headers=headers
+                "/api/statistic/eo/count", headers=headers
             )
             assert response.status_code == 200
 
             data = response.json()
-            assert "data" in data
+            assert "count" in data
+            assert data["count"] == 2
+            assert data["administrative_id"] is None
 
-            # Find Kiharu district
-            kiharu = next(
-                (d for d in data["data"] if d["district_name"] == "Kiharu"),
-                None,
+    def test_eo_count_by_administrative_id(
+        self, client, db_session, administrative_data
+    ):
+        """Test EO count filtered by administrative_id."""
+        # Create EOs
+        eo1 = User(
+            email="eo_count1@test.com",
+            phone_number="+254700000102",
+            full_name="Count EO 1",
+            user_type=UserType.EXTENSION_OFFICER,
+            hashed_password="hashed",
+            is_active=True,
+        )
+        eo2 = User(
+            email="eo_count2@test.com",
+            phone_number="+254700000103",
+            full_name="Count EO 2",
+            user_type=UserType.EXTENSION_OFFICER,
+            hashed_password="hashed",
+            is_active=True,
+        )
+        db_session.add_all([eo1, eo2])
+        db_session.commit()
+
+        # Assign EO1 to district, EO2 to ward under district
+        ua1 = UserAdministrative(
+            user_id=eo1.id,
+            administrative_id=administrative_data["district"].id,
+        )
+        ua2 = UserAdministrative(
+            user_id=eo2.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        db_session.add_all([ua1, ua2])
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+
+            # Filter by district - should include both EOs
+            district_id = administrative_data["district"].id
+            response = client.get(
+                f"/api/statistic/eo/count?administrative_id={district_id}",
+                headers=headers
             )
-            if kiharu:
-                assert kiharu["eo_count"] == 2
+            assert response.status_code == 200
+
+            data = response.json()
+            assert data["count"] == 2
+            assert data["administrative_id"] == district_id
+
+            # Filter by ward - should include only EO2
+            ward_id = administrative_data["ward1"].id
+            response = client.get(
+                f"/api/statistic/eo/count?administrative_id={ward_id}",
+                headers=headers
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            assert data["count"] == 1
+            assert data["administrative_id"] == ward_id
 
 
 class TestEOList:

@@ -15,7 +15,7 @@ class FarmerStatsFilters(BaseModel):
 
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    ward_id: Optional[int] = None
+    administrative_id: Optional[int] = None
     phone_prefix: Optional[str] = None
     active_days: int = 30
 
@@ -26,6 +26,7 @@ class EOStatsFilters(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     eo_id: Optional[int] = None
+    administrative_id: Optional[int] = None
 
 
 class RegistrationFilters(BaseModel):
@@ -33,7 +34,7 @@ class RegistrationFilters(BaseModel):
 
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    ward_id: Optional[int] = None
+    administrative_id: Optional[int] = None
     phone_prefix: Optional[str] = None
     group_by: str = "day"
 
@@ -159,19 +160,12 @@ class EOStatsByEOResponse(BaseModel):
     filters: EOStatsFilters
 
 
-# EO count by district schemas
-class DistrictEOCount(BaseModel):
-    """EO count for a single district."""
+# EO count schema
+class EOCountResponse(BaseModel):
+    """EO count response."""
 
-    district_id: int
-    district_name: str
-    eo_count: int
-
-
-class EOCountByDistrictResponse(BaseModel):
-    """EO counts grouped by district."""
-
-    data: List[DistrictEOCount]
+    count: int
+    administrative_id: Optional[int] = None
 
 
 # EO list schemas

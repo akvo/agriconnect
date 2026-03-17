@@ -173,7 +173,16 @@ To build a Region → District → Ward cascade dropdown:
 1. **Load Regions:** `GET /api/administrative/?level=Region`
 2. **On Region Select:** `GET /api/administrative/?parent_id={selected_region_id}`
 3. **On District Select:** `GET /api/administrative/?parent_id={selected_district_id}`
-4. **Use Ward ID:** Pass the selected ward's `id` as `ward_id` to statistics endpoints
+4. **Use administrative_id:** Pass the selected area's `id` as `administrative_id` to statistics endpoints
+
+**Key Feature: Any Level Works**
+
+The `administrative_id` parameter accepts IDs from **any administrative level**:
+- **Region ID** → Aggregates all farmers/stats from all districts and wards in that region
+- **District ID** → Aggregates all farmers/stats from all wards in that district
+- **Ward ID** → Returns stats for that specific ward only
+
+This means you can filter by region or district without needing to drill down to ward level!
 
 **Example Streamlit Code:**
 
@@ -182,30 +191,53 @@ import streamlit as st
 import requests
 
 API_BASE = "http://localhost:8000/api"
+TOKEN = "your-api-token"
+HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
 # Load regions
 regions = requests.get(f"{API_BASE}/administrative/?level=Region").json()
 region_options = {r["name"]: r["id"] for r in regions["administrative"]}
 selected_region = st.selectbox("Region", ["All"] + list(region_options.keys()))
 
-# Load districts based on region
+# Track the administrative_id to use for filtering
+administrative_id = None
+
 if selected_region != "All":
+    # Use region_id for filtering (aggregates all districts/wards)
+    administrative_id = region_options[selected_region]
+
+    # Load districts for further drill-down
     districts = requests.get(
-        f"{API_BASE}/administrative/?parent_id={region_options[selected_region]}"
+        f"{API_BASE}/administrative/?parent_id={administrative_id}"
     ).json()
     district_options = {d["name"]: d["id"] for d in districts["administrative"]}
     selected_district = st.selectbox("District", ["All"] + list(district_options.keys()))
 
-    # Load wards based on district
     if selected_district != "All":
+        # Use district_id for filtering (aggregates all wards)
+        administrative_id = district_options[selected_district]
+
+        # Load wards for further drill-down
         wards = requests.get(
-            f"{API_BASE}/administrative/?parent_id={district_options[selected_district]}"
+            f"{API_BASE}/administrative/?parent_id={administrative_id}"
         ).json()
         ward_options = {w["name"]: w["id"] for w in wards["administrative"]}
         selected_ward = st.selectbox("Ward", ["All"] + list(ward_options.keys()))
 
-        # Use ward_id in statistics call
-        ward_id = ward_options.get(selected_ward) if selected_ward != "All" else None
+        if selected_ward != "All":
+            # Use ward_id for filtering (specific ward)
+            administrative_id = ward_options[selected_ward]
+
+# Fetch stats with the selected administrative_id
+params = {}
+if administrative_id:
+    params["administrative_id"] = administrative_id
+
+stats = requests.get(
+    f"{API_BASE}/statistic/farmers/stats",
+    headers=HEADERS,
+    params=params
+).json()
 ```
 
 ---
@@ -224,15 +256,28 @@ Returns comprehensive farmer statistics including onboarding progress, activity 
 |-----------|------|----------|---------|-------------|
 | `start_date` | string | No | - | Filter start date (ISO 8601 format, e.g., `2024-01-01`) |
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
-| `ward_id` | integer | No | - | Filter by specific ward ID |
+| `administrative_id` | integer | No | - | Filter by administrative area (region, district, or ward). Aggregates data from all descendant areas. |
 | `phone_prefix` | string | No | - | Filter by phone number prefix (e.g., `+254`) |
 | `active_days` | integer | No | 30 | Days to consider a farmer as "active" |
 
-**Example Request:**
+**Example Requests:**
 
 ```bash
+# Filter by region (aggregates all districts/wards in Murang'a)
 curl -H "Authorization: Bearer your-secret-token" \
-  "http://localhost:8000/api/statistic/farmers/stats?start_date=2024-01-01&phone_prefix=%2B254"
+  "http://localhost:8000/api/statistic/farmers/stats?administrative_id=47"
+
+# Filter by district (aggregates all wards in Kiharu)
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/farmers/stats?administrative_id=56"
+
+# Filter by specific ward
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/farmers/stats?administrative_id=57"
+
+# Combine with date and phone filters
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/farmers/stats?administrative_id=47&start_date=2024-01-01&phone_prefix=%2B254"
 ```
 
 **Response:**
@@ -261,7 +306,7 @@ curl -H "Authorization: Bearer your-secret-token" \
   "filters": {
     "start_date": "2024-01-01",
     "end_date": null,
-    "ward_id": null,
+    "administrative_id": 47,
     "phone_prefix": "+254",
     "active_days": 30
   }
@@ -282,13 +327,23 @@ Returns farmer statistics grouped by ward.
 |-----------|------|----------|---------|-------------|
 | `start_date` | string | No | - | Filter start date (ISO 8601 format) |
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
+| `administrative_id` | integer | No | - | Filter to wards under this area. If region/district ID, shows all wards under that area. |
 | `phone_prefix` | string | No | - | Filter by phone number prefix |
 
-**Example Request:**
+**Example Requests:**
 
 ```bash
+# Get stats for all wards (no filter)
 curl -H "Authorization: Bearer your-secret-token" \
   "http://localhost:8000/api/statistic/farmers/stats/by-ward"
+
+# Get stats for wards in Murang'a region only
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/farmers/stats/by-ward?administrative_id=47"
+
+# Get stats for wards in Kiharu district only
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/farmers/stats/by-ward?administrative_id=56"
 ```
 
 **Response:**
@@ -311,6 +366,7 @@ curl -H "Authorization: Bearer your-secret-token" \
   "filters": {
     "start_date": null,
     "end_date": null,
+    "administrative_id": 47,
     "phone_prefix": null
   }
 }
@@ -330,15 +386,16 @@ Returns time series data of farmer registrations for charting.
 |-----------|------|----------|---------|-------------|
 | `start_date` | string | No | - | Filter start date (ISO 8601 format) |
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
-| `ward_id` | integer | No | - | Filter by specific ward ID |
+| `administrative_id` | integer | No | - | Filter by administrative area (region, district, or ward). Aggregates data from all descendant areas. |
 | `phone_prefix` | string | No | - | Filter by phone number prefix |
 | `group_by` | string | No | `day` | Group by: `day`, `week`, or `month` |
 
 **Example Request:**
 
 ```bash
+# Registration trends for entire Murang'a region
 curl -H "Authorization: Bearer your-secret-token" \
-  "http://localhost:8000/api/statistic/farmers/registrations?group_by=week&start_date=2024-01-01"
+  "http://localhost:8000/api/statistic/farmers/registrations?administrative_id=47&group_by=week&start_date=2024-01-01"
 ```
 
 **Response:**
@@ -354,7 +411,7 @@ curl -H "Authorization: Bearer your-secret-token" \
   "filters": {
     "start_date": "2024-01-01",
     "end_date": null,
-    "ward_id": null,
+    "administrative_id": 47,
     "phone_prefix": null,
     "group_by": "week"
   }
@@ -378,12 +435,18 @@ Returns EO statistics including ticket handling metrics and bulk message counts.
 | `start_date` | string | No | - | Filter start date (ISO 8601 format) |
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
 | `eo_id` | integer | No | - | Filter by specific EO ID |
+| `administrative_id` | integer | No | - | Filter tickets by customers in this administrative area |
 
-**Example Request:**
+**Example Requests:**
 
 ```bash
+# EO stats for tickets from customers in Murang'a region
 curl -H "Authorization: Bearer your-secret-token" \
-  "http://localhost:8000/api/statistic/eo/stats?start_date=2024-01-01"
+  "http://localhost:8000/api/statistic/eo/stats?administrative_id=47"
+
+# EO stats for a specific EO in a specific district
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/eo/stats?eo_id=5&administrative_id=56"
 ```
 
 **Response:**
@@ -401,7 +464,8 @@ curl -H "Authorization: Bearer your-secret-token" \
   "filters": {
     "start_date": "2024-01-01",
     "end_date": null,
-    "eo_id": null
+    "eo_id": null,
+    "administrative_id": 47
   }
 }
 ```
@@ -420,12 +484,22 @@ Returns statistics for each individual EO.
 |-----------|------|----------|---------|-------------|
 | `start_date` | string | No | - | Filter start date (ISO 8601 format) |
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
+| `administrative_id` | integer | No | - | Filter to EOs assigned to this area or its descendant areas |
 
-**Example Request:**
+**Example Requests:**
 
 ```bash
+# Get stats for all EOs
 curl -H "Authorization: Bearer your-secret-token" \
   "http://localhost:8000/api/statistic/eo/stats/by-eo"
+
+# Get stats for EOs assigned to Murang'a region (includes all districts/wards)
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/eo/stats/by-eo?administrative_id=47"
+
+# Get stats for EOs assigned to Kiharu district only
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/eo/stats/by-eo?administrative_id=56"
 ```
 
 **Response:**
@@ -450,34 +524,48 @@ curl -H "Authorization: Bearer your-secret-token" \
   ],
   "filters": {
     "start_date": null,
-    "end_date": null
+    "end_date": null,
+    "administrative_id": 47
   }
 }
 ```
 
 ---
 
-### 6. Get EO Count by District
+### 6. Get EO Count
 
-**Endpoint:** `GET /api/statistic/eo/count-by-district`
+**Endpoint:** `GET /api/statistic/eo/count`
 
-Returns the number of active EOs per district (sub-county).
+Returns the total count of active Extension Officers.
 
-**Example Request:**
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `administrative_id` | integer | No | - | Filter to EOs in this area. Works with any level (region, district, ward). |
+
+**Example Requests:**
 
 ```bash
+# Get total EO count (all areas)
 curl -H "Authorization: Bearer your-secret-token" \
-  "http://localhost:8000/api/statistic/eo/count-by-district"
+  "http://localhost:8000/api/statistic/eo/count"
+
+# Get EO count for Murang'a region (includes all districts/wards)
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/eo/count?administrative_id=47"
+
+# Get EO count for Kiharu district only
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/eo/count?administrative_id=56"
 ```
 
 **Response:**
 
 ```json
 {
-  "data": [
-    {"district_id": 1, "district_name": "Kiharu", "eo_count": 5},
-    {"district_id": 2, "district_name": "Mathioya", "eo_count": 3}
-  ]
+  "count": 8,
+  "administrative_id": 47
 }
 ```
 
@@ -575,6 +663,52 @@ The `phone_prefix` parameter filters customers by phone number prefix. This is u
 - Uganda: `+256`
 
 Note: URL-encode the `+` sign as `%2B` when using in query strings.
+
+---
+
+## Administrative ID Filter (Hierarchical Aggregation)
+
+The `administrative_id` parameter is a powerful filter that accepts IDs from **any administrative level** and automatically aggregates data from all descendant areas.
+
+### How It Works
+
+```
+Murang'a (Region, id=47)
+├── Kangema (District, id=48)
+│   ├── Ward A (id=49) → 10 farmers
+│   └── Ward B (id=50) → 15 farmers
+├── Kiharu (District, id=56)
+│   ├── Wangu (id=57) → 20 farmers
+│   └── Mugoiri (id=58) → 12 farmers
+└── Maragwa (District, id=59)
+    ├── Ward X (id=60) → 8 farmers
+    └── Ward Y (id=61) → 5 farmers
+```
+
+| Filter | Result |
+|--------|--------|
+| `?administrative_id=47` (Murang'a region) | Aggregates all 70 farmers across all districts/wards |
+| `?administrative_id=56` (Kiharu district) | Aggregates 32 farmers (Wangu + Mugoiri) |
+| `?administrative_id=57` (Wangu ward) | Returns 20 farmers (single ward) |
+| No filter | Returns stats for all farmers |
+
+### Endpoints Supporting administrative_id
+
+| Endpoint | Behavior |
+|----------|----------|
+| `/api/statistic/farmers/stats` | Aggregates farmer stats from all wards under the area |
+| `/api/statistic/farmers/stats/by-ward` | Returns only wards under the specified area |
+| `/api/statistic/farmers/registrations` | Aggregates registration data from all wards under the area |
+| `/api/statistic/eo/stats` | Filters tickets by customers in the area |
+| `/api/statistic/eo/stats/by-eo` | Filters to EOs assigned to the area or its descendants |
+| `/api/statistic/eo/count` | Returns EO count for the area and its descendants |
+
+### Benefits
+
+1. **No need to drill down** - Filter by region or district without selecting specific wards
+2. **Automatic aggregation** - Statistics are automatically summed across all descendant areas
+3. **Flexible** - Works with any level in the hierarchy
+4. **Consistent** - Same parameter name across all endpoints
 
 ---
 

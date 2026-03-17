@@ -21,6 +21,7 @@ from models.customer import Customer, OnboardingStatus
 from models.message import Message, MessageFrom
 from models.ticket import Ticket
 from models.user import User, UserType
+from services.administrative_service import AdministrativeService
 
 
 class StatisticService:
@@ -63,20 +64,48 @@ class StatisticService:
             )
         return query
 
-    def _get_ward_customer_ids(self, ward_id: int) -> List[int]:
-        """Get all customer IDs in a specific ward."""
+    def _get_administrative_customer_ids(
+        self, administrative_id: int
+    ) -> List[int]:
+        """
+        Get all customer IDs in a specific administrative area.
+
+        Supports any administrative level (Region, District, Ward).
+        For higher levels, aggregates customers from all descendant wards.
+        """
+        # Get all ward IDs under this administrative area
+        ward_ids = AdministrativeService.get_descendant_ward_ids(
+            self.db, administrative_id
+        )
+
+        if not ward_ids:
+            # If no descendant wards found, maybe it's directly assigned
+            ward_ids = [administrative_id]
+
         return [
             ca.customer_id
             for ca in self.db.query(CustomerAdministrative)
-            .filter(CustomerAdministrative.administrative_id == ward_id)
+            .filter(CustomerAdministrative.administrative_id.in_(ward_ids))
             .all()
         ]
+
+    def _get_administrative_ward_ids(
+        self, administrative_id: int
+    ) -> List[int]:
+        """
+        Get all ward IDs under an administrative area.
+
+        Returns descendant ward IDs for filtering by-ward results.
+        """
+        return AdministrativeService.get_descendant_ward_ids(
+            self.db, administrative_id
+        )
 
     def _get_base_customer_query(
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        ward_id: Optional[int] = None,
+        administrative_id: Optional[int] = None,
         phone_prefix: Optional[str] = None,
     ):
         """Build base customer query with common filters."""
@@ -90,9 +119,11 @@ class StatisticService:
         # Phone prefix filter
         query = self._apply_phone_prefix_filter(query, phone_prefix)
 
-        # Ward filter
-        if ward_id:
-            customer_ids = self._get_ward_customer_ids(ward_id)
+        # Administrative area filter (supports any level)
+        if administrative_id:
+            customer_ids = self._get_administrative_customer_ids(
+                administrative_id
+            )
             query = query.filter(Customer.id.in_(customer_ids))
 
         return query
@@ -101,7 +132,7 @@ class StatisticService:
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        ward_id: Optional[int] = None,
+        administrative_id: Optional[int] = None,
         phone_prefix: Optional[str] = None,
         active_days: int = 30,
     ) -> dict:
@@ -111,7 +142,8 @@ class StatisticService:
         Args:
             start_date: Filter customers created on or after this date
             end_date: Filter customers created on or before this date
-            ward_id: Filter by specific ward
+            administrative_id: Filter by administrative area (any level).
+                              Aggregates data from all descendant wards.
             phone_prefix: Filter by phone number prefix (e.g., "+254")
             active_days: Days to consider a farmer as "active"
 
@@ -119,7 +151,7 @@ class StatisticService:
             Dict with onboarding, activity, features, escalation stats
         """
         base_query = self._get_base_customer_query(
-            start_date, end_date, ward_id, phone_prefix
+            start_date, end_date, administrative_id, phone_prefix
         )
 
         # Build customer_ids list for subqueries
@@ -295,9 +327,18 @@ class StatisticService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         phone_prefix: Optional[str] = None,
+        administrative_id: Optional[int] = None,
     ) -> List[dict]:
         """
         Get farmer statistics grouped by ward.
+
+        Args:
+            start_date: Filter customers created on or after this date
+            end_date: Filter customers created on or before this date
+            phone_prefix: Filter by phone number prefix
+            administrative_id: Filter to wards under this administrative area.
+                              If Region/District, shows stats for all wards
+                              under that area.
 
         Returns:
             List of ward statistics dictionaries
@@ -312,11 +353,23 @@ class StatisticService:
         if not ward_level:
             return []
 
-        wards = (
-            self.db.query(Administrative)
-            .filter(Administrative.level_id == ward_level.id)
-            .all()
-        )
+        # If administrative_id is provided, filter to wards under that area
+        if administrative_id:
+            ward_ids = self._get_administrative_ward_ids(administrative_id)
+            wards = (
+                self.db.query(Administrative)
+                .filter(
+                    Administrative.level_id == ward_level.id,
+                    Administrative.id.in_(ward_ids)
+                )
+                .all()
+            )
+        else:
+            wards = (
+                self.db.query(Administrative)
+                .filter(Administrative.level_id == ward_level.id)
+                .all()
+            )
 
         results = []
 
@@ -427,7 +480,7 @@ class StatisticService:
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        ward_id: Optional[int] = None,
+        administrative_id: Optional[int] = None,
         phone_prefix: Optional[str] = None,
         group_by: str = "day",
     ) -> Tuple[List[dict], int]:
@@ -435,6 +488,11 @@ class StatisticService:
         Get registration data for charting.
 
         Args:
+            start_date: Filter customers created on or after this date
+            end_date: Filter customers created on or before this date
+            administrative_id: Filter by administrative area (any level).
+                              Aggregates data from all descendant wards.
+            phone_prefix: Filter by phone number prefix
             group_by: "day", "week", or "month"
 
         Returns:
@@ -464,8 +522,10 @@ class StatisticService:
                 Customer.phone_number.like(f"{phone_prefix}%")
             )
 
-        if ward_id:
-            customer_ids = self._get_ward_customer_ids(ward_id)
+        if administrative_id:
+            customer_ids = self._get_administrative_customer_ids(
+                administrative_id
+            )
             query = query.filter(Customer.id.in_(customer_ids))
 
         # Group and order
@@ -491,6 +551,7 @@ class StatisticService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         eo_id: Optional[int] = None,
+        administrative_id: Optional[int] = None,
     ) -> dict:
         """
         Get EO statistics.
@@ -499,20 +560,28 @@ class StatisticService:
             start_date: Filter by start date
             end_date: Filter by end date
             eo_id: Filter by specific EO
+            administrative_id: Filter by administrative area (any level).
+                              Filters tickets by customers in that area.
 
         Returns:
             Dictionary with ticket and message stats
         """
-        # Build EO filter
-        eo_filter = []
-        if eo_id:
-            eo_filter.append(Ticket.resolved_by == eo_id)
+        # Get customer IDs if filtering by administrative area
+        customer_ids = None
+        if administrative_id:
+            customer_ids = self._get_administrative_customer_ids(
+                administrative_id
+            )
 
         # Open tickets
         open_tickets_query = (
             self.db.query(func.count(Ticket.id))
             .filter(Ticket.resolved_at.is_(None))
         )
+        if customer_ids is not None:
+            open_tickets_query = open_tickets_query.filter(
+                Ticket.customer_id.in_(customer_ids)
+            )
         open_tickets = open_tickets_query.scalar() or 0
 
         # Closed tickets with date filters
@@ -522,6 +591,11 @@ class StatisticService:
 
         if eo_id:
             closed_query = closed_query.filter(Ticket.resolved_by == eo_id)
+
+        if customer_ids is not None:
+            closed_query = closed_query.filter(
+                Ticket.customer_id.in_(customer_ids)
+            )
 
         closed_query = self._apply_date_filter(
             closed_query, Ticket.resolved_at, start_date, end_date
@@ -542,6 +616,11 @@ class StatisticService:
         if eo_id:
             response_time_query = response_time_query.filter(
                 Ticket.resolved_by == eo_id
+            )
+
+        if customer_ids is not None:
+            response_time_query = response_time_query.filter(
+                Ticket.customer_id.in_(customer_ids)
             )
 
         response_time_query = self._apply_date_filter(
@@ -582,20 +661,43 @@ class StatisticService:
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        administrative_id: Optional[int] = None,
     ) -> List[dict]:
         """
         Get EO statistics grouped by individual EO.
+
+        Args:
+            start_date: Filter by start date
+            end_date: Filter by end date
+            administrative_id: Filter to EOs assigned to this area or
+                              its descendants.
 
         Returns:
             List of EO statistics dictionaries
         """
         # Get all EOs
-        eos = (
+        eos_query = (
             self.db.query(User)
             .filter(User.user_type == UserType.EXTENSION_OFFICER)
             .filter(User.is_active == True)  # noqa: E712
-            .all()
         )
+
+        # Filter EOs by administrative area
+        if administrative_id:
+            # Get all administrative areas under this one (including itself)
+            ward_ids = self._get_administrative_ward_ids(administrative_id)
+            area_ids = ward_ids + [administrative_id]
+
+            # Get EO IDs assigned to these areas
+            eo_ids_in_area = [
+                ua.user_id
+                for ua in self.db.query(UserAdministrative)
+                .filter(UserAdministrative.administrative_id.in_(area_ids))
+                .all()
+            ]
+            eos_query = eos_query.filter(User.id.in_(eo_ids_in_area))
+
+        eos = eos_query.all()
 
         results = []
 
@@ -662,65 +764,39 @@ class StatisticService:
 
         return results
 
-    def get_eo_count_by_district(self) -> List[dict]:
+    def get_eo_count(
+        self,
+        administrative_id: Optional[int] = None,
+    ) -> int:
         """
-        Get EO counts grouped by district.
+        Get EO count for an administrative area.
+
+        Args:
+            administrative_id: Filter to EOs in this area and its descendants.
+                              Works with any level (region, district, ward).
 
         Returns:
-            List of district EO count dictionaries
+            Total count of active EOs in the area
         """
-        # Get district level
-        district_level = (
-            self.db.query(AdministrativeLevel)
-            .filter(AdministrativeLevel.name == "District")
-            .first()
+        query = (
+            self.db.query(func.count(distinct(UserAdministrative.user_id)))
+            .join(User)
+            .filter(
+                User.user_type == UserType.EXTENSION_OFFICER,
+                User.is_active == True,  # noqa: E712
+            )
         )
 
-        if not district_level:
-            return []
+        if administrative_id:
+            # Get all areas under this administrative area (including itself)
+            ward_ids = self._get_administrative_ward_ids(administrative_id)
+            area_ids = ward_ids + [administrative_id]
 
-        # Get all districts
-        districts = (
-            self.db.query(Administrative)
-            .filter(Administrative.level_id == district_level.id)
-            .all()
-        )
-
-        results = []
-
-        for district in districts:
-            # Count EOs assigned to this district or its wards
-            # First, get all administrative areas under this district
-            child_areas = (
-                self.db.query(Administrative.id)
-                .filter(
-                    Administrative.path.like(f"{district.path}%")
-                )
-                .all()
-            )
-            area_ids = [a.id for a in child_areas] + [district.id]
-
-            # Count active EOs in these areas
-            eo_count = (
-                self.db.query(func.count(distinct(UserAdministrative.user_id)))
-                .join(User)
-                .filter(
-                    UserAdministrative.administrative_id.in_(area_ids),
-                    User.user_type == UserType.EXTENSION_OFFICER,
-                    User.is_active == True,  # noqa: E712
-                )
-                .scalar()
-                or 0
+            query = query.filter(
+                UserAdministrative.administrative_id.in_(area_ids)
             )
 
-            if eo_count > 0:
-                results.append({
-                    "district_id": district.id,
-                    "district_name": district.name,
-                    "eo_count": eo_count,
-                })
-
-        return results
+        return query.scalar() or 0
 
     def get_eo_list(self) -> List[dict]:
         """

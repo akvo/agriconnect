@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Administrative, AdministrativeLevel, UserAdministrative
@@ -238,10 +239,10 @@ class AdministrativeService:
         if not admin:
             return [administrative_id]
 
-        # Get the ward level
+        # Get the ward level (case-insensitive)
         ward_level = (
             db.query(AdministrativeLevel)
-            .filter(AdministrativeLevel.name == "ward")
+            .filter(func.lower(AdministrativeLevel.name) == "ward")
             .first()
         )
 
@@ -256,7 +257,7 @@ class AdministrativeService:
             .join(AdministrativeLevel)
             .filter(
                 Administrative.path.like(f"{admin.path} > %"),
-                AdministrativeLevel.name == "ward"
+                func.lower(AdministrativeLevel.name) == "ward"
             )
             .all()
         )
