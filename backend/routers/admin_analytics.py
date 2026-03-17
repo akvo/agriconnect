@@ -7,10 +7,11 @@ Provides endpoints for viewing ticket classification analytics.
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from config import settings
 from database import get_db
 from models.ticket import Ticket, TicketTag
 from models.user import User, UserType
@@ -161,4 +162,42 @@ async def get_available_tags(
     """
     return {
         "tags": get_all_tags(),
+    }
+
+
+@router.get("/statistic-api-token")
+async def get_statistic_api_token(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get the Statistics API token for external applications.
+
+    Only accessible by admin users. Returns the token value
+    for use in external dashboards (e.g., Streamlit).
+    """
+    if current_user.user_type != UserType.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin users can access this endpoint",
+        )
+
+    token = settings.statistic_api_token
+
+    if not token:
+        return {
+            "configured": False,
+            "token": None,
+            "description": (
+                "Statistics API token is not configured. "
+                "Set STATISTIC_API_TOKEN in the environment variables."
+            ),
+        }
+
+    return {
+        "configured": True,
+        "token": token,
+        "description": (
+            "Use this token in the Authorization header as: "
+            "Bearer <token>"
+        ),
     }

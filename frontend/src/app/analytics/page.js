@@ -14,6 +14,9 @@ import {
   TicketIcon,
   ArrowPathIcon,
   FunnelIcon,
+  KeyIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
 } from "@heroicons/react/24/outline";
 
 export default function AnalyticsPage() {
@@ -28,6 +31,10 @@ export default function AnalyticsPage() {
   // Date filters
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // Statistics API token (admin only)
+  const [apiToken, setApiToken] = useState(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const fetchStatistics = useCallback(async () => {
     setLoading(true);
@@ -61,6 +68,23 @@ export default function AnalyticsPage() {
     }
   }, [user, fetchStatistics]);
 
+  // Fetch API token for admin users
+  useEffect(() => {
+    const fetchApiToken = async () => {
+      if (user?.user_type === "admin") {
+        try {
+          const response = await api.get(
+            "/admin/analytics/statistic-api-token"
+          );
+          setApiToken(response.data);
+        } catch (err) {
+          console.error("Error fetching API token:", err);
+        }
+      }
+    };
+    fetchApiToken();
+  }, [user]);
+
   const handleProfileClick = () => {
     setShowProfileModal(true);
   };
@@ -79,6 +103,18 @@ export default function AnalyticsPage() {
   const handleClearFilters = () => {
     setStartDate("");
     setEndDate("");
+  };
+
+  const handleCopyToken = async () => {
+    if (apiToken?.token) {
+      try {
+        await navigator.clipboard.writeText(apiToken.token);
+        setTokenCopied(true);
+        setTimeout(() => setTokenCopied(false), 2000);
+      } catch (err) {
+        console.error("Failed to copy token:", err);
+      }
+    }
   };
 
   // Calculate percentages for the bar chart
@@ -388,6 +424,66 @@ export default function AnalyticsPage() {
                 })}
               </div>
             </div>
+
+            {/* Statistics API Token (Admin Only) */}
+            {user?.user_type === "admin" && apiToken && (
+              <div
+                className="bg-white/80 backdrop-blur-md p-6 mt-6 animate-fade-in"
+                style={{ borderRadius: "5px" }}
+              >
+                <div className="flex items-center mb-4">
+                  <div
+                    className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 mr-3"
+                    style={{ borderRadius: "5px" }}
+                  >
+                    <KeyIcon className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-secondary-900">
+                      Statistics API Token
+                    </h3>
+                    <p className="text-sm text-secondary-600">
+                      For external dashboards (e.g., Streamlit)
+                    </p>
+                  </div>
+                </div>
+
+                {apiToken.configured ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <code
+                        className="flex-1 bg-gray-50 px-4 py-3 text-sm font-mono text-gray-900 overflow-x-auto border border-gray-300"
+                        style={{ borderRadius: "5px" }}
+                      >
+                        {apiToken.token}
+                      </code>
+                      <button
+                        onClick={handleCopyToken}
+                        className="flex items-center px-4 py-3 bg-green-600 text-white hover:bg-green-700 transition-colors cursor-pointer"
+                        style={{ borderRadius: "5px" }}
+                        title="Copy to clipboard"
+                      >
+                        {tokenCopied ? (
+                          <CheckIcon className="w-5 h-5" />
+                        ) : (
+                          <ClipboardDocumentIcon className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-sm text-secondary-600">
+                      {apiToken.description}
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3"
+                    style={{ borderRadius: "5px" }}
+                  >
+                    <p className="text-sm">{apiToken.description}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </main>

@@ -10,7 +10,11 @@ Administrative endpoints (`/api/administrative/*`) are **public** and do not req
 
 ### Getting the Token
 
-Request the `STATISTIC_API_TOKEN` from your system administrator. The token is configured in the backend's `.env` file.
+There are two ways to get the token:
+
+1. **From the Web UI (Admin only):** Navigate to the Analytics page (`/analytics`) and scroll to the "Statistics API Token" section. Click the copy button to copy the token.
+
+2. **From the system administrator:** Request the `STATISTIC_API_TOKEN` value which is configured in the backend's `.env` file.
 
 ### Using the Token
 
