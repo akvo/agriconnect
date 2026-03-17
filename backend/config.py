@@ -292,6 +292,9 @@ class Settings(BaseSettings):
         "intent_keywords", ["weather", "forecast", "hali ya hewa"]
     )
 
+    # Statistic API Token (for external applications like Streamlit dashboards)
+    statistic_api_token: str = os.getenv("STATISTIC_API_TOKEN", "")
+
     @property
     def celery_broker_url(self) -> str:
         """Auto-construct Celery broker URL (like Akvo RAG)"""

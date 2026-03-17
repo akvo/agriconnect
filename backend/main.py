@@ -25,6 +25,7 @@ from routers import (
     document,
     weather,
     user_stats,
+    statistic,
 )
 from fastapi.staticfiles import StaticFiles
 from services.external_ai_service import ExternalAIService
@@ -115,6 +116,7 @@ app.include_router(crop_types.router, prefix="/api")
 app.include_router(openai_demo.router)
 app.include_router(weather.router, prefix="/api")
 app.include_router(user_stats.router, prefix="/api")
+app.include_router(statistic.router, prefix="/api")
 
 # Ensure storage directory exists before mounting
 os.makedirs("storage", exist_ok=True)

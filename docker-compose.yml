@@ -94,6 +94,7 @@ services:
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_DB=${REDIS_DB:-0}
+      - STATISTIC_API_TOKEN=${STATISTIC_API_TOKEN}
     command: ["./dev.sh"]
     working_dir: /app
     volumes:
