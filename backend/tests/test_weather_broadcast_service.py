@@ -17,7 +17,7 @@ class TestWeatherBroadcastService:
     def mock_settings(self):
         """Mock settings with weather broadcast enabled"""
         with patch("services.weather_broadcast_service.settings") as mock:
-            mock.openweather_api_key = "test-api-key"
+            mock.google_weather_api_key = "test-api-key"
             mock.weather_broadcast_enabled = True
             yield mock
 
@@ -46,7 +46,7 @@ class TestWeatherBroadcastService:
     def test_is_configured_missing_api_key(self, mock_openai_service):
         """Test is_configured returns False when API key is missing"""
         with patch("services.weather_broadcast_service.settings") as mock:
-            mock.openweather_api_key = ""
+            mock.google_weather_api_key = ""
             mock.weather_broadcast_enabled = True
 
             service = WeatherBroadcastService()
@@ -55,7 +55,7 @@ class TestWeatherBroadcastService:
     def test_is_configured_feature_disabled(self, mock_openai_service):
         """Test is_configured returns False when feature is disabled"""
         with patch("services.weather_broadcast_service.settings") as mock:
-            mock.openweather_api_key = "test-key"
+            mock.google_weather_api_key = "test-key"
             mock.weather_broadcast_enabled = False
 
             service = WeatherBroadcastService()
@@ -81,7 +81,7 @@ class TestWeatherBroadcastService:
             mock_weather_class = MagicMock()
             mock_instance = MagicMock()
             mock_weather_class.return_value = mock_instance
-            sys.modules["weather.services"].OpenWeatherMapService = (
+            sys.modules["weather.services"].GoogleWeatherService = (
                 mock_weather_class
             )
 
@@ -96,7 +96,7 @@ class TestWeatherBroadcastService:
     def test_get_weather_service_no_api_key(self):
         """Test weather service returns None when API key not set"""
         with patch("services.weather_broadcast_service.settings") as mock:
-            mock.openweather_api_key = ""
+            mock.google_weather_api_key = ""
 
             service = WeatherBroadcastService()
             result = service._get_weather_service()
@@ -443,12 +443,11 @@ class TestWeatherBroadcastService:
 
         assert service1 is service2
 
-    def test_get_weather_data_uses_api_30_when_configured(
+    def test_get_weather_data_uses_coords_when_available(
         self, weather_service, mock_settings
     ):
-        """Test get_weather_data uses OneCall 3.0 when config is 3.0"""
-        mock_settings.weather_api_version = "3.0"
-        mock_current = {"current": {"temp": 25}}
+        """Test get_weather_data uses coordinates when available"""
+        mock_current = {"temperature": 25, "description": "Sunny"}
 
         with patch.object(
             weather_service, "get_current_raw", return_value=mock_current
@@ -466,34 +465,10 @@ class TestWeatherBroadcastService:
                 mock_current_raw.assert_called_once_with(lat=-1.29, lon=36.82)
                 mock_forecast_raw.assert_not_called()
 
-    def test_get_weather_data_uses_api_25_when_configured(
+    def test_get_weather_data_uses_location_when_no_coordinates(
         self, weather_service, mock_settings
     ):
-        """Test get_weather_data uses API 2.5 when config is 2.5"""
-        mock_settings.weather_api_version = "2.5"
-        mock_forecast = {"city": {"name": "Nairobi"}}
-
-        with patch.object(
-            weather_service, "get_current_raw"
-        ) as mock_current_raw:
-            with patch.object(
-                weather_service, "get_forecast_raw", return_value=mock_forecast
-            ) as mock_forecast_raw:
-                result = weather_service.get_weather_data(
-                    location="Nairobi",
-                    lat=-1.29,
-                    lon=36.82,
-                )
-
-                assert result == mock_forecast
-                mock_current_raw.assert_not_called()
-                mock_forecast_raw.assert_called_once_with("Nairobi")
-
-    def test_get_weather_data_fallback_when_no_coordinates(
-        self, weather_service, mock_settings
-    ):
-        """Test get_weather_data falls back to 2.5 when no coordinates"""
-        mock_settings.weather_api_version = "3.0"
+        """Test get_weather_data uses location name when no coordinates"""
         mock_forecast = {"city": {"name": "Nairobi"}}
 
         with patch.object(
@@ -512,11 +487,10 @@ class TestWeatherBroadcastService:
                 mock_current_raw.assert_not_called()
                 mock_forecast_raw.assert_called_once_with("Nairobi")
 
-    def test_get_weather_data_fallback_when_onecall_fails(
+    def test_get_weather_data_fallback_when_coords_fail(
         self, weather_service, mock_settings
     ):
-        """Test get_weather_data falls back to 2.5 when OneCall fails"""
-        mock_settings.weather_api_version = "3.0"
+        """Test get_weather_data falls back to location when coords fail"""
         mock_forecast = {"city": {"name": "Nairobi"}}
 
         with patch.object(

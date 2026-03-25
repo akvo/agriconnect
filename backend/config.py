@@ -272,20 +272,15 @@ class Settings(BaseSettings):
     )
 
     # Weather Broadcast Configuration
-    # API key for OpenWeatherMap (required by akvo-weather-info library)
-    openweather_api_key: str = os.getenv("OPENWEATHER", "")
+    # API key for Google Weather (required by akvo-weather-info library)
+    google_weather_api_key: str = os.getenv("GOOGLEWEATHER", "")
     # Weather broadcast feature flag
     weather_broadcast_enabled: bool = _config.get("weather", {}).get(
         "broadcast_enabled", False
     )
     # Weather intent feature flag (on-demand weather requests)
-    # TODO: Set to True when weather service accuracy is fixed
     weather_intent_enabled: bool = _config.get("weather", {}).get(
         "intent_enabled", True
-    )
-    # Weather API version: "2.5" (location-based) or "3.0" (OneCall, lat/lon)
-    weather_api_version: str = _config.get("weather", {}).get(
-        "api_version", "2.5"
     )
     # Keywords for detecting weather-related messages
     weather_intent_keywords: List[str] = _config.get("weather", {}).get(
