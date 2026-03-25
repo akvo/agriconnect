@@ -340,9 +340,70 @@ Button payloads configured in `config.py`:
 
 ## Dependencies
 
-- `akvo-weather-info>=0.2.0` - OpenWeatherMap API wrapper (supports OneCall 3.0)
+- `akvo-weather-info>=0.3.0` - Weather API wrapper (Google Weather)
 - OpenAI API - Message generation
 - Existing services: `openai_service.py`, `whatsapp_service.py`, `broadcast_service.py`
+
+---
+
+## Changelog
+
+### v0.3.0 - Google Weather Migration (2026-03-25)
+
+Migrated from OpenWeatherMap to Google Weather API for improved accuracy and reliability.
+
+#### Breaking Changes
+
+- **Environment variable renamed**: `OPENWEATHER` → `GOOGLEWEATHER`
+- **Library updated**: `akvo-weather-info>=0.2.0` → `akvo-weather-info>=0.3.0`
+- **API version config removed**: `weather.api_version` no longer used
+
+#### Migration Guide
+
+1. **Update environment variable** in `.env`:
+   ```diff
+   - OPENWEATHER=your_openweather_api_key
+   + GOOGLEWEATHER=your_google_weather_api_key
+   ```
+
+2. **Get Google Weather API key**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Enable the Weather API
+   - Create an API key
+
+3. **Update docker-compose** (if using custom compose file):
+   ```diff
+   environment:
+   -  - OPENWEATHER=${OPENWEATHER}
+   +  - GOOGLEWEATHER=${GOOGLEWEATHER}
+   ```
+
+4. **Remove deprecated config** from `config.json`:
+   ```diff
+   "weather": {
+     "broadcast_enabled": true,
+     "intent_enabled": false,
+   -  "api_version": "3.0",
+     "intent_keywords": [...]
+   }
+   ```
+
+5. **Restart services**:
+   ```bash
+   ./dc.sh down && ./dc.sh up -d
+   ```
+
+#### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/requirements.txt` | Updated `akvo-weather-info>=0.3.0` |
+| `backend/config.py` | Replaced `openweather_api_key` with `google_weather_api_key`, removed `weather_api_version` |
+| `backend/services/weather_broadcast_service.py` | Changed from `OpenWeatherMapService` to `GoogleWeatherService` |
+| `docker-compose.yml` | Replaced `OPENWEATHER` with `GOOGLEWEATHER` |
+| `backend/config.json` | Removed `api_version` |
+| `backend/config.template.json` | Removed `api_version` |
+| `.env.example` | Updated env var documentation |
 
 ---
 

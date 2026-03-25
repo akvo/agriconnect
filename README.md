@@ -192,7 +192,7 @@ Create a `.env` file based on `.env.example` with the following key variables:
 - `BROADCAST_RETRY_INTERVALS` - Retry intervals in minutes (default: 5,15,60)
 
 **Weather Broadcast:**
-- `OPENWEATHER` - OpenWeatherMap API key for weather forecasts
+- `GOOGLEWEATHER` - Google Weather API key for weather forecasts
 - Enable in `config.json`:
   ```json
   {

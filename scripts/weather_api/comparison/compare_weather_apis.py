@@ -34,7 +34,7 @@ load_dotenv(env_file)
 
 # API Keys
 OPENWEATHER_KEY = os.getenv("OPENWEATHER")
-GOOGLE_WEATHER_KEY = os.getenv("GOOGLE_WEATHER_API_KEY")
+GOOGLE_WEATHER_KEY = os.getenv("GOOGLEWEATHER")
 
 # Administrative data path
 ADMIN_CSV = script_dir.parent.parent.parent / "backend" / "source" / "administrative.csv"
