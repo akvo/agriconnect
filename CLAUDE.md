@@ -39,7 +39,7 @@ docker volume create agriconnect-docker-sync
 ### Backend Development (FastAPI)
 ```bash
 ./dc.sh exec backend tests           # Run backend tests
-./dc.sh exec backend flake8          # Run backend linter
+./dc.sh exec backend flake8 --exclude=alembic,patches  # Run backend linter
 ./dc.sh exec backend bash            # Open backend shell
 ./dc.sh exec backend python -m pytest tests/ -v  # Run tests with verbose output
 ```

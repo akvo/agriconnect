@@ -455,16 +455,16 @@ trans: Dict[str, Any] = {
         "data_sharing": {
             "question": {
                 "en": (
-                    "Your data will be shared with Murang'a County "
-                    "for compliance with the ASTGS DTTI storage and program "
-                    "monitoring.\n\n"
+                    "Your data may be shared with trusted partners for "
+                    "program monitoring and service delivery, and will be "
+                    "handled securely in line with data protection standards. "
                     "Reply 'Yes' to accept and continue."
                 ),
                 "sw": (
-                    "Data yako itashirikiwa na Kaunti ya Murang'a "
-                    "kwa mujibu wa ASTGS DTTI kwa uhifadhi na ufuatiliaji "
-                    "wa programu.\n\n"
-                    "Jibu *Ndiyo* kukubali na kuendelea."
+                    "Data yako inaweza kushirikiwa na washirika waaminifu "
+                    "kwa ufuatiliaji wa programu na utoaji wa huduma, na "
+                    "itashughulikiwa kwa usalama kulingana na viwango vya "
+                    "ulinzi wa data. Jibu 'Ndiyo' kukubali na kuendelea."
                 ),
             },
             "accepted": {
