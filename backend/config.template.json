@@ -79,8 +79,8 @@
 		"phone_number": "+1234567891"
 	},
 	"weather": {
-		"broadcast_enabled": true,
-		"intent_enabled": true,
+		"broadcast_enabled": false,
+		"intent_enabled": false,
 		"intent_keywords": [
 			"weather",
 			"forecast",
