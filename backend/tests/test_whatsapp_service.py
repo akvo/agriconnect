@@ -764,7 +764,7 @@ class TestWhatsAppService:
             "2. Water Management: Rice cultivation requires water.\n"
             "3. Seed Selection: Choose a rice variety.\n"
             "Remember to seek advice from agricultural experts.. "
-            "\n\nDo you want to ask further to our representative officer?"
+            "\n\nDo you want to ask further to our extension officer?"
         )
         result = WhatsAppService.sanitize_whatsapp_content(text)
         # Should fix all violations
