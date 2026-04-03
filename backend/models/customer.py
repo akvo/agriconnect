@@ -173,6 +173,46 @@ class Customer(Base):
     def delete_requested(self, value: bool):
         self.set_profile_field("delete_requested", value)
 
+    # Weather advisory properties
+    @property
+    def variety(self) -> str:
+        """Get avocado variety from profile_data, defaults to 'Hass'."""
+        return self.get_profile_field("variety", "Hass")
+
+    @variety.setter
+    def variety(self, value: str):
+        self.set_profile_field("variety", value)
+
+    @property
+    def tree_age_years(self) -> int:
+        """Get tree age in years from profile_data, defaults to 6 (mature)."""
+        return self.get_profile_field("tree_age_years", 6)
+
+    @tree_age_years.setter
+    def tree_age_years(self, value: int):
+        self.set_profile_field("tree_age_years", value)
+
+    @property
+    def altitude_m(self) -> int | None:
+        """Get altitude in meters from profile_data."""
+        return self.get_profile_field("altitude_m", None)
+
+    @altitude_m.setter
+    def altitude_m(self, value: int | None):
+        self.set_profile_field("altitude_m", value)
+
+    @property
+    def planting_season(self) -> str:
+        """
+        Get potato planting season, defaults to 'long_rains_crop'.
+        For potato: long_rains_crop or short_rains_crop
+        """
+        return self.get_profile_field("planting_season", "long_rains_crop")
+
+    @planting_season.setter
+    def planting_season(self, value: str):
+        self.set_profile_field("planting_season", value)
+
     def needs_reconnection_template(self, threshold_hours: int = 24) -> bool:
         """
         Check if customer needs reconnection template.

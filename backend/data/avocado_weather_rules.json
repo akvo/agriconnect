@@ -1,0 +1,1667 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2026-03-25",
+    "description": "Weather-triggered advisory rules for avocado farming in Kenya, derived from agronomic literature",
+    "sources": [
+      {"id": "COLEAD", "title": "COLEAD Sustainable Avocado Production Guide", "year": 2023, "pages": 254},
+      {"id": "BIF", "title": "BIF Avocado Production Manual - CDAAC Kenya", "year": 2019, "pages": 34},
+      {"id": "GRIESBACH", "title": "Avocado Growing in Kenya - Jürgen Griesbach, ICRAF", "year": 2005, "pages": 118},
+      {"id": "KALRO_MITE", "title": "Persea Mite Management in Avocados - Samuel Khabi, KALRO", "year": 2025, "pages": 25}
+    ],
+    "total_rules": 75,
+    "categories": [
+      "DISEASE_PHYTOPHTHORA",
+      "DISEASE_ANTHRACNOSE",
+      "DISEASE_CERCOSPORA",
+      "DISEASE_SCAB",
+      "DISEASE_STEM_END_ROT",
+      "DISEASE_BACTERIAL_CANKER",
+      "DISEASE_VERTICILLIUM",
+      "PEST_FRUIT_FLY",
+      "PEST_FALSE_CODLING_MOTH",
+      "PEST_THRIPS",
+      "PEST_PERSEA_MITE",
+      "PEST_WHITEFLY",
+      "PEST_SHOT_HOLE_BORER",
+      "PEST_LACE_BUG",
+      "PEST_SCALE",
+      "PEST_STINK_BUG",
+      "PEST_BROAD_MITE",
+      "PEST_NEMATODE",
+      "CLIMATE_TEMPERATURE",
+      "CLIMATE_WIND",
+      "CLIMATE_SUNBURN",
+      "WATER_IRRIGATION",
+      "WATER_WATERLOGGING",
+      "POLLINATION",
+      "HARVEST",
+      "POST_HARVEST",
+      "SPRAY_WINDOW",
+      "FERTILIZER",
+      "PRUNING"
+    ]
+  },
+  "rules": [
+    {
+      "id": "PHYT-001",
+      "category": "DISEASE_PHYTOPHTHORA",
+      "name": "Phytophthora Root Rot - High Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_72h_mm", "op": ">=", "value": 20},
+          {"field": "soil_temp_estimate_c", "op": ">=", "value": 15},
+          {"field": "soil_temp_estimate_c", "op": "<=", "value": 33},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 85}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "higher_risk": ["newly_transplanted", "young_trees_1_3yr"],
+        "soil_risk_factors": ["poor_drainage", "clay_soil", "high_water_table"]
+      },
+      "risk": "Phytophthora cinnamomi zoospores activate and spread in waterlogged soil at 20-32.5°C (optimum). Root damage begins after just 24 hours of waterlogging. The most serious avocado disease worldwide.",
+      "priority": "critical",
+      "actions": [
+        "Check and clear all drainage channels around trees immediately",
+        "Do NOT irrigate — soil is already saturated",
+        "Inspect root crown for dark discolouration or bark cracking",
+        "If phosphonate (fosetyl-Al) injection is scheduled, proceed — wet conditions aid uptake",
+        "Apply mefenoxam soil drench if not already applied this season"
+      ],
+      "preventive_actions": [
+        "Apply mefenoxam soil drench before onset of rainy season, repeat 16-20 weeks later",
+        "Plant on raised mounds/berms in heavy clay soils",
+        "Use resistant rootstocks: Duke 7 (for Fuerte), Thomas (for Hass)",
+        "Never use overhead irrigation"
+      ],
+      "sources": ["COLEAD §6.6.3 p189-194", "BIF p17,20,23", "GRIESBACH p8,17,20"]
+    },
+    {
+      "id": "PHYT-002",
+      "category": "DISEASE_PHYTOPHTHORA",
+      "name": "Phytophthora - Pre-Season Prevention",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "days_until_rainy_season_onset", "op": "<=", "value": 14}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "applies_to_varieties": ["all"]
+      },
+      "risk": "Zoospores become active and mobile at season onset. Prevention timing is critical.",
+      "priority": "high",
+      "actions": [
+        "Apply first mefenoxam soil drench now — should coincide with new growth before rains",
+        "Ensure all drainage infrastructure is functional before rains begin",
+        "Apply Ridomil (Metalaxyl) granules to soil around susceptible trees"
+      ],
+      "sources": ["COLEAD §6.6.3 p194", "GRIESBACH p20"]
+    },
+    {
+      "id": "ANTH-001",
+      "category": "DISEASE_ANTHRACNOSE",
+      "name": "Anthracnose - Active Infection Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 23},
+          {"field": "temperature_c", "op": "<=", "value": 29},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 90}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_enlargement", "pre_harvest", "harvest"],
+        "higher_risk_varieties": ["Fuerte", "Bacon", "Ettinger", "Edranol"]
+      },
+      "risk": "Colletotrichum gloeosporioides sporulates and infects at 23-29°C with near-100% RH. Infections remain dormant until fruit ripens, then cause post-harvest losses up to 60%.",
+      "priority": "critical",
+      "actions": [
+        "Apply copper-based fungicide (e.g., Cupravit at 50g/20L) if not sprayed in last 14 days",
+        "Apply azoxystrobin at pigeon-egg fruit size (max 2 sprays/season)",
+        "Apply cyprodinil-fludioxonil every 7-10 days while conditions remain favourable",
+        "Prune to improve canopy airflow and reduce microhumidity",
+        "Remove dead fruit mummies from canopy and ground"
+      ],
+      "sources": ["COLEAD §6.6.1 p180-187", "BIF p23-24", "GRIESBACH p20"]
+    },
+    {
+      "id": "ANTH-002",
+      "category": "DISEASE_ANTHRACNOSE",
+      "name": "Anthracnose - Spray Window (Dry Break)",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_next_6h_pct", "op": "<=", "value": 15},
+          {"field": "wind_speed_kmh", "op": "<=", "value": 15},
+          {"field": "temperature_c", "op": ">=", "value": 12},
+          {"field": "is_daytime", "op": "==", "value": true},
+          {"field": "hours_since_last_rain", "op": ">=", "value": 4}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_development", "pre_harvest"],
+        "variety_note": "Hass and Fuerte are highly susceptible"
+      },
+      "risk": "none — this is an opportunity window",
+      "priority": "opportunity",
+      "actions": [
+        "Good window to apply copper-based fungicide — spray must dry on leaf surface for 4-6 hours",
+        "Morning application is best — spray upward into canopy to cover all fruit-bearing branches",
+        "Spray will be ineffective if rain occurs within 4-6 hours"
+      ],
+      "sources": ["COLEAD §6.6.1 p184-187", "BIF p23-24"]
+    },
+    {
+      "id": "CERC-001",
+      "category": "DISEASE_CERCOSPORA",
+      "name": "Cercospora Spot - Infection Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 22},
+          {"field": "temperature_c", "op": "<=", "value": 28},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 80}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_enlargement", "pre_harvest"],
+        "fruit_size_note": "Fruits susceptible from quarter to three-quarter of full size",
+        "higher_risk_varieties": ["Fuerte"],
+        "resistant_varieties": ["Pinkerton"]
+      },
+      "risk": "Pseudocercospora purpurea conidia require water/heavy dew to germinate. Losses up to 60-69% possible. Wind and rain spread spores.",
+      "priority": "high",
+      "actions": [
+        "Monitor for small irregular spots on fruits and leaves",
+        "Apply copper-based fungicides every 14 days during extended wet weather",
+        "Apply azoxystrobin at pigeon-egg fruit size (max 2 sprays/season)",
+        "Remove dead twigs and fallen fruits to reduce inoculum"
+      ],
+      "sources": ["COLEAD §6.6.5 p196-202", "GRIESBACH p20"]
+    },
+    {
+      "id": "SCAB-001",
+      "category": "DISEASE_SCAB",
+      "name": "Avocado Scab - Infection Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "relative_humidity_pct", "op": ">=", "value": 80},
+          {"field": "temperature_c", "op": ">=", "value": 18},
+          {"field": "temperature_c", "op": "<=", "value": 28}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_enlargement", "pre_harvest"],
+        "higher_risk_varieties": ["Lula"],
+        "resistant_varieties": ["Choquette"],
+        "region_note": "Common in humid lowlands — Kenya Coast, Nyanza, Western provinces"
+      },
+      "risk": "Sphaceloma perseae sporulates in cool moist/warm humid conditions. Produces corky lesions on fruit surface. Spread by wind, rain, and insects.",
+      "priority": "medium",
+      "actions": [
+        "Apply copper-based fungicides from end of flowering to harvest",
+        "Apply azoxystrobin at pigeon-egg size, follow-up 28 days later (max 3/season)",
+        "Apply Bacillus subtilis as preventive biopesticide",
+        "Remove dead branches and fallen rotten fruits"
+      ],
+      "sources": ["COLEAD §6.6.7 p205-210", "GRIESBACH p21"]
+    },
+    {
+      "id": "SER-001",
+      "category": "DISEASE_STEM_END_ROT",
+      "name": "Stem End Rot - Wet Harvest Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "relative_humidity_pct", "op": ">=", "value": 80},
+          {"field": "temperature_c", "op": ">=", "value": 20},
+          {"field": "rain_probability_today_pct", "op": ">=", "value": 40}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["harvest", "post_harvest"]
+      },
+      "risk": "Lasiodiplodia, Neofusicoccum, and Fusarium spores spread via wind and water splash. Warm humid conditions favour sporulation. Harvesting in wet weather significantly increases stem end rot incidence. Losses up to 30%.",
+      "priority": "high",
+      "actions": [
+        "Avoid harvesting today if possible — wait for dry conditions",
+        "If harvest is unavoidable, apply post-harvest fungicide dip (fludioxonil + azoxystrobin) immediately",
+        "Pre-cool harvested fruit to 5°C within 6 hours",
+        "Minimize time between harvest and cold storage"
+      ],
+      "sources": ["COLEAD §6.6.6 p201-206", "COLEAD §7.10 p231-233"]
+    },
+    {
+      "id": "BAC-001",
+      "category": "DISEASE_BACTERIAL_CANKER",
+      "name": "Bacterial Canker - Drought Stress Trigger",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 14},
+          {"field": "temperature_c", "op": ">=", "value": 25}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "young_trees_1_3yr"]
+      },
+      "risk": "Xanthomonas campestris symptoms typically appear during drought years. Drought stress and boron deficiency promote disease. Wet/warm/humid conditions then spread it.",
+      "priority": "medium",
+      "actions": [
+        "Maintain adequate and even irrigation to prevent drought stress",
+        "Check boron levels and supplement if deficient",
+        "Inspect end-of-line trees (lowest water pressure) carefully",
+        "Apply copper-based bactericide if symptoms appear",
+        "Sterilise pruning tools between trees"
+      ],
+      "sources": ["COLEAD §6.7.1 p209-213"]
+    },
+    {
+      "id": "VERT-001",
+      "category": "DISEASE_VERTICILLIUM",
+      "name": "Verticillium Wilt - Optimal Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "soil_temp_estimate_c", "op": ">=", "value": 18},
+          {"field": "soil_temp_estimate_c", "op": "<=", "value": 24}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["young_trees_1_3yr", "vegetative"],
+        "note": "Growth stops above 30°C soil temp"
+      },
+      "risk": "Verticillium albo-atrum optimum at 21°C. Causes serious damage on younger seedlings. Conidia travel in air.",
+      "priority": "medium",
+      "actions": [
+        "Monitor young trees for sudden wilting on one side",
+        "Avoid planting in previously infected soils",
+        "Use crop rotation with non-host crops before replanting"
+      ],
+      "sources": ["COLEAD §6.6.4 p193-197"]
+    },
+    {
+      "id": "FF-001",
+      "category": "PEST_FRUIT_FLY",
+      "name": "Fruit Fly - Year-Round Breeding Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 18},
+          {"field": "temperature_c", "op": "<=", "value": 27}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_enlargement", "pre_harvest", "harvest"],
+        "applies_to_varieties": ["all"],
+        "higher_risk_varieties": ["Simmonds", "Waldin"],
+        "quarantine_note": "EU quarantine pest"
+      },
+      "risk": "Bactrocera dorsalis breeds year-round at 18-27°C in tropical environments. Losses can reach 100% of unprotected fruit.",
+      "priority": "critical",
+      "actions": [
+        "Install methyl eugenol baited traps (20 per acre) for B. dorsalis monitoring",
+        "Apply spinosad or malathion-based bait sprays starting shortly after flowering",
+        "Spray early morning or late evening for best efficacy",
+        "Collect and destroy ALL fallen infested fruits — bag in black plastic for solar heat treatment, bury 50cm deep, or burn",
+        "Eradicate alternative host plants nearby (especially guavas)"
+      ],
+      "sources": ["COLEAD §6.5.1 p101-118", "BIF p24", "GRIESBACH p19"]
+    },
+    {
+      "id": "FCM-001",
+      "category": "PEST_FALSE_CODLING_MOTH",
+      "name": "False Codling Moth - Breeding Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 20},
+          {"field": "temperature_c", "op": "<=", "value": 30},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 70}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_enlargement", "pre_harvest"],
+        "quarantine_note": "EU quarantine pest",
+        "degree_days_per_generation": 450
+      },
+      "risk": "Thaumatotibia leucotreta optimum at 25°C, RH 80%. Up to 800 eggs/female. 2-10 generations/year. Larvae bore into fruit.",
+      "priority": "critical",
+      "actions": [
+        "Install pheromone traps (4 per acre) from pre-bloom onwards",
+        "Apply methoxyfenozide at 8 and 4 weeks prior to harvest",
+        "Weekly orchard sanitation of fallen fruit (reduces infestation by 75%)",
+        "Apply CrleGV baculovirus spray in late evening (UV-sensitive)",
+        "Apply Bacillus thuringiensis at first sign of infestation"
+      ],
+      "sources": ["COLEAD §6.5.2 p117-129", "BIF p24-25", "GRIESBACH p19"]
+    },
+    {
+      "id": "FCM-002",
+      "category": "PEST_FALSE_CODLING_MOTH",
+      "name": "FCM - Heavy Rain Suppression",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_48h_mm", "op": ">=", "value": 30}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_enlargement", "pre_harvest"]
+      },
+      "risk": "none — this is a suppression event. Heavy rainfall destroys FCM larvae and pupae.",
+      "priority": "informational",
+      "actions": [
+        "FCM pressure is temporarily reduced after heavy rain",
+        "Delay next FCM spray application — natural suppression is active",
+        "Resume monitoring after 7-10 dry days"
+      ],
+      "sources": ["COLEAD §6.5.2 p117"]
+    },
+    {
+      "id": "FCM-003",
+      "category": "PEST_FALSE_CODLING_MOTH",
+      "name": "FCM - Biopesticide Application Window",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "relative_humidity_pct", "op": ">=", "value": 75},
+          {"field": "cloud_cover_pct", "op": ">=", "value": 60},
+          {"field": "temperature_c", "op": ">=", "value": 18},
+          {"field": "temperature_c", "op": "<=", "value": 28}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_enlargement", "pre_harvest"]
+      },
+      "risk": "none — this is an opportunity window for biological control",
+      "priority": "opportunity",
+      "actions": [
+        "Good conditions for applying entomopathogenic fungi (Beauveria bassiana, Metarhizium anisopliae)",
+        "Apply in evening for best results — UV degrades biopesticides",
+        "Add sugar/molasses to CrleGV baculovirus sprays to enhance efficacy",
+        "High humidity enables 80%+ reduction in single application"
+      ],
+      "sources": ["COLEAD §6.5.2 p127-129"]
+    },
+    {
+      "id": "THR-001",
+      "category": "PEST_THRIPS",
+      "name": "Thrips - Outbreak Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 5},
+          {"field": "temperature_max_c", "op": ">=", "value": 22},
+          {"field": "relative_humidity_pct", "op": "<=", "value": 60}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["flowering", "fruit_set"],
+        "critical_period": "Young fruit up to 2cm / 2-3 weeks after fruit set",
+        "note": "Older fruit with thicker skin is less susceptible"
+      },
+      "risk": "Hot dry spells during flowering/fruit set favour thrips population explosion. Damage causes scarring ('alligator skin') on young fruit, reducing market grade. Up to 80% fruit cull possible.",
+      "priority": "high",
+      "actions": [
+        "Scout flowers and young fruit — shake branch over white paper, count thrips",
+        "If >5 thrips per flower cluster, apply spinosad-based product",
+        "Apply abamectin when fewer than 5 immature thrips per leaf/fruit (preventive)",
+        "Spray early morning when thrips are less active",
+        "If rain is expected within 3 days, wait — rain suppresses thrips naturally"
+      ],
+      "sources": ["COLEAD §6.5.3 p128-139", "BIF p25-26", "GRIESBACH p19"]
+    },
+    {
+      "id": "PM-001",
+      "category": "PEST_PERSEA_MITE",
+      "name": "Persea Mite - Warm Dry Outbreak",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 28},
+          {"field": "relative_humidity_pct", "op": "<=", "value": 55},
+          {"field": "consecutive_dry_days", "op": ">=", "value": 5}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "note": "Egg-to-adult in ~15 days at 30°C vs ~40 days at 20°C"
+      },
+      "risk": "Warm dry conditions drive rapid Persea mite population surges. Drought-stressed trees have reduced tolerance. Severe infestations cause defoliation, exposing fruit to sunburn.",
+      "priority": "high",
+      "actions": [
+        "Shorten scouting interval to every 5 days",
+        "Check undersides of leaves along midrib and veins for silvery webbing",
+        "Action threshold: 70-100 mites/leaf or 7.5-10% leaf surface damage",
+        "Release predatory mites (Neoseiulus californicus, Galendromus helveolus) at minimum 2,000/tree",
+        "Ensure adequate irrigation to maintain tree health and stress tolerance",
+        "Avoid broad-spectrum pesticides — they kill natural enemies"
+      ],
+      "sources": ["KALRO_MITE p4-5,14,16"]
+    },
+    {
+      "id": "PM-002",
+      "category": "PEST_PERSEA_MITE",
+      "name": "Persea Mite - Cold/Rainy Suppression Window",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": "<=", "value": 20},
+          {"field": "cumulative_rain_7d_mm", "op": ">=", "value": 20}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "none — this is a natural suppression window",
+      "priority": "opportunity",
+      "actions": [
+        "Mite populations are naturally suppressed — use this window for cultural controls",
+        "Prune and thin canopy to reduce mite habitat before dry season",
+        "Remove alternate host weeds (milkweed, sow thistle) near orchards",
+        "Sanitise tools and equipment to prevent spread",
+        "Prepare biological control inputs for dry season rebound"
+      ],
+      "sources": ["KALRO_MITE p5,6,15"]
+    },
+    {
+      "id": "PM-003",
+      "category": "PEST_PERSEA_MITE",
+      "name": "Persea Mite - Rainy-to-Dry Transition Rebound Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_trend_7d", "op": "==", "value": "declining"},
+          {"field": "temperature_trend_7d", "op": "==", "value": "rising"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "End of rainy season is the highest-risk window for explosive mite population rebound. Suppressed populations bounce back rapidly as conditions dry.",
+      "priority": "high",
+      "actions": [
+        "Begin scouting every 5-7 days immediately",
+        "Pre-position biological control agents (predatory mites)",
+        "Remove alternate host weeds which may harbour mites that reinvade",
+        "Check for previously wind-dispersed mites on trees downwind"
+      ],
+      "sources": ["KALRO_MITE p5,6"]
+    },
+    {
+      "id": "PM-004",
+      "category": "PEST_PERSEA_MITE",
+      "name": "Persea Mite - Wind Dispersal Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "wind_speed_kmh", "op": ">=", "value": 20},
+          {"field": "relative_humidity_pct", "op": "<=", "value": 60}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Wind is the primary Persea mite dispersal mechanism via silk strands. Windy + dry conditions enable spread from infested to clean trees.",
+      "priority": "medium",
+      "actions": [
+        "After wind events, extend scouting to previously clean trees downwind",
+        "Inspect orchard perimeters and alternate host plants near windward borders",
+        "Enforce movement hygiene for workers, tools, and equipment"
+      ],
+      "sources": ["KALRO_MITE p5"]
+    },
+    {
+      "id": "WF-001",
+      "category": "PEST_WHITEFLY",
+      "name": "Whitefly - Optimal Breeding Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 15},
+          {"field": "temperature_c", "op": "<=", "value": 25},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 75}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "fruit_enlargement"],
+        "note": "Trialeurodes vaporariorum optimal at 19-21°C, RH 80%"
+      },
+      "risk": "Honeydew from whiteflies promotes sooty mold, reducing fruit quality and marketability.",
+      "priority": "medium",
+      "actions": [
+        "Use bright yellow sticky traps to monitor movement",
+        "Apply neem-based pesticides (azadirachtin) at 7-14 day intervals",
+        "Use entomopathogenic fungi (Beauveria bassiana) in high humidity conditions",
+        "Rely on biological control (Encarsia, Eretmocerus parasitoids) as primary approach",
+        "Remove alternate weed hosts"
+      ],
+      "sources": ["COLEAD §6.5.4 p138-149"]
+    },
+    {
+      "id": "SHB-001",
+      "category": "PEST_SHOT_HOLE_BORER",
+      "name": "Shot-Hole Borer - Optimal Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 26},
+          {"field": "temperature_c", "op": "<=", "value": 35},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 75}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["young_trees_1_3yr", "vegetative"]
+      },
+      "risk": "Euwallacea/Xylosandrus bore into healthy wood causing branch dieback. White 'sugar volcano' exudates are diagnostic.",
+      "priority": "medium",
+      "actions": [
+        "Survey for branch dieback and sugar volcano signs in warm humid conditions",
+        "Remove and burn/bury infested branches immediately",
+        "Apply Beauveria bassiana as biopesticide",
+        "Use quercivorol and α-copaene attractant traps for monitoring"
+      ],
+      "sources": ["COLEAD §6.5.5 p148-157"]
+    },
+    {
+      "id": "LB-001",
+      "category": "PEST_LACE_BUG",
+      "name": "Lace Bug - Warm Weather Acceleration",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 25},
+          {"field": "temperature_c", "op": "<=", "value": 35}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["young_trees_1_3yr", "vegetative"]
+      },
+      "risk": "Pseudacysta perseae life cycle completes in 21 days at 30°C. Higher temperatures accelerate multiplication.",
+      "priority": "low",
+      "actions": [
+        "Do NOT apply pesticides during drought stress, wind, or freezing conditions",
+        "Apply insecticidal soap or narrow-range oil",
+        "Use Beauveria bassiana biopesticide",
+        "Maintain mulch and proper drainage to keep trees healthy"
+      ],
+      "sources": ["COLEAD §6.5.6 p156-162"]
+    },
+    {
+      "id": "SC-001",
+      "category": "PEST_SCALE",
+      "name": "Scale Insects - Development Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 21},
+          {"field": "temperature_c", "op": "<=", "value": 24},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 75}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["young_trees_1_3yr", "vegetative", "fruit_enlargement"]
+      },
+      "risk": "Latania scale develops at 21-24°C, RH 79%. Infested fruit downgraded/rejected for export. Sooty mold from honeydew worse in humid conditions.",
+      "priority": "medium",
+      "actions": [
+        "Apply buprofezin or pyriproxyfen before first-generation crawlers move",
+        "Conserve natural enemies — avoid broad-spectrum pesticides",
+        "Control ant populations (ants protect scales from predators)",
+        "Maintain adequate tree spacing to prevent canopy contact"
+      ],
+      "sources": ["COLEAD §6.5.8 p166-173", "BIF p25-26", "GRIESBACH p19"]
+    },
+    {
+      "id": "SB-001",
+      "category": "PEST_STINK_BUG",
+      "name": "Stink Bug - Optimal Development",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 22},
+          {"field": "temperature_c", "op": "<=", "value": 28},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 30},
+          {"field": "relative_humidity_pct", "op": "<=", "value": 50}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["flowering", "fruit_set", "fruit_enlargement", "pre_harvest"]
+      },
+      "risk": "Nezara viridula optimum at 25°C, RH 40%. Causes up to 25% fruit damage. Feeding distorts fruits and causes premature drop.",
+      "priority": "medium",
+      "actions": [
+        "Apply lambda-cyhalothrin early morning or late evening, not against wind",
+        "Use Crotalaria rattlepod as trap-border crops",
+        "Weed and prune to remove infested materials"
+      ],
+      "sources": ["COLEAD §6.5.7 p161-167"]
+    },
+    {
+      "id": "BM-001",
+      "category": "PEST_BROAD_MITE",
+      "name": "Broad Mite - Dusty Dry Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 23},
+          {"field": "temperature_c", "op": "<=", "value": 28},
+          {"field": "consecutive_dry_days", "op": ">=", "value": 7}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "flowering", "fruit_enlargement"],
+        "note": "Fruits on shaded side especially affected; egg-to-adult 4.1 days at 25°C"
+      },
+      "risk": "Dusty dry conditions promote mite outbreaks. Toxic saliva causes twisted, hardened growth, aborted blooms, deformed fruits.",
+      "priority": "medium",
+      "actions": [
+        "Prune to allow light penetration — broad mites sensitive to heat/sunlight",
+        "Maintain cover crops to reduce dusty conditions",
+        "Apply abamectin at first signs",
+        "Apply early morning or late evening"
+      ],
+      "sources": ["COLEAD §6.5.9 p172-177"]
+    },
+    {
+      "id": "NEM-001",
+      "category": "PEST_NEMATODE",
+      "name": "Nematode - Optimal Reproduction Temperature",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "soil_temp_estimate_c", "op": ">=", "value": 23},
+          {"field": "soil_temp_estimate_c", "op": "<=", "value": 29}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["young_trees_1_3yr", "vegetative"],
+        "note": "Heavy rainfall suppresses nematodes (fills soil air pores) but promotes Phytophthora simultaneously"
+      },
+      "risk": "Pratylenchus vulnus optimal reproduction at 26°C. Can suppress plant growth by 50%.",
+      "priority": "low",
+      "actions": [
+        "Apply organic soil amendments (farmyard manure) to improve plant tolerance",
+        "Use clean planting materials only",
+        "Soil test before planting in new areas"
+      ],
+      "sources": ["COLEAD §6.5.10 p176-181"]
+    },
+    {
+      "id": "TEMP-001",
+      "category": "CLIMATE_TEMPERATURE",
+      "name": "Heat Stress Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 33}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "applies_to_varieties": ["all"]
+      },
+      "risk": "Above 33°C, avocado productivity and tree health decline. Above 35°C, fruit yield and size severely affected. Combined with low humidity increases sunburn risk.",
+      "priority": "high",
+      "actions": [
+        "Ensure adequate irrigation to reduce heat stress",
+        "Shade young trees if possible",
+        "Monitor for fruit drop and desiccation symptoms",
+        "Do not prune — avoid exposing bark or fruit to direct sun"
+      ],
+      "sources": ["BIF p4", "COLEAD §1.2.1 p10", "GRIESBACH p19"]
+    },
+    {
+      "id": "TEMP-002",
+      "category": "CLIMATE_TEMPERATURE",
+      "name": "Frost Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_min_c", "op": "<=", "value": 0}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "frost_tolerance": {
+          "Bacon": -4.4,
+          "Fuerte": -2.8,
+          "Hass": -2.0,
+          "Pinkerton": -2.0,
+          "Edranol": -2.0,
+          "Reed": -1.1,
+          "West_Indian_race": 0
+        }
+      },
+      "risk": "Avocado has very low frost resistance. Frost can kill trees. West Indian varieties have zero frost tolerance.",
+      "priority": "critical",
+      "actions": [
+        "Protect young trees immediately — cover with fabric or apply irrigation for thermal mass",
+        "Check variety-specific frost tolerance limits before deciding on intervention level",
+        "Inspect for frost damage after event — look for blackened leaves, bark splitting"
+      ],
+      "sources": ["COLEAD §1.2 p24, §2.3 p30-39", "GRIESBACH p19"]
+    },
+    {
+      "id": "TEMP-003",
+      "category": "CLIMATE_TEMPERATURE",
+      "name": "Fruit Drop - Sudden Temperature Change",
+      "weather_condition": {
+        "operator": "OR",
+        "conditions": [
+          {
+            "operator": "AND",
+            "conditions": [
+              {"field": "temperature_change_24h_c", "op": ">=", "value": 8},
+              {"field": "temperature_trend", "op": "==", "value": "rising"}
+            ]
+          },
+          {
+            "operator": "AND",
+            "conditions": [
+              {"field": "temperature_change_24h_c", "op": ">=", "value": 8},
+              {"field": "temperature_trend", "op": "==", "value": "falling"}
+            ]
+          }
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_set", "fruit_enlargement"],
+        "critical_sizes": ["pea_size", "egg_size"]
+      },
+      "risk": "Sudden chilling or sudden heat triggers physiological fruit drop at two critical periods (pea-size and egg-size).",
+      "priority": "high",
+      "actions": [
+        "Alert farmer of likely fruit drop in coming days",
+        "Ensure irrigation is active to buffer temperature stress",
+        "Do not apply additional stressors (pruning, heavy fertilizer)"
+      ],
+      "sources": ["GRIESBACH p21"]
+    },
+    {
+      "id": "WIND-001",
+      "category": "CLIMATE_WIND",
+      "name": "Strong Wind - Structural Damage Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "wind_gust_kmh", "op": ">=", "value": 40}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "higher_risk": ["young_trees_1_3yr", "fruit_development", "pre_harvest"]
+      },
+      "risk": "Strong winds break branches, cause flower and fruit drop, uproot young trees. Wind + rain on fruit-laden branches causes premature fruit drop and bruising.",
+      "priority": "high",
+      "actions": [
+        "If harvesting, pause until wind drops below 20 km/h",
+        "Check tree stakes and supports on young trees after event",
+        "Collect any fallen fruit immediately — do not leave on ground (disease reservoir)",
+        "Inspect for broken branches — prune clean cuts and seal wounds"
+      ],
+      "sources": ["BIF p4,19", "COLEAD §2.1 p24, §3.1.2 p53", "GRIESBACH p12"]
+    },
+    {
+      "id": "WIND-002",
+      "category": "CLIMATE_WIND",
+      "name": "Hot Dry Wind - Flower Desiccation",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "wind_speed_kmh", "op": ">=", "value": 25},
+          {"field": "temperature_c", "op": ">=", "value": 30},
+          {"field": "relative_humidity_pct", "op": "<=", "value": 40}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["flowering"]
+      },
+      "risk": "Hot dry winds desiccate flower buds and cause abrasion, reducing pollination success and fruit set.",
+      "priority": "high",
+      "actions": [
+        "Alert farmer of likely poor fruit set",
+        "Ensure windbreaks are intact before flowering season",
+        "Increase irrigation to buffer evapotranspiration"
+      ],
+      "sources": ["BIF p4", "GRIESBACH p21"]
+    },
+    {
+      "id": "WIND-003",
+      "category": "CLIMATE_WIND",
+      "name": "Wind - Disease Spread Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "wind_speed_kmh", "op": ">=", "value": 25},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 70}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "fruit_enlargement"]
+      },
+      "risk": "Wind spreads bacterial and fungal disease spores (Xanthomonas, Colletotrichum, Sphaceloma) across the orchard.",
+      "priority": "medium",
+      "actions": [
+        "Apply protective fungicides before predicted wind + rain events",
+        "Inspect orchard after wind storms for new disease entry points",
+        "Maintain windbreak integrity"
+      ],
+      "sources": ["COLEAD §3.1.2 p53"]
+    },
+    {
+      "id": "SUN-001",
+      "category": "CLIMATE_SUNBURN",
+      "name": "Sunburn Risk - High Radiation",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 32},
+          {"field": "relative_humidity_pct", "op": "<=", "value": 40},
+          {"field": "cloud_cover_pct", "op": "<=", "value": 20}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "higher_risk": ["young_trees_1_3yr", "recently_pruned"],
+        "variety_note": "Hass fruits specifically susceptible to sunburn"
+      },
+      "risk": "Sun-scorch damages stems, bark, fruit, and leaves. Most severe on western-facing side (afternoon sun). Combined with defoliation from mite damage, sunburn risk compounds.",
+      "priority": "medium",
+      "actions": [
+        "Whitewash exposed trunks and major limbs with 10% agricultural lime",
+        "Do not hard-prune during hot season — avoid exposing canopy interior",
+        "Ensure adequate irrigation to reduce heat stress"
+      ],
+      "sources": ["BIF p9,23-24", "GRIESBACH p13,14,24", "COLEAD §1.2.1 p10"]
+    },
+    {
+      "id": "IRR-001",
+      "category": "WATER_IRRIGATION",
+      "name": "Critical Post-Fruit-Set Irrigation",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 7},
+          {"field": "growth_stage", "op": "==", "value": "post_fruit_set"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["fruit_set", "fruit_enlargement"],
+        "note": "The 2 months immediately after fruit set are the most critical water period"
+      },
+      "risk": "Moisture stress in the 2 months post-fruit-set directly causes reduced fruit size, poor quality, and fruit drop.",
+      "priority": "critical",
+      "actions": [
+        "Irrigate immediately if soil is dry — apply 40-50 m³/ha/day",
+        "Use drip irrigation only — never overhead",
+        "Apply no more than 50mm per irrigation event, but irrigate frequently",
+        "Monitor for leaf wilting and fruit shrinking as emergency indicators"
+      ],
+      "sources": ["COLEAD §5.1 p70", "GRIESBACH p16", "BIF p4,20"]
+    },
+    {
+      "id": "IRR-002",
+      "category": "WATER_IRRIGATION",
+      "name": "Kenya Dry Season Irrigation Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "month", "op": "in", "value": [1, 2, 3, 8, 9]},
+          {"field": "cumulative_rain_14d_mm", "op": "<=", "value": 10}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "note": "January-March and August-September are Kenya's dry seasons"
+      },
+      "risk": "Without irrigation during these windows, trees suffer stress, poor fruit fill, and potential mortality for young trees.",
+      "priority": "high",
+      "actions": [
+        "Activate drip irrigation — apply ≤50mm per event, frequently",
+        "For young trees (years 1-3), use water bottles during dry period",
+        "Increase soil moisture monitoring frequency",
+        "Maintain mulch to reduce evaporation"
+      ],
+      "sources": ["BIF p20", "GRIESBACH p16"]
+    },
+    {
+      "id": "IRR-003",
+      "category": "WATER_IRRIGATION",
+      "name": "Flowering Induction - Deliberate Dry Period",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 45},
+          {"field": "tree_age_years", "op": ">=", "value": 3}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative"],
+        "note": "Requires ~2 months of dry stress to induce flowering"
+      },
+      "risk": "none — this is a production management technique",
+      "priority": "informational",
+      "actions": [
+        "A 2-month dry period triggers flowering initiation (dormancy break)",
+        "Do not irrigate during this window for bearing-age trees",
+        "Monitor trees for dormancy signs — reduced flush, leaf curl",
+        "Resume irrigation after dormancy to trigger flowering and off-season fruit production"
+      ],
+      "sources": ["BIF p4,20", "GRIESBACH p16"]
+    },
+    {
+      "id": "WL-001",
+      "category": "WATER_WATERLOGGING",
+      "name": "Waterlogging Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_24h_mm", "op": ">=", "value": 40},
+          {"field": "rain_probability_next_12h_pct", "op": ">=", "value": 60}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "soil_risk_factors": ["clay_soil", "poor_drainage", "flat_land"]
+      },
+      "risk": "Root damage begins after just 24 hours of waterlogging. Creates ideal conditions for Phytophthora cinnamomi. The single most dangerous condition for avocado.",
+      "priority": "critical",
+      "actions": [
+        "Check and clear all drainage channels immediately",
+        "Do NOT irrigate",
+        "Inspect root crowns for darkening or bark cracking",
+        "If waterlogging persists >24 hours, prepare Phytophthora fungicide application",
+        "Never allow standing water around tree bases"
+      ],
+      "sources": ["COLEAD §5.1.1 p70", "BIF p4,12,13,17,23", "GRIESBACH p19,20"]
+    },
+    {
+      "id": "POL-001",
+      "category": "POLLINATION",
+      "name": "Poor Pollination - Cold Flowering Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": "<=", "value": 16},
+          {"field": "is_daytime", "op": "==", "value": true}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["flowering"],
+        "note": "Bee activity severely reduced below 16°C daytime"
+      },
+      "risk": "Bees are much less active below 16°C. Significantly reduced pollination. Cold also delays pollen tube growth and disrupts A/B flower type synchrony.",
+      "priority": "high",
+      "actions": [
+        "Alert farmer of likely poor fruit set this flowering cycle",
+        "Increase bee hive density near flowering trees",
+        "Apply foliar boron spray before/during flowering to aid remaining pollination",
+        "Postpone any pesticide applications that might further reduce bee activity"
+      ],
+      "sources": ["COLEAD §5.8 p92-93"]
+    },
+    {
+      "id": "POL-002",
+      "category": "POLLINATION",
+      "name": "Pollination - Rain During Flowering",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_today_pct", "op": ">=", "value": 60},
+          {"field": "is_daytime", "op": "==", "value": true},
+          {"field": "growth_stage", "op": "==", "value": "flowering"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["flowering"],
+        "note": "Occasional light showers do NOT harm flowers"
+      },
+      "risk": "Heavy/prolonged rain reduces bee activity and washes pollen from flowers. Can lead to flower shedding and reduced cropping. Light showers are NOT harmful.",
+      "priority": "medium",
+      "actions": [
+        "If heavy rain predicted (>10mm): alert farmer of likely poor fruit set",
+        "If light showers only: no action needed — flowers are not harmed",
+        "After heavy rain during flowering, monitor fruit set and consider thinning later if needed",
+        "Do not irrigate during or shortly after heavy rain at flowering"
+      ],
+      "sources": ["COLEAD §5.8 p93, §1.4 p11", "GRIESBACH p19"]
+    },
+    {
+      "id": "POL-003",
+      "category": "POLLINATION",
+      "name": "Optimal Pollination Window",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_min_c", "op": ">=", "value": 20},
+          {"field": "temperature_max_c", "op": "<=", "value": 25},
+          {"field": "rain_probability_today_pct", "op": "<=", "value": 20},
+          {"field": "wind_speed_kmh", "op": "<=", "value": 15}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["flowering"]
+      },
+      "risk": "none — this is the optimal pollination window",
+      "priority": "opportunity",
+      "actions": [
+        "Excellent pollination conditions — ensure bee hives are in place (2-5 per hectare)",
+        "Ensure A and B flower type varieties are interplanted (1:9 ratio)",
+        "Do NOT spray any pesticides today — protect pollinators",
+        "This is the best window for maximum fruit set"
+      ],
+      "sources": ["COLEAD §5.6.1 Table 7 p88"]
+    },
+    {
+      "id": "POL-004",
+      "category": "POLLINATION",
+      "name": "Floral Induction Temperature Trigger",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": "<=", "value": 20},
+          {"field": "day_length_hours", "op": "<=", "value": 10}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative"],
+        "note": "Required condition for transition from vegetative to floral buds"
+      },
+      "risk": "none — this is a positive phenological trigger",
+      "priority": "informational",
+      "actions": [
+        "Floral induction conditions are being met — flowering expected in coming weeks",
+        "Prepare for flowering management: arrange bee hives, prepare pheromone traps, schedule fungicide program",
+        "This is the time to apply foliar boron if levels are low (<40 ppm)"
+      ],
+      "sources": ["COLEAD §5.7 p92"]
+    },
+    {
+      "id": "HRV-001",
+      "category": "HARVEST",
+      "name": "Optimal Harvest Day",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_today_pct", "op": "<=", "value": 20},
+          {"field": "temperature_max_c", "op": "<=", "value": 25},
+          {"field": "wind_speed_kmh", "op": "<=", "value": 20},
+          {"field": "consecutive_dry_hours", "op": ">=", "value": 12}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["harvest"]
+      },
+      "risk": "none — this is an opportunity window",
+      "priority": "opportunity",
+      "actions": [
+        "Good day to harvest — dry fruit stores better and has lower disease incidence",
+        "Harvest in the morning when fruit is cool",
+        "Use clippers, leave 5mm stem attached to reduce rot entry",
+        "Do not stack fruit more than 2 layers in crates",
+        "Move to shade immediately — pre-cool to 5-7°C within 6 hours"
+      ],
+      "sources": ["COLEAD §7.10 p231-233", "BIF p28", "GRIESBACH p23-24"]
+    },
+    {
+      "id": "HRV-002",
+      "category": "HARVEST",
+      "name": "Wet Harvest Warning",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_today_pct", "op": ">=", "value": 50},
+          {"field": "growth_stage", "op": "==", "value": "harvest"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["harvest"],
+        "variety_note": "Fuerte especially susceptible to lenticel damage in wet conditions"
+      },
+      "risk": "Water droplets on fruit accelerate post-harvest disease. Lenticel damage more pronounced. Harvesting in wet weather increases vascular browning incidence.",
+      "priority": "high",
+      "actions": [
+        "Delay harvest until dry conditions if possible",
+        "If harvest is unavoidable: apply post-harvest fungicide dip (prochloraz/Sportak) within 24 hours",
+        "Pre-cool immediately to 5-7°C",
+        "Fuerte: highest urgency to avoid wet harvest; Hass: lenticel damage hidden by purple skin"
+      ],
+      "sources": ["COLEAD §7.10 p231-233", "BIF p28"]
+    },
+    {
+      "id": "HRV-003",
+      "category": "HARVEST",
+      "name": "Harvest Season Calendar - Kenya",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "month", "op": "in", "value": [3, 4, 5, 6, 7, 8, 9, 10]}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["pre_harvest", "harvest"],
+        "variety_calendar": {
+          "Fuerte": {"flowering": "Sep-Oct", "harvest": "Mar-May"},
+          "Hass": {"flowering": "Oct", "harvest": "Jun-Sep"},
+          "Puebla": {"months_from_bloom": "5-7"},
+          "Nabal": {"months_from_bloom": "8-9"},
+          "Pinkerton": {"months_from_bloom": "8-9"}
+        }
+      },
+      "risk": "Picking before maturity results in watery, tasteless fruit. Picking too late risks quality deterioration.",
+      "priority": "informational",
+      "actions": [
+        "Conduct maturity test: store a few fruits 7-10 days at room temperature (~27°C)",
+        "If fruit softens without shrivelling, crop is ready for commercial harvest",
+        "Match harvest timing to variety-specific calendar",
+        "Central/Eastern Kenya main season: March-October"
+      ],
+      "sources": ["COLEAD §5.6.1 Table 5 p88", "BIF p28", "GRIESBACH p22-25"]
+    },
+    {
+      "id": "PH-001",
+      "category": "POST_HARVEST",
+      "name": "Post-Harvest Field Heat Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 26}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["harvest", "post_harvest"]
+      },
+      "risk": "Internal fruit temperature reaching 26°C accelerates ripening, ethylene production, and fungal infection onset.",
+      "priority": "high",
+      "actions": [
+        "Move harvested fruit to shade IMMEDIATELY — do not leave in sun",
+        "Pre-cool to 5-7°C within 6 hours of harvest using freeze-blast method",
+        "Cover transport vehicles with 80% shade-cloth (NOT plastic — creates warm humid environment)",
+        "Do NOT use banana leaves to cover fruit (produce ethylene)",
+        "Transfer to packhouse within 2 hours of picking in hot conditions"
+      ],
+      "sources": ["COLEAD §8.3.4 p242, §8.2 p239", "BIF p28"]
+    },
+    {
+      "id": "PH-002",
+      "category": "POST_HARVEST",
+      "name": "Cold Chain Requirements",
+      "weather_condition": {
+        "operator": "ALWAYS",
+        "conditions": []
+      },
+      "crop_context": {
+        "applies_to_stages": ["post_harvest"]
+      },
+      "risk": "Breaking the cold chain leads to accelerated ripening and post-harvest disease.",
+      "priority": "high",
+      "actions": [
+        "Pre-cool to 5-7°C within 6 hours of harvest",
+        "Store at 5°C, 85-95% RH",
+        "Hot-water fungicidal treatment: 50°C for 3-5 minutes (optional Carbendazim/Bavistin in dip)",
+        "Apply post-harvest fungicide dip (fludioxonil + azoxystrobin or prochloraz) within 24 hours",
+        "FCM quarantine treatment for EU export: 1.1°C for 14 days",
+        "Ripening room: 15-20°C (reduces rots vs higher temperatures)"
+      ],
+      "sources": ["COLEAD §8.3.4 p242, §8.3.5 p243-244", "BIF p28-30"]
+    },
+    {
+      "id": "SPR-001",
+      "category": "SPRAY_WINDOW",
+      "name": "General Spray Window - Optimal Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_next_6h_pct", "op": "<=", "value": 20},
+          {"field": "wind_speed_kmh", "op": "<=", "value": 15},
+          {"field": "is_early_morning_or_late_evening", "op": "==", "value": true}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "none — this is an opportunity window",
+      "priority": "opportunity",
+      "actions": [
+        "Good conditions for pesticide/fungicide application",
+        "Apply early morning or late evening when wind is calm",
+        "Observe wind direction before spraying — spray will drift in wind",
+        "Do NOT spray during windy or freezing conditions",
+        "Ensure protective clothing during application"
+      ],
+      "sources": ["COLEAD §6.5.1 p115, §6.5.6 p162", "BIF p19"]
+    },
+    {
+      "id": "SPR-002",
+      "category": "SPRAY_WINDOW",
+      "name": "No-Spray During Flowering",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "growth_stage", "op": "==", "value": "flowering"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["flowering"],
+        "note": "Kenya flowering: mainly Aug-Sep; off-season Mar-Apr"
+      },
+      "risk": "Broad-spectrum insecticides during flowering kill pollinators (bees), directly reducing fruit set and yield.",
+      "priority": "critical",
+      "actions": [
+        "Do NOT apply broad-spectrum insecticides during flowering",
+        "If pest control is unavoidable, use selective/bee-safe products only",
+        "Spray only in the evening after bees have retired",
+        "Maintain bee hives at 2-5 per hectare"
+      ],
+      "sources": ["COLEAD §5.8 p93", "GRIESBACH p6-7,19"]
+    },
+    {
+      "id": "SPR-003",
+      "category": "SPRAY_WINDOW",
+      "name": "Prophylactic Fungicide Before Wet Season",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "days_until_rainy_season_onset", "op": "<=", "value": 14}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Prophylactic spraying before wet periods is far more effective than reactive treatment after infection establishes.",
+      "priority": "high",
+      "actions": [
+        "Apply copper-based fungicide now (pre-season coverage)",
+        "For anthracnose: apply from early fruit set, repeat every 14 days during wet weather",
+        "For cercospora: apply from end of flowering to harvest during wet weather",
+        "For Phytophthora: apply mefenoxam soil drench before rains",
+        "Ensure thorough coverage of all susceptible plant parts"
+      ],
+      "sources": ["COLEAD §6.6.1 p184-187", "BIF p23-24", "GRIESBACH p20"]
+    },
+    {
+      "id": "FRT-001",
+      "category": "FERTILIZER",
+      "name": "Nitrogen Application - Soil Moisture Required",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "soil_moisture", "op": "==", "value": "moist"},
+          {"field": "rain_probability_next_24h_pct", "op": "<=", "value": 60}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Nitrogen on dry soil volatilises and is wasted. Nitrogen before heavy rain leaches away. Both waste fertilizer and can damage crops.",
+      "priority": "medium",
+      "actions": [
+        "Apply CAN/nitrogen fertilizer only when soil is moist",
+        "Avoid application immediately before forecast heavy rainfall (leaching risk)",
+        "If soil is dry, irrigate first then apply fertilizer",
+        "Split annual nitrogen dose into 2-3 applications timed to follow rains"
+      ],
+      "sources": ["BIF p15-16", "GRIESBACH p17"]
+    },
+    {
+      "id": "FRT-002",
+      "category": "FERTILIZER",
+      "name": "Foliar Zinc - Young Leaf Flush Required",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "growth_stage", "op": "==", "value": "vegetative_flush"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative"]
+      },
+      "risk": "Zinc foliar spray is only absorbed by young leaves — application at wrong time is completely ineffective.",
+      "priority": "medium",
+      "actions": [
+        "Apply zinc sulphate or zinc nitrate foliar spray ONLY during flush of young leaves",
+        "Old leaves do not absorb foliar zinc — timing is critical",
+        "Alternative: apply zinc as granules around trunk (less timing-dependent)"
+      ],
+      "sources": ["COLEAD §5.2 p75"]
+    },
+    {
+      "id": "FRT-003",
+      "category": "FERTILIZER",
+      "name": "Boron Application Before Flowering",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "weeks_until_flowering", "op": "<=", "value": 4}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["pre_flowering"],
+        "note": "Especially important in high humidity/cool conditions where boron uptake is limited"
+      },
+      "risk": "Low boron during flowering impairs fruit set. Minimum 40 ppm boron required in floral organs.",
+      "priority": "medium",
+      "actions": [
+        "Monitor boron levels in leaf samples (take samples 2 months before flowering)",
+        "If boron < 40 ppm, apply foliar boron now",
+        "Apply by fertigation with irrigation water if available",
+        "Apply only when young leaves are present for foliar uptake"
+      ],
+      "sources": ["COLEAD §1.2.3 p11, §5.8 p93"]
+    },
+    {
+      "id": "FRT-004",
+      "category": "FERTILIZER",
+      "name": "Reduce Fertilizer in Dry Season",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 21},
+          {"field": "irrigation_available", "op": "==", "value": false}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Over-application under low water availability favours pest development, causes nutrient imbalances, and increases salinity risk.",
+      "priority": "medium",
+      "actions": [
+        "Reduce fertilizer application rates during dry periods without irrigation",
+        "Avoid KCl (potassium chloride) to prevent soil salinization",
+        "Combine mineral with organic inputs"
+      ],
+      "sources": ["COLEAD §5.2 p72-73"]
+    },
+    {
+      "id": "PRN-001",
+      "category": "PRUNING",
+      "name": "Pruning - Dry Conditions Required",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_next_48h_pct", "op": "<=", "value": 20},
+          {"field": "relative_humidity_pct", "op": "<=", "value": 70}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["post_harvest"],
+        "note": "Prune after harvest and before flowering; Oct-Dec in Central/Eastern Kenya"
+      },
+      "risk": "Pruning wounds are entry points for stem end rot and bacterial canker pathogens. Wet conditions increase infection risk at wound sites.",
+      "priority": "medium",
+      "actions": [
+        "Good conditions for pruning — dry weather allows wounds to heal",
+        "Sterilise pruning tools between trees (20% household bleach or 1.5% sodium hypochlorite)",
+        "Whitewash exposed trunks and branches to protect against sunburn",
+        "Maintain canopy height at 70% of row width, max 5.5-7m",
+        "Remove all dead and sucker branches"
+      ],
+      "sources": ["COLEAD §5.5 p83-87", "BIF p19-20", "GRIESBACH p14"]
+    },
+    {
+      "id": "PRN-002",
+      "category": "PRUNING",
+      "name": "Pruning for Disease Prevention - Humid Season",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "relative_humidity_pct", "op": ">=", "value": 80},
+          {"field": "consecutive_wet_days", "op": ">=", "value": 5}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "note": "Dense canopy traps moisture and creates disease-conducive microclimate"
+      },
+      "risk": "Dense unpruned canopy maintains high humidity at leaf and fruit surfaces, promoting fungal disease. Also reduces spray penetration.",
+      "priority": "informational",
+      "actions": [
+        "If canopy is dense and not recently pruned, schedule pruning for next dry window",
+        "An open canopy benefits from natural sun and air movement to prevent disease buildup",
+        "Post-rain canopy flush (after high-rainfall season) increases mite habitat — prune before dry season"
+      ],
+      "sources": ["COLEAD §5.5 p87", "BIF p19-20", "KALRO_MITE p15"]
+    },
+    {
+      "id": "PLT-001",
+      "category": "WATER_IRRIGATION",
+      "name": "Planting Window - Rain Onset",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rainy_season_onset", "op": "==", "value": true},
+          {"field": "cumulative_rain_7d_mm", "op": ">=", "value": 20}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["transplanting"],
+        "note": "Seedlings should be ≥1m height, 6 months to 2 years old"
+      },
+      "risk": "none — this is the optimal planting window",
+      "priority": "opportunity",
+      "actions": [
+        "Optimal time to transplant seedlings — soil is deeply wetted",
+        "Water seedlings immediately after planting with 15-20 litres",
+        "Mulch around base to retain moisture",
+        "Whitewash stems with 10% agricultural lime to prevent sunburn",
+        "Stake young trees for wind protection"
+      ],
+      "sources": ["COLEAD §4.1 p62", "BIF p13", "GRIESBACH p13"]
+    },
+    {
+      "id": "ALT-001",
+      "category": "CLIMATE_TEMPERATURE",
+      "name": "Altitude-Variety Suitability - Low (90-800m)",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "altitude_m", "op": ">=", "value": 90},
+          {"field": "altitude_m", "op": "<=", "value": 800}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["establishment"],
+        "recommended_varieties": ["Simmonds", "Booth 7", "Booth 8", "Hardy", "Waldin", "Tambarina", "Ruehle"]
+      },
+      "risk": "Wrong variety at wrong altitude fails to thrive. West Indian race adapted to hot lowland conditions.",
+      "priority": "informational",
+      "actions": [
+        "Plant West Indian varieties only: Simmonds, Booth 7, Booth 8, Hardy, Waldin, Tambarina",
+        "Do NOT plant Hass or Fuerte at this altitude — they will underperform"
+      ],
+      "sources": ["BIF p4-5", "GRIESBACH p14,19"]
+    },
+    {
+      "id": "ALT-002",
+      "category": "CLIMATE_TEMPERATURE",
+      "name": "Altitude-Variety Suitability - Mid (800-2100m)",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "altitude_m", "op": ">=", "value": 800},
+          {"field": "altitude_m", "op": "<=", "value": 2100}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["establishment"],
+        "recommended_varieties": ["Hass", "Nabal", "Reed", "Linda", "Pinkerton", "Tonnage", "TX 531"]
+      },
+      "risk": "This is Kenya's primary commercial zone. Guatemalan race and hybrids perform best.",
+      "priority": "informational",
+      "actions": [
+        "Plant Hass, Nabal, or other Guatemalan varieties for commercial production",
+        "This altitude range covers most of Kenya's main avocado production areas"
+      ],
+      "sources": ["BIF p4-5", "GRIESBACH p14,19"]
+    },
+    {
+      "id": "ALT-003",
+      "category": "CLIMATE_TEMPERATURE",
+      "name": "Altitude-Variety Suitability - High (1500-2500m)",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "altitude_m", "op": ">=", "value": 1500},
+          {"field": "altitude_m", "op": "<=", "value": 2500}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["establishment"],
+        "recommended_varieties": ["Fuerte", "Puebla", "Bacon", "Zutano", "Ettinger", "Teague"]
+      },
+      "risk": "Mexican race and hybrids flourish at high altitude. Most cold-tolerant. Fuerte performs best here.",
+      "priority": "informational",
+      "actions": [
+        "Plant Mexican race varieties: Fuerte, Puebla, Bacon, Zutano, Ettinger",
+        "Zutano preferred for windy/cold-exposed highland sites",
+        "Fuerte preferred for export production at high altitude"
+      ],
+      "sources": ["BIF p4-5", "GRIESBACH p14,19,44,82"]
+    }
+  ],
+  "derived_fields": {
+    "description": "Fields that must be computed from raw weather API data before rule evaluation",
+    "fields": [
+      {
+        "name": "cumulative_rain_72h_mm",
+        "computation": "Sum precipitation from hourly history (72h lookback)",
+        "required_by": ["PHYT-001"]
+      },
+      {
+        "name": "cumulative_rain_48h_mm",
+        "computation": "Sum precipitation from hourly history (48h lookback)",
+        "required_by": ["FCM-002"]
+      },
+      {
+        "name": "cumulative_rain_24h_mm",
+        "computation": "Sum precipitation from hourly history (24h lookback)",
+        "required_by": ["WL-001"]
+      },
+      {
+        "name": "cumulative_rain_7d_mm",
+        "computation": "Sum precipitation from daily history (7d lookback)",
+        "required_by": ["PM-002", "PLT-001"]
+      },
+      {
+        "name": "cumulative_rain_14d_mm",
+        "computation": "Sum precipitation from daily history (14d lookback)",
+        "required_by": ["IRR-002"]
+      },
+      {
+        "name": "consecutive_dry_days",
+        "computation": "Count consecutive days with rain < 1mm from today backwards",
+        "required_by": ["THR-001", "PM-001", "BM-001", "BAC-001", "IRR-001", "IRR-003", "FRT-004"]
+      },
+      {
+        "name": "consecutive_dry_hours",
+        "computation": "Count consecutive hours with no precipitation",
+        "required_by": ["HRV-001"]
+      },
+      {
+        "name": "consecutive_wet_days",
+        "computation": "Count consecutive days with rain >= 1mm",
+        "required_by": ["PRN-002"]
+      },
+      {
+        "name": "hours_since_last_rain",
+        "computation": "Hours since last hourly observation with precipitation > 0",
+        "required_by": ["ANTH-002"]
+      },
+      {
+        "name": "soil_temp_estimate_c",
+        "computation": "Air temperature - 2°C (rough proxy at 10cm depth)",
+        "required_by": ["PHYT-001", "VERT-001", "NEM-001"]
+      },
+      {
+        "name": "temperature_change_24h_c",
+        "computation": "Absolute difference between current temp and temp 24h ago",
+        "required_by": ["TEMP-003"]
+      },
+      {
+        "name": "rain_trend_7d",
+        "computation": "Compare average rain in last 3 days vs previous 4 days: rising/falling/stable",
+        "required_by": ["PM-003"]
+      },
+      {
+        "name": "temperature_trend_7d",
+        "computation": "Compare average temp in last 3 days vs previous 4 days: rising/falling/stable",
+        "required_by": ["PM-003"]
+      },
+      {
+        "name": "is_early_morning_or_late_evening",
+        "computation": "True if hour is 5-8 AM or 5-7 PM local time",
+        "required_by": ["SPR-001"]
+      },
+      {
+        "name": "is_daytime",
+        "computation": "True if hour is between sunrise and sunset",
+        "required_by": ["ANTH-002", "POL-001", "POL-002"]
+      }
+    ]
+  },
+  "conflict_resolution": {
+    "description": "Rules for resolving contradictory advice when multiple rules fire simultaneously",
+    "rules": [
+      {
+        "conflict": "SPRAY rule fires but WIND rule says don't spray",
+        "resolution": "Wind rule wins — delay spray until wind calms. Never spray in wind > 15 km/h.",
+        "priority_order": ["WIND-001", "SPR-001"]
+      },
+      {
+        "conflict": "SPRAY rule fires but FLOWERING rule says no insecticides",
+        "resolution": "Flowering rule wins for insecticides. Fungicides can still be applied if bee-safe.",
+        "priority_order": ["SPR-002", "ANTH-001"]
+      },
+      {
+        "conflict": "IRRIGATION rule fires but WATERLOGGING rule says don't irrigate",
+        "resolution": "Waterlogging rule wins. Never irrigate saturated soil.",
+        "priority_order": ["WL-001", "IRR-001"]
+      },
+      {
+        "conflict": "HARVEST opportunity fires but WET HARVEST warning also fires",
+        "resolution": "Wet harvest warning wins. Delay harvest.",
+        "priority_order": ["HRV-002", "HRV-001"]
+      },
+      {
+        "conflict": "Multiple disease rules fire simultaneously",
+        "resolution": "Use a single integrated spray recommendation that covers all active diseases. Copper-based fungicides cover anthracnose + cercospora + scab.",
+        "priority_order": ["PHYT-001", "ANTH-001", "CERC-001", "SCAB-001"]
+      },
+      {
+        "conflict": "PERSEA MITE rule fires with broad-spectrum spray recommendation from another pest",
+        "resolution": "Avoid broad-spectrum pesticides — they kill mite natural enemies. Use targeted/biological control.",
+        "priority_order": ["PM-001", "SC-001"]
+      }
+    ]
+  },
+  "kenya_seasonal_calendar": {
+    "description": "Kenya bimodal rainfall calendar for rule timing",
+    "seasons": {
+      "long_rains": {"months": [3, 4, 5], "label": "March-May"},
+      "long_dry": {"months": [6, 7, 8, 9], "label": "June-September"},
+      "short_rains": {"months": [10, 11, 12], "label": "October-December"},
+      "short_dry": {"months": [1, 2], "label": "January-February"}
+    },
+    "flowering_calendar": {
+      "Fuerte": {"peak_flowering": "Sep-Oct", "peak_harvest": "Mar-May"},
+      "Hass": {"peak_flowering": "Oct", "peak_harvest": "Jun-Sep"}
+    },
+    "high_risk_transitions": [
+      {
+        "transition": "Short rains → Short dry (Dec-Jan)",
+        "risks": ["Persea mite rebound", "Phytophthora from residual soil moisture", "Anthracnose from residual humidity"]
+      },
+      {
+        "transition": "Long rains → Long dry (May-Jun)",
+        "risks": ["Persea mite rebound", "Thrips outbreak in dry conditions", "FCM population increase"]
+      }
+    ]
+  }
+}

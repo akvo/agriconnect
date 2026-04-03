@@ -69,26 +69,35 @@ def send_weather_broadcasts() -> Dict[str, Any]:
         for customer, admin_id in customers_with_areas:
             if customer.weather_subscribed is True:
                 crop = customer.crop_type or "unknown"
-                all_subscribed.append((customer.id, admin_id, crop))
+                # For avocado: use variety, for potato: use planting_season
+                if crop.lower() == "potato":
+                    variety_or_season = customer.planting_season
+                else:
+                    variety_or_season = customer.variety  # Default "Hass"
+                all_subscribed.append(
+                    (customer.id, admin_id, crop, variety_or_season)
+                )
 
         if not all_subscribed:
             logger.info("No customers with weather subscription")
             return {"areas_processed": 0, "broadcasts_created": 0}
 
-        # Group by (administrative area, crop_type)
+        # Group by (administrative area, crop_type, variety)
         from collections import defaultdict
-        by_area_crop = defaultdict(list)
-        for customer_id, admin_id, crop in all_subscribed:
-            by_area_crop[(admin_id, crop)].append(customer_id)
+        by_area_crop_variety = defaultdict(list)
+        for customer_id, admin_id, crop, variety in all_subscribed:
+            by_area_crop_variety[(admin_id, crop, variety)].append(customer_id)
 
         logger.info(
-            f"Found {len(by_area_crop)} area+crop groups with subscribers"
+            f"Found {len(by_area_crop_variety)} area+crop+variety groups "
+            f"with subscribers"
         )
 
         broadcasts_created = 0
         errors = []
 
-        for (admin_id, crop_type), customer_ids in by_area_crop.items():
+        for key, customer_ids in by_area_crop_variety.items():
+            admin_id, crop_type, variety = key
             try:
                 # Get administrative area
                 area = db.query(Administrative).filter(
@@ -123,10 +132,11 @@ def send_weather_broadcasts() -> Dict[str, Any]:
                 # So farmer sees their local area first
                 location_name = ", ".join(path_parts)
 
-                # Create weather broadcast for this area+crop
+                # Create weather broadcast for this area+crop+variety
                 weather_broadcast = WeatherBroadcast(
                     administrative_id=admin_id,
                     crop_type=crop_type,
+                    variety=variety,
                     location_name=location_name,
                     status='pending',
                     scheduled_at=datetime.utcnow(),
@@ -142,18 +152,19 @@ def send_weather_broadcasts() -> Dict[str, Any]:
 
                 logger.info(
                     f"Created weather broadcast {weather_broadcast.id} "
-                    f"for area {area.name}, crop {crop_type} "
-                    f"({len(customer_ids)} subscribers)"
+                    f"for area {area.name}, crop {crop_type}, "
+                    f"variety {variety} ({len(customer_ids)} subscribers)"
                 )
 
             except Exception as e:
                 logger.error(
                     f"Failed to create broadcast for area {admin_id}, "
-                    f"crop {crop_type}: {e}"
+                    f"crop {crop_type}, variety {variety}: {e}"
                 )
                 errors.append({
                     "area_id": admin_id,
                     "crop_type": crop_type,
+                    "variety": variety,
                     "error": str(e)
                 })
                 db.rollback()
@@ -164,7 +175,7 @@ def send_weather_broadcasts() -> Dict[str, Any]:
         )
 
         return {
-            "groups_processed": len(by_area_crop),
+            "groups_processed": len(by_area_crop_variety),
             "broadcasts_created": broadcasts_created,
             "errors": errors if errors else None
         }
@@ -223,7 +234,7 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
 
         broadcast.weather_data = weather_data
 
-        # Generate messages in both languages with crop-specific advice
+        # Generate messages in both languages with variety-specific advice
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -233,6 +244,8 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
                     language="en",
                     weather_data=weather_data,
                     farmer_crop=broadcast.crop_type,
+                    farmer_variety=broadcast.variety or "Hass",
+                    farmer_altitude=area.altitude_m if area else None,
                 )
             )
             message_sw = loop.run_until_complete(
@@ -241,6 +254,8 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
                     language="sw",
                     weather_data=weather_data,
                     farmer_crop=broadcast.crop_type,
+                    farmer_variety=broadcast.variety or "Hass",
+                    farmer_altitude=area.altitude_m if area else None,
                 )
             )
         finally:
@@ -270,12 +285,22 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
             .all()
         )
 
-        # Filter for subscribed customers with matching crop_type
-        subscribers = [
-            c for c in customers_in_area
-            if c.weather_subscribed
-            and (c.crop_type or "unknown") == broadcast.crop_type
-        ]
+        # Filter for matching crop_type and variety/season
+        subscribers = []
+        for c in customers_in_area:
+            if not c.weather_subscribed:
+                continue
+            if (c.crop_type or "unknown") != broadcast.crop_type:
+                continue
+
+            # For avocado: match variety, for potato: match planting_season
+            if broadcast.crop_type.lower() == "potato":
+                expected = broadcast.variety or "long_rains_crop"
+                if c.planting_season == expected:
+                    subscribers.append(c)
+            else:
+                if c.variety == (broadcast.variety or "Hass"):
+                    subscribers.append(c)
 
         if not subscribers:
             broadcast.status = 'completed'

@@ -1,0 +1,712 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2026-04-03",
+    "crop": "potato",
+    "description": "Weather-triggered advisory rules for potato farming in Kenya, derived from agronomic literature",
+    "sources": [
+      {"id": "NPCK", "title": "Climate Resilient Potato Production Handbook - NPCK & CRAFT", "pages": 136},
+      {"id": "TRAINING", "title": "Final Potato Training Manual", "pages": 82}
+    ],
+    "total_rules": 30
+  },
+  "rules": [
+    {
+      "id": "LB-001",
+      "category": "DISEASE_LATE_BLIGHT",
+      "name": "Late Blight - Infection Trigger",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 10},
+          {"field": "consecutive_days_above_10c", "op": ">=", "value": 2},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 90}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "tuberization", "bulking", "maturation"]
+      },
+      "risk": "Phytophthora infestans infection triggered. Late blight can destroy entire crop within days if untreated.",
+      "priority": "critical",
+      "actions": [
+        "Apply Mancozeb fungicide immediately if not sprayed in last 7 days",
+        "For susceptible varieties: spray every 7 days from emergence onwards — do NOT wait for symptoms",
+        "For resistant varieties (Kenya Faulu, Karibu, Chaguo, Mavuno, Sifa, Tigoni, Asante): spray when symptoms first appear",
+        "Alternate Mancozeb with Metalaxyl to prevent resistance"
+      ],
+      "sources": ["NPCK p.88-89"]
+    },
+    {
+      "id": "LB-002",
+      "category": "DISEASE_LATE_BLIGHT",
+      "name": "Late Blight - Accelerated Spread",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 15},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 85}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "tuberization", "bulking"]
+      },
+      "risk": "Warm + humid conditions accelerate blight spread. Infection can move from first spots to total crop loss rapidly.",
+      "priority": "critical",
+      "actions": [
+        "Reduce spray interval to every 7 days or less",
+        "Scout daily for grey spots on lower leaf tips and edges",
+        "Do NOT use sprinkler irrigation — wet canopy promotes blight",
+        "Switch to drip or furrow irrigation"
+      ],
+      "sources": ["NPCK p.88"]
+    },
+    {
+      "id": "LB-003",
+      "category": "DISEASE_LATE_BLIGHT",
+      "name": "Late Blight - Spray Window",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_next_6h_pct", "op": "<=", "value": 20},
+          {"field": "wind_speed_kmh", "op": "<=", "value": 15}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "tuberization", "bulking", "maturation"]
+      },
+      "risk": "none — this is an opportunity window",
+      "priority": "opportunity",
+      "actions": [
+        "Good window to apply Mancozeb — calm and dry conditions for good coverage",
+        "Spray early morning or late evening",
+        "Use 6 knapsacks per acre for full coverage"
+      ],
+      "sources": ["NPCK p.89,96"]
+    },
+    {
+      "id": "EB-001",
+      "category": "DISEASE_EARLY_BLIGHT",
+      "name": "Early Blight - Favorable Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 20},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 80}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "tuberization", "bulking"]
+      },
+      "risk": "Alternaria solani causes brown scorching spots on leaves. Warm humid conditions favour infection.",
+      "priority": "high",
+      "actions": [
+        "Spray Mancozeb from emergence, every 7 days",
+        "Scout for brown concentric ring spots on older leaves"
+      ],
+      "sources": ["NPCK p.89"]
+    },
+    {
+      "id": "BS-001",
+      "category": "DISEASE_BLACK_SCURF",
+      "name": "Black Scurf - Cold Wet Soil at Planting",
+      "weather_condition": {
+        "operator": "OR",
+        "conditions": [
+          {"field": "soil_temp_estimate_c", "op": "<=", "value": 7},
+          {
+            "operator": "AND",
+            "conditions": [
+              {"field": "cumulative_rain_72h_mm", "op": ">=", "value": 30},
+              {"field": "rain_probability_today_pct", "op": ">=", "value": 60}
+            ]
+          }
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["planting"]
+      },
+      "risk": "Rhizoctonia solani (black scurf) promoted by cold (<7°C) or waterlogged soil. Causes hard brown masses on tubers, dead tissue on stems.",
+      "priority": "high",
+      "actions": [
+        "Do NOT plant today — soil is too cold or too wet",
+        "Wait for soil to warm above 7°C and drain",
+        "Use certified disease-free seed"
+      ],
+      "sources": ["NPCK p.29", "TRAINING p.60"]
+    },
+    {
+      "id": "BW-001",
+      "category": "DISEASE_BACTERIAL_WILT",
+      "name": "Bacterial Wilt - Waterlogging Spread Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_72h_mm", "op": ">=", "value": 40}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Heavy rain carries Ralstonia solanacearum via surface runoff from infected fields. Bacterial wilt is soil-persistent and devastating.",
+      "priority": "high",
+      "actions": [
+        "Check drainage channels are clear — runoff spreads bacterial wilt",
+        "Inspect for wilting plants despite adequate moisture (diagnostic sign)",
+        "If wilt found: rogue diseased plants immediately, do NOT compost them",
+        "Rotate with non-solanaceous crops for >2 years if field infected"
+      ],
+      "sources": ["NPCK p.27,90,122"]
+    },
+    {
+      "id": "BL-001",
+      "category": "DISEASE_BLACKLEG",
+      "name": "Blackleg - Wet Field Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_48h_mm", "op": ">=", "value": 25},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 85}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Pectobacterium (blackleg/soft rot) thrives in wet, flooded fields. Slimy black stem bases, tuber rot.",
+      "priority": "medium",
+      "actions": [
+        "Check drainage — do not allow standing water around plants",
+        "Do NOT hill up while soil is this wet — spreads disease",
+        "If harvesting soon, wait for dry weather"
+      ],
+      "sources": ["NPCK p.91", "TRAINING p.63-64"]
+    },
+    {
+      "id": "CS-001",
+      "category": "DISEASE_COMMON_SCAB",
+      "name": "Common Scab - Dry Soil at Tuber Set",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 7},
+          {"field": "growth_stage", "op": "==", "value": "tuberization"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["tuberization"]
+      },
+      "risk": "Streptomyces scab promoted by dry soil at tuber initiation. Rough, cracked, scabby skin reduces market value.",
+      "priority": "high",
+      "actions": [
+        "Irrigate NOW — soil moisture at tuber set is critical to prevent scab",
+        "Maintain consistent soil moisture through tuber initiation period",
+        "Avoid over-liming (alkaline soil worsens scab)"
+      ],
+      "sources": ["NPCK p.133", "TRAINING p.64"]
+    },
+    {
+      "id": "TEMP-001",
+      "category": "CLIMATE_TEMPERATURE",
+      "name": "Heat Stress - Tuberization Decline",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_max_c", "op": ">=", "value": 21}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["tuberization", "bulking"]
+      },
+      "risk": "Above 21°C daily average causes sharp decline in tuber formation. Above 29°C, little or no tubers form.",
+      "priority": "high",
+      "actions": [
+        "Irrigate to reduce soil temperature",
+        "Apply mulch to conserve soil moisture and moderate temperature",
+        "If temperature consistently >25°C, expect reduced yield"
+      ],
+      "sources": ["NPCK p.26"]
+    },
+    {
+      "id": "TEMP-002",
+      "category": "CLIMATE_TEMPERATURE",
+      "name": "Frost Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_min_c", "op": "<=", "value": 1}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Frost scorching destroys potato foliage. Can cause total crop loss. Primary climate hazard in Nyandarua County.",
+      "priority": "critical",
+      "actions": [
+        "Apply mulch to protect crop from frost tonight",
+        "If frost damage has occurred, assess crop — severely damaged crops may not recover",
+        "Plan future planting dates to avoid frost-prone periods"
+      ],
+      "sources": ["NPCK p.20", "TRAINING p.163"]
+    },
+    {
+      "id": "WIND-001",
+      "category": "CLIMATE_WIND",
+      "name": "Wind - No Spray Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "wind_speed_kmh", "op": ">=", "value": 15}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Wind causes spray drift, poor coverage, and wasted chemicals.",
+      "priority": "medium",
+      "actions": [
+        "Do NOT spray in windy conditions — chemicals will drift",
+        "Wait for calm conditions (early morning or late evening)"
+      ],
+      "sources": ["NPCK p.85"]
+    },
+    {
+      "id": "WL-001",
+      "category": "WATER_WATERLOGGING",
+      "name": "Waterlogging Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_48h_mm", "op": ">=", "value": 40}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Waterlogging causes root suffocation, nutrient leaching, fungal diseases (blackleg, black scurf), and crop washout.",
+      "priority": "critical",
+      "actions": [
+        "Clear all drainage channels and cut-off drains immediately",
+        "Do NOT irrigate — soil is saturated",
+        "Do NOT hill up — wet soil compaction spreads disease",
+        "If planting: delay until soil drains"
+      ],
+      "sources": ["NPCK p.20,29,54", "TRAINING p.42"]
+    },
+    {
+      "id": "IRR-001",
+      "category": "WATER_IRRIGATION",
+      "name": "Irrigation Needed - Below Weekly Threshold",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_7d_mm", "op": "<=", "value": 25}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["emergence", "vegetative", "tuberization", "bulking"],
+        "note": "Critical stages: germination, flowering, tuber setting, tuber bulking"
+      },
+      "risk": "Potato needs minimum 25mm/week. Deficit reduces yield and tuber quality.",
+      "priority": "high",
+      "actions": [
+        "Start irrigation — rainfall below 25mm threshold this week",
+        "Use drip irrigation (recommended) — avoids late blight risk from wet canopy",
+        "Avoid sprinkler irrigation — promotes late blight",
+        "Prioritise watering at tuber initiation and bulking stages"
+      ],
+      "sources": ["NPCK p.26,56"]
+    },
+    {
+      "id": "APHID-001",
+      "category": "PEST_APHID",
+      "name": "Aphid Surge - Dry Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 7},
+          {"field": "temperature_c", "op": ">=", "value": 18}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "tuberization", "bulking"]
+      },
+      "risk": "Drought conditions cause aphid and whitefly population surge. Aphids are vectors for Potato Leaf Roll Virus and Potato Virus Y.",
+      "priority": "high",
+      "actions": [
+        "Check yellow water traps (6 per acre) for aphid counts",
+        "Spray Alphacypermethrin or Dimethoate (30-40ml per 20L water) if aphids detected",
+        "Apply mineral oils to prevent virus transmission",
+        "Rogue any plants showing virus symptoms (leaf curling, mosaic)"
+      ],
+      "sources": ["NPCK p.20,91,94,105"]
+    },
+    {
+      "id": "PTM-001",
+      "category": "PEST_TUBER_MOTH",
+      "name": "Potato Tuber Moth - Warm Dry Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 20},
+          {"field": "consecutive_dry_days", "op": ">=", "value": 5}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["bulking", "maturation", "harvest"]
+      },
+      "risk": "Warm and dry weather favours PTM infestation. Larvae tunnel into tubers in field and storage.",
+      "priority": "high",
+      "actions": [
+        "Check ridges — re-earth up if any tubers are exposed",
+        "Maintain ridge height at 25cm minimum",
+        "Cut foliage at 80 days after planting (prevents larvae on foliage from moving into tubers)",
+        "Harvest immediately after dehaulming — don't leave tubers in ground"
+      ],
+      "sources": ["NPCK p.92", "TRAINING p.68-70"]
+    },
+    {
+      "id": "PTM-002",
+      "category": "PEST_TUBER_MOTH",
+      "name": "PTM - Exposed Tubers After Rain/Wind",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_24h_mm", "op": ">=", "value": 15},
+          {"field": "wind_gust_kmh", "op": ">=", "value": 20}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["tuberization", "bulking", "maturation"]
+      },
+      "risk": "Heavy rain and wind erode ridges, exposing tubers to PTM egg laying and greening.",
+      "priority": "medium",
+      "actions": [
+        "Inspect ridges after heavy rain/wind — check for exposed tubers",
+        "Re-earth up immediately if tubers are visible",
+        "Do NOT wait — exposed tubers attract PTM within hours"
+      ],
+      "sources": ["NPCK p.32,92"]
+    },
+    {
+      "id": "NEM-001",
+      "category": "PEST_NEMATODE",
+      "name": "Root-Knot Nematode - Warm Moist Soil",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "soil_temp_estimate_c", "op": ">=", "value": 20},
+          {"field": "soil_temp_estimate_c", "op": "<=", "value": 30}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "tuberization", "bulking"],
+        "note": "Optimal at ~27°C. No egg-laying below 14.2°C or above 31.7°C"
+      },
+      "risk": "Meloidogyne spp. root galling peaks at warm soil temperatures. New generation in 25 days under favourable conditions.",
+      "priority": "low",
+      "actions": [
+        "If nematodes are a known problem in this field, plant trap crops (Mexican marigold) between seasons",
+        "Rotate with non-host crops",
+        "Avoid furrow irrigation on sandy soils (promotes nematodes)"
+      ],
+      "sources": ["NPCK p.90,124"]
+    },
+    {
+      "id": "CW-001",
+      "category": "PEST_CUTWORM",
+      "name": "Cutworm Risk - Dry Spell at Emergence",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 5},
+          {"field": "growth_stage", "op": "==", "value": "emergence"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["emergence", "early_vegetative"]
+      },
+      "risk": "Cutworms (Agrotis spp.) active during dry spells. Cut emerging shoots at ground level, causing plant death.",
+      "priority": "high",
+      "actions": [
+        "Scout for cut stems and foliage holes — cutworms are nocturnal, check early morning",
+        "Spray Alphacypermethrin or Dimethoate (30-40ml per 20L) at 10 days after germination",
+        "Hill up to cover exposed tubers and stem bases"
+      ],
+      "sources": ["NPCK p.93-94", "TRAINING p.70-71"]
+    },
+    {
+      "id": "HRV-001",
+      "category": "HARVEST",
+      "name": "Harvest Window - Dry and Overcast",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_today_pct", "op": "<=", "value": 20},
+          {"field": "cloud_cover_pct", "op": ">=", "value": 50}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["harvest"]
+      },
+      "risk": "none — this is the ideal harvest window",
+      "priority": "opportunity",
+      "actions": [
+        "Good day to harvest — dry soil with cloud cover is ideal",
+        "Confirm skin set: rub thumb on tuber — skin should not slip",
+        "Leave tubers on ground max 3 hours for soil to fall off, then move to shade",
+        "Do NOT expose tubers to direct sunlight — causes greening"
+      ],
+      "sources": ["NPCK p.67", "TRAINING p.75"]
+    },
+    {
+      "id": "HRV-002",
+      "category": "HARVEST",
+      "name": "No Harvest - Wet Soil",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_today_pct", "op": ">=", "value": 50},
+          {"field": "growth_stage", "op": "==", "value": "harvest"}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["harvest"]
+      },
+      "risk": "Wet harvest increases bruising, disease spread, and dirty tubers. Blackleg infection rises sharply.",
+      "priority": "high",
+      "actions": [
+        "Do NOT harvest today — wait for dry conditions",
+        "Wet-harvested tubers rot in storage"
+      ],
+      "sources": ["NPCK p.67", "TRAINING p.63"]
+    },
+    {
+      "id": "HRV-003",
+      "category": "HARVEST",
+      "name": "Harvest Alert - Sun Exposure Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cloud_cover_pct", "op": "<=", "value": 30},
+          {"field": "temperature_max_c", "op": ">=", "value": 22}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["harvest"]
+      },
+      "risk": "Clear skies + warm temperatures cause rapid greening and sunscald of harvested tubers.",
+      "priority": "medium",
+      "actions": [
+        "If harvesting today, move tubers to shade within 3 hours",
+        "Cover harvested tubers during field transport",
+        "Prefer harvesting early morning or late afternoon if skies are clear"
+      ],
+      "sources": ["NPCK p.67", "TRAINING p.75"]
+    },
+    {
+      "id": "HILL-001",
+      "category": "FIELD_OPERATIONS",
+      "name": "Hilling - Wet Soil Warning",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_24h_mm", "op": ">=", "value": 10},
+          {"field": "growth_stage", "op": "in", "value": ["vegetative", "early_vegetative"]}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "early_vegetative"]
+      },
+      "risk": "Earthing up on wet soil causes compaction and spreads late blight and blackleg.",
+      "priority": "medium",
+      "actions": [
+        "Do NOT hill up today — soil is too wet",
+        "Wait for soil to dry (at least 2 days without rain)",
+        "Hilling on wet soil compacts it and spreads fungal diseases"
+      ],
+      "sources": ["NPCK p.34", "TRAINING p.58"]
+    },
+    {
+      "id": "NLEACH-001",
+      "category": "FERTILIZER",
+      "name": "Nitrogen Leaching Risk - Heavy Rain on Young Crop",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_48h_mm", "op": ">=", "value": 30},
+          {"field": "days_after_planting", "op": ">=", "value": 30},
+          {"field": "days_after_planting", "op": "<=", "value": 55}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative"],
+        "note": "40-50 DAP: crop demand low, heavy rain leaches applied N"
+      },
+      "risk": "Heavy rain at 40-50 DAP leaches nitrogen before crop demand peaks. Wasted fertilizer.",
+      "priority": "medium",
+      "actions": [
+        "If N not yet applied, delay until rain eases — it will leach",
+        "If N was recently applied, consider a supplemental top-dress at tuber bulking",
+        "Split N applications across the season to reduce leaching risk"
+      ],
+      "sources": ["NPCK p.101"]
+    },
+    {
+      "id": "FRT-001",
+      "category": "FERTILIZER",
+      "name": "Fertilizer Window - Moist Soil",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "qpf_today_mm", "op": ">=", "value": 1},
+          {"field": "qpf_today_mm", "op": "<=", "value": 10},
+          {"field": "rain_probability_next_6h_pct", "op": "<=", "value": 40}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "tuberization", "bulking"]
+      },
+      "risk": "none — this is a fertilizer application opportunity",
+      "priority": "opportunity",
+      "actions": [
+        "Good day to apply fertilizer — soil is moist but not waterlogged",
+        "Apply DAP at planting; CAN as top-dress",
+        "Incorporate urea into soil immediately after spreading"
+      ],
+      "sources": ["NPCK p.101"]
+    },
+    {
+      "id": "PLT-001",
+      "category": "PLANTING",
+      "name": "Planting Window - Rain Onset",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_7d_mm", "op": ">=", "value": 15},
+          {"field": "soil_temp_estimate_c", "op": ">=", "value": 8}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["planting"]
+      },
+      "risk": "none — this is the optimal planting window",
+      "priority": "opportunity",
+      "actions": [
+        "Rains have started and soil is warm enough — plant now",
+        "Use well-sprouted seed (3+ sprouts per tuber)",
+        "Plant at 30cm spacing, cover to 15cm depth",
+        "Planting at exact rain onset gives best yield and escapes late-season disease pressure"
+      ],
+      "sources": ["NPCK p.29-30", "TRAINING p.129"]
+    },
+    {
+      "id": "PLT-002",
+      "category": "PLANTING",
+      "name": "Do Not Plant - Cold or Waterlogged",
+      "weather_condition": {
+        "operator": "OR",
+        "conditions": [
+          {"field": "soil_temp_estimate_c", "op": "<=", "value": 7},
+          {"field": "cumulative_rain_48h_mm", "op": ">=", "value": 40}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["planting"]
+      },
+      "risk": "Cold soil (<7°C) promotes black scurf. Waterlogged soil promotes blackleg and root rot. Both cause crop failure.",
+      "priority": "high",
+      "actions": [
+        "Do NOT plant today — soil is too cold or too wet",
+        "Wait for soil to warm and drain before planting"
+      ],
+      "sources": ["NPCK p.29"]
+    },
+    {
+      "id": "DRY-001",
+      "category": "CLIMATE_DROUGHT",
+      "name": "Drought Alert - Crop Stress",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 14}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["vegetative", "tuberization", "bulking"]
+      },
+      "risk": "Prolonged dry spell causes crop failure, reduced tuber quality, and aphid/whitefly population surge.",
+      "priority": "critical",
+      "actions": [
+        "Irrigate immediately if water available — drip irrigation preferred",
+        "Apply mulch to conserve soil moisture",
+        "Increase aphid scouting — dry conditions cause pest surge",
+        "Check yellow water traps for aphid counts"
+      ],
+      "sources": ["NPCK p.20"]
+    },
+    {
+      "id": "SPR-001",
+      "category": "SPRAY_WINDOW",
+      "name": "General Spray Window",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "rain_probability_next_6h_pct", "op": "<=", "value": 20},
+          {"field": "wind_speed_kmh", "op": "<=", "value": 15}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "none — this is an opportunity window",
+      "priority": "opportunity",
+      "actions": [
+        "Good conditions for spraying — calm and dry",
+        "Apply early morning or late evening for best results",
+        "Use protective clothing during application"
+      ],
+      "sources": ["NPCK p.85"]
+    },
+    {
+      "id": "SPR-002",
+      "category": "SPRAY_WINDOW",
+      "name": "No Spray - Rain or Wind",
+      "weather_condition": {
+        "operator": "OR",
+        "conditions": [
+          {"field": "rain_probability_next_6h_pct", "op": ">=", "value": 60},
+          {"field": "wind_speed_kmh", "op": ">=", "value": 15}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Rain washes off chemicals. Wind causes drift and poor coverage.",
+      "priority": "informational",
+      "actions": [
+        "Do NOT spray today — chemicals will wash off or drift",
+        "Wait for calm, dry conditions"
+      ],
+      "sources": ["NPCK p.85,91"]
+    }
+  ],
+  "conflict_resolution": {
+    "rules": [
+      {
+        "conflict": "Spray needed but rain/wind prevents it",
+        "resolution": "Weather wins. Delay spray. But do NOT skip — apply at first available window."
+      },
+      {
+        "conflict": "Irrigation needed but soil is waterlogged",
+        "resolution": "Waterlogging wins. Do not irrigate saturated soil."
+      },
+      {
+        "conflict": "Harvest season but soil is wet",
+        "resolution": "Wet harvest warning wins. Delay harvest."
+      },
+      {
+        "conflict": "Hilling due but soil is wet",
+        "resolution": "Wet soil warning wins. Delay hilling."
+      }
+    ]
+  }
+}

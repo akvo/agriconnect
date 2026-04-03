@@ -1,0 +1,432 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2026-04-03",
+    "crop": "potato",
+    "description": "Potato crop calendar for Kenya highlands (1,500-3,000m ASL), derived from NPCK and CRAFT literature",
+    "sources": [
+      "Climate Resilient Potato Production Handbook - NPCK & CRAFT",
+      "Final Potato Training Manual"
+    ],
+    "notes": [
+      "Calendar is for Kenya's highland potato zone (1,500-3,000m ASL)",
+      "Two crops per year aligned to bimodal rainfall",
+      "Crop duration: 120-150 days depending on variety",
+      "Timing shifts by ±2 weeks depending on altitude and rainfall onset"
+    ]
+  },
+  "kenya_seasons": {
+    "long_rains":  {"months": [3, 4, 5], "label": "Long Rains (Mar-May)"},
+    "long_dry":    {"months": [6, 7, 8], "label": "Long Dry (Jun-Aug)"},
+    "short_rains": {"months": [10, 11, 12], "label": "Short Rains (Oct-Dec)"},
+    "short_dry":   {"months": [1, 2, 9], "label": "Short Dry (Jan-Feb, Sep)"}
+  },
+  "planting_seasons": {
+    "long_rains": {
+      "planting_months": [3, 4],
+      "harvest_months": [6, 7, 8],
+      "label": "Long Rains Season (main)",
+      "note": "Higher yields; main production season"
+    },
+    "short_rains": {
+      "planting_months": [10, 11],
+      "harvest_months": [1, 2, 3],
+      "label": "Short Rains Season (secondary)",
+      "note": "Lower yields currently but improving under climate change"
+    }
+  },
+  "growth_stages": {
+    "land_preparation": {
+      "description": "Plough 15-25cm deep, harrow, prepare furrows/ridges. Apply lime if pH <6.0. Apply well-decomposed manure.",
+      "timing": "3 weeks before planting (during dry season)",
+      "duration_days": 21
+    },
+    "planting": {
+      "description": "Plant well-sprouted seed (3+ sprouts) at 30cm spacing, 15cm depth. Apply DAP fertilizer at planting.",
+      "timing": "At onset of rains",
+      "duration_days": 1
+    },
+    "emergence": {
+      "description": "Shoots emerge through soil. First weeding begins 2-3 weeks after emergence. Cutworm scouting critical.",
+      "timing": "~14 days after planting",
+      "duration_days": 14
+    },
+    "vegetative": {
+      "description": "Rapid canopy growth. First and second hilling. Begin fungicide spray (Mancozeb every 7 days). Aphid monitoring.",
+      "timing": "2-8 weeks after planting",
+      "duration_days": 42,
+      "key_activities": [
+        "First hilling at ~20cm plant height",
+        "Second hilling 2-3 weeks after first",
+        "First insecticide at 10 DAP",
+        "Fungicide every 7 days from emergence"
+      ]
+    },
+    "tuberization": {
+      "description": "Tuber initiation. Soil moisture CRITICAL to prevent common scab. Optimal soil temp 15-24°C. 70% of potassium uptake in first 6 weeks.",
+      "timing": "6-8 weeks after planting",
+      "duration_days": 14,
+      "critical_conditions": {
+        "soil_temp_optimal_c": [15, 24],
+        "soil_moisture": "must maintain — dry soil causes scab",
+        "max_temp_decline_c": 21,
+        "max_temp_cessation_c": 29
+      }
+    },
+    "bulking": {
+      "description": "Tubers enlarge rapidly. Highest nitrogen demand — top-dress if deficient. PTM risk if tubers exposed. Continue fungicide program.",
+      "timing": "8-14 weeks after planting",
+      "duration_days": 42
+    },
+    "maturation": {
+      "description": "Foliage yellows. Dehaulm when ≥50% haulms yellow (100-120 DAE). Leave tubers 2 weeks for skin to harden.",
+      "timing": "14-20 weeks after planting",
+      "duration_days": 28,
+      "key_activities": [
+        "Cut foliage at 80 DAP (PTM management)",
+        "Dehaulm at 100-120 DAE when 50%+ haulms yellow",
+        "Leave tubers in ground 2 weeks after dehaulming for skin set"
+      ]
+    },
+    "harvest": {
+      "description": "Harvest only in dry weather with cloud cover. Thumb test: skin should not slip. Move tubers to shade within 3 hours.",
+      "timing": "16-22 weeks after planting",
+      "duration_days": 14
+    },
+    "curing": {
+      "description": "Wound healing before storage. Temperature 18-20°C, humidity 85-90% RH, for 10-14 days. Well-ventilated shed.",
+      "timing": "Immediately after harvest",
+      "duration_days": 14,
+      "conditions": {
+        "temperature_c": [18, 20],
+        "humidity_pct": [85, 90]
+      }
+    }
+  },
+  "monthly_calendar": {
+    "1": {
+      "month_name": "January",
+      "season": "short_dry",
+      "phenology": {
+        "long_rains_crop": "n/a",
+        "short_rains_crop": "harvest"
+      },
+      "management": {
+        "harvest": {
+          "priority": "critical",
+          "action": "Short rains crop ready to harvest. Harvest only in dry weather with cloud cover. Confirm skin set (thumb test)."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "PTM risk high in warm dry conditions. Check ridges for exposed tubers. Inspect stored tubers for PTM damage."
+        },
+        "spraying": {
+          "priority": "low",
+          "action": "Short rains crop at maturation/harvest — stop fungicide 2 weeks before harvest."
+        },
+        "planting": {
+          "priority": "low",
+          "action": "Prepare land for long rains planting. Plough during dry season. Take soil samples (dry soil only)."
+        }
+      },
+      "disease_risk": {"late_blight": "low", "bacterial_wilt": "moderate", "blackleg": "low"},
+      "pest_risk": {"aphid": "moderate", "ptm": "high", "cutworm": "low"}
+    },
+    "2": {
+      "month_name": "February",
+      "season": "short_dry",
+      "phenology": {
+        "long_rains_crop": "n/a",
+        "short_rains_crop": "harvest_to_curing"
+      },
+      "management": {
+        "harvest": {
+          "priority": "high",
+          "action": "Complete short rains harvest. Cure tubers at 18-20°C, 85-90% RH for 10-14 days."
+        },
+        "planting": {
+          "priority": "high",
+          "action": "Land preparation for long rains. Plough 15-25cm. Harrow 2 weeks later. Apply lime if pH <6.0. Apply manure."
+        },
+        "spraying": {
+          "priority": "low",
+          "action": "No crop in field. Clean and fumigate storage."
+        }
+      },
+      "disease_risk": {"late_blight": "low", "bacterial_wilt": "low", "blackleg": "low"},
+      "pest_risk": {"aphid": "low", "ptm": "moderate", "cutworm": "low"}
+    },
+    "3": {
+      "month_name": "March",
+      "season": "long_rains",
+      "phenology": {
+        "long_rains_crop": "planting_to_emergence",
+        "short_rains_crop": "curing_to_storage"
+      },
+      "management": {
+        "planting": {
+          "priority": "critical",
+          "action": "PLANT NOW at rain onset. Use well-sprouted seed (3+ sprouts). 30cm spacing, 15cm depth. Apply DAP at planting."
+        },
+        "spraying": {
+          "priority": "high",
+          "action": "Begin Mancozeb fungicide from crop emergence. Spray every 7 days. First insecticide at 10 days after germination."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Set up 6 yellow water traps per acre for aphids. Scout for cutworms at emergence (check early morning for cut stems)."
+        },
+        "irrigation": {
+          "priority": "low",
+          "action": "Rains provide moisture. Ensure drainage is clear."
+        }
+      },
+      "disease_risk": {"late_blight": "rising", "bacterial_wilt": "moderate", "blackleg": "moderate"},
+      "pest_risk": {"aphid": "moderate", "ptm": "low", "cutworm": "high"}
+    },
+    "4": {
+      "month_name": "April",
+      "season": "long_rains",
+      "phenology": {
+        "long_rains_crop": "vegetative",
+        "short_rains_crop": "storage"
+      },
+      "management": {
+        "spraying": {
+          "priority": "critical",
+          "action": "Continue Mancozeb every 7 days — peak blight risk. Alternate with Metalaxyl. Do NOT skip sprays."
+        },
+        "fertilizer": {
+          "priority": "high",
+          "action": "First hilling + weeding when crop is 20cm high. CAN top-dress if nitrogen deficiency visible."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Check aphid traps weekly. Spray Alphacypermethrin if detected. Scout for cutworm damage."
+        }
+      },
+      "disease_risk": {"late_blight": "very_high", "bacterial_wilt": "high", "blackleg": "high"},
+      "pest_risk": {"aphid": "moderate", "ptm": "low", "cutworm": "moderate"}
+    },
+    "5": {
+      "month_name": "May",
+      "season": "long_rains",
+      "phenology": {
+        "long_rains_crop": "tuberization_to_bulking",
+        "short_rains_crop": "storage"
+      },
+      "management": {
+        "spraying": {
+          "priority": "critical",
+          "action": "Continue fungicide every 7 days. Late blight risk remains very high."
+        },
+        "irrigation": {
+          "priority": "medium",
+          "action": "Soil moisture critical at tuber set — irrigate if dry spell occurs. Dry soil at tuber set causes common scab."
+        },
+        "fertilizer": {
+          "priority": "medium",
+          "action": "Second hilling 2-3 weeks after first. Top-dress N before bulking phase if deficient."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "As rains ease, aphid risk rises. Check tubers are covered — PTM risk increases as ridges erode."
+        }
+      },
+      "disease_risk": {"late_blight": "very_high", "bacterial_wilt": "high", "blackleg": "high", "common_scab": "moderate"},
+      "pest_risk": {"aphid": "rising", "ptm": "moderate", "cutworm": "low"}
+    },
+    "6": {
+      "month_name": "June",
+      "season": "long_dry",
+      "phenology": {
+        "long_rains_crop": "bulking_to_maturation",
+        "short_rains_crop": "storage"
+      },
+      "management": {
+        "spraying": {
+          "priority": "high",
+          "action": "Continue fungicide if canopy still green. Reduce frequency as foliage yellows."
+        },
+        "harvest": {
+          "priority": "high",
+          "action": "Early varieties may be ready. Dehaulm when ≥50% haulms yellow. Leave 2 weeks for skin set."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "PTM risk HIGH — warm dry conditions. Check ridges, re-earth up if tubers exposed. Cut foliage at 80 DAP."
+        }
+      },
+      "disease_risk": {"late_blight": "moderate", "bacterial_wilt": "moderate", "blackleg": "low"},
+      "pest_risk": {"aphid": "high", "ptm": "high", "cutworm": "low"}
+    },
+    "7": {
+      "month_name": "July",
+      "season": "long_dry",
+      "phenology": {
+        "long_rains_crop": "harvest",
+        "short_rains_crop": "storage"
+      },
+      "management": {
+        "harvest": {
+          "priority": "critical",
+          "action": "MAIN HARVEST. Harvest only in dry weather with cloud cover. Thumb test for skin set. Move to shade within 3 hours."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "PTM very active. Harvest immediately after dehaulming — do not leave tubers in ground. Fumigate store before use."
+        },
+        "spraying": {
+          "priority": "low",
+          "action": "Stop spraying at dehaulming."
+        }
+      },
+      "disease_risk": {"late_blight": "low", "bacterial_wilt": "low", "blackleg": "low"},
+      "pest_risk": {"aphid": "high", "ptm": "very_high", "cutworm": "low"}
+    },
+    "8": {
+      "month_name": "August",
+      "season": "long_dry",
+      "phenology": {
+        "long_rains_crop": "curing_to_storage",
+        "short_rains_crop": "storage"
+      },
+      "management": {
+        "harvest": {
+          "priority": "medium",
+          "action": "Late varieties still being harvested. Cure tubers 10-14 days at 18-20°C, 85-90% RH."
+        },
+        "planting": {
+          "priority": "low",
+          "action": "Begin preparing for short rains. Procure certified seed. Check DLS for aphid infestation on stored seed."
+        }
+      },
+      "disease_risk": {"late_blight": "low", "bacterial_wilt": "low", "blackleg": "low"},
+      "pest_risk": {"aphid": "moderate", "ptm": "high", "cutworm": "low"}
+    },
+    "9": {
+      "month_name": "September",
+      "season": "short_dry",
+      "phenology": {
+        "long_rains_crop": "storage",
+        "short_rains_crop": "n/a"
+      },
+      "management": {
+        "planting": {
+          "priority": "high",
+          "action": "Land preparation for short rains. Plough 15-25cm. Apply lime if needed. Apply manure. Harrow and prepare ridges."
+        },
+        "pest_monitoring": {
+          "priority": "medium",
+          "action": "Check stored seed for PTM and aphids. Remove apical sprout 10-14 days before planting to get 3+ sprouts."
+        }
+      },
+      "disease_risk": {"late_blight": "low", "bacterial_wilt": "low", "blackleg": "low"},
+      "pest_risk": {"aphid": "moderate", "ptm": "moderate", "cutworm": "low"}
+    },
+    "10": {
+      "month_name": "October",
+      "season": "short_rains",
+      "phenology": {
+        "long_rains_crop": "storage",
+        "short_rains_crop": "planting_to_emergence"
+      },
+      "management": {
+        "planting": {
+          "priority": "critical",
+          "action": "PLANT at rain onset. Use well-sprouted seed. Same protocol as March planting."
+        },
+        "spraying": {
+          "priority": "high",
+          "action": "Begin Mancozeb at emergence. Every 7 days. First insecticide at 10 DAP."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Set up yellow water traps. Scout for cutworms at emergence."
+        }
+      },
+      "disease_risk": {"late_blight": "rising", "bacterial_wilt": "moderate", "blackleg": "moderate"},
+      "pest_risk": {"aphid": "moderate", "ptm": "low", "cutworm": "high"}
+    },
+    "11": {
+      "month_name": "November",
+      "season": "short_rains",
+      "phenology": {
+        "long_rains_crop": "storage",
+        "short_rains_crop": "vegetative"
+      },
+      "management": {
+        "spraying": {
+          "priority": "critical",
+          "action": "Mancozeb every 7 days. Peak blight risk. Do NOT skip."
+        },
+        "fertilizer": {
+          "priority": "high",
+          "action": "First hilling + weeding at 20cm height. CAN top-dress if needed."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Check aphid traps. Scout for cutworm damage."
+        }
+      },
+      "disease_risk": {"late_blight": "very_high", "bacterial_wilt": "high", "blackleg": "high"},
+      "pest_risk": {"aphid": "moderate", "ptm": "low", "cutworm": "moderate"}
+    },
+    "12": {
+      "month_name": "December",
+      "season": "short_rains",
+      "phenology": {
+        "long_rains_crop": "storage",
+        "short_rains_crop": "tuberization_to_bulking"
+      },
+      "management": {
+        "spraying": {
+          "priority": "critical",
+          "action": "Continue fungicide every 7 days."
+        },
+        "irrigation": {
+          "priority": "medium",
+          "action": "If rains easing, irrigate at tuber set. Dry soil = common scab risk."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Aphid risk rising as rains ease. PTM check on ridges. Second hilling if not done."
+        }
+      },
+      "disease_risk": {"late_blight": "high", "bacterial_wilt": "moderate", "blackleg": "moderate", "common_scab": "moderate"},
+      "pest_risk": {"aphid": "rising", "ptm": "moderate", "cutworm": "low"}
+    }
+  },
+  "variety_maturity_classes": {
+    "early": {"days_to_maturity": [90, 110], "examples": "Use for shortened seasons or late planting"},
+    "medium": {"days_to_maturity": [110, 130], "examples": "Shangi, Tigoni"},
+    "late": {"days_to_maturity": [130, 150], "examples": "For full-length seasons with reliable rainfall"}
+  },
+  "blight_resistant_varieties": [
+    "Kenya Faulu", "Kenya Karibu", "Chaguo", "Kenya Mavuno", "Kenya Sifa", "Tigoni", "Asante"
+  ],
+  "kenya_potato_regions": {
+    "central": ["Nyandarua", "Nyeri", "Kiambu", "Kirinyaga", "Murang'a"],
+    "rift_valley": ["Nakuru", "Narok", "Bomet", "Elgeyo Marakwet", "Kericho", "Uasin Gishu", "Nandi", "Laikipia", "West Pokot", "Baringo", "Trans-Nzoia"],
+    "eastern": ["Meru", "Machakos", "Makueni", "Embu", "Tharaka Nithi"],
+    "western": ["Bungoma", "Kakamega"],
+    "nyanza": ["Nyamira", "Kisii"],
+    "coast": ["Taita-Taveta"]
+  },
+  "spray_schedule": {
+    "fungicide": {
+      "product": "Mancozeb (alternate with Metalaxyl)",
+      "start": "At crop emergence",
+      "interval_days": 7,
+      "stop": "At dehaulming (2 weeks before harvest)",
+      "rate": "6 knapsacks per acre per spray",
+      "total_sprays_per_season": "up to 10"
+    },
+    "insecticide": {
+      "product": "Alphacypermethrin or Dimethoate",
+      "rate": "30-40ml per 20 litres water",
+      "start": "10 days after germination",
+      "targets": ["aphids", "cutworms", "PTM"]
+    }
+  }
+}

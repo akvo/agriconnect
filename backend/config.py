@@ -286,6 +286,18 @@ class Settings(BaseSettings):
     weather_intent_keywords: List[str] = _config.get("weather", {}).get(
         "intent_keywords", ["weather", "forecast", "hali ya hewa"]
     )
+    # Weather Advisory Configuration (rule-based system)
+    weather_advisory_enabled: bool = _config.get("weather", {}).get(
+        "advisory_enabled", True
+    )
+    weather_default_variety: str = _config.get("weather", {}).get(
+        "default_variety", "Hass"
+    )
+    # Elevation API endpoint (Open-Elevation)
+    elevation_api_url: str = _config.get("weather", {}).get(
+        "elevation_api_url",
+        "https://api.open-elevation.com/api/v1/lookup",
+    )
 
     # Statistic API Token (for external applications like Streamlit dashboards)
     statistic_api_token: str = os.getenv("STATISTIC_API_TOKEN", "")
