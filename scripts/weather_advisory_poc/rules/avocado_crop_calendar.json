@@ -1,0 +1,690 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2026-03-25",
+    "description": "Avocado crop calendar for Kenya, derived from COLEAD, BIF-CDAAC, Griesbach/ICRAF, and KALRO literature",
+    "sources": [
+      "COLEAD Sustainable Avocado Production Guide (2023)",
+      "BIF Avocado Production Manual - CDAAC Kenya (2019)",
+      "Avocado Growing in Kenya - Jürgen Griesbach, ICRAF (2005)",
+      "Persea Mite Management in Avocados - Samuel Khabi, KALRO (2025)"
+    ],
+    "notes": [
+      "Calendar is for Kenya's central/eastern highlands (800-2100m), the primary commercial zone",
+      "Bimodal rainfall: Long rains Mar-May, Short rains Oct-Dec",
+      "Timing shifts by ±2-4 weeks depending on altitude, microclimate, and year",
+      "Fuerte and Hass are the two dominant commercial/export varieties"
+    ]
+  },
+  "kenya_seasons": {
+    "long_rains":  {"months": [3, 4, 5],     "label": "Long Rains (Mar-May)"},
+    "long_dry":    {"months": [6, 7, 8, 9],   "label": "Long Dry (Jun-Sep)"},
+    "short_rains": {"months": [10, 11, 12],    "label": "Short Rains (Oct-Dec)"},
+    "short_dry":   {"months": [1, 2],          "label": "Short Dry (Jan-Feb)"}
+  },
+  "varieties": {
+    "Fuerte": {
+      "race": "Mexican x Guatemalan",
+      "flower_type": "B",
+      "altitude_range_m": [1500, 2500],
+      "bloom_to_harvest_months": [6, 8],
+      "peak_flowering_months": [9, 10],
+      "peak_harvest_months": [3, 4, 5],
+      "maturity_class": "mid_season",
+      "susceptibilities": ["cercospora", "anthracnose"],
+      "tolerances": ["persea_mite", "cold"],
+      "frost_tolerance_c": -2.8
+    },
+    "Hass": {
+      "race": "Guatemalan",
+      "flower_type": "A",
+      "altitude_range_m": [800, 2100],
+      "bloom_to_harvest_months": [8, 9],
+      "peak_flowering_months": [10],
+      "peak_harvest_months": [6, 7, 8, 9],
+      "maturity_class": "mid_late",
+      "susceptibilities": ["sunburn", "persea_mite"],
+      "tolerances": ["adaptable_climate"],
+      "frost_tolerance_c": -2.0
+    },
+    "Pinkerton": {
+      "race": "Guatemalan x Mexican",
+      "flower_type": "A",
+      "altitude_range_m": [800, 2100],
+      "bloom_to_harvest_months": [8, 9],
+      "peak_flowering_months": [9, 10],
+      "peak_harvest_months": [5, 6, 7, 8],
+      "maturity_class": "mid_late",
+      "susceptibilities": ["persea_mite"],
+      "tolerances": ["cercospora", "cold"],
+      "frost_tolerance_c": -2.0
+    },
+    "Puebla": {
+      "race": "Mexican",
+      "flower_type": "A",
+      "altitude_range_m": [1500, 2500],
+      "bloom_to_harvest_months": [5, 7],
+      "peak_flowering_months": [9, 10],
+      "peak_harvest_months": [2, 3, 4, 5],
+      "maturity_class": "mid_season",
+      "susceptibilities": [],
+      "tolerances": ["cold"],
+      "frost_tolerance_c": -5.0
+    },
+    "Nabal": {
+      "race": "Guatemalan",
+      "flower_type": "B",
+      "altitude_range_m": [800, 2100],
+      "bloom_to_harvest_months": [8, 9],
+      "peak_flowering_months": [9, 10],
+      "peak_harvest_months": [6, 7, 8, 9],
+      "maturity_class": "late",
+      "susceptibilities": [],
+      "tolerances": [],
+      "frost_tolerance_c": -2.0
+    }
+  },
+  "monthly_calendar": {
+    "1": {
+      "month_name": "January",
+      "season": "short_dry",
+      "phenology": {
+        "Fuerte": "fruit_development",
+        "Hass": "fruit_development"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "critical",
+          "action": "Begin irrigation — mid-January to April is the most critical water period. Apply 40-50 m³/ha/day via drip."
+        },
+        "fertilizer": {
+          "priority": "medium",
+          "action": "Leaf sampling for nutrient analysis — collect from stress-free trees, 2 months before expected flowering."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Not recommended this month — too close to flowering window."
+        },
+        "spraying": {
+          "priority": "low",
+          "action": "Low disease pressure in dry conditions. Monitor only."
+        },
+        "pest_monitoring": {
+          "priority": "medium",
+          "action": "Persea mite risk rising (dry season). Scout every 7-10 days. FCM risk moderate in warm areas."
+        },
+        "planting": {
+          "priority": "low",
+          "action": "Prepare planting holes during dry season. Fill with manure + DSP at least 3 weeks before transplanting."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "low",
+        "phytophthora": "low",
+        "cercospora": "low"
+      },
+      "pest_risk": {
+        "fruit_fly": "moderate",
+        "fcm": "moderate",
+        "thrips": "low",
+        "persea_mite": "rising"
+      }
+    },
+    "2": {
+      "month_name": "February",
+      "season": "short_dry",
+      "phenology": {
+        "Fuerte": "fruit_development_to_pre_harvest",
+        "Hass": "fruit_development"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "critical",
+          "action": "Continue irrigation. This is the driest period. Monitor for leaf wilting and fruit shrinking — emergency indicators."
+        },
+        "fertilizer": {
+          "priority": "medium",
+          "action": "Apply boron foliar spray if levels <40 ppm — flowering is approaching (Aug-Oct). Apply zinc only during new leaf flush."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Not recommended. Reserve for post-harvest."
+        },
+        "spraying": {
+          "priority": "low",
+          "action": "Low disease pressure. Prepare inputs for rainy season."
+        },
+        "pest_monitoring": {
+          "priority": "medium",
+          "action": "Persea mite at peak dry-season risk. Thrips may increase. Set up fruit fly traps if not already done."
+        },
+        "planting": {
+          "priority": "medium",
+          "action": "Finish planting hole preparation. Dig holes, fill with soil/manure/DSP mix."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "low",
+        "phytophthora": "low",
+        "cercospora": "low"
+      },
+      "pest_risk": {
+        "fruit_fly": "moderate",
+        "fcm": "moderate",
+        "thrips": "moderate",
+        "persea_mite": "high"
+      }
+    },
+    "3": {
+      "month_name": "March",
+      "season": "long_rains",
+      "phenology": {
+        "Fuerte": "harvest",
+        "Hass": "fruit_enlargement"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "low",
+          "action": "Rains starting — reduce or stop irrigation. Ensure drainage is functional."
+        },
+        "fertilizer": {
+          "priority": "high",
+          "action": "Apply CAN when soil is moist from rains (but not waterlogged). Split nitrogen into 2-3 applications."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Not recommended during wet season — wound infection risk."
+        },
+        "spraying": {
+          "priority": "critical",
+          "action": "Apply mefenoxam soil drench (Ridomil) for Phytophthora prevention at rain onset. Apply copper fungicide for anthracnose at first dry window."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Fruit fly traps must be active — warm + wet conditions favour breeding. Monitor for FCM. Persea mite pressure declining (rain suppression)."
+        },
+        "planting": {
+          "priority": "high",
+          "action": "OPTIMAL PLANTING WINDOW — long rains onset. Transplant seedlings once soil is deeply wetted."
+        },
+        "harvest": {
+          "priority": "critical",
+          "action": "FUERTE HARVEST BEGINS. Conduct maturity test (7-10 days at 27°C). Harvest only on dry mornings. Pre-cool to 5-7°C within 6 hours."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "high",
+        "phytophthora": "high",
+        "cercospora": "moderate"
+      },
+      "pest_risk": {
+        "fruit_fly": "high",
+        "fcm": "moderate",
+        "thrips": "low",
+        "persea_mite": "declining"
+      }
+    },
+    "4": {
+      "month_name": "April",
+      "season": "long_rains",
+      "phenology": {
+        "Fuerte": "harvest",
+        "Hass": "fruit_enlargement"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "none",
+          "action": "No irrigation needed — peak rainfall. Focus on drainage."
+        },
+        "fertilizer": {
+          "priority": "medium",
+          "action": "Second CAN application if split dosing. Apply to moist soil, not before heavy rain (leaching risk)."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Not recommended. Wet conditions."
+        },
+        "spraying": {
+          "priority": "critical",
+          "action": "Copper fungicide every 14 days during wet weather for anthracnose + cercospora. Second phosphonate application 16-20 weeks after first."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Fruit fly peak — destroy all fallen fruit. FCM monitoring continues. Possible off-season flowering (Mar-Apr) — avoid insecticides near flowers."
+        },
+        "harvest": {
+          "priority": "high",
+          "action": "FUERTE HARVEST CONTINUES. Pick only on dry days. Wet-harvested fruit has higher rot incidence."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "very_high",
+        "phytophthora": "very_high",
+        "cercospora": "high"
+      },
+      "pest_risk": {
+        "fruit_fly": "high",
+        "fcm": "moderate",
+        "thrips": "low",
+        "persea_mite": "low"
+      }
+    },
+    "5": {
+      "month_name": "May",
+      "season": "long_rains",
+      "phenology": {
+        "Fuerte": "harvest_ending",
+        "Hass": "fruit_enlargement"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "none",
+          "action": "No irrigation. Rains still active."
+        },
+        "fertilizer": {
+          "priority": "low",
+          "action": "Third CAN application if split. Avoid excess nitrogen before flowering."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Not yet — wait for dry conditions post-harvest."
+        },
+        "spraying": {
+          "priority": "high",
+          "action": "Continue copper fungicide program every 14 days if wet weather persists."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Fruit fly remains high risk. Weed at end of rainy season to reduce pest/disease reservoirs."
+        },
+        "harvest": {
+          "priority": "medium",
+          "action": "Fuerte harvest ending. Early Pinkerton harvest may begin."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "high",
+        "phytophthora": "high",
+        "cercospora": "high"
+      },
+      "pest_risk": {
+        "fruit_fly": "high",
+        "fcm": "moderate",
+        "thrips": "low",
+        "persea_mite": "low"
+      }
+    },
+    "6": {
+      "month_name": "June",
+      "season": "long_dry",
+      "phenology": {
+        "Fuerte": "post_harvest_to_dormancy",
+        "Hass": "harvest_beginning"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "low",
+          "action": "Soil moisture from long rains still present. Monitor; begin irrigation if wilting observed."
+        },
+        "fertilizer": {
+          "priority": "low",
+          "action": "Reduce fertilizer rates in dry conditions without irrigation."
+        },
+        "pruning": {
+          "priority": "critical",
+          "action": "OPTIMAL PRUNING WINDOW — Fuerte post-harvest, before flowering (Aug-Sep). Remove dead wood, shape canopy, max height 5.5-7m. Sterilise tools between trees. Prune in dry conditions only."
+        },
+        "spraying": {
+          "priority": "low",
+          "action": "Disease pressure declining with dry weather. Reduce fungicide program."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Persea mite rebound alert — transition from wet to dry. Scout every 5-7 days. Thrips risk rising. FCM risk rising in warm conditions."
+        },
+        "harvest": {
+          "priority": "critical",
+          "action": "HASS HARVEST BEGINS. Maturity test: fruit softens without shrivelling at 27°C in 1 week. Pick morning, pre-cool immediately."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "moderate",
+        "phytophthora": "low",
+        "cercospora": "moderate"
+      },
+      "pest_risk": {
+        "fruit_fly": "high",
+        "fcm": "high",
+        "thrips": "rising",
+        "persea_mite": "rising"
+      }
+    },
+    "7": {
+      "month_name": "July",
+      "season": "long_dry",
+      "phenology": {
+        "Fuerte": "dormancy",
+        "Hass": "harvest"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "low",
+          "action": "Generally not needed. Monitor soil moisture."
+        },
+        "fertilizer": {
+          "priority": "medium",
+          "action": "Leaf sampling 2 months before flowering — collect now for Aug-Sep flowering analysis."
+        },
+        "pruning": {
+          "priority": "high",
+          "action": "Continue pruning window for Fuerte. Dormant season is ideal."
+        },
+        "spraying": {
+          "priority": "low",
+          "action": "Low disease pressure. Focus on post-harvest fruit treatments."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Persea mite at high dry-season risk. Thrips at peak in hot dry weather. FCM active — maintain pheromone traps."
+        },
+        "harvest": {
+          "priority": "critical",
+          "action": "HASS PEAK HARVEST. Prioritise dry mornings. Cold chain critical in warm weather — pre-cool within 2 hours if ambient >26°C."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "low",
+        "phytophthora": "low",
+        "cercospora": "low"
+      },
+      "pest_risk": {
+        "fruit_fly": "high",
+        "fcm": "high",
+        "thrips": "high",
+        "persea_mite": "high"
+      }
+    },
+    "8": {
+      "month_name": "August",
+      "season": "long_dry",
+      "phenology": {
+        "Fuerte": "flowering_beginning",
+        "Hass": "harvest"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "high",
+          "action": "Irrigation needed Aug-Sep for flowering support. Light, frequent applications ≤50mm. Critical for Fuerte flowering + Hass fruit fill."
+        },
+        "fertilizer": {
+          "priority": "high",
+          "action": "Apply boron foliar spray before flowering if levels <40 ppm. Apply nitrogen after irreversible commitment to flowering to reduce alternate bearing."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Stop pruning — flowering is starting. Any pruning now removes flower buds."
+        },
+        "spraying": {
+          "priority": "high",
+          "action": "NO INSECTICIDES during flowering — kills bees. Fungicides OK if bee-safe. Prepare copper program for upcoming rains."
+        },
+        "pest_monitoring": {
+          "priority": "critical",
+          "action": "Bee hives in place (2-5/ha). Monitor pollinators. Persea mite still high risk. FCM active."
+        },
+        "harvest": {
+          "priority": "high",
+          "action": "Hass harvest continues. Late-season fruit ripens faster — move quickly to packhouse."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "low",
+        "phytophthora": "low",
+        "cercospora": "low"
+      },
+      "pest_risk": {
+        "fruit_fly": "high",
+        "fcm": "high",
+        "thrips": "high",
+        "persea_mite": "high"
+      }
+    },
+    "9": {
+      "month_name": "September",
+      "season": "long_dry",
+      "phenology": {
+        "Fuerte": "peak_flowering",
+        "Hass": "harvest_ending_to_flowering"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "critical",
+          "action": "Critical irrigation month — flowering needs moisture. Light showers during flowering do NOT harm flowers."
+        },
+        "fertilizer": {
+          "priority": "medium",
+          "action": "Post-anthesis nitrogen to reduce alternate bearing. Apply to moist soil."
+        },
+        "pruning": {
+          "priority": "none",
+          "action": "NO PRUNING — peak flowering period."
+        },
+        "spraying": {
+          "priority": "medium",
+          "action": "NO insecticides near flowers. Bee-safe fungicides only if needed. Begin copper program at end of flowering."
+        },
+        "pest_monitoring": {
+          "priority": "critical",
+          "action": "Protect pollinators. Thrips in flowers — scout, if >5 per cluster apply spinosad in evening after bees retire. Persea mite remains high."
+        },
+        "harvest": {
+          "priority": "medium",
+          "action": "Hass harvest ending. Late varieties (Nabal, Reed) may still be picked."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "low",
+        "phytophthora": "low",
+        "cercospora": "low"
+      },
+      "pest_risk": {
+        "fruit_fly": "moderate",
+        "fcm": "moderate",
+        "thrips": "high",
+        "persea_mite": "high"
+      }
+    },
+    "10": {
+      "month_name": "October",
+      "season": "short_rains",
+      "phenology": {
+        "Fuerte": "fruit_set",
+        "Hass": "peak_flowering"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "medium",
+          "action": "Short rains starting — reduce irrigation as soil wets. Ensure the 2-month post-fruit-set window for Fuerte has adequate moisture."
+        },
+        "fertilizer": {
+          "priority": "medium",
+          "action": "Apply CAN to moist soil. Zinc foliar during new flush."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Not recommended — Hass is flowering, Fuerte has young fruit."
+        },
+        "spraying": {
+          "priority": "critical",
+          "action": "Apply mefenoxam soil drench at rain onset (Phytophthora). Begin copper fungicide program for anthracnose — spray at first dry window. Apply azoxystrobin at pigeon-egg fruit size for cercospora."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Persea mite declining with rains. Fruit fly traps essential — Hass fruit set beginning. Set FCM pheromone traps."
+        },
+        "planting": {
+          "priority": "high",
+          "action": "SECOND PLANTING WINDOW — short rains onset. Transplant seedlings."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "rising",
+        "phytophthora": "rising",
+        "cercospora": "moderate"
+      },
+      "pest_risk": {
+        "fruit_fly": "moderate",
+        "fcm": "moderate",
+        "thrips": "declining",
+        "persea_mite": "declining"
+      }
+    },
+    "11": {
+      "month_name": "November",
+      "season": "short_rains",
+      "phenology": {
+        "Fuerte": "fruit_development",
+        "Hass": "fruit_set"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "low",
+          "action": "No irrigation needed — short rains active. Ensure drainage."
+        },
+        "fertilizer": {
+          "priority": "medium",
+          "action": "Second CAN application. Post-fruit-set period for Hass — ensure adequate nutrition."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Not recommended — wet season."
+        },
+        "spraying": {
+          "priority": "high",
+          "action": "Continue copper fungicide every 14 days during wet weather. Second phosphonate application if first was in March (16-20 weeks later)."
+        },
+        "pest_monitoring": {
+          "priority": "medium",
+          "action": "Persea mite suppressed by rain. Monitor fruit fly. FCM monitoring. Check young Hass fruit for thrips damage (critical 2-3 weeks after fruit set)."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "high",
+        "phytophthora": "high",
+        "cercospora": "moderate"
+      },
+      "pest_risk": {
+        "fruit_fly": "moderate",
+        "fcm": "low",
+        "thrips": "moderate",
+        "persea_mite": "low"
+      }
+    },
+    "12": {
+      "month_name": "December",
+      "season": "short_rains",
+      "phenology": {
+        "Fuerte": "fruit_development",
+        "Hass": "fruit_development"
+      },
+      "management": {
+        "irrigation": {
+          "priority": "low",
+          "action": "Rains ending. Begin monitoring soil moisture for January dry period."
+        },
+        "fertilizer": {
+          "priority": "low",
+          "action": "No major application. Prepare inputs for January."
+        },
+        "pruning": {
+          "priority": "low",
+          "action": "Light pruning possible as rains end, if dry window available."
+        },
+        "spraying": {
+          "priority": "medium",
+          "action": "Last fungicide application of wet season if conditions warrant."
+        },
+        "pest_monitoring": {
+          "priority": "high",
+          "action": "Persea mite rebound alert — transition from wet to dry. Begin scouting every 5-7 days. FCM eggs sensitive to cold."
+        }
+      },
+      "disease_risk": {
+        "anthracnose": "moderate",
+        "phytophthora": "moderate",
+        "cercospora": "low"
+      },
+      "pest_risk": {
+        "fruit_fly": "moderate",
+        "fcm": "low",
+        "thrips": "low",
+        "persea_mite": "rising"
+      }
+    }
+  },
+  "growth_stage_definitions": {
+    "dormancy": {
+      "description": "Tree at rest, minimal growth. Triggered by 2-month dry period and/or cool temperatures + short days.",
+      "typical_duration_weeks": 8
+    },
+    "flowering": {
+      "description": "Inflorescences open. Type A: female morning Day 1, male afternoon Day 2. Type B: reversed. Bees are primary pollinators.",
+      "typical_duration_weeks": 6,
+      "critical_temperature_min_c": 16,
+      "optimal_temperature_range_c": [20, 25]
+    },
+    "fruit_set": {
+      "description": "Pollinated flowers develop into small fruits. Two natural drop periods: pea-size and egg-size. Most critical water period.",
+      "typical_duration_weeks": 4
+    },
+    "fruit_enlargement": {
+      "description": "Fruit grows to full size. Susceptible to cercospora (quarter to three-quarter of full size), anthracnose infection (dormant until ripening), and FCM boring.",
+      "typical_duration_months": [4, 10],
+      "note": "Duration varies enormously by race: West Indian 5-8mo, Mexican 6-8mo, Guatemalan 10-15mo"
+    },
+    "harvest": {
+      "description": "Fruit at physiological maturity. Maturity test: fruit softens without shrivelling at 27°C in 7-10 days. Harvest only in dry conditions, morning preferred.",
+      "typical_duration_weeks": 8
+    },
+    "post_harvest": {
+      "description": "Orchard recovery period. Pruning, sanitation, input preparation for next cycle."
+    }
+  },
+  "annual_input_schedule": {
+    "fertilizer_per_tree": {
+      "description": "Annual quantities split across 2-3 applications",
+      "by_age": {
+        "1-3_years": {"CAN_g": 125, "DSP_g": 225, "MOP_g": 0, "manure_kg": 15},
+        "4-5_years": {"CAN_g": 225, "DSP_g": 450, "MOP_g": 0, "manure_kg": 15},
+        "6-7_years": {"CAN_g": 450, "DSP_g": 650, "MOP_g": 225, "manure_kg": 30},
+        "8-9_years": {"CAN_g": 650, "DSP_g": 650, "MOP_g": 450, "manure_kg": 30},
+        "10-14_years": {"CAN_g": 900, "DSP_g": 1000, "MOP_g": 635, "manure_kg": 30},
+        "15+_years": {"CAN_g": 1300, "DSP_g": 1200, "MOP_g": 650, "manure_kg": 30}
+      },
+      "source": "BIF Manual p.15"
+    },
+    "fungicide_program": {
+      "phosphonate_applications": 2,
+      "phosphonate_timing": "First at rain onset, second 16-20 weeks later",
+      "copper_sprays_per_season": "Minimum 3 full cover at 4-week intervals; every 14 days in extended wet weather",
+      "source": "COLEAD §6.6.1, §6.6.3"
+    },
+    "pest_trap_requirements": {
+      "fruit_fly_traps_per_acre": 20,
+      "fcm_pheromone_traps_per_acre": 4,
+      "persea_mite_scouting_interval_days": [7, 10],
+      "bee_hives_per_hectare": [2, 5]
+    }
+  },
+  "polliniser_compatibility": {
+    "Hass_A": {
+      "best_pollinisers_B": ["Ettinger", "Bacon", "Edranol", "Fuerte", "Zutano"],
+      "ratio": "1 polliniser : 9 main variety",
+      "note": "In Kenya, extensive overlapping within one flower type observed, so self-pollination occurs but cross-pollination improves yield"
+    },
+    "Fuerte_B": {
+      "best_pollinisers_A": ["Hass", "Pinkerton", "Reed"],
+      "ratio": "1 polliniser : 9 main variety"
+    }
+  }
+}

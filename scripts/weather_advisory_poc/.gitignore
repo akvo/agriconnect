@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Generated outputs
+*.png
+*.jpg
+*.jpeg
+rules/advisory_card.png
+
+# Large PDF source materials (45MB+)
+# These are reference materials extracted into JSON rules
+PDFs/
+extracted_text/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
