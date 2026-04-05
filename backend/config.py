@@ -290,9 +290,6 @@ class Settings(BaseSettings):
     weather_advisory_enabled: bool = _config.get("weather", {}).get(
         "advisory_enabled", True
     )
-    weather_default_variety: str = _config.get("weather", {}).get(
-        "default_variety", "Hass"
-    )
     # Elevation API endpoint (Open-Elevation)
     elevation_api_url: str = _config.get("weather", {}).get(
         "elevation_api_url",

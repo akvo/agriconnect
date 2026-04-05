@@ -102,18 +102,6 @@ class CropIdentificationResult(BaseModel):
     )
 
 
-class VarietyIdentificationResult(BaseModel):
-    """Structured output for AI avocado variety identification"""
-
-    variety: Optional[str] = Field(
-        None,
-        description=(
-            "The avocado variety mentioned (Hass, Fuerte, Pinkerton, or Other)"
-        ),
-    )
-    confidence: str = Field(
-        ..., description="Confidence level: 'high', 'medium', or 'low'"
-    )
 
 
 # ============================================================================
@@ -214,18 +202,6 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
         max_attempts=2,
         field_type="integer",
         success_message_template="Got it, thank you!",
-    ),
-    # PRIORITY 6: Avocado Variety (OPTIONAL)
-    OnboardingFieldConfig(
-        field_name="variety",
-        db_field="variety",
-        required=False,
-        priority=6,
-        extraction_method="extract_variety",
-        matching_method=None,  # Direct string mapping
-        max_attempts=2,
-        field_type="string",
-        success_message_template="onboarding.variety.success",
     ),
 ]
 

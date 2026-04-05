@@ -29,7 +29,6 @@ class WeatherBroadcast(Base):
         index=True
     )
     crop_type = Column(String(100), nullable=True, index=True)
-    variety = Column(String(50), nullable=True, index=True)  # Avocado variety
     location_name = Column(String(255), nullable=False)
     weather_data = Column(JSON, nullable=True)  # Raw API response
     generated_message_en = Column(Text, nullable=True)

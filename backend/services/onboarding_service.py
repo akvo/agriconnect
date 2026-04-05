@@ -120,7 +120,7 @@ class OnboardingService:
         - Language is NULL (even if onboarding was completed), OR
         - Any required field is incomplete
 
-        Returns False if all required fields are complete.
+        Returns False if all required fields are complete or already COMPLETED.
         """
         # TAC-7: If language is NULL, always trigger language selection
         if customer.language is None:
@@ -128,6 +128,10 @@ class OnboardingService:
 
         # If onboarding previously failed, do not retry
         if customer.onboarding_status == OnboardingStatus.FAILED:
+            return False
+
+        # If onboarding already completed, skip (don't check optional fields)
+        if customer.onboarding_status == OnboardingStatus.COMPLETED:
             return False
 
         # Check if there's a next incomplete field
@@ -1058,79 +1062,6 @@ Birth year must be between 1900 and {current_year}."""
 
         logger.info(f"[OnboardingService] Extracted birth year: {birth_year}")
         return birth_year
-
-    async def extract_variety(self, message: str) -> Optional[str]:
-        """
-        Extract avocado variety from farmer's message using OpenAI.
-
-        Handles various input formats:
-        - Direct variety name: "Hass", "I grow Fuerte"
-        - Numbers for options: "1" → Hass, "2" → Fuerte, etc.
-        - Ambiguous: "green skin", "large fruit"
-
-        Args:
-            message: Farmer's message text
-
-        Returns:
-            Variety name (Hass, Fuerte, Pinkerton, Other) or None
-        """
-        system_prompt = """You are extracting avocado variety from messages.
-
-Common Kenyan avocado varieties:
-1. Hass - most common, dark purple-black skin, small-medium size
-2. Fuerte - green skin, pear-shaped, cold-tolerant
-3. Pinkerton - green skin, large fruit, long season
-4. Other - for any other variety or "I don't know"
-
-Handle these formats:
-- Variety names: "Hass", "I grow Fuerte", "Pinkerton avocados"
-- Numbers (from menu): "1" → Hass, "2" → Fuerte, "3" → Pinkerton, "4" → Other
-- Descriptions: "dark skin" → Hass, "green large fruit" → Pinkerton
-- Unknown: "I don't know", "not sure" → Other
-
-Return a JSON object with: variety field.
-Variety must be one of: Hass, Fuerte, Pinkerton, Other"""
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": f"Extract variety: {message}",
-            },
-        ]
-
-        response = await self.openai_service.structured_output(
-            messages=messages,
-            response_format={
-                "type": "object",
-                "properties": {
-                    "variety": {
-                        "type": ["string", "null"],
-                        "enum": ["Hass", "Fuerte", "Pinkerton", "Other", None],
-                    },
-                },
-            },
-        )
-
-        if not response or not response.data.get("variety"):
-            logger.info(
-                f"[OnboardingService] No variety extracted from: {message}"
-            )
-            return None
-
-        variety = response.data["variety"]
-
-        # Validate variety
-        valid_varieties = ["Hass", "Fuerte", "Pinkerton", "Other"]
-        if variety not in valid_varieties:
-            logger.warning(
-                f"[OnboardingService] Invalid variety: {variety}, "
-                "defaulting to Hass"
-            )
-            return "Hass"
-
-        logger.info(f"[OnboardingService] Extracted variety: {variety}")
-        return variety
 
     # ================================================================
     # MATCHING METHODS

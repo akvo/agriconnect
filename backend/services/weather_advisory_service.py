@@ -71,27 +71,26 @@ class WeatherAdvisoryService:
         return self._calendar_cache[crop]
 
     def get_growth_stage(
-        self, month: int, crop: str = "avocado", variety: str = "Hass"
-    ) -> str:
+        self, month: int, crop: str = "avocado", variety: str = None
+    ) -> dict:
         """
-        Get current growth stage from crop calendar.
+        Get current growth stages from crop calendar for ALL varieties.
 
         Args:
             month: Month number (1-12)
             crop: Crop type (avocado, potato)
-            variety: For avocado (Hass/Fuerte/Pinkerton)
-                     or potato season (long_rains_crop/short_rains_crop)
+            variety: Ignored - returns all varieties
 
         Returns:
-            Growth stage string
+            Dict of variety -> growth stage
         """
         calendar = self.load_calendar(crop)
         month_data = calendar.get("monthly_calendar", {}).get(str(month), {})
         phenology = month_data.get("phenology", {})
-        return phenology.get(variety, "unknown")
+        return phenology
 
     def get_calendar_context(
-        self, month: int, crop: str = "avocado", variety: str = "Hass"
+        self, month: int, crop: str = "avocado", variety: str = None
     ) -> dict:
         """
         Extract month context from crop calendar.
@@ -99,7 +98,7 @@ class WeatherAdvisoryService:
         Args:
             month: Month number (1-12)
             crop: Crop type (avocado, potato)
-            variety: For avocado or potato planting season
+            variety: Ignored - returns context for ALL varieties
         """
         calendar = self.load_calendar(crop)
         month_data = calendar.get("monthly_calendar", {}).get(str(month), {})
@@ -108,7 +107,9 @@ class WeatherAdvisoryService:
             return {}
 
         phenology = month_data.get("phenology", {})
-        growth_stage = phenology.get(variety, "unknown")
+
+        # Get all growth stages for all varieties (don't filter)
+        all_growth_stages = phenology
 
         # Extract high-priority management tasks
         mgmt = month_data.get("management", {})
@@ -124,7 +125,7 @@ class WeatherAdvisoryService:
                 )
 
         return {
-            "growth_stage": growth_stage,
+            "growth_stages_all": all_growth_stages,  # All varieties' stages
             "season": month_data.get("season", "unknown"),
             "month_name": month_data.get("month_name", ""),
             "management_due": management_due,
@@ -163,12 +164,18 @@ class WeatherAdvisoryService:
         self, weather: dict, calendar_ctx: dict
     ) -> dict:
         """Inject calendar context into weather data."""
-        weather["growth_stage"] = calendar_ctx.get("growth_stage", "unknown")
+        # Get all growth stages from all varieties
+        all_stages = calendar_ctx.get("growth_stages_all", {})
+        weather["growth_stages_all"] = all_stages
         weather["season_name"] = calendar_ctx.get("season", "unknown")
 
-        # Add stage tags for rule filtering
-        stage = calendar_ctx.get("growth_stage", "")
-        weather["_active_stages"] = self._map_growth_stage_to_tags(stage)
+        # Collect all unique stage tags across ALL varieties
+        all_stage_tags = set()
+        for variety, stage in all_stages.items():
+            tags = self._map_growth_stage_to_tags(stage)
+            all_stage_tags.update(tags)
+
+        weather["_active_stages"] = all_stage_tags
 
         # Inject disease/pest risk levels
         for disease, level in calendar_ctx.get("disease_risk", {}).items():
@@ -476,23 +483,22 @@ class WeatherAdvisoryService:
         self,
         weather_data: dict,
         crop: str = "avocado",
-        variety: str = "Hass",
+        variety: str = None,
         month: Optional[int] = None,
         altitude: Optional[int] = None,
     ) -> List[dict]:
         """
-        Evaluate weather rules against current conditions.
+        Evaluate weather rules against current conditions for ALL varieties.
 
         Args:
             weather_data: Parsed weather data dict
             crop: Crop type (avocado, potato)
-            variety: For avocado (Hass/Fuerte/Pinkerton)
-                     or potato season (long_rains_crop/short_rains_crop)
+            variety: Ignored - evaluates for ALL varieties
             month: Current month (1-12), defaults to current month
             altitude: Altitude in meters (optional)
 
         Returns:
-            List of triggered rules
+            List of triggered rules (covering all varieties)
         """
         if month is None:
             month = datetime.now().month
@@ -500,8 +506,8 @@ class WeatherAdvisoryService:
         # Load crop-specific data
         rules_data = self.load_rules(crop)
 
-        # Get calendar context
-        calendar_ctx = self.get_calendar_context(month, crop, variety)
+        # Get calendar context for ALL varieties
+        calendar_ctx = self.get_calendar_context(month, crop, variety=None)
 
         # Enrich weather with calendar context
         weather = weather_data.copy()
@@ -524,7 +530,7 @@ class WeatherAdvisoryService:
                 )
                 continue
 
-        # Filter by growth stage
+        # Filter by growth stage (includes ALL varieties' stages)
         active_stages = weather.get("_active_stages", {"all"})
         triggered = self._filter_by_growth_stage(triggered, active_stages)
 
@@ -537,7 +543,7 @@ class WeatherAdvisoryService:
 
         month_name = calendar_ctx.get('month_name')
         logger.info(
-            f"Evaluated rules for {crop}/{variety} in {month_name}: "
+            f"Evaluated rules for {crop} (all varieties) in {month_name}: "
             f"{len(triggered)} triggered"
         )
 
@@ -548,14 +554,14 @@ class WeatherAdvisoryService:
         triggered_rules: List[dict],
         weather_data: dict,
         location: str,
-        variety: str,
-        growth_stage: str,
+        variety: str = None,
+        growth_stage: str = None,
     ) -> dict:
         """
         Build structured advisory data for LLM prompt.
 
         Returns a dict with:
-        - location, variety, growth_stage
+        - location, all varieties, all growth stages
         - weather summary
         - rules grouped by priority
         - source citations
@@ -573,10 +579,12 @@ class WeatherAdvisoryService:
             if r["priority"] in ("informational", "low")
         ]
 
+        # Get all growth stages from weather data
+        all_growth_stages = weather_data.get("growth_stages_all", {})
+
         return {
             "location": location,
-            "variety": variety,
-            "growth_stage": growth_stage,
+            "varieties_all": all_growth_stages,  # All varieties with their stages
             "date": datetime.now().strftime("%A, %d %B %Y"),
             "weather": {
                 "temperature_min": weather_data.get("temperature_min_c", "?"),

@@ -217,18 +217,17 @@ class WeatherBroadcastService:
         language: str = "en",
         weather_data: Optional[Dict[str, Any]] = None,
         farmer_crop: Optional[str] = None,
-        farmer_variety: Optional[str] = "Hass",
         farmer_altitude: Optional[int] = None,
     ) -> Optional[str]:
         """
         Generate a weather broadcast message for farmers using rule engine.
+        Includes advice for ALL varieties of the crop (not filtered to one).
 
         Args:
             location: Location name for the forecast
             language: Language code ("en" or "sw")
             weather_data: Optional pre-fetched weather data
             farmer_crop: Optional crop type for specific suggestions
-            farmer_variety: Avocado variety (Hass, Fuerte, Pinkerton)
             farmer_altitude: Altitude in meters (optional)
 
         Returns:
@@ -247,36 +246,34 @@ class WeatherBroadcastService:
         # Parse weather data to normalized format
         parsed_weather = advisory_service.parse_weather_data(weather_data)
 
-        # Get current growth stage
+        # Get current growth stages for ALL varieties
         from datetime import datetime
 
         month = datetime.now().month
         crop = (farmer_crop or "avocado").lower()
-        growth_stage = advisory_service.get_growth_stage(
-            month, crop, farmer_variety
+        all_growth_stages = advisory_service.get_growth_stage(
+            month, crop, variety=None
         )
 
-        # Evaluate rules
+        # Evaluate rules (for ALL varieties)
         triggered_rules = advisory_service.evaluate_rules(
             weather_data=parsed_weather,
             crop=crop,
-            variety=farmer_variety,
+            variety=None,
             month=month,
             altitude=farmer_altitude,
         )
 
         logger.info(
-            f"Weather advisory for {location} ({crop}/{farmer_variety}): "
+            f"Weather advisory for {location} ({crop}, all varieties): "
             f"{len(triggered_rules)} rules triggered"
         )
 
-        # Build advisory data for LLM
+        # Build advisory data for LLM (includes all varieties)
         advisory_data = advisory_service.build_advisory_data(
             triggered_rules=triggered_rules,
             weather_data=parsed_weather,
             location=location,
-            variety=farmer_variety,
-            growth_stage=growth_stage,
         )
 
         # Load advisory prompt template
@@ -328,7 +325,7 @@ class WeatherBroadcastService:
             if response and response.content:
                 message = response.content.strip()
                 logger.info(
-                    f"✓ Generated advisory for {location} ({farmer_variety}): "
+                    f"✓ Generated advisory for {location} (all varieties): "
                     f"{len(message)} chars, {len(triggered_rules)} rules"
                 )
                 return message

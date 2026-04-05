@@ -175,15 +175,6 @@ class Customer(Base):
 
     # Weather advisory properties
     @property
-    def variety(self) -> str:
-        """Get avocado variety from profile_data, defaults to 'Hass'."""
-        return self.get_profile_field("variety", "Hass")
-
-    @variety.setter
-    def variety(self, value: str):
-        self.set_profile_field("variety", value)
-
-    @property
     def tree_age_years(self) -> int:
         """Get tree age in years from profile_data, defaults to 6 (mature)."""
         return self.get_profile_field("tree_age_years", 6)

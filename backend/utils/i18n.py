@@ -283,34 +283,6 @@ trans: Dict[str, Any] = {
             },
             "field_name": {"en": "Birth Year", "sw": "Mwaka wa Kuzaliwa"},
         },
-        "variety": {
-            "question": {
-                "en": (
-                    "What avocado variety do you grow?\n\n"
-                    "1. Hass (dark skin, most common)\n"
-                    "2. Fuerte (green skin, pear-shaped)\n"
-                    "3. Pinkerton (green skin, large fruit)\n"
-                    "4. Other/Not sure\n\n"
-                    "Reply with the number or variety name"
-                ),
-                "sw": (
-                    "Unalima aina gani ya parachichi?\n\n"
-                    "1. Hass (ganda jeusi, maarufu zaidi)\n"
-                    "2. Fuerte (ganda la kijani, umbo la pea)\n"
-                    "3. Pinkerton (ganda la kijani, tunda kubwa)\n"
-                    "4. Nyingine/Sijui\n\n"
-                    "Jibu kwa namba au jina la aina"
-                ),
-            },
-            "success": {
-                "en": "Variety recorded: {value}",
-                "sw": "Aina imerekodiwa: {value}",
-            },
-            "field_name": {
-                "en": "Avocado Variety",
-                "sw": "Aina ya Parachichi"
-            },
-        },
         "common": {
             "extraction_failed": {
                 "en": "I couldn't identify that information. {question}",
