@@ -290,11 +290,6 @@ class Settings(BaseSettings):
     weather_advisory_enabled: bool = _config.get("weather", {}).get(
         "advisory_enabled", True
     )
-    # Elevation API endpoint (Open-Elevation)
-    elevation_api_url: str = _config.get("weather", {}).get(
-        "elevation_api_url",
-        "https://api.open-elevation.com/api/v1/lookup",
-    )
 
     # Statistic API Token (for external applications like Streamlit dashboards)
     statistic_api_token: str = os.getenv("STATISTIC_API_TOKEN", "")

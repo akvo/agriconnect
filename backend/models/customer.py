@@ -184,15 +184,6 @@ class Customer(Base):
         self.set_profile_field("tree_age_years", value)
 
     @property
-    def altitude_m(self) -> int | None:
-        """Get altitude in meters from profile_data."""
-        return self.get_profile_field("altitude_m", None)
-
-    @altitude_m.setter
-    def altitude_m(self, value: int | None):
-        self.set_profile_field("altitude_m", value)
-
-    @property
     def planting_season(self) -> str:
         """
         Get potato planting season, defaults to 'long_rains_crop'.

@@ -217,7 +217,6 @@ class WeatherBroadcastService:
         language: str = "en",
         weather_data: Optional[Dict[str, Any]] = None,
         farmer_crop: Optional[str] = None,
-        farmer_altitude: Optional[int] = None,
     ) -> Optional[str]:
         """
         Generate a weather broadcast message for farmers using rule engine.
@@ -228,7 +227,6 @@ class WeatherBroadcastService:
             language: Language code ("en" or "sw")
             weather_data: Optional pre-fetched weather data
             farmer_crop: Optional crop type for specific suggestions
-            farmer_altitude: Altitude in meters (optional)
 
         Returns:
             Generated message string or None if error
@@ -261,7 +259,6 @@ class WeatherBroadcastService:
             crop=crop,
             variety=None,
             month=month,
-            altitude=farmer_altitude,
         )
 
         logger.info(

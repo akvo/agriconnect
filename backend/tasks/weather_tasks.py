@@ -237,7 +237,6 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
                     language="en",
                     weather_data=weather_data,
                     farmer_crop=broadcast.crop_type,
-                    farmer_altitude=area.altitude_m if area else None,
                 )
             )
             message_sw = loop.run_until_complete(
@@ -246,7 +245,6 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
                     language="sw",
                     weather_data=weather_data,
                     farmer_crop=broadcast.crop_type,
-                    farmer_altitude=area.altitude_m if area else None,
                 )
             )
         finally:

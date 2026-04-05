@@ -485,7 +485,6 @@ class WeatherAdvisoryService:
         crop: str = "avocado",
         variety: str = None,
         month: Optional[int] = None,
-        altitude: Optional[int] = None,
     ) -> List[dict]:
         """
         Evaluate weather rules against current conditions for ALL varieties.
@@ -495,7 +494,6 @@ class WeatherAdvisoryService:
             crop: Crop type (avocado, potato)
             variety: Ignored - evaluates for ALL varieties
             month: Current month (1-12), defaults to current month
-            altitude: Altitude in meters (optional)
 
         Returns:
             List of triggered rules (covering all varieties)
@@ -512,10 +510,6 @@ class WeatherAdvisoryService:
         # Enrich weather with calendar context
         weather = weather_data.copy()
         weather = self._enrich_weather_with_calendar(weather, calendar_ctx)
-
-        # Add altitude if provided
-        if altitude is not None:
-            weather["altitude_m"] = altitude
 
         # Evaluate weather rules
         triggered = []
