@@ -5,7 +5,6 @@ Handles weather forecast retrieval and
 message generation for farmer broadcasts.
 """
 
-import json
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -14,6 +13,7 @@ from jinja2 import Template
 
 from config import settings
 from services.openai_service import get_openai_service
+from services.weather_advisory_service import get_weather_advisory_service
 
 
 logger = logging.getLogger(__name__)
@@ -219,7 +219,8 @@ class WeatherBroadcastService:
         farmer_crop: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Generate a weather broadcast message for farmers.
+        Generate a weather broadcast message for farmers using rule engine.
+        Includes advice for ALL varieties of the crop (not filtered to one).
 
         Args:
             location: Location name for the forecast
@@ -230,27 +231,66 @@ class WeatherBroadcastService:
         Returns:
             Generated message string or None if error
         """
-        # Load prompt template
-        template_content = self._load_prompt_template()
-        if template_content is None:
-            return None
-
         # Get weather data if not provided
         if weather_data is None:
             weather_data = self.get_forecast_raw(location)
             if weather_data is None:
-                logger.error(
-                    f"✗ No weather data for {location}"
-                )
+                logger.error(f"✗ No weather data for {location}")
                 return None
 
-        # Render the prompt template with raw weather data
+        # Get advisory service
+        advisory_service = get_weather_advisory_service()
+
+        # Parse weather data to normalized format
+        parsed_weather = advisory_service.parse_weather_data(weather_data)
+
+        # Get current growth stages for ALL varieties
+        from datetime import datetime
+
+        month = datetime.now().month
+        crop = (farmer_crop or "avocado").lower()
+
+        # Evaluate rules (for ALL varieties)
+        triggered_rules = advisory_service.evaluate_rules(
+            weather_data=parsed_weather,
+            crop=crop,
+            variety=None,
+            month=month,
+        )
+
+        logger.info(
+            f"Weather advisory for {location} ({crop}, all varieties): "
+            f"{len(triggered_rules)} rules triggered"
+        )
+
+        # Build advisory data for LLM (includes all varieties)
+        advisory_data = advisory_service.build_advisory_data(
+            triggered_rules=triggered_rules,
+            weather_data=parsed_weather,
+            location=location,
+        )
+
+        # Load advisory prompt template
+        template_path = (
+            Path(__file__).parent.parent / "templates" / "advisory_prompt.txt"
+        )
+
+        try:
+            with open(template_path, "r") as f:
+                template_content = f.read()
+        except Exception as e:
+            logger.error(f"✗ Failed to load advisory template: {e}")
+            # Fallback to old template if advisory template not found
+            template_content = self._load_prompt_template()
+            if template_content is None:
+                return None
+
+        # Render prompt with advisory data
         template = Template(template_content)
         prompt = template.render(
-            location=location,
+            advisory_data=advisory_data,
             language=language,
-            weather_data=json.dumps(weather_data, indent=2),
-            farmer_crop=farmer_crop or "Not specified",
+            farmer_crop=farmer_crop or "avocado",
         )
 
         # Generate message using OpenAI
@@ -265,9 +305,9 @@ class WeatherBroadcastService:
                     {
                         "role": "system",
                         "content": (
-                            "You are a helpful agricultural weather advisor. "
-                            "Generate concise, actionable weather messages "
-                            "for farmers."
+                            "You are an expert agricultural weather advisor "
+                            "for farmers in Kenya. Generate clear, actionable "
+                            "weather advisories based on agronomic rules."
                         ),
                     },
                     {"role": "user", "content": prompt},
@@ -279,8 +319,8 @@ class WeatherBroadcastService:
             if response and response.content:
                 message = response.content.strip()
                 logger.info(
-                    f"✓ Generated weather message for {location} "
-                    f"({len(message)} chars)"
+                    f"✓ Generated advisory for {location} (all varieties): "
+                    f"{len(message)} chars, {len(triggered_rules)} rules"
                 )
                 return message
 

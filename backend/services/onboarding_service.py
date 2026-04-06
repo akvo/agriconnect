@@ -120,7 +120,7 @@ class OnboardingService:
         - Language is NULL (even if onboarding was completed), OR
         - Any required field is incomplete
 
-        Returns False if all required fields are complete.
+        Returns False if all required fields are complete or already COMPLETED.
         """
         # TAC-7: If language is NULL, always trigger language selection
         if customer.language is None:
@@ -128,6 +128,10 @@ class OnboardingService:
 
         # If onboarding previously failed, do not retry
         if customer.onboarding_status == OnboardingStatus.FAILED:
+            return False
+
+        # If onboarding already completed, skip (don't check optional fields)
+        if customer.onboarding_status == OnboardingStatus.COMPLETED:
             return False
 
         # Check if there's a next incomplete field

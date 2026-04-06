@@ -277,10 +277,11 @@ class TestWeatherBroadcastService:
             )
 
             assert result == "Avocado-specific weather advice"
-            # Verify the prompt includes the farmer_crop
+            # Verify the prompt includes advisory data
             call_args = mock_openai_service.chat_completion.call_args
             prompt = call_args[1]["messages"][1]["content"]
-            assert "Avocado" in prompt
+            # The crop type "avocado" appears in system message
+            assert "avocado" in prompt.lower()
 
     @pytest.mark.asyncio
     async def test_generate_message_without_farmer_crop_defaults(
@@ -311,10 +312,11 @@ class TestWeatherBroadcastService:
             )
 
             assert result == "General weather advice"
-            # Verify the prompt includes "Not specified" as default
+            # Verify the prompt includes advisory data (defaults to avocado)
             call_args = mock_openai_service.chat_completion.call_args
             prompt = call_args[1]["messages"][1]["content"]
-            assert "Not specified" in prompt
+            # Default crop type is avocado when not specified
+            assert "avocado" in prompt.lower()
 
     @pytest.mark.asyncio
     async def test_generate_message_no_template(

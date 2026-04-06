@@ -286,6 +286,10 @@ class Settings(BaseSettings):
     weather_intent_keywords: List[str] = _config.get("weather", {}).get(
         "intent_keywords", ["weather", "forecast", "hali ya hewa"]
     )
+    # Weather Advisory Configuration (rule-based system)
+    weather_advisory_enabled: bool = _config.get("weather", {}).get(
+        "advisory_enabled", True
+    )
 
     # Statistic API Token (for external applications like Streamlit dashboards)
     statistic_api_token: str = os.getenv("STATISTIC_API_TOKEN", "")
