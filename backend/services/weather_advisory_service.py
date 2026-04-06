@@ -39,10 +39,8 @@ class WeatherAdvisoryService:
             try:
                 with open(rules_file, "r", encoding="utf-8") as f:
                     self._rules_cache[crop] = json.load(f)
-                rule_count = len(self._rules_cache[crop].get('rules', []))
-                logger.info(
-                    f"Loaded {rule_count} {crop} weather rules"
-                )
+                rule_count = len(self._rules_cache[crop].get("rules", []))
+                logger.info(f"Loaded {rule_count} {crop} weather rules")
             except Exception as e:
                 logger.error(f"Failed to load {crop} rules: {e}")
                 self._rules_cache[crop] = {"rules": []}
@@ -144,9 +142,7 @@ class WeatherAdvisoryService:
         if "fruit_set" in stage:
             stage_tags.update(["fruit_set", "fruit_enlargement"])
         if "fruit_development" in stage or "fruit_enlargement" in stage:
-            stage_tags.update(
-                ["fruit_enlargement", "fruit_development"]
-            )
+            stage_tags.update(["fruit_enlargement", "fruit_development"])
         if "harvest" in stage:
             stage_tags.update(["harvest", "pre_harvest"])
         if "post_harvest" in stage:
@@ -185,9 +181,7 @@ class WeatherAdvisoryService:
 
         return weather
 
-    def _evaluate_condition(
-        self, condition: dict, weather: dict
-    ) -> bool:
+    def _evaluate_condition(self, condition: dict, weather: dict) -> bool:
         """Evaluate a single condition against weather data."""
         try:
             field = condition.get("field")
@@ -378,7 +372,7 @@ class WeatherAdvisoryService:
 
                 else:
                     # Generic calendar task
-                    activity_name = activity.replace('_', ' ').title()
+                    activity_name = activity.replace("_", " ").title()
                     rules.append(
                         {
                             "id": f"CAL-{activity.upper()}",
@@ -493,12 +487,12 @@ class WeatherAdvisoryService:
                         day_forecast["date"] = start_time[:10]
 
                     # Temperature
-                    max_temp = day_data.get(
-                        "maxTemperature", {}
-                    ).get("degrees")
-                    min_temp = day_data.get(
-                        "minTemperature", {}
-                    ).get("degrees")
+                    max_temp = day_data.get("maxTemperature", {}).get(
+                        "degrees"
+                    )
+                    min_temp = day_data.get("minTemperature", {}).get(
+                        "degrees"
+                    )
                     if max_temp is not None:
                         day_forecast["temperature_max_c"] = max_temp
                     if min_temp is not None:
@@ -514,9 +508,9 @@ class WeatherAdvisoryService:
                     total_rainfall += qpf_day
 
                     # Precipitation probability
-                    precip_prob = precip.get(
-                        "probability", {}
-                    ).get("percent", 0)
+                    precip_prob = precip.get("probability", {}).get(
+                        "percent", 0
+                    )
                     day_forecast["precipitation_probability"] = precip_prob
 
                     # Weather condition
@@ -530,6 +524,25 @@ class WeatherAdvisoryService:
                 # Summary statistics
                 parsed["forecast_total_rainfall_mm"] = total_rainfall
                 parsed["forecast_days_count"] = len(forecast_days)
+
+                # Forecast-based computed fields for rule evaluation
+                max_temps = [
+                    d.get("temperature_max_c")
+                    for d in parsed["forecast_days"]
+                    if d.get("temperature_max_c") is not None
+                ]
+                if max_temps:
+                    parsed["forecast_max_temp_c"] = max(max_temps)
+                    # Detect rising temperature trend
+                    if len(max_temps) >= 2:
+                        parsed["temperature_rising"] = (
+                            max_temps[-1] > max_temps[0]
+                        )
+
+                # Estimate soil temperature (~2°C below air temp average)
+                if parsed.get("temperature_c"):
+                    soil_temp = parsed["temperature_c"] - 2
+                    parsed["soil_temp_estimate_c"] = soil_temp
 
         except Exception as e:
             logger.error(f"Weather data parsing error: {e}")
@@ -592,7 +605,7 @@ class WeatherAdvisoryService:
         # Prioritize
         triggered = self._prioritize_rules(triggered)
 
-        month_name = calendar_ctx.get('month_name')
+        month_name = calendar_ctx.get("month_name")
         logger.info(
             f"Evaluated rules for {crop} (all varieties) in {month_name}: "
             f"{len(triggered)} triggered"
@@ -607,67 +620,181 @@ class WeatherAdvisoryService:
         location: str,
         variety: str = None,
         growth_stage: str = None,
+        crop: str = "potato",
+        language: str = "en",
     ) -> dict:
         """
         Build structured advisory data for LLM prompt.
 
-        Returns a dict with:
-        - location, all varieties, all growth stages
-        - weather summary
-        - rules grouped by priority
-        - source citations
+        Returns a dict with calendar, daily forecast, and week summary.
         """
-        # Group rules by priority
-        critical = [r for r in triggered_rules if r["priority"] == "critical"]
-        high = [r for r in triggered_rules if r["priority"] == "high"]
-        opportunities = [
-            r for r in triggered_rules if r["priority"] == "opportunity"
-        ]
-        medium = [r for r in triggered_rules if r["priority"] == "medium"]
-        info = [
-            r
-            for r in triggered_rules
-            if r["priority"] in ("informational", "low")
-        ]
+        from datetime import datetime, timedelta
 
-        # Get all growth stages from weather data
-        all_growth_stages = weather_data.get("growth_stages_all", {})
+        now = datetime.now()
 
-        # Build forecast summary if available
-        forecast_summary = None
+        # Extract calendar management tasks from triggered rules
+        calendar_tasks = []
+        for rule in triggered_rules:
+            if rule.get("category") == "CALENDAR_MANAGEMENT":
+                # Extract first action as summary
+                actions = rule.get("actions", [])
+                if actions:
+                    calendar_tasks.append(actions[0])
+
+        # Get disease and pest risks from rules
+        disease_risks = []
+        pest_risks = []
+        for rule in triggered_rules:
+            category = rule.get("category", "")
+            if "DISEASE" in category:
+                risk_name = (
+                    category.replace("DISEASE_", "").replace("_", " ").lower()
+                )
+                priority = rule.get("priority", "")
+                if priority in ["critical", "high"]:
+                    disease_risks.append(f"{risk_name} {priority.upper()}")
+            elif "PEST" in category:
+                pest_name = (
+                    category.replace("PEST_", "").replace("_", " ").lower()
+                )
+                priority = rule.get("priority", "")
+                pest_risks.append(f"{pest_name} {priority}")
+
+        # Determine season from current month
+        month = now.month
+        if month in [3, 4, 5]:
+            season = "Long Rains"
+        elif month in [6, 7, 8]:
+            season = "Long Dry"
+        elif month in [10, 11, 12]:
+            season = "Short Rains"
+        else:
+            season = "Short Dry"
+
+        # Get current growth stage from weather data
+        current_stage = weather_data.get("_primary_stage", "vegetative")
+
+        # Build daily forecast with gates and blocks
         forecast_days = weather_data.get("forecast_days", [])
-        if forecast_days:
-            forecast_summary = {
-                "days_count": len(forecast_days),
-                "total_rainfall_mm": weather_data.get(
-                    "forecast_total_rainfall_mm", 0
-                ),
-                "daily": forecast_days,
+        days = []
+        for i, day_data in enumerate(forecast_days[:6]):  # Limit to 6 days
+            day_date = now + timedelta(days=i)
+            day_name = day_date.strftime("%a %d")
+
+            rain = day_data.get("qpf_mm", 0)
+            temp_min = day_data.get("temperature_min_c", "?")
+            temp_max = day_data.get("temperature_max_c", "?")
+            temp_str = f"{temp_min}–{temp_max}°C"
+
+            # Determine gates (favorable windows) and blocks
+            gates = []
+            blocked = []
+
+            rain_prob = day_data.get("precipitation_probability", 0)
+
+            # Spray window logic
+            if rain_prob <= 20 and rain < 2:
+                gates.append("spray_window")
+            elif rain_prob > 50 or rain > 5:
+                blocked.append(f"spray (rain {rain_prob}%)")
+
+            # Hilling window logic
+            if rain < 1 and i > 0:  # Day after rain
+                prev_rain = (
+                    forecast_days[i - 1].get("qpf_mm", 0) if i > 0 else 0
+                )
+                if prev_rain > 3:  # Soil drained after previous rain
+                    gates.append("hilling_window")
+            if rain > 5:
+                blocked.append("hilling (soil wet)")
+
+            # Fertilizer window
+            if rain > 2 and rain < 10:
+                gates.append("fertilizer_window")
+
+            # Disease risk
+            if rain > 5 and temp_max > 15:
+                gates.append("blight_risk_overnight")
+
+            # Heat stress warning
+            if temp_max >= 25:
+                gates.append("heat_warning")
+
+            day_entry = {
+                "day": day_name,
+                "rain": round(rain, 1),
+                "temp": temp_str,
+                "gates": gates,
             }
 
-        return {
+            if blocked:
+                day_entry["blocked"] = ", ".join(blocked)
+
+            days.append(day_entry)
+
+        # Week summary
+        total_rain = sum(d.get("qpf_mm", 0) for d in forecast_days[:6])
+        dry_days = sum(1 for d in forecast_days[:6] if d.get("qpf_mm", 0) < 2)
+
+        # Find best spray day (earliest dry window)
+        best_spray_day = None
+        for i, day_data in enumerate(forecast_days[:6]):
+            rain_prob = day_data.get("precipitation_probability", 0)
+            rain = day_data.get("qpf_mm", 0)
+            if rain_prob <= 20 and rain < 2:
+                day_date = now + timedelta(days=i)
+                best_spray_day = (
+                    day_date.strftime("%A %d")
+                    + " (earliest dry window — don't wait)"
+                )
+                break
+
+        # Find best hilling day
+        best_hilling_day = None
+        for i, day_data in enumerate(forecast_days[1:6], start=1):
+            rain = day_data.get("qpf_mm", 0)
+            prev_rain = forecast_days[i - 1].get("qpf_mm", 0) if i > 0 else 0
+            if rain < 1 and prev_rain > 3:
+                day_date = now + timedelta(days=i)
+                best_hilling_day = (
+                    day_date.strftime("%A %d")
+                    + " (soil drained after previous rain)"
+                )
+                break
+
+        # Week alert
+        week_alert = (
+            f"Good week — {dry_days} dry days ahead. Use them."
+            if dry_days >= 4
+            else f"Wet week — {dry_days} dry days only. Plan carefully."
+        )
+
+        advisory_data = {
             "location": location,
-            "varieties_all": all_growth_stages,  # All varieties' stages
-            "date": datetime.now().strftime("%A, %d %B %Y"),
-            "weather": {
-                "temperature_min": weather_data.get("temperature_min_c", "?"),
-                "temperature_max": weather_data.get("temperature_max_c", "?"),
-                "rainfall": weather_data.get("qpf_today_mm", 0),
-                "wind_speed": weather_data.get("wind_speed_kmh", "?"),
-                "cloud_cover": weather_data.get("cloud_cover_pct", "?"),
-                "humidity": weather_data.get("relative_humidity_pct", "?"),
+            "date": now.strftime("%Y-%m-%d"),
+            "crop": crop,
+            "language": language,
+            "calendar": {
+                "season": season,
+                "growth_stage": current_stage,
+                "tasks": calendar_tasks,
+                "disease_risk": ", ".join(disease_risks)
+                if disease_risks
+                else "low",
+                "pest_risk": ", ".join(pest_risks) if pest_risks else "low",
             },
-            "forecast": forecast_summary,
-            "rules": {
-                "critical": critical,
-                "high": high,
-                "opportunities": opportunities,
-                "medium": medium,
-                "informational": info,
+            "days": days,
+            "week": {
+                "best_spray_day": best_spray_day
+                or "No clear window this week",
+                "best_hilling_day": best_hilling_day
+                or "Wait for drier conditions",
+                "total_rain": f"{round(total_rain, 1)}mm",
+                "alert": week_alert,
             },
-            "rules_count": len(triggered_rules),
-            "sources": "COLEAD, BIF-CDAAC, Griesbach/ICRAF, KALRO",
         }
+
+        return advisory_data
 
 
 # Singleton instance

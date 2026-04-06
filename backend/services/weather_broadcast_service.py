@@ -308,6 +308,8 @@ class WeatherBroadcastService:
             triggered_rules=triggered_rules,
             weather_data=parsed_weather,
             location=location,
+            crop=crop,
+            language=language,
         )
 
         # Load advisory prompt template
