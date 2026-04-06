@@ -440,7 +440,7 @@ class WeatherAdvisoryService:
         parsed = {}
 
         try:
-            # Temperature
+            # Temperature from current conditions
             hist = raw.get("currentConditionsHistory", {})
             temp_max = hist.get("maxTemperature", {}).get("degrees")
             temp_min = hist.get("minTemperature", {}).get("degrees")
@@ -461,8 +461,11 @@ class WeatherAdvisoryService:
             qpf = hist.get("qpf", {}).get("quantity", 0)
             parsed["qpf_today_mm"] = qpf
 
-            # Estimate humidity
-            if qpf > 0 and parsed.get("cloud_cover_pct", 0) > 80:
+            # Estimate humidity from current conditions or use actual value
+            humidity = raw.get("relativeHumidity")
+            if humidity is not None:
+                parsed["relative_humidity_pct"] = humidity
+            elif qpf > 0 and parsed.get("cloud_cover_pct", 0) > 80:
                 parsed["relative_humidity_pct"] = 85
             elif parsed.get("cloud_cover_pct", 0) > 80:
                 parsed["relative_humidity_pct"] = 75
@@ -473,6 +476,60 @@ class WeatherAdvisoryService:
             now = datetime.now()
             parsed["month"] = now.month
             parsed["hour"] = now.hour
+
+            # Parse daily forecast if available
+            forecast_days = raw.get("forecastDays", [])
+            if forecast_days:
+                parsed["forecast_days"] = []
+                total_rainfall = 0
+
+                for day_data in forecast_days:
+                    day_forecast = {}
+
+                    # Date from interval
+                    interval = day_data.get("interval", {})
+                    start_time = interval.get("startTime", "")
+                    if start_time:
+                        day_forecast["date"] = start_time[:10]
+
+                    # Temperature
+                    max_temp = day_data.get(
+                        "maxTemperature", {}
+                    ).get("degrees")
+                    min_temp = day_data.get(
+                        "minTemperature", {}
+                    ).get("degrees")
+                    if max_temp is not None:
+                        day_forecast["temperature_max_c"] = max_temp
+                    if min_temp is not None:
+                        day_forecast["temperature_min_c"] = min_temp
+
+                    # Daytime forecast details
+                    daytime = day_data.get("daytimeForecast", {})
+
+                    # Precipitation
+                    precip = daytime.get("precipitation", {})
+                    qpf_day = precip.get("qpf", {}).get("quantity", 0)
+                    day_forecast["qpf_mm"] = qpf_day
+                    total_rainfall += qpf_day
+
+                    # Precipitation probability
+                    precip_prob = precip.get(
+                        "probability", {}
+                    ).get("percent", 0)
+                    day_forecast["precipitation_probability"] = precip_prob
+
+                    # Weather condition
+                    condition = daytime.get("weatherCondition", {})
+                    day_forecast["condition"] = condition.get(
+                        "description", {}
+                    ).get("text", "")
+
+                    parsed["forecast_days"].append(day_forecast)
+
+                # Summary statistics
+                parsed["forecast_total_rainfall_mm"] = total_rainfall
+                parsed["forecast_days_count"] = len(forecast_days)
 
         except Exception as e:
             logger.error(f"Weather data parsing error: {e}")
@@ -576,6 +633,18 @@ class WeatherAdvisoryService:
         # Get all growth stages from weather data
         all_growth_stages = weather_data.get("growth_stages_all", {})
 
+        # Build forecast summary if available
+        forecast_summary = None
+        forecast_days = weather_data.get("forecast_days", [])
+        if forecast_days:
+            forecast_summary = {
+                "days_count": len(forecast_days),
+                "total_rainfall_mm": weather_data.get(
+                    "forecast_total_rainfall_mm", 0
+                ),
+                "daily": forecast_days,
+            }
+
         return {
             "location": location,
             "varieties_all": all_growth_stages,  # All varieties' stages
@@ -588,6 +657,7 @@ class WeatherAdvisoryService:
                 "cloud_cover": weather_data.get("cloud_cover_pct", "?"),
                 "humidity": weather_data.get("relative_humidity_pct", "?"),
             },
+            "forecast": forecast_summary,
             "rules": {
                 "critical": critical,
                 "high": high,

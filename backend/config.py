@@ -290,6 +290,10 @@ class Settings(BaseSettings):
     weather_advisory_enabled: bool = _config.get("weather", {}).get(
         "advisory_enabled", True
     )
+    # Number of days for weather forecast (default 6)
+    weather_forecast_days: int = _config.get("weather", {}).get(
+        "forecast_days", 6
+    )
 
     # Statistic API Token (for external applications like Streamlit dashboards)
     statistic_api_token: str = os.getenv("STATISTIC_API_TOKEN", "")

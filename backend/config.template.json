@@ -87,6 +87,7 @@
 			"weather updates",
 			"hali ya hewa",
 			"hali ya anga"
-		]
+		],
+		"forecast_days": 6
 	}
 }

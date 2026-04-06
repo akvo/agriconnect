@@ -154,22 +154,52 @@ class WeatherBroadcastService:
             return None
 
         try:
-            weather_data = weather_service.get_current_by_coords(
+            weather_data = weather_service.get_current_raw_by_coords(
                 lat=lat,
                 lon=lon,
             )
             logger.info(f"✓ Retrieved current weather for ({lat}, {lon})")
-            # Convert WeatherData to dict for compatibility
-            if weather_data:
-                data = weather_data.__dict__.copy()
-                # Convert datetime to ISO string for JSON serialization
-                if "timestamp" in data and data["timestamp"]:
-                    data["timestamp"] = data["timestamp"].isoformat()
-                return data
-            return None
+            return weather_data
         except Exception as e:
             logger.error(
                 f"✗ Failed to get current weather for ({lat}, {lon}): {e}"
+            )
+            return None
+
+    def get_daily_forecast_raw(
+        self, lat: float, lon: float, days: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get daily forecast data with coordinates using Google Weather.
+
+        Args:
+            lat: Latitude of the location
+            lon: Longitude of the location
+            days: Number of forecast days (default from config)
+
+        Returns:
+            Raw daily forecast data dict or None if error
+        """
+        weather_service = self._get_weather_service()
+        if weather_service is None:
+            return None
+
+        if days is None:
+            days = settings.weather_forecast_days
+
+        try:
+            forecast_data = weather_service.get_daily_forecast_raw_by_coords(
+                lat=lat,
+                lon=lon,
+                days=days,
+            )
+            logger.info(
+                f"✓ Retrieved {days}-day forecast for ({lat}, {lon})"
+            )
+            return forecast_data
+        except Exception as e:
+            logger.error(
+                f"✗ Failed to get daily forecast for ({lat}, {lon}): {e}"
             )
             return None
 
@@ -182,8 +212,8 @@ class WeatherBroadcastService:
         """
         Get weather data using Google Weather API.
 
-        Prefers coordinates if available (more accurate), falls back to
-        location name.
+        Combines current conditions with daily forecast for comprehensive data.
+        Prefers coordinates if available (more accurate).
 
         Args:
             location: Location name for fallback
@@ -191,16 +221,26 @@ class WeatherBroadcastService:
             lon: Longitude (optional, preferred if available)
 
         Returns:
-            Raw weather data dict or None if error
+            Combined weather data dict or None if error
         """
         # Use coordinates if available (more accurate)
         if lat is not None and lon is not None:
-            weather_data = self.get_current_raw(lat=lat, lon=lon)
-            if weather_data:
-                logger.info(
-                    f"Using Google Weather for {location} ({lat}, {lon})"
-                )
-                return weather_data
+            # Get current conditions
+            current_data = self.get_current_raw(lat=lat, lon=lon)
+            if current_data:
+                # Get daily forecast
+                forecast_data = self.get_daily_forecast_raw(lat=lat, lon=lon)
+                if forecast_data:
+                    # Combine current conditions with forecast
+                    current_data["forecastDays"] = forecast_data.get(
+                        "forecastDays", []
+                    )
+                    days = settings.weather_forecast_days
+                    logger.info(
+                        f"Using Google Weather with {days}-day forecast "
+                        f"for {location} ({lat}, {lon})"
+                    )
+                return current_data
             # Fall through to location-based on failure
             logger.warning(
                 f"Google Weather coords failed for ({lat}, {lon}), "
