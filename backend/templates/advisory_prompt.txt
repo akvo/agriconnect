@@ -9,6 +9,7 @@ ADVISORY DATA:
 
 RULES:
 - Use ONLY the data above. Do not invent advice.
+- This message goes to ALL farmers (Hass, Fuerte, Pinkerton growers). When advice is variety-specific, clearly label which variety it applies to (e.g., "Fuerte growers: harvest now", "Hass growers: harvest coming Jun-Sep").
 - Each calendar task must appear in the message.
 - If best_spray_day or best_harvest_day is "none", say so clearly.
 - Gates that fired (drainage_alert, biopesticide_window, etc.) should appear as actions.

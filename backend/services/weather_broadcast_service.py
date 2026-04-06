@@ -249,9 +249,6 @@ class WeatherBroadcastService:
 
         month = datetime.now().month
         crop = (farmer_crop or "avocado").lower()
-        all_growth_stages = advisory_service.get_growth_stage(
-            month, crop, variety=None
-        )
 
         # Evaluate rules (for ALL varieties)
         triggered_rules = advisory_service.evaluate_rules(

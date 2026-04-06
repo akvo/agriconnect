@@ -578,7 +578,7 @@ class WeatherAdvisoryService:
 
         return {
             "location": location,
-            "varieties_all": all_growth_stages,  # All varieties with their stages
+            "varieties_all": all_growth_stages,  # All varieties' stages
             "date": datetime.now().strftime("%A, %d %B %Y"),
             "weather": {
                 "temperature_min": weather_data.get("temperature_min_c", "?"),
