@@ -17,6 +17,7 @@ class FarmerStatsFilters(BaseModel):
     end_date: Optional[str] = None
     administrative_id: Optional[int] = None
     phone_prefix: Optional[str] = None
+    crop_type: Optional[str] = None
     active_days: int = 30
 
 
@@ -36,6 +37,7 @@ class RegistrationFilters(BaseModel):
     end_date: Optional[str] = None
     administrative_id: Optional[int] = None
     phone_prefix: Optional[str] = None
+    crop_type: Optional[str] = None
     group_by: str = "day"
 
 

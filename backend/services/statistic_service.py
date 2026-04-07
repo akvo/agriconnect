@@ -107,6 +107,7 @@ class StatisticService:
         end_date: Optional[str] = None,
         administrative_id: Optional[int] = None,
         phone_prefix: Optional[str] = None,
+        crop_type: Optional[str] = None,
     ):
         """Build base customer query with common filters."""
         query = self.db.query(Customer)
@@ -126,6 +127,12 @@ class StatisticService:
             )
             query = query.filter(Customer.id.in_(customer_ids))
 
+        # Crop type filter
+        if crop_type:
+            query = query.filter(
+                Customer.profile_data.op("->>")("crop_type") == crop_type
+            )
+
         return query
 
     def get_farmer_stats(
@@ -134,6 +141,7 @@ class StatisticService:
         end_date: Optional[str] = None,
         administrative_id: Optional[int] = None,
         phone_prefix: Optional[str] = None,
+        crop_type: Optional[str] = None,
         active_days: int = 30,
     ) -> dict:
         """
@@ -145,13 +153,14 @@ class StatisticService:
             administrative_id: Filter by administrative area (any level).
                               Aggregates data from all descendant wards.
             phone_prefix: Filter by phone number prefix (e.g., "+254")
+            crop_type: Filter by crop type (e.g., "maize", "coffee")
             active_days: Days to consider a farmer as "active"
 
         Returns:
             Dict with onboarding, activity, features, escalation stats
         """
         base_query = self._get_base_customer_query(
-            start_date, end_date, administrative_id, phone_prefix
+            start_date, end_date, administrative_id, phone_prefix, crop_type
         )
 
         # Build customer_ids list for subqueries
@@ -327,6 +336,7 @@ class StatisticService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         phone_prefix: Optional[str] = None,
+        crop_type: Optional[str] = None,
         administrative_id: Optional[int] = None,
     ) -> List[dict]:
         """
@@ -336,6 +346,7 @@ class StatisticService:
             start_date: Filter customers created on or after this date
             end_date: Filter customers created on or before this date
             phone_prefix: Filter by phone number prefix
+            crop_type: Filter by crop type (e.g., "maize", "coffee")
             administrative_id: Filter to wards under this administrative area.
                               If Region/District, shows stats for all wards
                               under that area.
@@ -392,6 +403,11 @@ class StatisticService:
             if phone_prefix:
                 base_customer_query = self._apply_phone_prefix_filter(
                     base_customer_query, phone_prefix
+                )
+
+            if crop_type:
+                base_customer_query = base_customer_query.filter(
+                    Customer.profile_data.op("->>")("crop_type") == crop_type
                 )
 
             customer_ids = [c.id for c in base_customer_query.all()]
@@ -482,6 +498,7 @@ class StatisticService:
         end_date: Optional[str] = None,
         administrative_id: Optional[int] = None,
         phone_prefix: Optional[str] = None,
+        crop_type: Optional[str] = None,
         group_by: str = "day",
     ) -> Tuple[List[dict], int]:
         """
@@ -493,6 +510,7 @@ class StatisticService:
             administrative_id: Filter by administrative area (any level).
                               Aggregates data from all descendant wards.
             phone_prefix: Filter by phone number prefix
+            crop_type: Filter by crop type (e.g., "maize", "coffee")
             group_by: "day", "week", or "month"
 
         Returns:
@@ -527,6 +545,11 @@ class StatisticService:
                 administrative_id
             )
             query = query.filter(Customer.id.in_(customer_ids))
+
+        if crop_type:
+            query = query.filter(
+                Customer.profile_data.op("->>")("crop_type") == crop_type
+            )
 
         # Group and order
         query = query.group_by(date_trunc).order_by(date_trunc)

@@ -258,6 +258,7 @@ Returns comprehensive farmer statistics including onboarding progress, activity 
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
 | `administrative_id` | integer | No | - | Filter by administrative area (region, district, or ward). Aggregates data from all descendant areas. |
 | `phone_prefix` | string | No | - | Filter by phone number prefix (e.g., `+254`) |
+| `crop_type` | string | No | - | Filter by crop type (e.g., `maize`, `coffee`, `potato`) |
 | `active_days` | integer | No | 30 | Days to consider a farmer as "active" |
 
 **Example Requests:**
@@ -267,17 +268,17 @@ Returns comprehensive farmer statistics including onboarding progress, activity 
 curl -H "Authorization: Bearer your-secret-token" \
   "http://localhost:8000/api/statistic/farmers/stats?administrative_id=47"
 
+# Filter by crop type (maize farmers only)
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/farmers/stats?crop_type=maize"
+
 # Filter by district (aggregates all wards in Kiharu)
 curl -H "Authorization: Bearer your-secret-token" \
   "http://localhost:8000/api/statistic/farmers/stats?administrative_id=56"
 
-# Filter by specific ward
+# Combine crop type with administrative filter
 curl -H "Authorization: Bearer your-secret-token" \
-  "http://localhost:8000/api/statistic/farmers/stats?administrative_id=57"
-
-# Combine with date and phone filters
-curl -H "Authorization: Bearer your-secret-token" \
-  "http://localhost:8000/api/statistic/farmers/stats?administrative_id=47&start_date=2024-01-01&phone_prefix=%2B254"
+  "http://localhost:8000/api/statistic/farmers/stats?administrative_id=47&crop_type=coffee"
 ```
 
 **Response:**
@@ -329,6 +330,7 @@ Returns farmer statistics grouped by ward.
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
 | `administrative_id` | integer | No | - | Filter to wards under this area. If region/district ID, shows all wards under that area. |
 | `phone_prefix` | string | No | - | Filter by phone number prefix |
+| `crop_type` | string | No | - | Filter by crop type (e.g., `maize`, `coffee`, `potato`) |
 
 **Example Requests:**
 
@@ -341,9 +343,9 @@ curl -H "Authorization: Bearer your-secret-token" \
 curl -H "Authorization: Bearer your-secret-token" \
   "http://localhost:8000/api/statistic/farmers/stats/by-ward?administrative_id=47"
 
-# Get stats for wards in Kiharu district only
+# Get stats for maize farmers by ward
 curl -H "Authorization: Bearer your-secret-token" \
-  "http://localhost:8000/api/statistic/farmers/stats/by-ward?administrative_id=56"
+  "http://localhost:8000/api/statistic/farmers/stats/by-ward?crop_type=maize"
 ```
 
 **Response:**
@@ -388,6 +390,7 @@ Returns time series data of farmer registrations for charting.
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
 | `administrative_id` | integer | No | - | Filter by administrative area (region, district, or ward). Aggregates data from all descendant areas. |
 | `phone_prefix` | string | No | - | Filter by phone number prefix |
+| `crop_type` | string | No | - | Filter by crop type (e.g., `maize`, `coffee`, `potato`) |
 | `group_by` | string | No | `day` | Group by: `day`, `week`, or `month` |
 
 **Example Request:**
@@ -396,6 +399,10 @@ Returns time series data of farmer registrations for charting.
 # Registration trends for entire Murang'a region
 curl -H "Authorization: Bearer your-secret-token" \
   "http://localhost:8000/api/statistic/farmers/registrations?administrative_id=47&group_by=week&start_date=2024-01-01"
+
+# Registration trends for maize farmers
+curl -H "Authorization: Bearer your-secret-token" \
+  "http://localhost:8000/api/statistic/farmers/registrations?crop_type=maize&group_by=month"
 ```
 
 **Response:**
@@ -413,6 +420,7 @@ curl -H "Authorization: Bearer your-secret-token" \
     "end_date": null,
     "administrative_id": 47,
     "phone_prefix": null,
+    "crop_type": null,
     "group_by": "week"
   }
 }

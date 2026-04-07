@@ -53,6 +53,9 @@ async def get_farmer_statistics(
     phone_prefix: Optional[str] = Query(
         None, description="Filter by phone number prefix (e.g., '+254')"
     ),
+    crop_type: Optional[str] = Query(
+        None, description="Filter by crop type (e.g., 'maize', 'coffee')"
+    ),
     active_days: int = Query(
         30, description="Days to consider a farmer as 'active' (default: 30)"
     ),
@@ -77,6 +80,7 @@ async def get_farmer_statistics(
         end_date=end_date,
         administrative_id=administrative_id,
         phone_prefix=phone_prefix,
+        crop_type=crop_type,
         active_days=active_days,
     )
 
@@ -90,6 +94,7 @@ async def get_farmer_statistics(
             end_date=end_date,
             administrative_id=administrative_id,
             phone_prefix=phone_prefix,
+            crop_type=crop_type,
             active_days=active_days,
         ),
     )
@@ -111,6 +116,9 @@ async def get_farmer_statistics_by_ward(
     phone_prefix: Optional[str] = Query(
         None, description="Filter by phone number prefix (e.g., '+254')"
     ),
+    crop_type: Optional[str] = Query(
+        None, description="Filter by crop type (e.g., 'maize', 'coffee')"
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -130,6 +138,7 @@ async def get_farmer_statistics_by_ward(
         start_date=start_date,
         end_date=end_date,
         phone_prefix=phone_prefix,
+        crop_type=crop_type,
         administrative_id=administrative_id,
     )
 
@@ -140,6 +149,7 @@ async def get_farmer_statistics_by_ward(
             end_date=end_date,
             administrative_id=administrative_id,
             phone_prefix=phone_prefix,
+            crop_type=crop_type,
         ),
     )
 
@@ -159,6 +169,9 @@ async def get_registration_chart_data(
     ),
     phone_prefix: Optional[str] = Query(
         None, description="Filter by phone number prefix (e.g., '+254')"
+    ),
+    crop_type: Optional[str] = Query(
+        None, description="Filter by crop type (e.g., 'maize', 'coffee')"
     ),
     group_by: str = Query(
         "day", description="Group by: 'day', 'week', or 'month'"
@@ -188,6 +201,7 @@ async def get_registration_chart_data(
         end_date=end_date,
         administrative_id=administrative_id,
         phone_prefix=phone_prefix,
+        crop_type=crop_type,
         group_by=group_by,
     )
 
@@ -199,6 +213,7 @@ async def get_registration_chart_data(
             end_date=end_date,
             administrative_id=administrative_id,
             phone_prefix=phone_prefix,
+            crop_type=crop_type,
             group_by=group_by,
         ),
     )
