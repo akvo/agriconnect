@@ -412,6 +412,29 @@ class WeatherAdvisoryService:
                 }
             )
 
+        # Add pest alert (matching POC behavior)
+        pest_risk = calendar_ctx.get("pest_risk", {})
+        high_pests = [
+            p
+            for p, level in pest_risk.items()
+            if level in ("high", "rising")
+        ]
+        if high_pests:
+            rules.append(
+                {
+                    "id": "CAL-PEST-ALERT",
+                    "category": "CALENDAR_MANAGEMENT",
+                    "name": "Elevated pest risk this month",
+                    "priority": "medium",
+                    "risk": f"Seasonal pest pressure: {', '.join(high_pests)}",
+                    "actions": [
+                        f"Increase scouting for {', '.join(high_pests)}",
+                        "Check traps and replace lures if >4 weeks old",
+                    ],
+                    "source": "crop_calendar",
+                }
+            )
+
         return rules
 
     def _prioritize_rules(self, triggered: List[dict]) -> List[dict]:
@@ -500,18 +523,55 @@ class WeatherAdvisoryService:
 
                     # Daytime forecast details
                     daytime = day_data.get("daytimeForecast", {})
+                    nighttime = day_data.get("nighttimeForecast", {})
 
-                    # Precipitation
-                    precip = daytime.get("precipitation", {})
-                    qpf_day = precip.get("qpf", {}).get("quantity", 0)
-                    day_forecast["qpf_mm"] = qpf_day
-                    total_rainfall += qpf_day
+                    # Precipitation - combine day and night
+                    day_precip = daytime.get("precipitation", {})
+                    night_precip = nighttime.get("precipitation", {})
 
-                    # Precipitation probability
-                    precip_prob = precip.get("probability", {}).get(
+                    qpf_day = day_precip.get("qpf", {}).get("quantity", 0)
+                    qpf_night = night_precip.get("qpf", {}).get("quantity", 0)
+                    qpf_total = qpf_day + qpf_night
+
+                    day_forecast["qpf_day_mm"] = qpf_day
+                    day_forecast["qpf_night_mm"] = qpf_night
+                    day_forecast["qpf_mm"] = qpf_total
+                    total_rainfall += qpf_total
+
+                    # Precipitation probability - max of day and night
+                    day_prob = day_precip.get("probability", {}).get(
                         "percent", 0
                     )
-                    day_forecast["precipitation_probability"] = precip_prob
+                    night_prob = night_precip.get("probability", {}).get(
+                        "percent", 0
+                    )
+                    day_forecast["precipitation_probability"] = max(
+                        day_prob, night_prob
+                    )
+                    day_forecast["precip_prob_day"] = day_prob
+                    day_forecast["precip_prob_night"] = night_prob
+
+                    # Humidity - day and night
+                    day_forecast["humidity_day"] = daytime.get(
+                        "relativeHumidity", 0
+                    )
+                    day_forecast["humidity_night"] = nighttime.get(
+                        "relativeHumidity", 0
+                    )
+
+                    # Wind
+                    day_wind = daytime.get("wind", {})
+                    day_forecast["wind_speed_day_kmh"] = day_wind.get(
+                        "speed", {}
+                    ).get("value", 0)
+                    day_forecast["wind_gust_day_kmh"] = day_wind.get(
+                        "gust", {}
+                    ).get("value", 0)
+
+                    # Cloud cover
+                    day_forecast["cloud_cover_day_pct"] = daytime.get(
+                        "cloudCover", 0
+                    )
 
                     # Weather condition
                     condition = daytime.get("weatherCondition", {})
@@ -543,6 +603,100 @@ class WeatherAdvisoryService:
                 if parsed.get("temperature_c"):
                     soil_temp = parsed["temperature_c"] - 2
                     parsed["soil_temp_estimate_c"] = soil_temp
+
+            # Derived fields from current conditions
+            parsed["is_daytime"] = raw.get("isDaytime", True)
+
+            # Time-based derived fields
+            hour = parsed.get("hour", 12)
+            parsed["is_early_morning_or_late_evening"] = hour in range(
+                5, 9
+            ) or hour in range(17, 20)
+
+            # Wind gust from current conditions
+            wind = raw.get("wind", {})
+            parsed["wind_gust_kmh"] = wind.get("gust", {}).get("value", 0)
+
+            # Rain probability from forecast day 0
+            if parsed.get("forecast_days"):
+                day0 = parsed["forecast_days"][0]
+                day_prob = day0.get("precip_prob_day", 0)
+                night_prob = day0.get("precip_prob_night", 0)
+
+                # Max probability for today
+                rain_prob_today = max(day_prob, night_prob)
+                parsed["rain_probability_today_pct"] = rain_prob_today
+
+                # Estimate next 6h probability based on time of day
+                if parsed["is_daytime"]:
+                    # During day, use daytime probability
+                    parsed["rain_probability_next_6h_pct"] = day_prob
+                else:
+                    # At night, use night probability
+                    parsed["rain_probability_next_6h_pct"] = night_prob
+
+            # Compute derived fields from forecast sequence
+            # (forward-looking approximation since we lack historical data)
+            if parsed.get("forecast_days"):
+                days = parsed["forecast_days"]
+
+                # Cumulative rain fields (using forecast as proxy)
+                rain_values = [d.get("qpf_mm", 0) for d in days]
+
+                # Today's rain (use current conditions if available)
+                today_rain = parsed.get("qpf_today_mm", 0)
+                parsed["cumulative_rain_24h_mm"] = today_rain
+
+                # 48h = today + tomorrow
+                rain_48h = today_rain
+                if len(rain_values) >= 1:
+                    rain_48h += rain_values[0]
+                parsed["cumulative_rain_48h_mm"] = rain_48h
+
+                # 72h = today + next 2 days
+                rain_72h = today_rain + sum(rain_values[:2])
+                parsed["cumulative_rain_72h_mm"] = rain_72h
+
+                # 7d = all forecast days
+                parsed["cumulative_rain_7d_mm"] = today_rain + sum(rain_values)
+
+                # Consecutive dry days (from forecast)
+                consecutive_dry = 0
+                for d in days:
+                    if d.get("qpf_mm", 0) < 1:
+                        consecutive_dry += 1
+                    else:
+                        break
+                # If today is also dry, add it
+                if today_rain < 1:
+                    consecutive_dry += 1
+                parsed["consecutive_dry_days"] = consecutive_dry
+
+                # Consecutive wet days
+                consecutive_wet = 0
+                for d in days:
+                    if d.get("qpf_mm", 0) >= 1:
+                        consecutive_wet += 1
+                    else:
+                        break
+                if today_rain >= 1:
+                    consecutive_wet += 1
+                parsed["consecutive_wet_days"] = consecutive_wet
+
+                # Days with temperature above 10°C
+                min_temps = [d.get("temperature_min_c", 15) for d in days]
+                days_above_10c = sum(1 for t in min_temps if t > 10)
+                # Include today
+                if parsed.get("temperature_min_c", 15) > 10:
+                    days_above_10c += 1
+                parsed["consecutive_days_above_10c"] = days_above_10c
+
+                # Hours since last rain (estimate from consecutive dry)
+                if today_rain > 0:
+                    parsed["hours_since_last_rain"] = 0
+                else:
+                    # Approximate: consecutive dry days * 24 hours
+                    parsed["hours_since_last_rain"] = consecutive_dry * 24
 
         except Exception as e:
             logger.error(f"Weather data parsing error: {e}")
@@ -793,6 +947,7 @@ class WeatherAdvisoryService:
                 "alert": week_alert,
             },
         }
+        print(f"{advisory_data}")
 
         return advisory_data
 
