@@ -947,7 +947,6 @@ class WeatherAdvisoryService:
                 "alert": week_alert,
             },
         }
-        print(f"{advisory_data}")
 
         return advisory_data
 
