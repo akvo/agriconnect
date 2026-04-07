@@ -56,6 +56,7 @@ class ActivityStats(BaseModel):
     active_farmers: int
     dormant_farmers: int
     active_rate: float
+    total_questions: int = 0
     avg_days_to_first_question: Optional[float] = None
     avg_questions_per_farmer: Optional[float] = None
 

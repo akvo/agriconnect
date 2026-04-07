@@ -319,6 +319,7 @@ class StatisticService:
                 "active_farmers": active_farmers,
                 "dormant_farmers": dormant_farmers,
                 "active_rate": round(active_rate, 2),
+                "total_questions": total_questions,
                 "avg_days_to_first_question": avg_days_to_first_question,
                 "avg_questions_per_farmer": avg_questions_per_farmer,
             },

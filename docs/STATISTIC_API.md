@@ -858,6 +858,7 @@ selected_crop = st.selectbox("Crop Type", crop_options)
 | `active_farmers` | Completed farmers who sent a message within `active_days` |
 | `dormant_farmers` | `completed_farmers - active_farmers` |
 | `active_rate` | `active_farmers / completed_farmers` |
+| `total_questions` | Total number of messages from customers |
 | `avg_days_to_first_question` | Average days between registration and first message |
 | `avg_questions_per_farmer` | Total questions / farmers who asked questions |
 
