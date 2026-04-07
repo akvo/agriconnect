@@ -598,6 +598,241 @@ curl -H "Authorization: Bearer your-secret-token" \
 
 ---
 
+## Aggregate Endpoints (Dashboard View)
+
+These endpoints provide a **different approach** to viewing statistics, designed specifically for dashboard pages where you want to see data **aggregated by administrative level** with filter highlighting.
+
+### Why Aggregate Endpoints?
+
+The existing endpoints (`/farmers/stats`, `/eo/stats`) are designed for **drill-down workflows**:
+1. User selects Region → District → Ward
+2. Each selection narrows the data
+
+However, dashboards often need a **different view**:
+- Show all regions/districts/wards **side by side** with their statistics
+- Let users **compare** areas at the same level
+- **Highlight** which filter options have data (so users don't select empty areas)
+
+The aggregate endpoints solve this by:
+1. **Grouping data by administrative level** - See all regions, districts, or wards at once
+2. **Including an `available` object** - Lists all areas and crop types that have data, so your UI can highlight valid filter options
+3. **Supporting crop type filtering** - Filter by specific crops (e.g., maize, coffee)
+
+### 8. Get Farmer Data Aggregated by Level
+
+**Endpoint:** `GET /api/statistic/aggregate/farmers`
+
+Returns farmer statistics grouped by administrative level (region, district, or ward).
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `level` | string | No | `region` | Administrative level: `region`, `district`, or `ward` |
+| `administrative_id` | integer | No | - | Filter to children of this area only |
+| `crop_type` | string | No | - | Filter by crop type (e.g., `maize`, `coffee`, `potato`) |
+| `start_date` | string | No | - | Filter start date (ISO 8601 format) |
+| `end_date` | string | No | - | Filter end date (ISO 8601 format) |
+
+**Example Requests:**
+
+```bash
+# Get all regions with farmer counts
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/aggregate/farmers?level=region"
+
+# Get all districts with farmer counts
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/aggregate/farmers?level=district"
+
+# Get districts in a specific region only
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/aggregate/farmers?level=district&administrative_id=47"
+
+# Filter by crop type (maize farmers only)
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/aggregate/farmers?level=region&crop_type=maize"
+```
+
+**Response:**
+
+```json
+{
+  "data": [
+    {
+      "id": 47,
+      "name": "Murang'a",
+      "path": "Kenya > Murang'a",
+      "farmer_count": 150,
+      "completed_onboarding": 120,
+      "incomplete_onboarding": 30,
+      "questions_count": 450,
+      "escalations_count": 25,
+      "weather_subscribers": 85
+    },
+    {
+      "id": 52,
+      "name": "Nakuru",
+      "path": "Kenya > Nakuru",
+      "farmer_count": 230,
+      "completed_onboarding": 200,
+      "incomplete_onboarding": 30,
+      "questions_count": 680,
+      "escalations_count": 42,
+      "weather_subscribers": 120
+    }
+  ],
+  "filters": {
+    "level": "region",
+    "administrative_id": null,
+    "crop_type": null,
+    "start_date": null,
+    "end_date": null
+  },
+  "available": {
+    "regions": [
+      {"id": 47, "name": "Murang'a"},
+      {"id": 52, "name": "Nakuru"}
+    ],
+    "districts": [
+      {"id": 56, "name": "Kiharu"},
+      {"id": 59, "name": "Maragwa"},
+      {"id": 65, "name": "Naivasha"}
+    ],
+    "wards": [
+      {"id": 57, "name": "Wangu"},
+      {"id": 58, "name": "Mugoiri"},
+      {"id": 70, "name": "Mai Mahiu"}
+    ],
+    "crop_types": ["coffee", "maize", "potato"]
+  }
+}
+```
+
+---
+
+### 9. Get EO Data Aggregated by Level
+
+**Endpoint:** `GET /api/statistic/aggregate/eo`
+
+Returns EO statistics grouped by administrative level (region, district, or ward).
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `level` | string | No | `region` | Administrative level: `region`, `district`, or `ward` |
+| `administrative_id` | integer | No | - | Filter to children of this area only |
+| `start_date` | string | No | - | Filter start date (ISO 8601 format) |
+| `end_date` | string | No | - | Filter end date (ISO 8601 format) |
+
+**Example Requests:**
+
+```bash
+# Get all regions with EO stats
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/aggregate/eo?level=region"
+
+# Get all districts with EO stats
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/aggregate/eo?level=district"
+
+# Get wards in a specific district
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/aggregate/eo?level=ward&administrative_id=56"
+```
+
+**Response:**
+
+```json
+{
+  "data": [
+    {
+      "id": 47,
+      "name": "Murang'a",
+      "path": "Kenya > Murang'a",
+      "eo_count": 8,
+      "open_tickets": 25,
+      "closed_tickets": 150,
+      "total_replies": 320
+    },
+    {
+      "id": 52,
+      "name": "Nakuru",
+      "path": "Kenya > Nakuru",
+      "eo_count": 12,
+      "open_tickets": 18,
+      "closed_tickets": 220,
+      "total_replies": 480
+    }
+  ],
+  "filters": {
+    "level": "region",
+    "administrative_id": null,
+    "crop_type": null,
+    "start_date": null,
+    "end_date": null
+  },
+  "available": {
+    "regions": [{"id": 47, "name": "Murang'a"}, {"id": 52, "name": "Nakuru"}],
+    "districts": [{"id": 56, "name": "Kiharu"}, {"id": 65, "name": "Naivasha"}],
+    "wards": [{"id": 57, "name": "Wangu"}, {"id": 70, "name": "Mai Mahiu"}],
+    "crop_types": ["coffee", "maize", "potato"]
+  }
+}
+```
+
+---
+
+### Using the `available` Object for Filter Highlighting
+
+The `available` object in the response contains lists of regions, districts, wards, and crop types that **have actual farmer data**. This is useful for:
+
+1. **Highlighting valid options** in dropdown menus
+2. **Disabling empty options** to prevent users from selecting areas with no data
+3. **Building smarter filters** that adapt to the data
+
+**Example Streamlit Implementation:**
+
+```python
+import streamlit as st
+import requests
+
+API_BASE = "http://localhost:8000/api"
+HEADERS = {"Authorization": "Bearer your-token"}
+
+# Fetch aggregate data (includes available filters)
+response = requests.get(
+    f"{API_BASE}/statistic/aggregate/farmers",
+    headers=HEADERS,
+    params={"level": "region"}
+).json()
+
+data = response["data"]
+available = response["available"]
+
+# Get all regions from administrative API
+all_regions = requests.get(f"{API_BASE}/administrative/?level=Region").json()
+
+# Build dropdown with highlighting
+region_options = {}
+for region in all_regions["administrative"]:
+    # Check if this region has data
+    has_data = any(r["id"] == region["id"] for r in available["regions"])
+    if has_data:
+        region_options[f"✓ {region['name']}"] = region["id"]  # Highlight with checkmark
+    else:
+        region_options[f"  {region['name']} (no data)"] = region["id"]
+
+selected = st.selectbox("Region", ["All"] + list(region_options.keys()))
+
+# Build crop type filter from available options
+crop_options = ["All"] + available["crop_types"]
+selected_crop = st.selectbox("Crop Type", crop_options)
+```
+
+---
+
 ## Metric Definitions
 
 ### Onboarding Metrics
@@ -641,6 +876,26 @@ curl -H "Authorization: Bearer your-secret-token" \
 | `bulk_messages_sent` | Count of broadcast messages created |
 | `total_replies` | Messages sent by EO (from_source = USER) |
 | `tickets_closed` | Tickets resolved by specific EO |
+
+### Aggregate Farmer Metrics
+
+| Metric | Definition |
+|--------|------------|
+| `farmer_count` | Total customers in the area |
+| `completed_onboarding` | Customers with `onboarding_status = COMPLETED` |
+| `incomplete_onboarding` | Customers with `onboarding_status IN (IN_PROGRESS, FAILED)` |
+| `questions_count` | Total messages from customers in the area |
+| `escalations_count` | Total tickets created by customers in the area |
+| `weather_subscribers` | Customers with `profile_data.weather_subscribed = true` |
+
+### Aggregate EO Metrics
+
+| Metric | Definition |
+|--------|------------|
+| `eo_count` | Number of active EOs assigned to the area |
+| `open_tickets` | Tickets from customers in the area with `resolved_at IS NULL` |
+| `closed_tickets` | Tickets from customers in the area with `resolved_at IS NOT NULL` |
+| `total_replies` | Messages from EOs to customers in the area |
 
 ---
 
@@ -702,6 +957,8 @@ Murang'a (Region, id=47)
 | `/api/statistic/eo/stats` | Filters tickets by customers in the area |
 | `/api/statistic/eo/stats/by-eo` | Filters to EOs assigned to the area or its descendants |
 | `/api/statistic/eo/count` | Returns EO count for the area and its descendants |
+| `/api/statistic/aggregate/farmers` | Filters to show only areas under the specified parent |
+| `/api/statistic/aggregate/eo` | Filters to show only areas under the specified parent |
 
 ### Benefits
 

@@ -926,3 +926,455 @@ class TestEOList:
             names = [eo["name"] for eo in data["data"]]
             assert "Real EO" in names
             assert "Admin User" not in names
+
+
+class TestFarmerAggregate:
+    """Test farmer aggregate endpoint."""
+
+    def test_aggregate_by_region(self, client, db_session, administrative_data):
+        """Test farmer data aggregated by region."""
+        # Create customer with crop type
+        c1 = Customer(
+            phone_number="+254700000200",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+            profile_data={"crop_type": "maize"},
+        )
+        db_session.add(c1)
+        db_session.commit()
+
+        # Assign to ward
+        ca1 = CustomerAdministrative(
+            customer_id=c1.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        db_session.add(ca1)
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+            response = client.get(
+                "/api/statistic/aggregate/farmers?level=region",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            assert "data" in data
+            assert "filters" in data
+            assert "available" in data
+
+            # Check filters
+            assert data["filters"]["level"] == "region"
+
+            # Check available has crop_types
+            assert "crop_types" in data["available"]
+            assert "maize" in data["available"]["crop_types"]
+
+    def test_aggregate_by_district(
+        self, client, db_session, administrative_data
+    ):
+        """Test farmer data aggregated by district."""
+        # Create customers
+        c1 = Customer(
+            phone_number="+254700000210",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+            profile_data={"crop_type": "coffee"},
+        )
+        c2 = Customer(
+            phone_number="+254700000211",
+            onboarding_status=OnboardingStatus.IN_PROGRESS,
+            language=CustomerLanguage.EN,
+        )
+        db_session.add_all([c1, c2])
+        db_session.commit()
+
+        # Assign to wards
+        ca1 = CustomerAdministrative(
+            customer_id=c1.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        ca2 = CustomerAdministrative(
+            customer_id=c2.id,
+            administrative_id=administrative_data["ward2"].id,
+        )
+        db_session.add_all([ca1, ca2])
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+            response = client.get(
+                "/api/statistic/aggregate/farmers?level=district",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            assert data["filters"]["level"] == "district"
+
+            # Find Kiharu district
+            kiharu = next(
+                (d for d in data["data"] if d["name"] == "Kiharu"), None
+            )
+            if kiharu:
+                assert kiharu["farmer_count"] == 2
+                assert kiharu["completed_onboarding"] == 1
+                assert kiharu["incomplete_onboarding"] == 1
+
+    def test_aggregate_by_ward(self, client, db_session, administrative_data):
+        """Test farmer data aggregated by ward."""
+        # Create customers with different attributes
+        c1 = Customer(
+            phone_number="+254700000220",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+            profile_data={"crop_type": "potato", "weather_subscribed": True},
+        )
+        db_session.add(c1)
+        db_session.commit()
+
+        # Assign to ward
+        ca1 = CustomerAdministrative(
+            customer_id=c1.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        db_session.add(ca1)
+        db_session.commit()
+
+        # Create message for question count
+        m1 = Message(
+            message_sid="AGG_WARD_1",
+            customer_id=c1.id,
+            body="Question",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(m1)
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+            response = client.get(
+                "/api/statistic/aggregate/farmers?level=ward",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+
+            # Find Wangu ward
+            wangu = next(
+                (w for w in data["data"] if w["name"] == "Wangu"), None
+            )
+            if wangu:
+                assert wangu["farmer_count"] == 1
+                assert wangu["questions_count"] == 1
+                assert wangu["weather_subscribers"] == 1
+
+    def test_aggregate_with_crop_type_filter(
+        self, client, db_session, administrative_data
+    ):
+        """Test filtering by crop type."""
+        # Create customers with different crops
+        c1 = Customer(
+            phone_number="+254700000230",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+            profile_data={"crop_type": "maize"},
+        )
+        c2 = Customer(
+            phone_number="+254700000231",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+            profile_data={"crop_type": "coffee"},
+        )
+        db_session.add_all([c1, c2])
+        db_session.commit()
+
+        # Assign to same ward
+        ca1 = CustomerAdministrative(
+            customer_id=c1.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        ca2 = CustomerAdministrative(
+            customer_id=c2.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        db_session.add_all([ca1, ca2])
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+
+            # Filter by maize
+            response = client.get(
+                "/api/statistic/aggregate/farmers?level=ward&crop_type=maize",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            assert data["filters"]["crop_type"] == "maize"
+
+            # Find Wangu ward - should only have 1 maize farmer
+            wangu = next(
+                (w for w in data["data"] if w["name"] == "Wangu"), None
+            )
+            if wangu:
+                assert wangu["farmer_count"] == 1
+
+    def test_aggregate_available_filters(
+        self, client, db_session, administrative_data
+    ):
+        """Test that available filters contain correct data."""
+        # Create customers with different crops
+        c1 = Customer(
+            phone_number="+254700000240",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+            profile_data={"crop_type": "maize"},
+        )
+        c2 = Customer(
+            phone_number="+254700000241",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+            profile_data={"crop_type": "coffee"},
+        )
+        db_session.add_all([c1, c2])
+        db_session.commit()
+
+        # Assign to different wards
+        ca1 = CustomerAdministrative(
+            customer_id=c1.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        ca2 = CustomerAdministrative(
+            customer_id=c2.id,
+            administrative_id=administrative_data["ward2"].id,
+        )
+        db_session.add_all([ca1, ca2])
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+            response = client.get(
+                "/api/statistic/aggregate/farmers?level=region",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            available = data["available"]
+
+            # Should have crop types
+            assert "maize" in available["crop_types"]
+            assert "coffee" in available["crop_types"]
+
+            # Should have wards with data
+            ward_names = [w["name"] for w in available["wards"]]
+            assert "Wangu" in ward_names
+            assert "Mukangu" in ward_names
+
+
+class TestEOAggregate:
+    """Test EO aggregate endpoint."""
+
+    def test_aggregate_eo_by_region(
+        self, client, db_session, administrative_data
+    ):
+        """Test EO data aggregated by region."""
+        # Create EO
+        eo = User(
+            email="eo_agg1@test.com",
+            phone_number="+254700000300",
+            full_name="Aggregate EO",
+            user_type=UserType.EXTENSION_OFFICER,
+            hashed_password="hashed",
+            is_active=True,
+        )
+        db_session.add(eo)
+        db_session.commit()
+
+        # Assign to district
+        ua = UserAdministrative(
+            user_id=eo.id,
+            administrative_id=administrative_data["district"].id,
+        )
+        db_session.add(ua)
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+            response = client.get(
+                "/api/statistic/aggregate/eo?level=region",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            assert "data" in data
+            assert "filters" in data
+            assert "available" in data
+            assert data["filters"]["level"] == "region"
+
+    def test_aggregate_eo_by_district(
+        self, client, db_session, administrative_data
+    ):
+        """Test EO data aggregated by district with tickets."""
+        # Create EO
+        eo = User(
+            email="eo_agg2@test.com",
+            phone_number="+254700000310",
+            full_name="District EO",
+            user_type=UserType.EXTENSION_OFFICER,
+            hashed_password="hashed",
+            is_active=True,
+        )
+        db_session.add(eo)
+        db_session.commit()
+
+        # Assign to ward
+        ua = UserAdministrative(
+            user_id=eo.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        db_session.add(ua)
+        db_session.commit()
+
+        # Create customer and ticket
+        c1 = Customer(
+            phone_number="+254700000311",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(c1)
+        db_session.commit()
+
+        ca1 = CustomerAdministrative(
+            customer_id=c1.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        db_session.add(ca1)
+        db_session.commit()
+
+        m1 = Message(
+            message_sid="AGG_EO_1",
+            customer_id=c1.id,
+            body="Help",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(m1)
+        db_session.commit()
+
+        # Create open ticket
+        t1 = Ticket(
+            ticket_number="AGG_EO_T001",
+            administrative_id=administrative_data["ward1"].id,
+            customer_id=c1.id,
+            message_id=m1.id,
+        )
+        db_session.add(t1)
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+            response = client.get(
+                "/api/statistic/aggregate/eo?level=district",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+
+            # Find Kiharu district
+            kiharu = next(
+                (d for d in data["data"] if d["name"] == "Kiharu"), None
+            )
+            if kiharu:
+                assert kiharu["eo_count"] >= 1
+                assert kiharu["open_tickets"] >= 1
+
+    def test_aggregate_eo_by_ward(
+        self, client, db_session, administrative_data
+    ):
+        """Test EO data aggregated by ward."""
+        # Create EO
+        eo = User(
+            email="eo_agg3@test.com",
+            phone_number="+254700000320",
+            full_name="Ward EO",
+            user_type=UserType.EXTENSION_OFFICER,
+            hashed_password="hashed",
+            is_active=True,
+        )
+        db_session.add(eo)
+        db_session.commit()
+
+        # Assign to ward
+        ua = UserAdministrative(
+            user_id=eo.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        db_session.add(ua)
+        db_session.commit()
+
+        # Create customer
+        c1 = Customer(
+            phone_number="+254700000321",
+            onboarding_status=OnboardingStatus.COMPLETED,
+            language=CustomerLanguage.EN,
+        )
+        db_session.add(c1)
+        db_session.commit()
+
+        ca1 = CustomerAdministrative(
+            customer_id=c1.id,
+            administrative_id=administrative_data["ward1"].id,
+        )
+        db_session.add(ca1)
+        db_session.commit()
+
+        # EO sends reply
+        m1 = Message(
+            message_sid="AGG_WARD_EO_1",
+            customer_id=c1.id,
+            user_id=eo.id,
+            body="Reply from EO",
+            from_source=MessageFrom.USER,
+        )
+        db_session.add(m1)
+        db_session.commit()
+
+        with patch(
+            "config.settings.statistic_api_token", TEST_STATISTIC_TOKEN
+        ):
+            headers = {"Authorization": f"Bearer {TEST_STATISTIC_TOKEN}"}
+            response = client.get(
+                "/api/statistic/aggregate/eo?level=ward",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+
+            # Find Wangu ward
+            wangu = next(
+                (w for w in data["data"] if w["name"] == "Wangu"), None
+            )
+            if wangu:
+                assert wangu["eo_count"] >= 1
+                assert wangu["total_replies"] >= 1

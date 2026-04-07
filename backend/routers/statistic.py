@@ -22,6 +22,10 @@ from schemas.statistic import (
     FarmerStatsFilters,
     EOStatsFilters,
     RegistrationFilters,
+    AggregateFilters,
+    AvailableFilters,
+    FarmerAggregateResponse,
+    EOAggregateResponse,
 )
 from services.statistic_service import StatisticService
 from utils.statistic_auth import verify_statistic_token
@@ -342,3 +346,112 @@ async def get_eo_list(
     data = service.get_eo_list()
 
     return EOListResponse(data=data)
+
+
+@router.get("/aggregate/farmers", response_model=FarmerAggregateResponse)
+async def get_farmer_aggregate(
+    level: str = Query(
+        "region",
+        description="Administrative level to aggregate by: "
+        "'region', 'district', or 'ward'"
+    ),
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter to children of this administrative area. "
+        "If provided, only shows areas under this parent."
+    ),
+    crop_type: Optional[str] = Query(
+        None,
+        description="Filter by crop type (e.g., 'maize', 'coffee', 'potato')"
+    ),
+    start_date: Optional[str] = Query(
+        None, description="Filter start date (ISO 8601 format)"
+    ),
+    end_date: Optional[str] = Query(
+        None, description="Filter end date (ISO 8601 format)"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Get farmer data aggregated by administrative level.
+
+    Returns farmer counts, onboarding stats, questions, and escalations
+    grouped by the specified administrative level (region, district, or ward).
+
+    The response includes:
+    - **data**: List of administrative areas with their farmer statistics
+    - **filters**: Applied filter parameters
+    - **available**: Lists of regions, districts, wards, and crop types
+      that have farmer data (useful for highlighting filter options)
+
+    Use the `available` object to highlight which filter options have data
+    in your UI dropdowns.
+
+    Authentication: Bearer token required (STATISTIC_API_TOKEN)
+    """
+    service = StatisticService(db)
+    result = service.get_farmer_aggregate(
+        level=level,
+        administrative_id=administrative_id,
+        crop_type=crop_type,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    return FarmerAggregateResponse(
+        data=result["data"],
+        filters=AggregateFilters(**result["filters"]),
+        available=AvailableFilters(**result["available"]),
+    )
+
+
+@router.get("/aggregate/eo", response_model=EOAggregateResponse)
+async def get_eo_aggregate(
+    level: str = Query(
+        "region",
+        description="Administrative level to aggregate by: "
+        "'region', 'district', or 'ward'"
+    ),
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter to children of this administrative area. "
+        "If provided, only shows areas under this parent."
+    ),
+    start_date: Optional[str] = Query(
+        None, description="Filter start date (ISO 8601 format)"
+    ),
+    end_date: Optional[str] = Query(
+        None, description="Filter end date (ISO 8601 format)"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Get EO data aggregated by administrative level.
+
+    Returns EO counts, ticket stats, and reply counts grouped by the
+    specified administrative level (region, district, or ward).
+
+    The response includes:
+    - **data**: List of administrative areas with their EO statistics
+    - **filters**: Applied filter parameters
+    - **available**: Lists of regions, districts, wards, and crop types
+      that have farmer data (useful for highlighting filter options)
+
+    Use the `available` object to highlight which filter options have data
+    in your UI dropdowns.
+
+    Authentication: Bearer token required (STATISTIC_API_TOKEN)
+    """
+    service = StatisticService(db)
+    result = service.get_eo_aggregate(
+        level=level,
+        administrative_id=administrative_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    return EOAggregateResponse(
+        data=result["data"],
+        filters=AggregateFilters(**result["filters"]),
+        available=AvailableFilters(**result["available"]),
+    )

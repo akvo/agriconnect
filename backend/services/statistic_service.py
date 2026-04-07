@@ -819,3 +819,485 @@ class StatisticService:
             {"id": eo.id, "name": eo.full_name}
             for eo in eos
         ]
+
+    def _get_available_filters(
+        self,
+        crop_type: Optional[str] = None,
+    ) -> dict:
+        """
+        Get available filter options that have farmer data.
+
+        Returns dict with regions, districts, wards, and crop_types
+        that have at least one farmer.
+        """
+        # Base query for customers with completed onboarding
+        base_customer_ids = (
+            self.db.query(Customer.id)
+            .filter(Customer.onboarding_status == OnboardingStatus.COMPLETED)
+        )
+
+        # Apply crop_type filter if provided
+        if crop_type:
+            base_customer_ids = base_customer_ids.filter(
+                Customer.profile_data.op("->>")("crop_type") == crop_type
+            )
+
+        customer_ids = [c.id for c in base_customer_ids.all()]
+
+        # Get ward IDs that have farmers
+        ward_ids_with_data = (
+            self.db.query(distinct(CustomerAdministrative.administrative_id))
+            .filter(CustomerAdministrative.customer_id.in_(customer_ids))
+            .all()
+        )
+        ward_ids_with_data = [w[0] for w in ward_ids_with_data]
+
+        # Get regions, districts, wards that have data
+        regions = []
+        districts = []
+        wards = []
+
+        # Get all wards with data
+        if ward_ids_with_data:
+            ward_admins = (
+                self.db.query(Administrative)
+                .filter(Administrative.id.in_(ward_ids_with_data))
+                .all()
+            )
+
+            seen_regions = set()
+            seen_districts = set()
+
+            for ward in ward_admins:
+                wards.append({"id": ward.id, "name": ward.name})
+
+                # Extract region and district from path
+                # Path format: "Country > Region > District > Ward"
+                path_parts = ward.path.split(" > ")
+                if len(path_parts) >= 2:
+                    # Get region (second level)
+                    region_name = (
+                        path_parts[1] if len(path_parts) > 1 else None
+                    )
+                    if region_name and region_name not in seen_regions:
+                        # Find region admin
+                        region_admin = (
+                            self.db.query(Administrative)
+                            .filter(
+                                Administrative.name == region_name,
+                                Administrative.level.has(name="region")
+                            )
+                            .first()
+                        )
+                        if region_admin:
+                            regions.append({
+                                "id": region_admin.id,
+                                "name": region_admin.name
+                            })
+                            seen_regions.add(region_name)
+
+                if len(path_parts) >= 3:
+                    # Get district (third level)
+                    district_name = (
+                        path_parts[2] if len(path_parts) > 2 else None
+                    )
+                    if district_name and district_name not in seen_districts:
+                        # Find district admin
+                        district_admin = (
+                            self.db.query(Administrative)
+                            .filter(
+                                Administrative.name == district_name,
+                                Administrative.level.has(name="district")
+                            )
+                            .first()
+                        )
+                        if district_admin:
+                            districts.append({
+                                "id": district_admin.id,
+                                "name": district_admin.name
+                            })
+                            seen_districts.add(district_name)
+
+        # Get unique crop types from farmers
+        crop_types = []
+        crop_type_col = Customer.profile_data.op("->>")("crop_type")
+        crop_type_results = (
+            self.db.query(distinct(crop_type_col))
+            .filter(
+                Customer.onboarding_status == OnboardingStatus.COMPLETED,
+                crop_type_col.isnot(None),
+                crop_type_col != "",
+            )
+            .all()
+        )
+        crop_types = sorted([c[0] for c in crop_type_results if c[0]])
+
+        return {
+            "regions": sorted(regions, key=lambda x: x["name"]),
+            "districts": sorted(districts, key=lambda x: x["name"]),
+            "wards": sorted(wards, key=lambda x: x["name"]),
+            "crop_types": crop_types,
+        }
+
+    def get_farmer_aggregate(
+        self,
+        level: str,
+        administrative_id: Optional[int] = None,
+        crop_type: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> dict:
+        """
+        Get farmer data aggregated by administrative level.
+
+        Args:
+            level: "region", "district", or "ward"
+            administrative_id: Filter to children of this area
+            crop_type: Filter by crop type
+            start_date: Filter customers created on or after this date
+            end_date: Filter customers created on or before this date
+
+        Returns:
+            Dict with data, filters, and available options
+        """
+        # Validate level
+        valid_levels = ["region", "district", "ward"]
+        if level not in valid_levels:
+            level = "region"
+
+        # Get the level object
+        admin_level = (
+            self.db.query(AdministrativeLevel)
+            .filter(AdministrativeLevel.name == level)
+            .first()
+        )
+
+        if not admin_level:
+            return {
+                "data": [],
+                "filters": {
+                    "level": level,
+                    "administrative_id": administrative_id,
+                    "crop_type": crop_type,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+                "available": self._get_available_filters(crop_type),
+            }
+
+        # Get administrative areas at this level
+        areas_query = (
+            self.db.query(Administrative)
+            .filter(Administrative.level_id == admin_level.id)
+        )
+
+        # Filter by parent administrative area
+        if administrative_id:
+            parent_admin = (
+                self.db.query(Administrative)
+                .filter(Administrative.id == administrative_id)
+                .first()
+            )
+            if parent_admin:
+                # Filter areas that are under this parent
+                areas_query = areas_query.filter(
+                    Administrative.path.like(f"{parent_admin.path}%")
+                )
+
+        areas = areas_query.order_by(Administrative.name).all()
+
+        results = []
+
+        for area in areas:
+            # Get ward IDs under this area
+            if level == "ward":
+                ward_ids = [area.id]
+            else:
+                ward_ids = AdministrativeService.get_descendant_ward_ids(
+                    self.db, area.id
+                )
+                if not ward_ids:
+                    ward_ids = [area.id]
+
+            # Get customer IDs in these wards
+            customer_query = (
+                self.db.query(Customer.id)
+                .join(CustomerAdministrative)
+                .filter(CustomerAdministrative.administrative_id.in_(ward_ids))
+            )
+
+            # Apply date filters
+            customer_query = self._apply_date_filter(
+                customer_query, Customer.created_at, start_date, end_date
+            )
+
+            # Apply crop_type filter
+            if crop_type:
+                customer_query = customer_query.filter(
+                    Customer.profile_data.op("->>")("crop_type") == crop_type
+                )
+
+            customer_ids = [c.id for c in customer_query.all()]
+
+            if not customer_ids:
+                continue
+
+            # Count farmers
+            farmer_count = len(customer_ids)
+
+            # Completed onboarding
+            completed_onboarding = (
+                self.db.query(func.count(Customer.id))
+                .filter(
+                    Customer.id.in_(customer_ids),
+                    Customer.onboarding_status == OnboardingStatus.COMPLETED,
+                )
+                .scalar()
+                or 0
+            )
+
+            # Incomplete onboarding
+            incomplete_onboarding = (
+                self.db.query(func.count(Customer.id))
+                .filter(
+                    Customer.id.in_(customer_ids),
+                    Customer.onboarding_status.in_([
+                        OnboardingStatus.IN_PROGRESS,
+                        OnboardingStatus.FAILED,
+                    ]),
+                )
+                .scalar()
+                or 0
+            )
+
+            # Questions count
+            questions_count = (
+                self.db.query(func.count(Message.id))
+                .filter(
+                    Message.customer_id.in_(customer_ids),
+                    Message.from_source == MessageFrom.CUSTOMER,
+                )
+                .scalar()
+                or 0
+            )
+
+            # Escalations count
+            escalations_count = (
+                self.db.query(func.count(Ticket.id))
+                .filter(Ticket.customer_id.in_(customer_ids))
+                .scalar()
+                or 0
+            )
+
+            # Weather subscribers
+            weather_sub_filter = (
+                Customer.profile_data.op("->>")("weather_subscribed") == "true"
+            )
+            weather_subscribers = (
+                self.db.query(func.count(Customer.id))
+                .filter(Customer.id.in_(customer_ids), weather_sub_filter)
+                .scalar()
+                or 0
+            )
+
+            results.append({
+                "id": area.id,
+                "name": area.name,
+                "path": area.path,
+                "farmer_count": farmer_count,
+                "completed_onboarding": completed_onboarding,
+                "incomplete_onboarding": incomplete_onboarding,
+                "questions_count": questions_count,
+                "escalations_count": escalations_count,
+                "weather_subscribers": weather_subscribers,
+            })
+
+        return {
+            "data": results,
+            "filters": {
+                "level": level,
+                "administrative_id": administrative_id,
+                "crop_type": crop_type,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            "available": self._get_available_filters(crop_type),
+        }
+
+    def get_eo_aggregate(
+        self,
+        level: str,
+        administrative_id: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> dict:
+        """
+        Get EO data aggregated by administrative level.
+
+        Args:
+            level: "region", "district", or "ward"
+            administrative_id: Filter to children of this area
+            start_date: Filter by start date
+            end_date: Filter by end date
+
+        Returns:
+            Dict with data, filters, and available options
+        """
+        # Validate level
+        valid_levels = ["region", "district", "ward"]
+        if level not in valid_levels:
+            level = "region"
+
+        # Get the level object
+        admin_level = (
+            self.db.query(AdministrativeLevel)
+            .filter(AdministrativeLevel.name == level)
+            .first()
+        )
+
+        if not admin_level:
+            return {
+                "data": [],
+                "filters": {
+                    "level": level,
+                    "administrative_id": administrative_id,
+                    "crop_type": None,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+                "available": self._get_available_filters(),
+            }
+
+        # Get administrative areas at this level
+        areas_query = (
+            self.db.query(Administrative)
+            .filter(Administrative.level_id == admin_level.id)
+        )
+
+        # Filter by parent administrative area
+        if administrative_id:
+            parent_admin = (
+                self.db.query(Administrative)
+                .filter(Administrative.id == administrative_id)
+                .first()
+            )
+            if parent_admin:
+                areas_query = areas_query.filter(
+                    Administrative.path.like(f"{parent_admin.path}%")
+                )
+
+        areas = areas_query.order_by(Administrative.name).all()
+
+        results = []
+
+        for area in areas:
+            # Get all area IDs under this area (including itself)
+            if level == "ward":
+                area_ids = [area.id]
+            else:
+                ward_ids = AdministrativeService.get_descendant_ward_ids(
+                    self.db, area.id
+                )
+                area_ids = ward_ids + [area.id]
+
+            # Get EO IDs assigned to these areas
+            eo_ids = [
+                ua.user_id
+                for ua in self.db.query(UserAdministrative)
+                .filter(UserAdministrative.administrative_id.in_(area_ids))
+                .all()
+            ]
+
+            # Filter to active EOs
+            eo_count = (
+                self.db.query(func.count(User.id))
+                .filter(
+                    User.id.in_(eo_ids),
+                    User.user_type == UserType.EXTENSION_OFFICER,
+                    User.is_active == True,  # noqa: E712
+                )
+                .scalar()
+                or 0
+            )
+
+            # Get customer IDs in these areas for ticket queries
+            customer_ids = [
+                ca.customer_id
+                for ca in self.db.query(CustomerAdministrative)
+                .filter(
+                    CustomerAdministrative.administrative_id.in_(
+                        area_ids if level == "ward"
+                        else AdministrativeService.get_descendant_ward_ids(
+                            self.db, area.id
+                        ) or [area.id]
+                    )
+                )
+                .all()
+            ]
+
+            # Open tickets
+            open_tickets = 0
+            closed_tickets = 0
+            total_replies = 0
+
+            if customer_ids:
+                open_tickets = (
+                    self.db.query(func.count(Ticket.id))
+                    .filter(
+                        Ticket.customer_id.in_(customer_ids),
+                        Ticket.resolved_at.is_(None),
+                    )
+                    .scalar()
+                    or 0
+                )
+
+                # Closed tickets with date filters
+                closed_query = (
+                    self.db.query(func.count(Ticket.id))
+                    .filter(
+                        Ticket.customer_id.in_(customer_ids),
+                        Ticket.resolved_at.isnot(None),
+                    )
+                )
+                closed_query = self._apply_date_filter(
+                    closed_query, Ticket.resolved_at, start_date, end_date
+                )
+                closed_tickets = closed_query.scalar() or 0
+
+                # Total replies from EOs to customers in this area
+                replies_query = (
+                    self.db.query(func.count(Message.id))
+                    .filter(
+                        Message.customer_id.in_(customer_ids),
+                        Message.from_source == MessageFrom.USER,
+                    )
+                )
+                replies_query = self._apply_date_filter(
+                    replies_query, Message.created_at, start_date, end_date
+                )
+                total_replies = replies_query.scalar() or 0
+
+            if eo_count == 0 and open_tickets == 0 and closed_tickets == 0:
+                continue
+
+            results.append({
+                "id": area.id,
+                "name": area.name,
+                "path": area.path,
+                "eo_count": eo_count,
+                "open_tickets": open_tickets,
+                "closed_tickets": closed_tickets,
+                "total_replies": total_replies,
+            })
+
+        return {
+            "data": results,
+            "filters": {
+                "level": level,
+                "administrative_id": administrative_id,
+                "crop_type": None,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            "available": self._get_available_filters(),
+        }

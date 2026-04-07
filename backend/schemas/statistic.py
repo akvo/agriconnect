@@ -180,3 +180,72 @@ class EOListResponse(BaseModel):
     """List of EOs for filter dropdown."""
 
     data: List[EOListItem]
+
+
+# Aggregate endpoint schemas
+class AggregateFilters(BaseModel):
+    """Applied filters for aggregate endpoints."""
+
+    level: str  # "region", "district", or "ward"
+    administrative_id: Optional[int] = None
+    crop_type: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+
+class AvailableAdminItem(BaseModel):
+    """Single administrative item in available filters."""
+
+    id: int
+    name: str
+
+
+class AvailableFilters(BaseModel):
+    """Available filter options that have data."""
+
+    regions: List[AvailableAdminItem]
+    districts: List[AvailableAdminItem]
+    wards: List[AvailableAdminItem]
+    crop_types: List[str]
+
+
+class FarmerAggregateItem(BaseModel):
+    """Farmer statistics for a single administrative area."""
+
+    id: int
+    name: str
+    path: str
+    farmer_count: int
+    completed_onboarding: int
+    incomplete_onboarding: int
+    questions_count: int
+    escalations_count: int
+    weather_subscribers: int
+
+
+class FarmerAggregateResponse(BaseModel):
+    """Farmer data aggregated by administrative level."""
+
+    data: List[FarmerAggregateItem]
+    filters: AggregateFilters
+    available: AvailableFilters
+
+
+class EOAggregateItem(BaseModel):
+    """EO statistics for a single administrative area."""
+
+    id: int
+    name: str
+    path: str
+    eo_count: int
+    open_tickets: int
+    closed_tickets: int
+    total_replies: int
+
+
+class EOAggregateResponse(BaseModel):
+    """EO data aggregated by administrative level."""
+
+    data: List[EOAggregateItem]
+    filters: AggregateFilters
+    available: AvailableFilters
