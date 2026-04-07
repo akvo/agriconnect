@@ -931,7 +931,9 @@ class TestEOList:
 class TestFarmerAggregate:
     """Test farmer aggregate endpoint."""
 
-    def test_aggregate_by_region(self, client, db_session, administrative_data):
+    def test_aggregate_by_region(
+        self, client, db_session, administrative_data
+    ):
         """Test farmer data aggregated by region."""
         # Create customer with crop type
         c1 = Customer(
