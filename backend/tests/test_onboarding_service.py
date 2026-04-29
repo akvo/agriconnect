@@ -395,13 +395,13 @@ class TestOnboardingService:
 
         assert onboarding_service._is_ambiguous(candidates) is True
 
-    def test_is_ambiguous_false_high_confidence(
+    def test_is_ambiguous_true_high_confidence_close_scores(
         self, db_session, onboarding_service
     ):
-        """Test high confidence scores auto-select without candidates"""
+        """Test high confidence but close scores are still ambiguous"""
         from schemas.onboarding_schemas import MatchCandidate
 
-        # Score >= 90 should auto-select even if second is within 15 points
+        # Score >= 90 but within 15 points of second - should be ambiguous
         candidates = [
             MatchCandidate(
                 id=1,
@@ -416,7 +416,33 @@ class TestOnboardingService:
                 path="Path 2",
                 level="ward",
                 score=92.0,
-            ),  # Within 15 points but top is high confidence
+            ),  # Within 15 points - still ambiguous
+        ]
+
+        assert onboarding_service._is_ambiguous(candidates) is True
+
+    def test_is_ambiguous_false_high_confidence_far_apart(
+        self, db_session, onboarding_service
+    ):
+        """Test high confidence AND far apart scores auto-select"""
+        from schemas.onboarding_schemas import MatchCandidate
+
+        # Score >= 90 AND more than 15 points above second - auto-select
+        candidates = [
+            MatchCandidate(
+                id=1,
+                name="Ward 1",
+                path="Path 1",
+                level="ward",
+                score=95.0,
+            ),
+            MatchCandidate(
+                id=2,
+                name="Ward 2",
+                path="Path 2",
+                level="ward",
+                score=70.0,
+            ),  # More than 15 points apart AND top is high confidence
         ]
 
         assert onboarding_service._is_ambiguous(candidates) is False

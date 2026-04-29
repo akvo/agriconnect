@@ -69,9 +69,9 @@ class OnboardingService:
         self.supported_crops = settings.crop_types
 
         # Configuration (can be overridden per field)
-        self.match_threshold = 60.0  # Minimum score for consideration
+        self.match_threshold = 30.0  # Minimum score for consideration
         self.ambiguity_threshold = 15.0  # Score difference for ambiguity
-        self.high_confidence_threshold = 90.0  # Auto-select without candidates
+        self.high_confidence_threshold = 90.0  # Auto-select threshold
         self.max_candidates = 5  # Max options to show farmer
 
         # Administrative level hierarchy (in order of selection)
@@ -1202,21 +1202,25 @@ Birth year must be between 1900 and {current_year}."""
         """
         Check if top matches are ambiguous (within threshold).
 
-        Returns True if multiple candidates are within ambiguity_threshold,
-        unless the top match has a high confidence score (e.g., small typo).
+        Returns True if multiple candidates are within ambiguity_threshold.
+        Auto-select only if top score is 90%+ AND significantly higher than
+        second candidate.
         """
         if len(candidates) < 2:
             return False
 
         top_score = candidates[0].score
+        second_score = candidates[1].score
+        score_diff = top_score - second_score
 
-        # High confidence match - auto-select (e.g., "Ithnga" -> "Ithanga")
-        if top_score >= self.high_confidence_threshold:
+        # Only auto-select if high confidence AND significantly better
+        if (
+            top_score >= self.high_confidence_threshold
+            and score_diff > self.ambiguity_threshold
+        ):
             return False
 
-        second_score = candidates[1].score
-
-        return (top_score - second_score) <= self.ambiguity_threshold
+        return score_diff <= self.ambiguity_threshold
 
     # ================================================================
     # MAIN GENERIC ONBOARDING HANDLER
@@ -1634,16 +1638,6 @@ Birth year must be between 1900 and {current_year}."""
         # Get customer language
         lang = customer.language.value if customer.language else "en"
 
-        # Parse selection
-        selection_index = self.parse_selection(message)
-
-        if selection_index is None:
-            return OnboardingResponse(
-                message=t("onboarding.common.invalid_selection", lang),
-                status="awaiting_selection",
-                attempts=self._get_attempts(customer, field_name),
-            )
-
         # Get candidates from JSON
         if not customer.onboarding_candidates or not isinstance(
             customer.onboarding_candidates, dict
@@ -1651,6 +1645,21 @@ Birth year must be between 1900 and {current_year}."""
             candidate_ids = []
         else:
             candidate_ids = customer.onboarding_candidates.get(field_name, [])
+
+        # Parse selection
+        selection_index = self.parse_selection(message)
+
+        if selection_index is None:
+            # User typed text instead of number - do fresh search
+            if field_name == "administration" and candidate_ids:
+                return await self._filter_candidates_by_text(
+                    customer, message, candidate_ids, field_config
+                )
+            return OnboardingResponse(
+                message=t("onboarding.common.invalid_selection", lang),
+                status="awaiting_selection",
+                attempts=self._get_attempts(customer, field_name),
+            )
 
         if selection_index >= len(candidate_ids):
             return OnboardingResponse(
@@ -1685,6 +1694,57 @@ Birth year must be between 1900 and {current_year}."""
 
         # Save the selected value
         return self._save_field_value(customer, selected_obj, field_config)
+
+    async def _filter_candidates_by_text(
+        self,
+        customer: Customer,
+        text: str,
+        candidate_ids: List[int],
+        field_config: OnboardingFieldConfig,
+    ) -> OnboardingResponse:
+        """Re-search locations when user types text instead of number."""
+        field_name = field_config.field_name
+        lang = customer.language.value if customer.language else "en"
+
+        # Extract location from the new text input
+        location = await self.extract_location(text)
+
+        if not location:
+            # Create a simple LocationData with just the text
+            location = LocationData(
+                province=None, district=None, ward=text, full_text=text
+            )
+
+        # Search all wards in database
+        candidates = self.find_lowest_administrative_location(location)
+
+        if not candidates:
+            # No matches - ask user to try again
+            return OnboardingResponse(
+                message=t(
+                    "onboarding.administration.no_match",
+                    lang,
+                    input=text,
+                ),
+                status="awaiting_selection",
+                attempts=self._get_attempts(customer, field_name),
+            )
+
+        # Check for ambiguity
+        if len(candidates) == 1 or not self._is_ambiguous(candidates):
+            # Clear match - save the top result
+            best_match = candidates[0]
+            administrative = (
+                self.db.query(Administrative)
+                .filter_by(id=best_match.id)
+                .first()
+            )
+            return self._save_field_value(
+                customer, administrative, field_config
+            )
+
+        # Multiple ambiguous matches - show options
+        return self._handle_ambiguous_match(customer, candidates, field_config)
 
     def _save_field_value(
         self,

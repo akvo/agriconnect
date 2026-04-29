@@ -58,11 +58,13 @@ trans: Dict[str, Any] = {
             "question": {
                 "en": (
                     "I need to know your location.\n\n"
-                    "Please tell me: Which ward are you from?"
+                    "Please tell me your district and ward.\n"
+                    "For example: Njoro, Lare"
                 ),
                 "sw": (
                     "Ninahitaji kujua eneo lako.\n\n"
-                    "Tafadhali niambie: Unatoka wadi gani?"
+                    "Tafadhali niambie wilaya na kata yako.\n"
+                    "Mfano: Njoro, Lare"
                 ),
             },
             "success": {
@@ -82,16 +84,38 @@ trans: Dict[str, Any] = {
                     "n.k.)"
                 ),
             },
-            "no_match": {
+            "filtered_matches": {
                 "en": (
-                    "I couldn't find a matching location for '{input}'. Could "
-                    "you please provide your location more specifically? "
-                    "Include your region, district, and ward."
+                    "I found these locations matching '{input}':\n\n{options}"
+                    "\n\nReply with the number (e.g., '1', '2', etc.)"
                 ),
                 "sw": (
-                    "Sikuweza kupata eneo linalingana na '{input}'. Tafadhali "
-                    "toa eneo lako kwa undani zaidi? Jumuisha mkoa, wilaya, "
-                    "na kata yako."
+                    "Nimepata maeneo haya yanayolingana na '{input}':\n\n"
+                    "{options}\n\nJibu kwa namba (mfano, '1', '2', n.k.)"
+                ),
+            },
+            "no_filter_match": {
+                "en": (
+                    "I couldn't find '{input}' in the options. "
+                    "Please select from:\n\n{options}\n\n"
+                    "Reply with the number (e.g., '1', '2', etc.)"
+                ),
+                "sw": (
+                    "Sikuweza kupata '{input}' katika chaguo. "
+                    "Tafadhali chagua kutoka:\n\n{options}\n\n"
+                    "Jibu kwa namba (mfano, '1', '2', n.k.)"
+                ),
+            },
+            "no_match": {
+                "en": (
+                    "I couldn't find a matching location for '{input}'. "
+                    "Please tell me your district and ward.\n"
+                    "For example: Njoro, Lare"
+                ),
+                "sw": (
+                    "Sikuweza kupata eneo linalingana na '{input}'. "
+                    "Tafadhali niambie wilaya na kata yako.\n"
+                    "Mfano: Njoro, Lare"
                 ),
             },
             "no_location_extracted_max": {
@@ -109,15 +133,13 @@ trans: Dict[str, Any] = {
             "no_location_extracted_retry": {
                 "en": (
                     "I couldn't identify your location from that message"
-                    "{attempt_msg}. Could you please tell me your "
-                    "province/region, district, and ward? For example: "
-                    "'I'm in Nairobi Region, Central District, Westlands Ward'"
+                    "{attempt_msg}. Please tell me your district and ward.\n"
+                    "For example: Njoro, Lare"
                 ),
                 "sw": (
                     "Sikuweza kutambua eneo lako kutoka ujumbe huo"
-                    "{attempt_msg}. Tafadhali niambie mkoa/eneo lako, wilaya, "
-                    "na kata? Mfano: 'Niko Mkoa wa Nairobi, Wilaya ya Kati, "
-                    "Kata ya Westlands'"
+                    "{attempt_msg}. Tafadhali niambie wilaya na kata yako.\n"
+                    "Mfano: Njoro, Lare"
                 ),
             },
             "no_matches_max": {
@@ -135,14 +157,14 @@ trans: Dict[str, Any] = {
             },
             "no_matches_retry": {
                 "en": (
-                    "I couldn't find a matching location for '{input}'. Could "
-                    "you please provide your location more specifically? "
-                    "Include your region, district, and ward."
+                    "I couldn't find a matching location for '{input}'. "
+                    "Please tell me your district and ward.\n"
+                    "For example: Njoro, Lare"
                 ),
                 "sw": (
-                    "Sikuweza kupata eneo linalingana na '{input}'. Tafadhali "
-                    "toa eneo lako kwa undani zaidi? Jumuisha mkoa, wilaya, "
-                    "na kata yako."
+                    "Sikuweza kupata eneo linalingana na '{input}'. "
+                    "Tafadhali niambie wilaya na kata yako.\n"
+                    "Mfano: Njoro, Lare"
                 ),
             },
             # Hierarchical selection messages
