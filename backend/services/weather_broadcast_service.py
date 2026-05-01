@@ -114,6 +114,41 @@ class WeatherBroadcastService:
 
         return has_weather_key and has_openai and is_enabled
 
+    def _format_weather_for_generic(self, parsed_weather: dict) -> str:
+        """Format parsed weather data for generic (non-crop) template."""
+        lines = []
+
+        # Current conditions
+        temp_min = parsed_weather.get("temperature_min_c")
+        temp_max = parsed_weather.get("temperature_max_c")
+        if temp_min and temp_max:
+            lines.append(f"Temperature: {temp_min}-{temp_max}°C")
+
+        humidity = parsed_weather.get("relative_humidity_pct")
+        if humidity:
+            lines.append(f"Humidity: {humidity}%")
+
+        rain_today = parsed_weather.get("qpf_today_mm")
+        if rain_today is not None:
+            lines.append(f"Rain today: {rain_today}mm")
+
+        # Weekly forecast
+        forecast_days = parsed_weather.get("forecast_days", [])
+        if forecast_days:
+            lines.append("\nWeek ahead:")
+            for day in forecast_days[:5]:
+                date = day.get("date", "")[-5:]  # Just MM-DD
+                rain = day.get("qpf_mm", 0)
+                t_max = day.get("temperature_max_c", "?")
+                t_min = day.get("temperature_min_c", "?")
+                lines.append(f"  {date}: {t_min}-{t_max}°C, {rain}mm")
+
+        total_rain = parsed_weather.get("forecast_total_rainfall_mm")
+        if total_rain:
+            lines.append(f"\nTotal expected rain: {total_rain}mm")
+
+        return "\n".join(lines)
+
     def get_forecast_raw(self, location: str) -> Optional[Dict[str, Any]]:
         """
         Get raw weather forecast data for a location.
@@ -290,50 +325,8 @@ class WeatherBroadcastService:
         month = datetime.now().month
         crop = (farmer_crop or "avocado").lower()
 
-        # Evaluate rules (for ALL varieties)
-        triggered_rules = advisory_service.evaluate_rules(
-            weather_data=parsed_weather,
-            crop=crop,
-            variety=None,
-            month=month,
-        )
-
-        logger.info(
-            f"Weather advisory for {location} ({crop}, all varieties): "
-            f"{len(triggered_rules)} rules triggered"
-        )
-
-        # Build advisory data for LLM (includes all varieties)
-        advisory_data = advisory_service.build_advisory_data(
-            triggered_rules=triggered_rules,
-            weather_data=parsed_weather,
-            location=location,
-            crop=crop,
-            language=language,
-        )
-
-        # Load advisory prompt template
-        template_path = (
-            Path(__file__).parent.parent / "templates" / "advisory_prompt.txt"
-        )
-
-        try:
-            with open(template_path, "r") as f:
-                template_content = f.read()
-        except Exception as e:
-            logger.error(f"✗ Failed to load advisory template: {e}")
-            # Fallback to old template if advisory template not found
-            template_content = self._load_prompt_template()
-            if template_content is None:
-                return None
-
-        # Render prompt with advisory data
-        template = Template(template_content)
-        prompt = template.render(
-            advisory_data=advisory_data,
-            language=language,
-            farmer_crop=farmer_crop or "avocado",
-        )
+        # Check if crop has calendar support
+        has_calendar = advisory_service.has_calendar_support(crop)
 
         # Generate message using OpenAI
         openai_service = get_openai_service()
@@ -341,17 +334,103 @@ class WeatherBroadcastService:
             logger.error("✗ OpenAI service not configured")
             return None
 
+        if has_calendar:
+            # Use crop-specific advisory flow
+            triggered_rules = advisory_service.evaluate_rules(
+                weather_data=parsed_weather,
+                crop=crop,
+                variety=None,
+                month=month,
+            )
+
+            logger.info(
+                f"Weather advisory for {location} ({crop}, all varieties): "
+                f"{len(triggered_rules)} rules triggered"
+            )
+
+            # Build advisory data for LLM (includes all varieties)
+            advisory_data = advisory_service.build_advisory_data(
+                triggered_rules=triggered_rules,
+                weather_data=parsed_weather,
+                location=location,
+                crop=crop,
+                language=language,
+            )
+
+            # Load advisory prompt template
+            template_path = (
+                Path(__file__).parent.parent
+                / "templates"
+                / "advisory_prompt.txt"
+            )
+
+            try:
+                with open(template_path, "r") as f:
+                    template_content = f.read()
+            except Exception as e:
+                logger.error(f"✗ Failed to load advisory template: {e}")
+                template_content = self._load_prompt_template()
+                if template_content is None:
+                    return None
+
+            # Render prompt with advisory data
+            template = Template(template_content)
+            prompt = template.render(
+                advisory_data=advisory_data,
+                language=language,
+                farmer_crop=farmer_crop or "avocado",
+            )
+
+            system_message = (
+                "You are an expert agricultural weather advisor "
+                "for farmers in Kenya. Generate clear, actionable "
+                "weather advisories based on agronomic rules."
+            )
+            triggered_count = len(triggered_rules)
+        else:
+            # Use generic weather template for crops without calendar support
+            logger.info(
+                f"No calendar support for {crop}, "
+                f"using generic weather advisory"
+            )
+
+            # Load generic weather template
+            template_path = (
+                Path(__file__).parent.parent
+                / "templates"
+                / "generic_weather_prompt.txt"
+            )
+
+            try:
+                with open(template_path, "r") as f:
+                    template_content = f.read()
+            except Exception as e:
+                logger.error(f"✗ Failed to load generic template: {e}")
+                return None
+
+            # Format weather data for generic template
+            weather_data_str = self._format_weather_for_generic(parsed_weather)
+
+            # Render prompt with weather data
+            template = Template(template_content)
+            prompt = template.render(
+                weather_data=weather_data_str,
+                location=location,
+                language=language,
+                farmer_type=farmer_crop or "general",
+            )
+
+            system_message = (
+                "You are a friendly weather advisor for farmers in Kenya. "
+                "Generate clear, practical weather updates without "
+                "crop-specific farming advice."
+            )
+            triggered_count = 0
+
         try:
             response = await openai_service.chat_completion(
                 messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert agricultural weather advisor "
-                            "for farmers in Kenya. Generate clear, actionable "
-                            "weather advisories based on agronomic rules."
-                        ),
-                    },
+                    {"role": "system", "content": system_message},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.7,
@@ -360,10 +439,17 @@ class WeatherBroadcastService:
 
             if response and response.content:
                 message = response.content.strip()
-                logger.info(
-                    f"✓ Generated advisory for {location} (all varieties): "
-                    f"{len(message)} chars, {len(triggered_rules)} rules"
-                )
+                if has_calendar:
+                    logger.info(
+                        f"✓ Generated advisory for {location} "
+                        f"(all varieties): {len(message)} chars, "
+                        f"{triggered_count} rules"
+                    )
+                else:
+                    logger.info(
+                        f"✓ Generated generic weather for {location} "
+                        f"({crop}): {len(message)} chars"
+                    )
                 return message
 
             logger.error("✗ OpenAI returned empty response")

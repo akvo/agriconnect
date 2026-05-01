@@ -68,6 +68,20 @@ class WeatherAdvisoryService:
                 self._calendar_cache[crop] = {"monthly_calendar": {}}
         return self._calendar_cache[crop]
 
+    def has_calendar_support(self, crop: str) -> bool:
+        """
+        Check if a crop has calendar/rules file support.
+
+        Args:
+            crop: Crop type (e.g., "avocado", "dairy")
+
+        Returns:
+            True if crop calendar file exists
+        """
+        crop = crop.lower()
+        calendar_file = DATA_DIR / f"{crop}_crop_calendar.json"
+        return calendar_file.exists()
+
     def get_growth_stage(
         self, month: int, crop: str = "avocado", variety: str = None
     ) -> dict:
