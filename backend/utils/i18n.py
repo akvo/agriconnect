@@ -408,6 +408,7 @@ trans: Dict[str, Any] = {
         "Avocado": {"name": {"en": "Avocado", "sw": "Parachichi"}},
         "Cacao": {"name": {"en": "cacao", "sw": "kakao"}},
         "Potato": {"name": {"en": "potato", "sw": "viazi"}},
+        "Dairy": {"name": {"en": "Dairy", "sw": "Maziwa"}},
     },
     "gender": {
         "male": {"en": "Male", "sw": "Mwanaume"},

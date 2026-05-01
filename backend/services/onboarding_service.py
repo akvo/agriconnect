@@ -88,8 +88,8 @@ class OnboardingService:
         Returns:
             Numbered list string, e.g.:
             1. Avocado
-            2. Cacao
-            3. Potato
+            2. Potato
+            3. Dairy
         """
         lines = []
         for i, crop in enumerate(self.supported_crops, start=1):
@@ -1993,20 +1993,14 @@ Birth year must be between 1900 and {current_year}."""
         # Show users list for customer ask edit their profile
         customer_adm_id = None
         if len(customer.customer_administrative) > 0:
-            customer_adm_id = customer\
-                .customer_administrative[0].administrative_id
+            customer_adm_id = customer.customer_administrative[
+                0
+            ].administrative_id
         users = UserService.get_users_by_administrative_id(
-            self.db,
-            administrative_id=customer_adm_id
+            self.db, administrative_id=customer_adm_id
         )
-        ask_profile_msg = t(
-            "onboarding.ask_edit_profile",
-            lang
-        )
-        ask_delete_msg = t(
-            "onboarding.ask_delete_data",
-            lang
-        )
+        ask_profile_msg = t("onboarding.ask_edit_profile", lang)
+        ask_delete_msg = t("onboarding.ask_delete_data", lang)
         message += f"\n\n{ask_profile_msg}\n"
         if len(users) == 0:
             contact_name = settings.contact_name
