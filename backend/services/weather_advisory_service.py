@@ -124,7 +124,10 @@ class WeatherAdvisoryService:
         all_growth_stages = phenology
 
         # Extract high-priority management tasks
-        mgmt = month_data.get("management", {})
+        # Bug fix B1: Support both "management" and "management_tasks" keys
+        mgmt = month_data.get(
+            "management", month_data.get("management_tasks", {})
+        )
         management_due = []
         for activity, details in mgmt.items():
             if details.get("priority") in ("critical", "high"):
@@ -133,6 +136,8 @@ class WeatherAdvisoryService:
                         "activity": activity,
                         "priority": details["priority"],
                         "action": details["action"],
+                        # Thread scenarios for weather-gated calendar rules
+                        "scenarios": details.get("scenarios", {}),
                     }
                 )
 
@@ -143,6 +148,8 @@ class WeatherAdvisoryService:
             "management_due": management_due,
             "disease_risk": month_data.get("disease_risk", {}),
             "pest_risk": month_data.get("pest_risk", {}),
+            # Bug fix B2: Include parasite_risk for dairy
+            "parasite_risk": month_data.get("parasite_risk", {}),
             "phenology_all": phenology,
         }
 
@@ -167,6 +174,22 @@ class WeatherAdvisoryService:
             stage_tags.update(["vegetative", "vegetative_flush"])
         if "young" in stage or "transplant" in stage:
             stage_tags.update(["young_trees_1_3yr", "newly_transplanted"])
+
+        # Dairy stage tags
+        if "calving" in stage:
+            stage_tags.add("calving_season")
+        if "peak_lactation" in stage:
+            stage_tags.add("peak_lactation")
+        if "breeding" in stage:
+            stage_tags.add("breeding_season")
+        if "late_lactation" in stage:
+            stage_tags.add("late_lactation")
+        if "drying_off" in stage:
+            stage_tags.update(["late_lactation", "drying_off"])
+        if "dry_period" in stage:
+            stage_tags.add("dry_period")
+        if "pre_calving" in stage:
+            stage_tags.update(["dry_period", "pre_calving"])
 
         return stage_tags
 
@@ -384,6 +407,208 @@ class WeatherAdvisoryService:
                             }
                         )
 
+                # Dairy-specific activity handlers
+                elif activity == "vaccination":
+                    scenarios = task.get("scenarios", {})
+                    if rain < 2:
+                        s = scenarios.get("suitable", {})
+                        name = s.get("name", "Vaccination due")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": priority,
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+                    else:
+                        s = scenarios.get("blocked", {})
+                        name = s.get("name", "Vaccination - wait")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}-WAIT",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": "informational",
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+
+                elif activity == "deworming":
+                    scenarios = task.get("scenarios", {})
+                    s = scenarios.get("always", {})
+                    name = s.get("name", "Deworming due")
+                    rules.append(
+                        {
+                            "id": f"CAL-{activity.upper()}",
+                            "category": "CALENDAR_MANAGEMENT",
+                            "name": f"Calendar: {name}",
+                            "priority": priority,
+                            "risk": s.get("risk", ""),
+                            "actions": [action] + s.get("extra_actions", []),
+                            "source": "crop_calendar",
+                        }
+                    )
+
+                elif activity == "acaricide_spraying":
+                    scenarios = task.get("scenarios", {})
+                    if rain < 2 and wind < 15:
+                        s = scenarios.get("suitable", {})
+                        name = s.get("name", "Acaricide spray due")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": priority,
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+                    else:
+                        s = scenarios.get("blocked", {})
+                        name = s.get("name", "Acaricide - wait")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}-WAIT",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": "informational",
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+
+                elif activity == "breeding_ai":
+                    scenarios = task.get("scenarios", {})
+                    thi = weather.get("thi_value", 70)
+                    if thi >= 78:
+                        s = scenarios.get("heat_warning", {})
+                        name = s.get("name", "Breeding - heat")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}-HEAT",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": "high",
+                                "risk": s.get(
+                                    "risk",
+                                    "Heat stress reduces conception rates",
+                                ),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+                    else:
+                        s = scenarios.get("suitable", {})
+                        name = s.get("name", "Breeding due")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": priority,
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+
+                elif activity == "drying_off":
+                    scenarios = task.get("scenarios", {})
+                    s = scenarios.get("always", {})
+                    name = s.get("name", "Drying off due")
+                    rules.append(
+                        {
+                            "id": f"CAL-{activity.upper()}",
+                            "category": "CALENDAR_MANAGEMENT",
+                            "name": f"Calendar: {name}",
+                            "priority": priority,
+                            "risk": s.get("risk", ""),
+                            "actions": [action] + s.get("extra_actions", []),
+                            "source": "crop_calendar",
+                        }
+                    )
+
+                elif activity == "housing_maintenance":
+                    scenarios = task.get("scenarios", {})
+                    if rain > 0:
+                        s = scenarios.get("urgent", {})
+                        name = s.get("name", "Housing urgent")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}-URGENT",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": "high",
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+                    else:
+                        s = scenarios.get("routine", {})
+                        name = s.get("name", "Housing check")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": priority,
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+
+                elif activity == "forage_planting":
+                    scenarios = task.get("scenarios", {})
+                    if rain > 2:
+                        s = scenarios.get("suitable", {})
+                        name = s.get("name", "Forage planting")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": priority,
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+                    else:
+                        s = scenarios.get("blocked", {})
+                        name = s.get("name", "Forage - wait")
+                        rules.append(
+                            {
+                                "id": f"CAL-{activity.upper()}-WAIT",
+                                "category": "CALENDAR_MANAGEMENT",
+                                "name": f"Calendar: {name}",
+                                "priority": "informational",
+                                "risk": s.get("risk", ""),
+                                "actions": [action]
+                                + s.get("extra_actions", []),
+                                "source": "crop_calendar",
+                            }
+                        )
+
                 else:
                     # Generic calendar task
                     activity_name = activity.replace("_", " ").title()
@@ -444,6 +669,37 @@ class WeatherAdvisoryService:
                     "actions": [
                         f"Increase scouting for {', '.join(high_pests)}",
                         "Check traps and replace lures if >4 weeks old",
+                    ],
+                    "source": "crop_calendar",
+                }
+            )
+
+        # Add parasite risk alert for dairy
+        parasite_risk = calendar_ctx.get("parasite_risk", {})
+        high_parasites = [
+            p
+            for p, level in parasite_risk.items()
+            if level in ("high", "very_high")
+        ]
+        if high_parasites:
+            rules.append(
+                {
+                    "id": "CAL-PARASITE-ALERT",
+                    "category": "CALENDAR_MANAGEMENT",
+                    "name": "Elevated parasite risk this month",
+                    "priority": "high"
+                    if any(
+                        parasite_risk[p] == "very_high"
+                        for p in high_parasites
+                    )
+                    else "medium",
+                    "risk": (
+                        f"Parasite pressure: {', '.join(high_parasites)}"
+                    ),
+                    "actions": [
+                        f"Monitor for {', '.join(high_parasites)}",
+                        "Check tick sites (ears, tail, udder, groin)",
+                        "Assess faecal egg count before deworming",
                     ],
                     "source": "crop_calendar",
                 }
@@ -617,6 +873,18 @@ class WeatherAdvisoryService:
                 if parsed.get("temperature_c"):
                     soil_temp = parsed["temperature_c"] - 2
                     parsed["soil_temp_estimate_c"] = soil_temp
+
+                # THI (Temperature-Humidity Index) for dairy heat stress
+                # THI < 72: comfortable | 72-77: mild stress | >= 78: severe
+                if (
+                    parsed.get("temperature_c") is not None
+                    and parsed.get("relative_humidity_pct") is not None
+                ):
+                    t = parsed["temperature_c"]
+                    rh = parsed["relative_humidity_pct"]
+                    parsed["thi_value"] = round(
+                        0.8 * t + (rh / 100) * (t - 14.4) + 46.4, 1
+                    )
 
             # Derived fields from current conditions
             parsed["is_daytime"] = raw.get("isDaytime", True)
