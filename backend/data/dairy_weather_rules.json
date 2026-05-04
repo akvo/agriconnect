@@ -1,0 +1,527 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2025-05-04",
+    "description": "Weather-triggered advisory rules for dairy farming in Kenya, based on THI (Temperature-Humidity Index) and weather conditions",
+    "sources": [
+      {"id": "KALRO", "title": "KALRO Dairy Production Manual", "year": 2020},
+      {"id": "KDB", "title": "Kenya Dairy Board Guidelines", "year": 2022},
+      {"id": "FAO", "title": "FAO Dairy Cattle Husbandry Guidelines for East Africa", "year": 2018},
+      {"id": "ILRI", "title": "ILRI Smallholder Dairy Production Systems", "year": 2019}
+    ],
+    "total_rules": 25,
+    "categories": [
+      "HEAT_STRESS",
+      "COLD_STRESS",
+      "PARASITE_RISK",
+      "DISEASE_RISK",
+      "HOUSING",
+      "NUTRITION",
+      "BREEDING",
+      "MILK_QUALITY",
+      "SPRAY_WINDOW"
+    ]
+  },
+  "rules": [
+    {
+      "id": "HEAT-001",
+      "category": "HEAT_STRESS",
+      "name": "Heat Stress - Mild (THI 72-77)",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "thi_value", "op": ">=", "value": 72},
+          {"field": "thi_value", "op": "<", "value": 78}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Mild heat stress begins at THI 72. Cows reduce feed intake by 3-5%, milk production may drop 2-5%. Early intervention prevents escalation.",
+      "priority": "medium",
+      "actions": [
+        "Ensure unlimited access to clean, cool drinking water",
+        "Provide shade in all grazing and holding areas",
+        "Reduce walking distance to water and feed",
+        "Consider feeding during cooler morning and evening hours"
+      ],
+      "sources": ["KALRO Dairy Manual", "FAO Guidelines"]
+    },
+    {
+      "id": "HEAT-002",
+      "category": "HEAT_STRESS",
+      "name": "Heat Stress - Moderate to Severe (THI >= 78)",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "thi_value", "op": ">=", "value": 78}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "higher_risk": ["peak_lactation", "breeding_season"]
+      },
+      "risk": "Severe heat stress at THI >= 78. Milk production drops 10-25%. Conception rates drop 20-30%. Risk of heat exhaustion in severe cases.",
+      "priority": "critical",
+      "actions": [
+        "Provide cooling - fans, sprinklers, or shade cloth immediately",
+        "Increase water availability - cows drink 50% more in heat stress",
+        "Avoid moving or handling cattle during hottest hours (10am-4pm)",
+        "Postpone AI services if possible - fertility significantly reduced",
+        "Feed high-quality, low-fibre diet to reduce metabolic heat",
+        "Monitor for signs of heat exhaustion: rapid breathing, drooling, reluctance to move"
+      ],
+      "sources": ["KALRO Dairy Manual", "ILRI Research"]
+    },
+    {
+      "id": "HEAT-003",
+      "category": "HEAT_STRESS",
+      "name": "Night-time Heat Stress Recovery",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_min_c", "op": ">=", "value": 21},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 70}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Warm humid nights prevent heat dissipation. Cows need cool nights (< 21°C) to recover from daytime heat stress.",
+      "priority": "high",
+      "actions": [
+        "Ensure adequate ventilation in night housing",
+        "Consider fan cooling overnight",
+        "Avoid overcrowding in housing - space allows heat dissipation",
+        "Ensure water access overnight"
+      ],
+      "sources": ["FAO Guidelines"]
+    },
+    {
+      "id": "COLD-001",
+      "category": "COLD_STRESS",
+      "name": "Cold Stress - Calves at Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_min_c", "op": "<", "value": 10},
+          {"field": "qpf_today_mm", "op": ">", "value": 0}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["calving_season"]
+      },
+      "risk": "Cold wet conditions are dangerous for newborn calves. Hypothermia can set in rapidly, especially if calf is wet.",
+      "priority": "critical",
+      "actions": [
+        "Ensure dry, draft-free housing for calving",
+        "Dry calves immediately after birth with clean towels",
+        "Feed warm colostrum within first hour",
+        "Use calf jackets in prolonged cold weather",
+        "Add extra bedding to calving area"
+      ],
+      "sources": ["KALRO Dairy Manual"]
+    },
+    {
+      "id": "COLD-002",
+      "category": "COLD_STRESS",
+      "name": "Cold Conditions - Increased Energy Needs",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": "<", "value": 10}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Cows use extra energy to maintain body temperature in cold weather. Feed intake must increase to maintain production.",
+      "priority": "medium",
+      "actions": [
+        "Increase concentrate feeding by 10-15%",
+        "Ensure adequate roughage for heat generation",
+        "Provide windbreaks in exposed areas",
+        "Monitor body condition - cold weather depletes reserves"
+      ],
+      "sources": ["FAO Guidelines"]
+    },
+    {
+      "id": "PARA-001",
+      "category": "PARASITE_RISK",
+      "name": "Tick Activity - High Risk Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 20},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 70}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Warm humid conditions (20°C+, 70%+ RH) are optimal for tick activity and ECF transmission. Tick-borne diseases peak in these conditions.",
+      "priority": "high",
+      "actions": [
+        "Apply acaricide if spray conditions permit",
+        "Inspect cattle daily for tick attachment (ears, tail head, udder, groin)",
+        "Reduce grazing time in tall grass areas where ticks wait",
+        "Keep pastures short through grazing management or cutting"
+      ],
+      "sources": ["KALRO", "Kenya Veterinary Services"]
+    },
+    {
+      "id": "PARA-002",
+      "category": "PARASITE_RISK",
+      "name": "Fly Activity - High Risk",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 22},
+          {"field": "qpf_today_mm", "op": "<", "value": 5}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Warm dry conditions favour biting flies. Face flies spread pink eye, horn flies cause irritation and blood loss.",
+      "priority": "medium",
+      "actions": [
+        "Use fly repellent ear tags or pour-on products",
+        "Clean manure from housing daily to reduce breeding sites",
+        "Provide dark shelters where cattle can escape flies",
+        "Monitor for signs of pink eye - treat early"
+      ],
+      "sources": ["FAO Guidelines"]
+    },
+    {
+      "id": "PARA-003",
+      "category": "PARASITE_RISK",
+      "name": "Internal Parasite Risk - Wet Pastures",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_7d_mm", "op": ">=", "value": 30},
+          {"field": "temperature_c", "op": ">=", "value": 15}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"],
+        "higher_risk": ["calving_season"]
+      },
+      "risk": "Wet warm pastures favour worm larvae development. Cows pick up infective larvae while grazing. Young stock most vulnerable.",
+      "priority": "high",
+      "actions": [
+        "Avoid grazing wet low-lying pastures",
+        "Rotate pastures - don't return to same area within 3 weeks",
+        "Consider faecal egg count to assess worm burden",
+        "Target deworming to high-risk animals (calves, first-lactation cows)"
+      ],
+      "sources": ["KALRO", "FAO Guidelines"]
+    },
+    {
+      "id": "DIS-001",
+      "category": "DISEASE_RISK",
+      "name": "Mastitis Risk - Wet Housing",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "qpf_today_mm", "op": ">=", "value": 10},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 80}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["peak_lactation", "late_lactation"]
+      },
+      "risk": "Wet conditions increase mastitis risk. Environmental bacteria (E. coli, Strep uberis) thrive in wet bedding and cause clinical mastitis.",
+      "priority": "critical",
+      "actions": [
+        "Add fresh dry bedding immediately - wet bedding is main risk factor",
+        "Check housing drainage and fix any pooling",
+        "Pre-dip teats before milking in wet conditions",
+        "Monitor milk for clots and changes - strip test before attaching clusters",
+        "Treat clinical cases immediately - delay increases quarter loss risk"
+      ],
+      "sources": ["Kenya Dairy Board Guidelines", "KALRO"]
+    },
+    {
+      "id": "DIS-002",
+      "category": "DISEASE_RISK",
+      "name": "Foot Rot Risk - Muddy Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "cumulative_rain_48h_mm", "op": ">=", "value": 20}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Soft wet hooves plus muddy conditions favour Fusobacterium infection. Foot rot causes severe lameness and production loss.",
+      "priority": "high",
+      "actions": [
+        "Provide hard standing areas where cattle can escape mud",
+        "Use foot bath with copper sulphate or formalin at entry to parlour",
+        "Inspect feet daily - early treatment is critical",
+        "Avoid forcing cattle through deep mud",
+        "Consider reducing time on pasture until conditions dry"
+      ],
+      "sources": ["KALRO Dairy Manual"]
+    },
+    {
+      "id": "HOUS-001",
+      "category": "HOUSING",
+      "name": "Housing Ventilation - Hot Humid Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 25},
+          {"field": "relative_humidity_pct", "op": ">=", "value": 75}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Poor ventilation in hot humid conditions leads to heat stress and respiratory problems. Ammonia buildup affects health.",
+      "priority": "high",
+      "actions": [
+        "Open all ventilation points - sides, ridge vents",
+        "Use fans if available to improve air movement",
+        "Do not overcrowd housing - allow 6+ sqm per cow",
+        "Remove wet bedding which adds humidity and ammonia"
+      ],
+      "sources": ["FAO Guidelines"]
+    },
+    {
+      "id": "HOUS-002",
+      "category": "HOUSING",
+      "name": "Storm Warning - Secure Housing",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "wind_speed_kmh", "op": ">=", "value": 40}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Strong winds can damage housing structures. Roof damage in rain causes wet bedding and health problems.",
+      "priority": "high",
+      "actions": [
+        "Secure loose roofing sheets and structures",
+        "Bring cattle inside to protected areas",
+        "Check and clear drainage to prevent flooding",
+        "Have emergency repair materials ready"
+      ],
+      "sources": ["Kenya Dairy Board Guidelines"]
+    },
+    {
+      "id": "NUTR-001",
+      "category": "NUTRITION",
+      "name": "Grazing Conditions - Wet Pasture Caution",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "qpf_today_mm", "op": ">=", "value": 15}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Wet pastures cause poaching (soil damage), bloat risk from lush grass, and internal parasite pickup. Energy content of wet grass is diluted.",
+      "priority": "medium",
+      "actions": [
+        "Limit grazing time to 2-3 hours in wet conditions",
+        "Supplement with dry hay or straw to add fibre and reduce bloat risk",
+        "Avoid grazing young rapidly-growing pastures when wet - highest bloat risk",
+        "Use sacrifice paddock to protect main pastures from poaching"
+      ],
+      "sources": ["KALRO", "FAO Guidelines"]
+    },
+    {
+      "id": "NUTR-002",
+      "category": "NUTRITION",
+      "name": "Drought Conditions - Feed Scarcity Alert",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "consecutive_dry_days", "op": ">=", "value": 14},
+          {"field": "cumulative_rain_7d_mm", "op": "<", "value": 5}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Extended dry conditions reduce pasture availability. Feed scarcity leads to weight loss and reduced production.",
+      "priority": "high",
+      "actions": [
+        "Assess feed reserves - calculate weeks of supply remaining",
+        "Source additional hay or silage before prices rise",
+        "Consider reducing herd size - sell unproductive animals early",
+        "Reduce energy demands - consider once-daily milking",
+        "Provide water - cattle need 50-100L/day, more if no pasture moisture"
+      ],
+      "sources": ["ILRI", "Kenya Dairy Board"]
+    },
+    {
+      "id": "BREED-001",
+      "category": "BREEDING",
+      "name": "Breeding Conditions - Good",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "thi_value", "op": "<", "value": 72}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["breeding_season"]
+      },
+      "risk": "none - optimal conditions for breeding",
+      "priority": "opportunity",
+      "actions": [
+        "Good conditions for AI - proceed with planned services",
+        "Heat detection should be reliable - watch for standing heat",
+        "Optimal conception rates expected in comfortable conditions"
+      ],
+      "sources": ["KALRO Dairy Manual"]
+    },
+    {
+      "id": "BREED-002",
+      "category": "BREEDING",
+      "name": "Breeding Conditions - Heat Stress Warning",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "thi_value", "op": ">=", "value": 78}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["breeding_season"]
+      },
+      "risk": "Heat stress severely impacts fertility. Conception rates can drop 20-30%. Silent heats more common.",
+      "priority": "high",
+      "actions": [
+        "Consider delaying AI if cow is heat stressed",
+        "If breeding, do so in early morning (5-7am) when cooler",
+        "Provide cooling before and after service",
+        "Use tail paint or activity monitors - visual heat detection less reliable",
+        "Consider timed AI protocols to ensure insemination despite poor heat expression"
+      ],
+      "sources": ["ILRI Research", "FAO Guidelines"]
+    },
+    {
+      "id": "MILK-001",
+      "category": "MILK_QUALITY",
+      "name": "Milk Spoilage Risk - Hot Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "temperature_c", "op": ">=", "value": 28}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["peak_lactation", "late_lactation"]
+      },
+      "risk": "High ambient temperature accelerates bacterial growth in milk. Milk spoils faster without cooling.",
+      "priority": "high",
+      "actions": [
+        "Cool milk immediately after milking - below 10°C within 2 hours",
+        "Deliver to collection point as soon as possible",
+        "Use clean containers - bacteria multiply faster in warm milk",
+        "If no cooling, deliver within 2 hours of milking in hot weather"
+      ],
+      "sources": ["Kenya Dairy Board Guidelines"]
+    },
+    {
+      "id": "SPRAY-001",
+      "category": "SPRAY_WINDOW",
+      "name": "Acaricide Application - Good Conditions",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "qpf_today_mm", "op": "<", "value": 2},
+          {"field": "wind_speed_kmh", "op": "<", "value": 15},
+          {"field": "rain_probability_today_pct", "op": "<", "value": 30}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "none - good spray window",
+      "priority": "opportunity",
+      "actions": [
+        "Good conditions for acaricide application",
+        "Apply early morning or late evening for best results",
+        "Ensure complete coverage - under belly, inner thighs, ears, tail",
+        "Allow product to dry before cattle lie down or enter wet areas"
+      ],
+      "sources": ["Kenya Veterinary Services"]
+    },
+    {
+      "id": "SPRAY-002",
+      "category": "SPRAY_WINDOW",
+      "name": "Acaricide Application - Conditions Unsuitable",
+      "weather_condition": {
+        "operator": "OR",
+        "conditions": [
+          {"field": "qpf_today_mm", "op": ">=", "value": 5},
+          {"field": "wind_speed_kmh", "op": ">=", "value": 20},
+          {"field": "rain_probability_today_pct", "op": ">=", "value": 70}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "Rain washes off acaricide before absorption. Wind causes drift and incomplete coverage. Wait for better conditions.",
+      "priority": "informational",
+      "actions": [
+        "Delay spraying until conditions improve",
+        "Use pour-on or injectable products if tick control is urgent",
+        "Hand-remove visible ticks as interim measure",
+        "Monitor weather forecast for next dry window"
+      ],
+      "sources": ["Kenya Veterinary Services"]
+    },
+    {
+      "id": "SPRAY-003",
+      "category": "SPRAY_WINDOW",
+      "name": "Vaccination Conditions - Good",
+      "weather_condition": {
+        "operator": "AND",
+        "conditions": [
+          {"field": "qpf_today_mm", "op": "<", "value": 2},
+          {"field": "temperature_c", "op": ">=", "value": 15},
+          {"field": "temperature_c", "op": "<=", "value": 28}
+        ]
+      },
+      "crop_context": {
+        "applies_to_stages": ["all"]
+      },
+      "risk": "none - good conditions for vaccination",
+      "priority": "opportunity",
+      "actions": [
+        "Good conditions for vaccination program",
+        "Animals not heat-stressed will have better immune response",
+        "Ensure cold chain is maintained - vaccines sensitive to temperature",
+        "Handle cattle calmly - stress reduces vaccine efficacy"
+      ],
+      "sources": ["Kenya Veterinary Services"]
+    }
+  ],
+  "conflict_resolution": {
+    "description": "Rules for resolving conflicting advisories",
+    "rules": [
+      {
+        "conflict": "HEAT-001 vs NUTR-001",
+        "resolution": "Heat stress takes priority - do not increase activity during heat stress conditions"
+      },
+      {
+        "conflict": "SPRAY-001 vs SPRAY-002",
+        "resolution": "Bad conditions block good conditions - if any blocking condition is met, do not spray"
+      },
+      {
+        "conflict": "BREED-001 vs BREED-002",
+        "resolution": "Heat stress warning overrides good breeding conditions"
+      }
+    ]
+  }
+}

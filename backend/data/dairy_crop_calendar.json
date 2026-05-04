@@ -1,0 +1,892 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2025-05-04",
+    "description": "Dairy herd calendar for Kenya, covering lactation cycles, health management, and seasonal activities",
+    "sources": [
+      "Kenya Dairy Board Guidelines",
+      "KALRO Dairy Production Manual",
+      "FAO Dairy Cattle Husbandry Guidelines for East Africa",
+      "ILRI Smallholder Dairy Production Systems"
+    ],
+    "notes": [
+      "Calendar is for Kenya's highland dairy zones (1500-2500m), the primary dairy production area",
+      "Bimodal rainfall: Long rains Mar-May, Short rains Oct-Dec",
+      "Heat stress becomes significant at THI >= 72",
+      "Parasite pressure highest during warm wet periods"
+    ]
+  },
+  "kenya_seasons": {
+    "long_rains": {"months": [3, 4, 5], "label": "Long Rains (Mar-May)"},
+    "long_dry": {"months": [6, 7, 8, 9], "label": "Long Dry (Jun-Sep)"},
+    "short_rains": {"months": [10, 11, 12], "label": "Short Rains (Oct-Dec)"},
+    "short_dry": {"months": [1, 2], "label": "Short Dry (Jan-Feb)"}
+  },
+  "herd_types": {
+    "Dairy": {
+      "common_breeds": ["Friesian", "Ayrshire", "Jersey", "Guernsey", "Crossbreeds"],
+      "altitude_range_m": [1500, 2500],
+      "optimal_temperature_c": [10, 25],
+      "heat_stress_thi_threshold": 72,
+      "severe_heat_stress_thi": 78,
+      "lactation_length_days": 305,
+      "dry_period_days": 60,
+      "calving_interval_months": 12,
+      "voluntary_waiting_period_days": 45
+    }
+  },
+  "monthly_calendar": {
+    "1": {
+      "month_name": "January",
+      "season": "short_dry",
+      "phenology": {
+        "Dairy": "peak_lactation"
+      },
+      "management_tasks": {
+        "vaccination": {
+          "priority": "high",
+          "action": "Vaccinate against FMD, ECF, and Lumpy Skin Disease before rains begin",
+          "scenarios": {
+            "suitable": {
+              "name": "Vaccination conditions good",
+              "risk": "Animals healthy and dry conditions favour vaccine efficacy",
+              "extra_actions": ["Ensure cold chain maintained", "Record batch numbers"]
+            },
+            "blocked": {
+              "name": "Vaccination delayed - wet conditions",
+              "risk": "Wet animals may have compromised immune response",
+              "extra_actions": ["Wait for animals to dry", "Reschedule within 48 hours"]
+            }
+          }
+        },
+        "deworming": {
+          "priority": "medium",
+          "action": "Strategic deworming before rainy season",
+          "scenarios": {
+            "always": {
+              "name": "Deworming due",
+              "risk": "Internal parasite load builds before wet season",
+              "extra_actions": ["Use broad-spectrum anthelmintic", "Rotate drug classes to prevent resistance"]
+            }
+          }
+        },
+        "breeding_ai": {
+          "priority": "high",
+          "action": "Peak breeding period - monitor heat detection closely",
+          "scenarios": {
+            "suitable": {
+              "name": "Good conditions for AI",
+              "risk": "Conception rates optimal in cool conditions",
+              "extra_actions": ["Observe standing heat", "Call AI technician within 12 hours"]
+            },
+            "heat_warning": {
+              "name": "Heat stress affecting breeding",
+              "risk": "Conception rates drop 20-30% in heat stress (THI > 78)",
+              "extra_actions": ["Provide shade and water", "Consider evening AI", "Delay breeding if possible"]
+            }
+          }
+        },
+        "housing_maintenance": {
+          "priority": "medium",
+          "action": "Check and repair housing structures before rains",
+          "scenarios": {
+            "routine": {
+              "name": "Housing maintenance routine",
+              "risk": "Minor repairs needed",
+              "extra_actions": ["Check roof for leaks", "Clear drainage channels"]
+            },
+            "urgent": {
+              "name": "Housing maintenance urgent - rain expected",
+              "risk": "Wet bedding leads to mastitis and foot problems",
+              "extra_actions": ["Prioritize roof repairs", "Stock dry bedding material"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "moderate",
+        "foot_rot": "low",
+        "tick_borne": "moderate"
+      },
+      "parasite_risk": {
+        "ticks": "moderate",
+        "worms": "low",
+        "flies": "moderate"
+      }
+    },
+    "2": {
+      "month_name": "February",
+      "season": "short_dry",
+      "phenology": {
+        "Dairy": "peak_lactation"
+      },
+      "management_tasks": {
+        "vaccination": {
+          "priority": "critical",
+          "action": "Complete all vaccinations before March rains - last opportunity",
+          "scenarios": {
+            "suitable": {
+              "name": "Final vaccination window",
+              "risk": "Must complete before wet season begins",
+              "extra_actions": ["Prioritize unvaccinated animals", "Update records"]
+            },
+            "blocked": {
+              "name": "Vaccination postponed",
+              "risk": "Wet conditions reduce vaccine effectiveness",
+              "extra_actions": ["Wait for dry spell", "Monitor weather forecast"]
+            }
+          }
+        },
+        "acaricide_spraying": {
+          "priority": "high",
+          "action": "Increase tick control frequency - tick population building",
+          "scenarios": {
+            "suitable": {
+              "name": "Spray conditions optimal",
+              "risk": "Tick population rising before rains",
+              "extra_actions": ["Spray early morning or late evening", "Ensure full body coverage"]
+            },
+            "blocked": {
+              "name": "Spraying delayed - unsuitable weather",
+              "risk": "Rain will wash off acaricide, wind causes drift",
+              "extra_actions": ["Wait for calm dry conditions", "Check forecast for 4-hour dry window"]
+            }
+          }
+        },
+        "forage_planting": {
+          "priority": "high",
+          "action": "Prepare land for fodder planting - Napier grass and fodder trees",
+          "scenarios": {
+            "suitable": {
+              "name": "Planting conditions good",
+              "risk": "Early rains expected - plant now for establishment",
+              "extra_actions": ["Plant Napier cuttings", "Establish fodder trees along boundaries"]
+            },
+            "blocked": {
+              "name": "Wait for moisture",
+              "risk": "Dry soil prevents establishment",
+              "extra_actions": ["Continue land preparation", "Source quality planting material"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "moderate",
+        "foot_rot": "low",
+        "tick_borne": "high"
+      },
+      "parasite_risk": {
+        "ticks": "high",
+        "worms": "low",
+        "flies": "high"
+      }
+    },
+    "3": {
+      "month_name": "March",
+      "season": "long_rains",
+      "phenology": {
+        "Dairy": "breeding_season"
+      },
+      "management_tasks": {
+        "acaricide_spraying": {
+          "priority": "critical",
+          "action": "Intensive tick control - ECF risk peaks with warm wet conditions",
+          "scenarios": {
+            "suitable": {
+              "name": "Spray window available",
+              "risk": "ECF transmission highest in warm wet weather",
+              "extra_actions": ["Spray every 5-7 days during peak", "Check for tick attachment sites"]
+            },
+            "blocked": {
+              "name": "Spraying blocked - rain/wind",
+              "risk": "Product washed off or drifts in wind",
+              "extra_actions": ["Wait for dry window", "Use pour-on products as backup"]
+            }
+          }
+        },
+        "housing_maintenance": {
+          "priority": "critical",
+          "action": "Ensure housing provides dry lying area - wet bedding causes mastitis",
+          "scenarios": {
+            "routine": {
+              "name": "Housing check routine",
+              "risk": "Monitor bedding moisture levels",
+              "extra_actions": ["Add fresh bedding daily", "Check drainage"]
+            },
+            "urgent": {
+              "name": "Urgent - wet conditions",
+              "risk": "Wet lying area dramatically increases mastitis risk",
+              "extra_actions": ["Change bedding immediately", "Improve drainage urgently"]
+            }
+          }
+        },
+        "forage_planting": {
+          "priority": "critical",
+          "action": "OPTIMAL PLANTING WINDOW - establish Napier grass and fodder crops",
+          "scenarios": {
+            "suitable": {
+              "name": "Planting conditions excellent",
+              "risk": "Best establishment window of the year",
+              "extra_actions": ["Plant immediately after rain", "Apply manure at planting"]
+            },
+            "blocked": {
+              "name": "Too dry for planting",
+              "risk": "Wait for adequate soil moisture",
+              "extra_actions": ["Continue preparing planting material"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "high",
+        "foot_rot": "high",
+        "tick_borne": "very_high"
+      },
+      "parasite_risk": {
+        "ticks": "very_high",
+        "worms": "rising",
+        "flies": "high"
+      }
+    },
+    "4": {
+      "month_name": "April",
+      "season": "long_rains",
+      "phenology": {
+        "Dairy": "breeding_season"
+      },
+      "management_tasks": {
+        "acaricide_spraying": {
+          "priority": "critical",
+          "action": "Continue intensive tick control - peak ECF transmission period",
+          "scenarios": {
+            "suitable": {
+              "name": "Spray conditions acceptable",
+              "risk": "ECF and other tick-borne diseases at peak",
+              "extra_actions": ["Maintain 5-7 day spray interval", "Inspect ears and tail daily"]
+            },
+            "blocked": {
+              "name": "Spraying postponed",
+              "risk": "Continuous rain makes spraying ineffective",
+              "extra_actions": ["Use injectable acaricide if available", "Inspect animals for tick loads"]
+            }
+          }
+        },
+        "deworming": {
+          "priority": "high",
+          "action": "Strategic deworming - worm burden rising with wet conditions",
+          "scenarios": {
+            "always": {
+              "name": "Deworming essential",
+              "risk": "Wet pastures increase worm infection",
+              "extra_actions": ["Target young stock and lactating cows", "Consider faecal egg count first"]
+            }
+          }
+        },
+        "breeding_ai": {
+          "priority": "medium",
+          "action": "Continue breeding program - monitor for silent heats in wet weather",
+          "scenarios": {
+            "suitable": {
+              "name": "AI conditions good",
+              "risk": "Good fertility expected if stress-free",
+              "extra_actions": ["Use tail paint or kamar for heat detection", "Record all services"]
+            },
+            "heat_warning": {
+              "name": "Fertility may be reduced",
+              "risk": "Heat stress even in rainy season if humidity high",
+              "extra_actions": ["Ensure adequate ventilation", "Provide shade in open areas"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "very_high",
+        "foot_rot": "very_high",
+        "tick_borne": "very_high"
+      },
+      "parasite_risk": {
+        "ticks": "very_high",
+        "worms": "high",
+        "flies": "high"
+      }
+    },
+    "5": {
+      "month_name": "May",
+      "season": "long_rains",
+      "phenology": {
+        "Dairy": "late_lactation"
+      },
+      "management_tasks": {
+        "acaricide_spraying": {
+          "priority": "high",
+          "action": "Continue tick control as rains taper",
+          "scenarios": {
+            "suitable": {
+              "name": "Spray window available",
+              "risk": "Tick pressure still significant",
+              "extra_actions": ["Can extend interval to 7-10 days as conditions dry"]
+            },
+            "blocked": {
+              "name": "Delay spraying",
+              "risk": "Rain expected - product will wash off",
+              "extra_actions": ["Wait for dry window"]
+            }
+          }
+        },
+        "housing_maintenance": {
+          "priority": "high",
+          "action": "Repair any rain damage to structures",
+          "scenarios": {
+            "routine": {
+              "name": "Post-rain maintenance",
+              "risk": "Assess damage from heavy rains",
+              "extra_actions": ["Fix leaks", "Repair muddy areas"]
+            },
+            "urgent": {
+              "name": "Urgent repairs needed",
+              "risk": "Continuing rain may worsen damage",
+              "extra_actions": ["Prioritize roof and drainage repairs"]
+            }
+          }
+        },
+        "drying_off": {
+          "priority": "high",
+          "action": "Begin drying off cows due to calve in Jul-Aug",
+          "scenarios": {
+            "always": {
+              "name": "Drying off period",
+              "risk": "Ensure 60-day dry period before calving",
+              "extra_actions": ["Reduce concentrate feeding", "Use dry cow therapy", "Check body condition"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "high",
+        "foot_rot": "high",
+        "tick_borne": "high"
+      },
+      "parasite_risk": {
+        "ticks": "high",
+        "worms": "high",
+        "flies": "moderate"
+      }
+    },
+    "6": {
+      "month_name": "June",
+      "season": "long_dry",
+      "phenology": {
+        "Dairy": "dry_period"
+      },
+      "management_tasks": {
+        "vaccination": {
+          "priority": "high",
+          "action": "Vaccinate dry cows - good time for boosters",
+          "scenarios": {
+            "suitable": {
+              "name": "Vaccination conditions optimal",
+              "risk": "Dry weather ideal for vaccination",
+              "extra_actions": ["Vaccinate against clostridial diseases", "Update all records"]
+            },
+            "blocked": {
+              "name": "Delay vaccination",
+              "risk": "Unexpected wet conditions",
+              "extra_actions": ["Reschedule for next dry day"]
+            }
+          }
+        },
+        "housing_maintenance": {
+          "priority": "medium",
+          "action": "Major repairs during dry season",
+          "scenarios": {
+            "routine": {
+              "name": "Dry season maintenance",
+              "risk": "Ideal conditions for construction",
+              "extra_actions": ["Concrete work", "Structural repairs"]
+            },
+            "urgent": {
+              "name": "Prioritize repairs",
+              "risk": "Complete before next rains",
+              "extra_actions": ["Focus on critical structures"]
+            }
+          }
+        },
+        "forage_planting": {
+          "priority": "medium",
+          "action": "Harvest and conserve excess fodder - silage or hay making",
+          "scenarios": {
+            "suitable": {
+              "name": "Conservation conditions good",
+              "risk": "Dry weather ideal for hay making",
+              "extra_actions": ["Cut Napier at 1m height", "Ensure proper wilting before baling"]
+            },
+            "blocked": {
+              "name": "Delay hay making",
+              "risk": "Unexpected rain will spoil cut forage",
+              "extra_actions": ["Monitor weather closely", "Have tarps ready"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "moderate",
+        "foot_rot": "low",
+        "tick_borne": "moderate"
+      },
+      "parasite_risk": {
+        "ticks": "moderate",
+        "worms": "moderate",
+        "flies": "low"
+      }
+    },
+    "7": {
+      "month_name": "July",
+      "season": "long_dry",
+      "phenology": {
+        "Dairy": "pre_calving"
+      },
+      "management_tasks": {
+        "vaccination": {
+          "priority": "medium",
+          "action": "Ensure pre-calving vaccinations complete",
+          "scenarios": {
+            "suitable": {
+              "name": "Vaccination timing good",
+              "risk": "Calves will receive passive immunity via colostrum",
+              "extra_actions": ["Focus on E. coli and rotavirus vaccines"]
+            },
+            "blocked": {
+              "name": "Delay if stressed",
+              "risk": "Avoid vaccinating stressed animals",
+              "extra_actions": ["Provide shelter and water first"]
+            }
+          }
+        },
+        "acaricide_spraying": {
+          "priority": "medium",
+          "action": "Maintain tick control - can reduce frequency in dry weather",
+          "scenarios": {
+            "suitable": {
+              "name": "Spray conditions good",
+              "risk": "Lower tick pressure but maintain vigilance",
+              "extra_actions": ["Extend to 10-14 day intervals if tick counts low"]
+            },
+            "blocked": {
+              "name": "Wind too strong",
+              "risk": "Product drift wastes acaricide",
+              "extra_actions": ["Spray early morning when calm"]
+            }
+          }
+        },
+        "breeding_ai": {
+          "priority": "medium",
+          "action": "Monitor returning heats - pregnancy check at 45-60 days",
+          "scenarios": {
+            "suitable": {
+              "name": "Breeding follow-up",
+              "risk": "Confirm pregnancies from earlier services",
+              "extra_actions": ["Schedule vet for rectal palpation", "Record results"]
+            },
+            "heat_warning": {
+              "name": "Possible heat stress",
+              "risk": "Watch for repeat breeders",
+              "extra_actions": ["Provide cooling", "Consider resynchronization"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "low",
+        "foot_rot": "low",
+        "tick_borne": "moderate"
+      },
+      "parasite_risk": {
+        "ticks": "moderate",
+        "worms": "low",
+        "flies": "low"
+      }
+    },
+    "8": {
+      "month_name": "August",
+      "season": "long_dry",
+      "phenology": {
+        "Dairy": "calving_season"
+      },
+      "management_tasks": {
+        "vaccination": {
+          "priority": "high",
+          "action": "Vaccinate newborn calves against clostridial diseases",
+          "scenarios": {
+            "suitable": {
+              "name": "Calf vaccination timing",
+              "risk": "Protect calves as maternal immunity wanes",
+              "extra_actions": ["Vaccinate at 2-3 weeks of age", "Mark vaccinated calves"]
+            },
+            "blocked": {
+              "name": "Delay if calves stressed",
+              "risk": "Stress reduces vaccine response",
+              "extra_actions": ["Ensure calves are healthy and well-fed first"]
+            }
+          }
+        },
+        "deworming": {
+          "priority": "medium",
+          "action": "Deworm calves at weaning",
+          "scenarios": {
+            "always": {
+              "name": "Weaning deworming",
+              "risk": "Transition stress increases parasite impact",
+              "extra_actions": ["Use calf-appropriate dose", "Combine with vitamin supplementation"]
+            }
+          }
+        },
+        "housing_maintenance": {
+          "priority": "high",
+          "action": "Ensure calving area is clean, dry, and ready",
+          "scenarios": {
+            "routine": {
+              "name": "Calving area preparation",
+              "risk": "Clean environment reduces calf mortality",
+              "extra_actions": ["Disinfect calving pen", "Stock clean bedding", "Prepare colostrum supplies"]
+            },
+            "urgent": {
+              "name": "Urgent preparation",
+              "risk": "Calvings imminent",
+              "extra_actions": ["Priority cleaning", "Have calving kit ready"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "moderate",
+        "foot_rot": "low",
+        "tick_borne": "low"
+      },
+      "parasite_risk": {
+        "ticks": "low",
+        "worms": "low",
+        "flies": "moderate"
+      }
+    },
+    "9": {
+      "month_name": "September",
+      "season": "long_dry",
+      "phenology": {
+        "Dairy": "calving_season"
+      },
+      "management_tasks": {
+        "breeding_ai": {
+          "priority": "high",
+          "action": "Begin breeding freshly calved cows after voluntary waiting period",
+          "scenarios": {
+            "suitable": {
+              "name": "Post-calving breeding",
+              "risk": "Good conception expected if body condition adequate",
+              "extra_actions": ["Wait minimum 45 days post-calving", "Ensure BCS > 2.5 before serving"]
+            },
+            "heat_warning": {
+              "name": "Heat affecting fertility",
+              "risk": "Heat stress reduces conception rates significantly",
+              "extra_actions": ["Breed in early morning or evening", "Provide cooling pre-service"]
+            }
+          }
+        },
+        "acaricide_spraying": {
+          "priority": "medium",
+          "action": "Prepare for increasing tick activity as short rains approach",
+          "scenarios": {
+            "suitable": {
+              "name": "Preventive spraying",
+              "risk": "Tick activity will increase with rains",
+              "extra_actions": ["Stock acaricides", "Resume regular spraying schedule"]
+            },
+            "blocked": {
+              "name": "Conditions unsuitable",
+              "risk": "Wait for suitable weather",
+              "extra_actions": ["Monitor tick loads manually"]
+            }
+          }
+        },
+        "forage_planting": {
+          "priority": "high",
+          "action": "Prepare land for short rains planting",
+          "scenarios": {
+            "suitable": {
+              "name": "Land preparation",
+              "risk": "Ready for planting when rains arrive",
+              "extra_actions": ["Clear and prepare plots", "Source seeds and cuttings"]
+            },
+            "blocked": {
+              "name": "Soil too hard",
+              "risk": "Dry conditions make preparation difficult",
+              "extra_actions": ["Wait for early rains to soften soil"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "moderate",
+        "foot_rot": "low",
+        "tick_borne": "rising"
+      },
+      "parasite_risk": {
+        "ticks": "rising",
+        "worms": "low",
+        "flies": "moderate"
+      }
+    },
+    "10": {
+      "month_name": "October",
+      "season": "short_rains",
+      "phenology": {
+        "Dairy": "peak_lactation"
+      },
+      "management_tasks": {
+        "acaricide_spraying": {
+          "priority": "critical",
+          "action": "Intensive tick control - second peak transmission period",
+          "scenarios": {
+            "suitable": {
+              "name": "Critical spray window",
+              "risk": "Tick-borne disease risk rising rapidly",
+              "extra_actions": ["Spray every 5-7 days", "Use effective acaricide class"]
+            },
+            "blocked": {
+              "name": "Spraying blocked by rain",
+              "risk": "Product washed off before absorption",
+              "extra_actions": ["Use pour-on or injectable alternatives", "Wait for 4-hour dry window"]
+            }
+          }
+        },
+        "deworming": {
+          "priority": "high",
+          "action": "Strategic deworming at rain onset",
+          "scenarios": {
+            "always": {
+              "name": "Pre-rain deworming",
+              "risk": "Reduce worm burden before wet pastures increase infection",
+              "extra_actions": ["Target all stock", "Record treatments"]
+            }
+          }
+        },
+        "forage_planting": {
+          "priority": "critical",
+          "action": "SECOND PLANTING WINDOW - establish fodder crops",
+          "scenarios": {
+            "suitable": {
+              "name": "Optimal planting time",
+              "risk": "Short rains provide establishment moisture",
+              "extra_actions": ["Plant Napier, Brachiaria, and fodder trees", "Apply manure at planting"]
+            },
+            "blocked": {
+              "name": "Wait for more rain",
+              "risk": "Insufficient soil moisture for establishment",
+              "extra_actions": ["Continue preparing planting material"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "high",
+        "foot_rot": "high",
+        "tick_borne": "very_high"
+      },
+      "parasite_risk": {
+        "ticks": "very_high",
+        "worms": "rising",
+        "flies": "high"
+      }
+    },
+    "11": {
+      "month_name": "November",
+      "season": "short_rains",
+      "phenology": {
+        "Dairy": "peak_lactation"
+      },
+      "management_tasks": {
+        "acaricide_spraying": {
+          "priority": "critical",
+          "action": "Continue intensive tick control",
+          "scenarios": {
+            "suitable": {
+              "name": "Spray conditions acceptable",
+              "risk": "Peak parasite pressure period",
+              "extra_actions": ["Maintain 5-7 day intervals", "Check for resistance signs"]
+            },
+            "blocked": {
+              "name": "Continuous rain",
+              "risk": "Spraying ineffective in wet conditions",
+              "extra_actions": ["Consider injectable products", "Hand-remove visible ticks"]
+            }
+          }
+        },
+        "housing_maintenance": {
+          "priority": "high",
+          "action": "Maintain dry lying areas - critical for mastitis prevention",
+          "scenarios": {
+            "routine": {
+              "name": "Regular maintenance",
+              "risk": "Wet bedding increases mastitis",
+              "extra_actions": ["Change bedding daily", "Monitor drainage"]
+            },
+            "urgent": {
+              "name": "Housing urgent",
+              "risk": "Persistent wet conditions",
+              "extra_actions": ["Emergency drainage", "Additional bedding material"]
+            }
+          }
+        },
+        "breeding_ai": {
+          "priority": "medium",
+          "action": "Continue breeding program",
+          "scenarios": {
+            "suitable": {
+              "name": "Breeding conditions adequate",
+              "risk": "Moderate fertility expected",
+              "extra_actions": ["Maintain heat detection", "Record all services"]
+            },
+            "heat_warning": {
+              "name": "Humidity affecting fertility",
+              "risk": "High humidity increases heat stress",
+              "extra_actions": ["Ensure ventilation", "Time AI for cooler periods"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "very_high",
+        "foot_rot": "very_high",
+        "tick_borne": "high"
+      },
+      "parasite_risk": {
+        "ticks": "high",
+        "worms": "high",
+        "flies": "high"
+      }
+    },
+    "12": {
+      "month_name": "December",
+      "season": "short_rains",
+      "phenology": {
+        "Dairy": "late_lactation"
+      },
+      "management_tasks": {
+        "acaricide_spraying": {
+          "priority": "high",
+          "action": "Continue tick control as rains end",
+          "scenarios": {
+            "suitable": {
+              "name": "End-of-rain spraying",
+              "risk": "Tick pressure declining but vigilance needed",
+              "extra_actions": ["Can extend intervals to 7-10 days"]
+            },
+            "blocked": {
+              "name": "Delay for dry conditions",
+              "risk": "Wait for rains to stop",
+              "extra_actions": ["Monitor tick loads"]
+            }
+          }
+        },
+        "drying_off": {
+          "priority": "high",
+          "action": "Dry off cows due to calve in Feb-Mar",
+          "scenarios": {
+            "always": {
+              "name": "Drying off management",
+              "risk": "Ensure adequate dry period before calving",
+              "extra_actions": ["Abrupt drying off for healthy cows", "Dry cow antibiotic therapy", "Teat sealant"]
+            }
+          }
+        },
+        "forage_planting": {
+          "priority": "medium",
+          "action": "Last chance for fodder establishment before dry season",
+          "scenarios": {
+            "suitable": {
+              "name": "Late planting opportunity",
+              "risk": "Plants need to establish before rains end",
+              "extra_actions": ["Focus on drought-tolerant species"]
+            },
+            "blocked": {
+              "name": "Too late for planting",
+              "risk": "Insufficient time for establishment",
+              "extra_actions": ["Focus on conserving existing fodder"]
+            }
+          }
+        }
+      },
+      "disease_risk": {
+        "mastitis": "high",
+        "foot_rot": "moderate",
+        "tick_borne": "moderate"
+      },
+      "parasite_risk": {
+        "ticks": "moderate",
+        "worms": "high",
+        "flies": "moderate"
+      }
+    }
+  },
+  "lactation_stage_definitions": {
+    "calving_season": {
+      "description": "Period when majority of herd calvings occur. Focus on colostrum management, calf care, and fresh cow monitoring.",
+      "typical_duration_weeks": 8,
+      "management_focus": ["colostrum_feeding", "calf_health", "fresh_cow_monitoring", "mastitis_prevention"]
+    },
+    "peak_lactation": {
+      "description": "Cows at highest milk production (weeks 4-10 post-calving). Nutrition is critical - negative energy balance common.",
+      "typical_duration_weeks": 10,
+      "management_focus": ["nutrition", "body_condition", "heat_detection", "milk_quality"]
+    },
+    "breeding_season": {
+      "description": "Active breeding period. Heat detection, AI timing, and fertility management are priorities.",
+      "typical_duration_weeks": 12,
+      "management_focus": ["heat_detection", "ai_timing", "nutrition", "pregnancy_diagnosis"]
+    },
+    "late_lactation": {
+      "description": "Declining milk production. Focus on maintaining body condition for next lactation.",
+      "typical_duration_weeks": 16,
+      "management_focus": ["body_condition", "culling_decisions", "drying_off_preparation"]
+    },
+    "drying_off": {
+      "description": "Transition from lactation to dry period. Critical for udder health.",
+      "typical_duration_weeks": 1,
+      "management_focus": ["dry_cow_therapy", "teat_sealant", "nutrition_change", "group_change"]
+    },
+    "dry_period": {
+      "description": "Rest and regeneration period before calving. Mammary tissue regenerates.",
+      "typical_duration_weeks": 8,
+      "management_focus": ["nutrition", "body_condition", "vaccination", "parasite_control"]
+    },
+    "pre_calving": {
+      "description": "Close-up dry period (3 weeks before calving). Transition diet and calving preparation.",
+      "typical_duration_weeks": 3,
+      "management_focus": ["transition_diet", "calving_monitoring", "colostrum_preparation"]
+    }
+  },
+  "annual_health_schedule": {
+    "vaccinations": {
+      "FMD": {"frequency": "biannual", "months": [1, 7]},
+      "ECF": {"frequency": "once", "note": "ITM vaccination provides lifelong immunity"},
+      "Lumpy_Skin_Disease": {"frequency": "annual", "months": [1, 2]},
+      "Blackleg_Anthrax": {"frequency": "annual", "months": [6]},
+      "Brucellosis": {"frequency": "once", "note": "Heifer calves at 3-8 months"}
+    },
+    "deworming": {
+      "strategic_timing": [2, 4, 10],
+      "frequency": "3-4 times per year",
+      "note": "Deworm before and during rainy seasons"
+    },
+    "acaricide_application": {
+      "rainy_season_interval_days": [5, 7],
+      "dry_season_interval_days": [10, 14],
+      "note": "Rotate acaricide classes to prevent resistance"
+    }
+  },
+  "heat_stress_thresholds": {
+    "thi_comfortable": {"max": 71, "description": "No heat stress, normal production and fertility"},
+    "thi_mild_stress": {"min": 72, "max": 77, "description": "Mild stress - reduced feed intake, slightly lower yield"},
+    "thi_moderate_stress": {"min": 78, "max": 82, "description": "Moderate stress - reduced fertility, noticeable production drop"},
+    "thi_severe_stress": {"min": 83, "description": "Severe stress - significant welfare and production impacts"}
+  }
+}
