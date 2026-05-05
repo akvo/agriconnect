@@ -52,11 +52,18 @@ class OpenAIService:
             )
 
         # Initialize OpenAI client
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            timeout=settings.openai_timeout,
-            max_retries=settings.openai_max_retries,
-        )
+        # When API key is not set, create client with a placeholder to avoid
+        # initialization errors. The is_configured() method should be used
+        # before making API calls to ensure the service is properly configured.
+        try:
+            self.client = AsyncOpenAI(
+                api_key=settings.openai_api_key or "sk-placeholder-for-init",
+                timeout=settings.openai_timeout,
+                max_retries=settings.openai_max_retries,
+            )
+        except Exception as e:
+            logger.warning(f"[OpenAIService] Failed to initialize client: {e}")
+            self.client = None
 
         # Cost tracking
         self.usage_stats: Dict[str, int] = {
@@ -68,7 +75,9 @@ class OpenAIService:
 
     def is_configured(self) -> bool:
         """Check if service is properly configured"""
-        is_valid = bool(settings.openai_enabled and settings.openai_api_key)
+        is_valid = bool(
+            settings.openai_enabled and settings.openai_api_key and self.client
+        )
 
         if not is_valid:
             missing = []
