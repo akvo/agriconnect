@@ -252,3 +252,44 @@ class EOAggregateResponse(BaseModel):
     data: List[EOAggregateItem]
     filters: AggregateFilters
     available: AvailableFilters
+
+
+# Crop distribution schemas
+class CropDistributionFilters(BaseModel):
+    """Applied filters for crop distribution."""
+
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    administrative_id: Optional[int] = None
+
+
+class CropDistributionItem(BaseModel):
+    """Single crop with count."""
+
+    crop: str
+    count: int
+
+
+class CropDistributionResponse(BaseModel):
+    """Crop distribution response (for bar chart)."""
+
+    crops: List[CropDistributionItem]
+    total: int
+    filters: CropDistributionFilters
+
+
+class CropMatrixRow(BaseModel):
+    """Single row in crop distribution matrix."""
+
+    county: str
+    county_id: int
+    crops: dict  # {crop_name: count}
+    total: int
+
+
+class CropDistributionMatrixResponse(BaseModel):
+    """Crop distribution matrix response (county × crop)."""
+
+    matrix: List[CropMatrixRow]
+    crop_types: List[str]
+    filters: CropDistributionFilters
