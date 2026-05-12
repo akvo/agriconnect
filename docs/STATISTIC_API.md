@@ -852,7 +852,7 @@ curl -H "Authorization: Bearer your-token" \
 
 **Endpoint:** `GET /api/statistic/crops/distribution/matrix`
 
-Returns crop distribution by county (district level) as a matrix. Ideal for cross-tabulation tables.
+Returns crop distribution by administrative level as a matrix. Ideal for cross-tabulation tables. The level shown automatically adjusts based on the `administrative_id` filter.
 
 **Query Parameters:**
 
@@ -860,18 +860,33 @@ Returns crop distribution by county (district level) as a matrix. Ideal for cros
 |-----------|------|----------|---------|-------------|
 | `start_date` | string | No | - | Filter start date (ISO 8601 format) |
 | `end_date` | string | No | - | Filter end date (ISO 8601 format) |
-| `administrative_id` | integer | No | - | Filter by region to show only districts under that region |
+| `administrative_id` | integer | No | - | Filter by administrative area. Shows one level down from the selected area. |
+
+**Dynamic Level Selection:**
+
+The level shown depends on the `administrative_id` filter:
+
+| Filter | Level Shown | Description |
+|--------|-------------|-------------|
+| No filter | Region | Shows all regions |
+| Region ID | District | Shows districts under that region |
+| District ID | Ward | Shows wards under that district |
+| Ward ID | Ward | Shows that specific ward |
 
 **Example Requests:**
 
 ```bash
-# Get crop matrix for all districts
+# Get crop matrix for all regions (no filter)
 curl -H "Authorization: Bearer your-token" \
   "http://localhost:8000/api/statistic/crops/distribution/matrix"
 
 # Get crop matrix for districts in Murang'a region
 curl -H "Authorization: Bearer your-token" \
   "http://localhost:8000/api/statistic/crops/distribution/matrix?administrative_id=47"
+
+# Get crop matrix for wards in Kiharu district
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/crops/distribution/matrix?administrative_id=56"
 ```
 
 **Response:**
@@ -899,6 +914,7 @@ curl -H "Authorization: Bearer your-token" \
     }
   ],
   "crop_types": ["Avocado", "Coffee", "Dairy", "Maize", "Potato"],
+  "level_name": "District",
   "filters": {
     "start_date": null,
     "end_date": null,
@@ -909,11 +925,12 @@ curl -H "Authorization: Bearer your-token" \
 
 **Usage Notes:**
 
-- `matrix`: Each row represents a county (district) with its crop counts
+- `matrix`: Each row represents an administrative area with its crop counts
 - `crop_types`: Alphabetically sorted list of all crop types found (use for table column headers)
+- `level_name`: The administrative level being displayed (Region, District, or Ward) - use for table row header
 - `crops`: Dictionary mapping crop name to farmer count
-- Counties with no farmers are excluded from the response
-- Missing crops in a county's `crops` dict means zero farmers for that crop
+- Areas with no farmers are excluded from the response
+- Missing crops in an area's `crops` dict means zero farmers for that crop
 
 ---
 

@@ -536,19 +536,21 @@ async def get_crop_distribution_matrix(
     db: Session = Depends(get_db),
 ):
     """
-    Get crop distribution matrix by county (district level).
+    Get crop distribution matrix by administrative level.
 
-    Returns data suitable for a matrix table (Rows: County, Columns: Crop).
-    Each row contains the county name and a dictionary of crop counts.
+    Returns data suitable for a matrix table (Rows: Areas, Columns: Crops).
+    Each row contains the area name and a dictionary of crop counts.
 
-    The administrative_id parameter filters which districts are included:
-    - Region ID: Shows all districts in that region
-    - District ID: Shows only that district
-    - No filter: Shows all districts
+    The level shown depends on the administrative_id filter:
+    - **No filter**: Shows all regions
+    - **Region ID**: Shows all districts in that region
+    - **District ID**: Shows all wards in that district
+    - **Ward ID**: Shows that ward only
 
     Response includes:
-    - **matrix**: List of counties with their crop counts
+    - **matrix**: List of areas with their crop counts
     - **crop_types**: Sorted list of all crop types (for column headers)
+    - **level_name**: The administrative level shown (Region/District/Ward)
     - **filters**: Applied filter parameters
 
     Authentication: Bearer token required (STATISTIC_API_TOKEN)
@@ -563,5 +565,6 @@ async def get_crop_distribution_matrix(
     return CropDistributionMatrixResponse(
         matrix=result["matrix"],
         crop_types=result["crop_types"],
+        level_name=result["level_name"],
         filters=CropDistributionFilters(**result["filters"]),
     )

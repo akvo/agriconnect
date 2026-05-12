@@ -1400,6 +1400,69 @@ class StatisticService:
             },
         }
 
+    def _get_child_level(
+        self, administrative_id: Optional[int]
+    ) -> Tuple[Optional[AdministrativeLevel], str]:
+        """
+        Determine the child level based on administrative_id.
+
+        Args:
+            administrative_id: The parent administrative area ID
+
+        Returns:
+            Tuple of (child_level, level_name)
+            - No filter → Region level
+            - Region filter → District level
+            - District filter → Ward level
+            - Ward filter → Ward level (same)
+        """
+        # Level hierarchy mapping: parent level -> child level name
+        level_hierarchy = {
+            "country": "region",
+            "region": "district",
+            "district": "ward",
+            "ward": "ward",  # Ward has no children, show itself
+        }
+
+        if not administrative_id:
+            # No filter: show regions
+            child_level = (
+                self.db.query(AdministrativeLevel)
+                .filter(AdministrativeLevel.name == "region")
+                .first()
+            )
+            return child_level, "Region"
+
+        # Get the parent administrative area
+        parent_admin = (
+            self.db.query(Administrative)
+            .filter(Administrative.id == administrative_id)
+            .first()
+        )
+
+        if not parent_admin or not parent_admin.level:
+            # Fallback to region
+            child_level = (
+                self.db.query(AdministrativeLevel)
+                .filter(AdministrativeLevel.name == "region")
+                .first()
+            )
+            return child_level, "Region"
+
+        parent_level_name = parent_admin.level.name.lower()
+        child_level_name = level_hierarchy.get(parent_level_name, "region")
+
+        child_level = (
+            self.db.query(AdministrativeLevel)
+            .filter(AdministrativeLevel.name == child_level_name)
+            .first()
+        )
+
+        # Capitalize for display
+        level_display_name = child_level_name.capitalize()
+
+        return child_level, level_display_name
+
     def get_crop_distribution_matrix(
         self,
         start_date: Optional[str] = None,
@@ -1407,7 +1470,13 @@ class StatisticService:
         administrative_id: Optional[int] = None,
     ) -> dict:
         """
-        Get crop distribution matrix by county (district level).
+        Get crop distribution matrix by administrative level.
+
+        The level shown depends on the administrative_id filter:
+        - No filter → Show regions
+        - Region filter → Show districts under that region
+        - District filter → Show wards under that district
+        - Ward filter → Show that ward only
 
         Args:
             start_date: Filter customers created on or after this date
@@ -1415,21 +1484,18 @@ class StatisticService:
             administrative_id: Filter by administrative area (any level)
 
         Returns:
-            Dict with matrix, crop_types, and filters
+            Dict with matrix, crop_types, level_name, and filters
         """
         crop_type_col = Customer.profile_data.op("->>")("crop_type")
 
-        # Get district level
-        district_level = (
-            self.db.query(AdministrativeLevel)
-            .filter(AdministrativeLevel.name == "district")
-            .first()
-        )
+        # Determine the child level based on filter
+        target_level, level_name = self._get_child_level(administrative_id)
 
-        if not district_level:
+        if not target_level:
             return {
                 "matrix": [],
                 "crop_types": [],
+                "level_name": "Region",
                 "filters": {
                     "start_date": start_date,
                     "end_date": end_date,
@@ -1437,13 +1503,13 @@ class StatisticService:
                 },
             }
 
-        # Get districts query
-        districts_query = (
+        # Get areas at the target level
+        areas_query = (
             self.db.query(Administrative)
-            .filter(Administrative.level_id == district_level.id)
+            .filter(Administrative.level_id == target_level.id)
         )
 
-        # Filter districts by administrative area
+        # Filter areas by parent administrative area
         if administrative_id:
             parent_admin = (
                 self.db.query(Administrative)
@@ -1452,23 +1518,26 @@ class StatisticService:
             )
             if parent_admin:
                 # Filter areas that are under this parent
-                districts_query = districts_query.filter(
+                areas_query = areas_query.filter(
                     Administrative.path.like(f"{parent_admin.path}%")
                 )
 
-        districts = districts_query.order_by(Administrative.name).all()
+        areas = areas_query.order_by(Administrative.name).all()
 
         # Collect all crop types for columns
         all_crop_types = set()
         matrix_data = []
 
-        for district in districts:
-            # Get ward IDs under this district
-            ward_ids = AdministrativeService.get_descendant_ward_ids(
-                self.db, district.id
-            )
-            if not ward_ids:
-                ward_ids = [district.id]
+        for area in areas:
+            # Get ward IDs under this area (or itself if it's a ward)
+            if target_level.name == "ward":
+                ward_ids = [area.id]
+            else:
+                ward_ids = AdministrativeService.get_descendant_ward_ids(
+                    self.db, area.id
+                )
+                if not ward_ids:
+                    ward_ids = [area.id]
 
             # Get customer IDs in these wards
             customer_query = (
@@ -1490,7 +1559,7 @@ class StatisticService:
             if not customer_ids:
                 continue
 
-            # Count farmers by crop type in this district
+            # Count farmers by crop type in this area
             crop_counts_query = (
                 self.db.query(
                     crop_type_col.label("crop"),
@@ -1505,18 +1574,18 @@ class StatisticService:
             )
 
             crop_counts = {}
-            total_in_district = 0
+            total_in_area = 0
             for crop, count in crop_counts_query.all():
                 crop_counts[crop] = count
-                total_in_district += count
+                total_in_area += count
                 all_crop_types.add(crop)
 
-            if total_in_district > 0:
+            if total_in_area > 0:
                 matrix_data.append({
-                    "county": district.name,
-                    "county_id": district.id,
+                    "county": area.name,
+                    "county_id": area.id,
                     "crops": crop_counts,
-                    "total": total_in_district,
+                    "total": total_in_area,
                 })
 
         # Sort crop types alphabetically
@@ -1525,6 +1594,7 @@ class StatisticService:
         return {
             "matrix": matrix_data,
             "crop_types": sorted_crop_types,
+            "level_name": level_name,
             "filters": {
                 "start_date": start_date,
                 "end_date": end_date,

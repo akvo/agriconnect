@@ -288,8 +288,9 @@ class CropMatrixRow(BaseModel):
 
 
 class CropDistributionMatrixResponse(BaseModel):
-    """Crop distribution matrix response (county × crop)."""
+    """Crop distribution matrix response (area × crop)."""
 
     matrix: List[CropMatrixRow]
     crop_types: List[str]
+    level_name: str  # e.g., "Region", "District", "Ward"
     filters: CropDistributionFilters
