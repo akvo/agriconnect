@@ -17,6 +17,9 @@ import {
   KeyIcon,
   ClipboardDocumentIcon,
   CheckIcon,
+  UserGroupIcon,
+  MapPinIcon,
+  Square3Stack3DIcon,
 } from "@heroicons/react/24/outline";
 
 export default function AnalyticsPage() {
@@ -27,6 +30,11 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+
+  // Crop distribution data
+  const [cropDistribution, setCropDistribution] = useState(null);
+  const [cropMatrix, setCropMatrix] = useState(null);
+  const [cropLoading, setCropLoading] = useState(true);
 
   // Date filters
   const [startDate, setStartDate] = useState("");
@@ -56,6 +64,32 @@ export default function AnalyticsPage() {
     }
   }, [startDate, endDate]);
 
+  const fetchCropDistribution = useCallback(async () => {
+    setCropLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.append("start_date", startDate);
+      if (endDate) params.append("end_date", endDate);
+      const queryString = params.toString();
+
+      const [distResponse, matrixResponse] = await Promise.all([
+        api.get(
+          `/admin/analytics/crop-distribution${queryString ? `?${queryString}` : ""}`
+        ),
+        api.get(
+          `/admin/analytics/crop-distribution/matrix${queryString ? `?${queryString}` : ""}`
+        ),
+      ]);
+
+      setCropDistribution(distResponse.data);
+      setCropMatrix(matrixResponse.data);
+    } catch (err) {
+      console.error("Error fetching crop distribution:", err);
+    } finally {
+      setCropLoading(false);
+    }
+  }, [startDate, endDate]);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/");
@@ -65,8 +99,9 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (user) {
       fetchStatistics();
+      fetchCropDistribution();
     }
-  }, [user, fetchStatistics]);
+  }, [user, fetchStatistics, fetchCropDistribution]);
 
   // Fetch API token for admin users
   useEffect(() => {
@@ -98,6 +133,12 @@ export default function AnalyticsPage() {
 
   const handleApplyFilters = () => {
     fetchStatistics();
+    fetchCropDistribution();
+  };
+
+  const handleRefresh = () => {
+    fetchStatistics();
+    fetchCropDistribution();
   };
 
   const handleClearFilters = () => {
@@ -127,6 +168,28 @@ export default function AnalyticsPage() {
   const getMaxCount = () => {
     if (!statistics?.statistics) return 1;
     return Math.max(...statistics.statistics.map((s) => s.count), 1);
+  };
+
+  // Get max count for crop distribution bars
+  const getCropMaxCount = () => {
+    if (!cropDistribution?.crops) return 1;
+    return Math.max(...cropDistribution.crops.map((c) => c.count), 1);
+  };
+
+  // Crop colors for the bar chart
+  const cropColors = [
+    { bg: "bg-emerald-500", text: "text-emerald-700" },
+    { bg: "bg-amber-500", text: "text-amber-700" },
+    { bg: "bg-sky-500", text: "text-sky-700" },
+    { bg: "bg-rose-500", text: "text-rose-700" },
+    { bg: "bg-violet-500", text: "text-violet-700" },
+    { bg: "bg-orange-500", text: "text-orange-700" },
+    { bg: "bg-teal-500", text: "text-teal-700" },
+    { bg: "bg-pink-500", text: "text-pink-700" },
+  ];
+
+  const getCropColor = (index) => {
+    return cropColors[index % cropColors.length];
   };
 
   if (authLoading) {
@@ -175,13 +238,13 @@ export default function AnalyticsPage() {
               </div>
             </div>
             <button
-              onClick={fetchStatistics}
-              disabled={loading}
+              onClick={handleRefresh}
+              disabled={loading || cropLoading}
               className="flex items-center px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50 cursor-pointer"
               style={{ borderRadius: "5px" }}
             >
               <ArrowPathIcon
-                className={`w-5 h-5 mr-2 ${loading ? "animate-spin" : ""}`}
+                className={`w-5 h-5 mr-2 ${loading || cropLoading ? "animate-spin" : ""}`}
               />
               Refresh
             </button>
@@ -424,6 +487,228 @@ export default function AnalyticsPage() {
                 })}
               </div>
             </div>
+
+            {/* Crop Distribution Section */}
+            {cropLoading ? (
+              <div
+                className="bg-white/80 backdrop-blur-md p-8 mt-6 animate-fade-in"
+                style={{ borderRadius: "5px" }}
+              >
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                </div>
+              </div>
+            ) : (
+              cropDistribution && (
+                <>
+                  {/* Crop Distribution Summary */}
+                  <div
+                    className="bg-white/80 backdrop-blur-md p-6 mt-6 animate-fade-in"
+                    style={{ borderRadius: "5px" }}
+                  >
+                    <div className="flex items-center">
+                      <div
+                        className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 mr-4"
+                        style={{ borderRadius: "5px" }}
+                      >
+                        <UserGroupIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-secondary-600">
+                          Total Farmers (by Crop)
+                        </p>
+                        <p className="text-3xl font-bold text-secondary-900">
+                          {cropDistribution.total}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Crop Distribution Bar Chart */}
+                  <div
+                    className="bg-white/80 backdrop-blur-md p-8 mt-6 animate-slide-up"
+                    style={{ borderRadius: "5px" }}
+                  >
+                    <div className="flex items-center mb-6">
+                      <Square3Stack3DIcon className="w-6 h-6 text-secondary-600 mr-2" />
+                      <h2 className="text-xl font-bold text-secondary-900">
+                        Crop Distribution
+                      </h2>
+                    </div>
+
+                    {cropDistribution.crops.length === 0 ? (
+                      <div className="text-center py-12">
+                        <UserGroupIcon className="w-16 h-16 text-secondary-300 mx-auto mb-4" />
+                        <p className="text-secondary-600">
+                          No crop data found for the selected period.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {cropDistribution.crops.map((item, index) => {
+                          const color = getCropColor(index);
+                          const percentage = Math.round(
+                            (item.count / cropDistribution.total) * 100
+                          );
+                          const barWidth =
+                            (item.count / getCropMaxCount()) * 100;
+
+                          return (
+                            <div key={item.crop} className="group">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center">
+                                  <span
+                                    className={`inline-flex items-center px-3 py-1 text-sm font-medium ${color.bg} text-white`}
+                                    style={{ borderRadius: "5px" }}
+                                  >
+                                    {item.crop}
+                                  </span>
+                                  <span className="ml-3 text-secondary-600 text-sm">
+                                    {percentage}% of total
+                                  </span>
+                                </div>
+                                <span className="text-lg font-semibold text-secondary-900">
+                                  {item.count}
+                                </span>
+                              </div>
+                              <div
+                                className="w-full bg-secondary-100 overflow-hidden"
+                                style={{ borderRadius: "5px", height: "12px" }}
+                              >
+                                <div
+                                  className={`h-full ${color.bg} transition-all duration-500 ease-out group-hover:opacity-80`}
+                                  style={{
+                                    width: `${barWidth}%`,
+                                    borderRadius: "5px",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Crop Distribution Matrix */}
+                  {cropMatrix && cropMatrix.matrix.length > 0 && (
+                    <div
+                      className="bg-white/80 backdrop-blur-md p-8 mt-6 animate-slide-up"
+                      style={{ borderRadius: "5px" }}
+                    >
+                      <div className="flex items-center mb-6">
+                        <MapPinIcon className="w-6 h-6 text-secondary-600 mr-2" />
+                        <h2 className="text-xl font-bold text-secondary-900">
+                          Crop Distribution by County
+                        </h2>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-secondary-200">
+                          <thead>
+                            <tr>
+                              <th
+                                className="px-4 py-3 text-left text-xs font-semibold text-secondary-600 uppercase tracking-wider bg-secondary-50"
+                                style={{
+                                  borderTopLeftRadius: "5px",
+                                  borderBottomLeftRadius: "5px",
+                                }}
+                              >
+                                County
+                              </th>
+                              {cropMatrix.crop_types.map((crop, index) => (
+                                <th
+                                  key={crop}
+                                  className="px-4 py-3 text-center text-xs font-semibold text-secondary-600 uppercase tracking-wider bg-secondary-50"
+                                  style={
+                                    index === cropMatrix.crop_types.length - 1
+                                      ? {
+                                          borderTopRightRadius: "5px",
+                                          borderBottomRightRadius: "5px",
+                                        }
+                                      : {}
+                                  }
+                                >
+                                  {crop}
+                                </th>
+                              ))}
+                              <th className="px-4 py-3 text-center text-xs font-semibold text-secondary-600 uppercase tracking-wider bg-secondary-50">
+                                Total
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-secondary-100">
+                            {cropMatrix.matrix.map((row, rowIndex) => (
+                              <tr
+                                key={row.county_id}
+                                className={
+                                  rowIndex % 2 === 0
+                                    ? "bg-white"
+                                    : "bg-secondary-50/50"
+                                }
+                              >
+                                <td className="px-4 py-3 text-sm font-medium text-secondary-900">
+                                  {row.county}
+                                </td>
+                                {cropMatrix.crop_types.map((crop) => {
+                                  const count = row.crops[crop] || 0;
+                                  return (
+                                    <td
+                                      key={crop}
+                                      className="px-4 py-3 text-sm text-center text-secondary-700"
+                                    >
+                                      {count > 0 ? (
+                                        <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 bg-primary-100 text-primary-700 font-medium rounded">
+                                          {count}
+                                        </span>
+                                      ) : (
+                                        <span className="text-secondary-400">
+                                          -
+                                        </span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                                <td className="px-4 py-3 text-sm text-center font-semibold text-secondary-900">
+                                  {row.total}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-secondary-100">
+                              <td className="px-4 py-3 text-sm font-semibold text-secondary-900">
+                                Total
+                              </td>
+                              {cropMatrix.crop_types.map((crop) => {
+                                const total = cropMatrix.matrix.reduce(
+                                  (sum, row) => sum + (row.crops[crop] || 0),
+                                  0
+                                );
+                                return (
+                                  <td
+                                    key={crop}
+                                    className="px-4 py-3 text-sm text-center font-semibold text-secondary-900"
+                                  >
+                                    {total}
+                                  </td>
+                                );
+                              })}
+                              <td className="px-4 py-3 text-sm text-center font-bold text-secondary-900">
+                                {cropMatrix.matrix.reduce(
+                                  (sum, row) => sum + row.total,
+                                  0
+                                )}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
+            )}
 
             {/* Statistics API Token (Admin Only) */}
             {user?.user_type === "admin" && apiToken && (

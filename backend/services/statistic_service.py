@@ -1325,3 +1325,209 @@ class StatisticService:
             },
             "available": self._get_available_filters(),
         }
+
+    def get_crop_distribution(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        administrative_id: Optional[int] = None,
+    ) -> dict:
+        """
+        Get farmer count per crop type.
+
+        Args:
+            start_date: Filter customers created on or after this date
+            end_date: Filter customers created on or before this date
+            administrative_id: Filter by administrative area (any level)
+
+        Returns:
+            Dict with crops list, total, and filters
+        """
+        crop_type_col = Customer.profile_data.op("->>")("crop_type")
+
+        # Base query: count farmers by crop type
+        query = self.db.query(
+            crop_type_col.label("crop"),
+            func.count(Customer.id).label("count"),
+        ).filter(
+            Customer.onboarding_status == OnboardingStatus.COMPLETED,
+            crop_type_col.isnot(None),
+            crop_type_col != "",
+        )
+
+        # Filter by administrative area
+        if administrative_id:
+            customer_ids = self._get_administrative_customer_ids(
+                administrative_id
+            )
+            if customer_ids:
+                query = query.filter(Customer.id.in_(customer_ids))
+            else:
+                return {
+                    "crops": [],
+                    "total": 0,
+                    "filters": {
+                        "start_date": start_date,
+                        "end_date": end_date,
+                        "administrative_id": administrative_id,
+                    },
+                }
+
+        # Apply date filters
+        query = self._apply_date_filter(
+            query, Customer.created_at, start_date, end_date
+        )
+
+        # Group by crop type and execute
+        results = query.group_by(crop_type_col).order_by(
+            func.count(Customer.id).desc()
+        ).all()
+
+        # Build response
+        crops = []
+        total = 0
+        for crop, count in results:
+            crops.append({"crop": crop, "count": count})
+            total += count
+
+        return {
+            "crops": crops,
+            "total": total,
+            "filters": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "administrative_id": administrative_id,
+            },
+        }
+
+    def get_crop_distribution_matrix(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        administrative_id: Optional[int] = None,
+    ) -> dict:
+        """
+        Get crop distribution matrix by county (district level).
+
+        Args:
+            start_date: Filter customers created on or after this date
+            end_date: Filter customers created on or before this date
+            administrative_id: Filter by administrative area (any level)
+
+        Returns:
+            Dict with matrix, crop_types, and filters
+        """
+        crop_type_col = Customer.profile_data.op("->>")("crop_type")
+
+        # Get district level
+        district_level = (
+            self.db.query(AdministrativeLevel)
+            .filter(AdministrativeLevel.name == "district")
+            .first()
+        )
+
+        if not district_level:
+            return {
+                "matrix": [],
+                "crop_types": [],
+                "filters": {
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "administrative_id": administrative_id,
+                },
+            }
+
+        # Get districts query
+        districts_query = (
+            self.db.query(Administrative)
+            .filter(Administrative.level_id == district_level.id)
+        )
+
+        # Filter districts by administrative area
+        if administrative_id:
+            parent_admin = (
+                self.db.query(Administrative)
+                .filter(Administrative.id == administrative_id)
+                .first()
+            )
+            if parent_admin:
+                # Filter areas that are under this parent
+                districts_query = districts_query.filter(
+                    Administrative.path.like(f"{parent_admin.path}%")
+                )
+
+        districts = districts_query.order_by(Administrative.name).all()
+
+        # Collect all crop types for columns
+        all_crop_types = set()
+        matrix_data = []
+
+        for district in districts:
+            # Get ward IDs under this district
+            ward_ids = AdministrativeService.get_descendant_ward_ids(
+                self.db, district.id
+            )
+            if not ward_ids:
+                ward_ids = [district.id]
+
+            # Get customer IDs in these wards
+            customer_query = (
+                self.db.query(Customer.id)
+                .join(CustomerAdministrative)
+                .filter(
+                    CustomerAdministrative.administrative_id.in_(ward_ids),
+                    Customer.onboarding_status == OnboardingStatus.COMPLETED,
+                )
+            )
+
+            # Apply date filters
+            customer_query = self._apply_date_filter(
+                customer_query, Customer.created_at, start_date, end_date
+            )
+
+            customer_ids = [c.id for c in customer_query.all()]
+
+            if not customer_ids:
+                continue
+
+            # Count farmers by crop type in this district
+            crop_counts_query = (
+                self.db.query(
+                    crop_type_col.label("crop"),
+                    func.count(Customer.id).label("count"),
+                )
+                .filter(
+                    Customer.id.in_(customer_ids),
+                    crop_type_col.isnot(None),
+                    crop_type_col != "",
+                )
+                .group_by(crop_type_col)
+            )
+
+            crop_counts = {}
+            total_in_district = 0
+            for crop, count in crop_counts_query.all():
+                crop_counts[crop] = count
+                total_in_district += count
+                all_crop_types.add(crop)
+
+            if total_in_district > 0:
+                matrix_data.append({
+                    "county": district.name,
+                    "county_id": district.id,
+                    "crops": crop_counts,
+                    "total": total_in_district,
+                })
+
+        # Sort crop types alphabetically
+        sorted_crop_types = sorted(list(all_crop_types))
+
+        return {
+            "matrix": matrix_data,
+            "crop_types": sorted_crop_types,
+            "filters": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "administrative_id": administrative_id,
+            },
+        }

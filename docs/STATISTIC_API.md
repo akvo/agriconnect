@@ -792,6 +792,131 @@ curl -H "Authorization: Bearer your-token" \
 
 ---
 
+## Crop Distribution Endpoints
+
+These endpoints provide crop distribution statistics for visualization in charts and tables.
+
+### 10. Get Crop Distribution
+
+**Endpoint:** `GET /api/statistic/crops/distribution`
+
+Returns farmer count per crop type, sorted by count in descending order. Ideal for horizontal bar charts.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `start_date` | string | No | - | Filter start date (ISO 8601 format) |
+| `end_date` | string | No | - | Filter end date (ISO 8601 format) |
+| `administrative_id` | integer | No | - | Filter by administrative area (region, district, or ward). Aggregates from all descendant areas. |
+
+**Example Requests:**
+
+```bash
+# Get crop distribution for all areas
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/crops/distribution"
+
+# Get crop distribution for Murang'a region only
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/crops/distribution?administrative_id=47"
+
+# Get crop distribution with date filter
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/crops/distribution?start_date=2024-01-01&end_date=2024-12-31"
+```
+
+**Response:**
+
+```json
+{
+  "crops": [
+    {"crop": "Maize", "count": 150},
+    {"crop": "Coffee", "count": 89},
+    {"crop": "Potato", "count": 45},
+    {"crop": "Avocado", "count": 32},
+    {"crop": "Dairy", "count": 18}
+  ],
+  "total": 334,
+  "filters": {
+    "start_date": null,
+    "end_date": null,
+    "administrative_id": 47
+  }
+}
+```
+
+---
+
+### 11. Get Crop Distribution Matrix
+
+**Endpoint:** `GET /api/statistic/crops/distribution/matrix`
+
+Returns crop distribution by county (district level) as a matrix. Ideal for cross-tabulation tables.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `start_date` | string | No | - | Filter start date (ISO 8601 format) |
+| `end_date` | string | No | - | Filter end date (ISO 8601 format) |
+| `administrative_id` | integer | No | - | Filter by region to show only districts under that region |
+
+**Example Requests:**
+
+```bash
+# Get crop matrix for all districts
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/crops/distribution/matrix"
+
+# Get crop matrix for districts in Murang'a region
+curl -H "Authorization: Bearer your-token" \
+  "http://localhost:8000/api/statistic/crops/distribution/matrix?administrative_id=47"
+```
+
+**Response:**
+
+```json
+{
+  "matrix": [
+    {
+      "county": "Kiharu",
+      "county_id": 56,
+      "crops": {"Maize": 50, "Coffee": 30, "Potato": 15},
+      "total": 95
+    },
+    {
+      "county": "Kangema",
+      "county_id": 48,
+      "crops": {"Coffee": 45, "Maize": 20, "Avocado": 12},
+      "total": 77
+    },
+    {
+      "county": "Maragwa",
+      "county_id": 59,
+      "crops": {"Maize": 80, "Dairy": 18, "Potato": 30},
+      "total": 128
+    }
+  ],
+  "crop_types": ["Avocado", "Coffee", "Dairy", "Maize", "Potato"],
+  "filters": {
+    "start_date": null,
+    "end_date": null,
+    "administrative_id": 47
+  }
+}
+```
+
+**Usage Notes:**
+
+- `matrix`: Each row represents a county (district) with its crop counts
+- `crop_types`: Alphabetically sorted list of all crop types found (use for table column headers)
+- `crops`: Dictionary mapping crop name to farmer count
+- Counties with no farmers are excluded from the response
+- Missing crops in a county's `crops` dict means zero farmers for that crop
+
+---
+
 ### Using the `available` Object for Filter Highlighting
 
 The `available` object in the response contains lists of regions, districts, wards, and crop types that **have actual farmer data**. This is useful for:
@@ -968,6 +1093,8 @@ Murang'a (Region, id=47)
 | `/api/statistic/eo/count` | Returns EO count for the area and its descendants |
 | `/api/statistic/aggregate/farmers` | Filters to show only areas under the specified parent |
 | `/api/statistic/aggregate/eo` | Filters to show only areas under the specified parent |
+| `/api/statistic/crops/distribution` | Aggregates crop counts from all wards under the area |
+| `/api/statistic/crops/distribution/matrix` | Shows only districts under the specified parent |
 
 ### Benefits
 

@@ -1,22 +1,22 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(./dc.sh exec backend find:*)",
-      "Bash(./dc.sh exec backend grep:*)",
-      "Bash(./dc.sh logs:*)",
-      "Bash(./dc.sh exec backend pytest:*)",
-      "Bash(./dc.sh exec:*)",
-      "Bash(./dc.sh down:*)",
-      "Bash(./dc.sh up:*)",
-      "Bash(./dc.sh ps:*)",
-      "Bash(./dc.sh restart:*)",
-      "Bash(./dc.sh:*)",
-      "Bash(docker build:*)",
-      "Bash(find:*)",
-      "Bash(curl:*)",
-      "Bash(rm:*)"
-    ],
-    "deny": [],
-    "ask": []
-  }
+	"permissions": {
+		"allow": [
+			"Bash(./dc.sh exec backend find:*)",
+			"Bash(./dc.sh exec backend grep:*)",
+			"Bash(./dc.sh logs:*)",
+			"Bash(./dc.sh exec backend pytest:*)",
+			"Bash(./dc.sh exec:*)",
+			"Bash(./dc.sh down:*)",
+			"Bash(./dc.sh up:*)",
+			"Bash(./dc.sh ps:*)",
+			"Bash(./dc.sh restart:*)",
+			"Bash(./dc.sh:*)",
+			"Bash(find:*)",
+			"Bash(curl:*)",
+			"Bash(ls:*)",
+			"Bash(python -c:*)"
+		],
+		"deny": [],
+		"ask": []
+	}
 }

@@ -26,6 +26,9 @@ from schemas.statistic import (
     AvailableFilters,
     FarmerAggregateResponse,
     EOAggregateResponse,
+    CropDistributionFilters,
+    CropDistributionResponse,
+    CropDistributionMatrixResponse,
 )
 from services.statistic_service import StatisticService
 from utils.statistic_auth import verify_statistic_token
@@ -469,4 +472,96 @@ async def get_eo_aggregate(
         data=result["data"],
         filters=AggregateFilters(**result["filters"]),
         available=AvailableFilters(**result["available"]),
+    )
+
+
+@router.get("/crops/distribution", response_model=CropDistributionResponse)
+async def get_crop_distribution(
+    start_date: Optional[str] = Query(
+        None, description="Filter start date (ISO 8601 format)"
+    ),
+    end_date: Optional[str] = Query(
+        None, description="Filter end date (ISO 8601 format)"
+    ),
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter by administrative area ID (region, district, "
+        "or ward). Aggregates data from all descendant areas."
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Get farmer count per crop type.
+
+    Returns data suitable for a horizontal bar chart (X: count, Y: crop).
+    Crops are sorted by count in descending order.
+
+    The administrative_id parameter accepts any administrative level:
+    - Region ID: Aggregates counts from all wards in the region
+    - District ID: Aggregates counts from all wards in the district
+    - Ward ID: Returns counts for that specific ward
+
+    Authentication: Bearer token required (STATISTIC_API_TOKEN)
+    """
+    service = StatisticService(db)
+    result = service.get_crop_distribution(
+        start_date=start_date,
+        end_date=end_date,
+        administrative_id=administrative_id,
+    )
+
+    return CropDistributionResponse(
+        crops=result["crops"],
+        total=result["total"],
+        filters=CropDistributionFilters(**result["filters"]),
+    )
+
+
+@router.get(
+    "/crops/distribution/matrix",
+    response_model=CropDistributionMatrixResponse
+)
+async def get_crop_distribution_matrix(
+    start_date: Optional[str] = Query(
+        None, description="Filter start date (ISO 8601 format)"
+    ),
+    end_date: Optional[str] = Query(
+        None, description="Filter end date (ISO 8601 format)"
+    ),
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter by administrative area ID (region, district). "
+        "Shows only districts under this area."
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Get crop distribution matrix by county (district level).
+
+    Returns data suitable for a matrix table (Rows: County, Columns: Crop).
+    Each row contains the county name and a dictionary of crop counts.
+
+    The administrative_id parameter filters which districts are included:
+    - Region ID: Shows all districts in that region
+    - District ID: Shows only that district
+    - No filter: Shows all districts
+
+    Response includes:
+    - **matrix**: List of counties with their crop counts
+    - **crop_types**: Sorted list of all crop types (for column headers)
+    - **filters**: Applied filter parameters
+
+    Authentication: Bearer token required (STATISTIC_API_TOKEN)
+    """
+    service = StatisticService(db)
+    result = service.get_crop_distribution_matrix(
+        start_date=start_date,
+        end_date=end_date,
+        administrative_id=administrative_id,
+    )
+
+    return CropDistributionMatrixResponse(
+        matrix=result["matrix"],
+        crop_types=result["crop_types"],
+        filters=CropDistributionFilters(**result["filters"]),
     )
