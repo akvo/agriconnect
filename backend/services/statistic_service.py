@@ -1639,10 +1639,8 @@ class StatisticService:
             .filter(Ticket.resolved_at.is_(None))
         )
 
-        # Apply date filters on ticket creation
-        query = self._apply_date_filter(
-            query, Ticket.created_at, start_date, end_date
-        )
+        # Note: Date filters are NOT applied to this query
+        # We want to see ALL open tickets regardless of creation date
 
         # Filter by administrative area
         if administrative_id:
@@ -1690,10 +1688,6 @@ class StatisticService:
             # Calculate waiting time in hours
             waiting_time = now - last_customer_msg.created_at
             waiting_hours = waiting_time.total_seconds() / 3600
-
-            # Only include if waiting >= 2 hours
-            if waiting_hours < 2:
-                continue
 
             # Get customer info
             customer = ticket.customer
@@ -1771,9 +1765,9 @@ class StatisticService:
 
             tickets_data.append(ticket_item)
 
-        # Categorize by wait time
-        tickets_2_24 = [
-            t for t in tickets_data if 2 <= t["waiting_hours"] < 24
+        # Categorize by wait time (starting from 0 hours)
+        tickets_0_24 = [
+            t for t in tickets_data if t["waiting_hours"] < 24
         ]
         tickets_24_48 = [
             t for t in tickets_data if 24 <= t["waiting_hours"] < 48
@@ -1783,18 +1777,18 @@ class StatisticService:
         ]
 
         # Sort each list by waiting_hours descending
-        tickets_2_24.sort(key=lambda x: x["waiting_hours"], reverse=True)
+        tickets_0_24.sort(key=lambda x: x["waiting_hours"], reverse=True)
         tickets_24_48.sort(key=lambda x: x["waiting_hours"], reverse=True)
         tickets_over_48.sort(key=lambda x: x["waiting_hours"], reverse=True)
 
         return {
             "summary": {
-                "waiting_2_24_hours": len(tickets_2_24),
+                "waiting_0_24_hours": len(tickets_0_24),
                 "waiting_24_48_hours": len(tickets_24_48),
                 "waiting_over_48_hours": len(tickets_over_48),
                 "total_waiting": len(tickets_data),
             },
-            "tickets_2_24_hours": tickets_2_24,
+            "tickets_0_24_hours": tickets_0_24,
             "tickets_24_48_hours": tickets_24_48,
             "tickets_over_48_hours": tickets_over_48,
             "filters": {

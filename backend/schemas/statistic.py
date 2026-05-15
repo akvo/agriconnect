@@ -317,7 +317,7 @@ class TicketWaitingItem(BaseModel):
 class WaitingResponseStats(BaseModel):
     """Summary statistics for waiting response."""
 
-    waiting_2_24_hours: int
+    waiting_0_24_hours: int
     waiting_24_48_hours: int
     waiting_over_48_hours: int
     total_waiting: int
@@ -335,7 +335,7 @@ class TicketWaitingResponseResponse(BaseModel):
     """Ticket waiting response statistics."""
 
     summary: WaitingResponseStats
-    tickets_2_24_hours: List[TicketWaitingItem]
+    tickets_0_24_hours: List[TicketWaitingItem]
     tickets_24_48_hours: List[TicketWaitingItem]
     tickets_over_48_hours: List[TicketWaitingItem]
     filters: TicketWaitingResponseFilters

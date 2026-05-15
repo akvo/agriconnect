@@ -597,7 +597,7 @@ async def get_tickets_waiting_response(
 
     Returns open tickets where farmers have sent messages but EOs have not
     yet responded, grouped by waiting time:
-    - 2-24 hours
+    - 0-24 hours
     - 24-48 hours
     - >48 hours
 
@@ -606,6 +606,9 @@ async def get_tickets_waiting_response(
     - If no ward EO, finds district/region EO and marks as `assigned_to_parent`
 
     This helps identify response delays and wards lacking dedicated EOs.
+
+    **Note:** Date filters do NOT apply to this endpoint. It shows ALL
+    currently open tickets regardless of creation date.
 
     The administrative_id parameter accepts any administrative level:
     - Region ID: Shows tickets from all wards in the region
@@ -623,8 +626,8 @@ async def get_tickets_waiting_response(
 
     return TicketWaitingResponseResponse(
         summary=WaitingResponseStats(**result["summary"]),
-        tickets_2_24_hours=[
-            TicketWaitingItem(**t) for t in result["tickets_2_24_hours"]
+        tickets_0_24_hours=[
+            TicketWaitingItem(**t) for t in result["tickets_0_24_hours"]
         ],
         tickets_24_48_hours=[
             TicketWaitingItem(**t) for t in result["tickets_24_48_hours"]
