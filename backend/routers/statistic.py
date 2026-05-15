@@ -29,6 +29,10 @@ from schemas.statistic import (
     CropDistributionFilters,
     CropDistributionResponse,
     CropDistributionMatrixResponse,
+    TicketWaitingResponseResponse,
+    TicketWaitingResponseFilters,
+    WaitingResponseStats,
+    TicketWaitingItem,
 )
 from services.statistic_service import StatisticService
 from utils.statistic_auth import verify_statistic_token
@@ -567,4 +571,66 @@ async def get_crop_distribution_matrix(
         crop_types=result["crop_types"],
         level_name=result["level_name"],
         filters=CropDistributionFilters(**result["filters"]),
+    )
+
+
+@router.get(
+    "/eo/tickets-waiting-response",
+    response_model=TicketWaitingResponseResponse
+)
+async def get_tickets_waiting_response(
+    start_date: Optional[str] = Query(
+        None, description="Filter start date (ISO 8601 format)"
+    ),
+    end_date: Optional[str] = Query(
+        None, description="Filter end date (ISO 8601 format)"
+    ),
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter by administrative area ID (region, district, "
+        "or ward). Shows tickets from all descendant wards."
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Get tickets waiting for EO response, categorized by wait time.
+
+    Returns open tickets where farmers have sent messages but EOs have not
+    yet responded, grouped by waiting time:
+    - 2-24 hours
+    - 24-48 hours
+    - >48 hours
+
+    For each ticket, identifies the responsible EO:
+    - If ward has an assigned EO, shows that EO
+    - If no ward EO, finds district/region EO and marks as `assigned_to_parent`
+
+    This helps identify response delays and wards lacking dedicated EOs.
+
+    The administrative_id parameter accepts any administrative level:
+    - Region ID: Shows tickets from all wards in the region
+    - District ID: Shows tickets from all wards in the district
+    - Ward ID: Shows tickets from that specific ward only
+
+    Authentication: Bearer token required (STATISTIC_API_TOKEN)
+    """
+    service = StatisticService(db)
+    result = service.get_tickets_waiting_response(
+        start_date=start_date,
+        end_date=end_date,
+        administrative_id=administrative_id,
+    )
+
+    return TicketWaitingResponseResponse(
+        summary=WaitingResponseStats(**result["summary"]),
+        tickets_2_24_hours=[
+            TicketWaitingItem(**t) for t in result["tickets_2_24_hours"]
+        ],
+        tickets_24_48_hours=[
+            TicketWaitingItem(**t) for t in result["tickets_24_48_hours"]
+        ],
+        tickets_over_48_hours=[
+            TicketWaitingItem(**t) for t in result["tickets_over_48_hours"]
+        ],
+        filters=TicketWaitingResponseFilters(**result["filters"]),
     )

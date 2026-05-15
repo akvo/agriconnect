@@ -1601,3 +1601,205 @@ class StatisticService:
                 "administrative_id": administrative_id,
             },
         }
+
+    def get_tickets_waiting_response(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        administrative_id: Optional[int] = None,
+    ) -> dict:
+        """
+        Get tickets waiting for EO response, categorized by wait time.
+
+        This shows tickets where the farmer has escalated but the EO
+        has not yet responded, grouped by:
+        - 2-24 hours waiting
+        - 24-48 hours waiting
+        - >48 hours waiting
+
+        For each ticket, identifies the responsible EO (may be at ward,
+        district, or region level) and marks if assigned to parent area.
+
+        Args:
+            start_date: Filter by ticket creation start date
+            end_date: Filter by ticket creation end date
+            administrative_id: Filter to tickets in this area and descendants
+
+        Returns:
+            Dictionary with summary stats and ticket lists by wait time
+        """
+        from datetime import datetime, timezone
+
+        # Get current time for calculating wait time
+        now = datetime.now(timezone.utc)
+
+        # Base query: open tickets only
+        query = (
+            self.db.query(Ticket)
+            .filter(Ticket.resolved_at.is_(None))
+        )
+
+        # Apply date filters on ticket creation
+        query = self._apply_date_filter(
+            query, Ticket.created_at, start_date, end_date
+        )
+
+        # Filter by administrative area
+        if administrative_id:
+            ward_ids = self._get_administrative_ward_ids(administrative_id)
+            if ward_ids:
+                query = query.filter(Ticket.administrative_id.in_(ward_ids))
+            else:
+                # If no ward IDs, use the administrative_id directly
+                query = query.filter(
+                    Ticket.administrative_id == administrative_id
+                )
+
+        # Get all open tickets
+        open_tickets = query.all()
+
+        # Process each ticket to determine wait time and assigned EO
+        tickets_data = []
+
+        for ticket in open_tickets:
+            # Get last message from customer
+            last_customer_msg = (
+                self.db.query(Message)
+                .filter(Message.customer_id == ticket.customer_id)
+                .filter(Message.from_source == MessageFrom.CUSTOMER)
+                .order_by(Message.created_at.desc())
+                .first()
+            )
+
+            if not last_customer_msg:
+                continue
+
+            # Check if EO has replied after last customer message
+            eo_reply = (
+                self.db.query(Message)
+                .filter(Message.customer_id == ticket.customer_id)
+                .filter(Message.from_source == MessageFrom.USER)
+                .filter(Message.created_at > last_customer_msg.created_at)
+                .first()
+            )
+
+            # Only include if no EO reply after last customer message
+            if eo_reply:
+                continue
+
+            # Calculate waiting time in hours
+            waiting_time = now - last_customer_msg.created_at
+            waiting_hours = waiting_time.total_seconds() / 3600
+
+            # Only include if waiting >= 2 hours
+            if waiting_hours < 2:
+                continue
+
+            # Get customer info
+            customer = ticket.customer
+
+            # Get ward info
+            ward = (
+                self.db.query(Administrative)
+                .filter(Administrative.id == ticket.administrative_id)
+                .first()
+            )
+
+            if not ward:
+                continue
+
+            # Find responsible EO (check ward, then district, then region)
+            assigned_to_parent = False
+            responsible_eo = None
+
+            # First check ward level
+            ward_eo = (
+                self.db.query(User)
+                .join(UserAdministrative)
+                .filter(UserAdministrative.administrative_id == ward.id)
+                .filter(User.user_type == UserType.EXTENSION_OFFICER)
+                .filter(User.is_active == True)  # noqa: E712
+                .first()
+            )
+
+            if ward_eo:
+                responsible_eo = ward_eo
+            else:
+                # No ward EO, check parent areas
+                assigned_to_parent = True
+                ancestor_ids = AdministrativeService.get_ancestor_ids(
+                    self.db, ward.id
+                )
+
+                # Try to find EO in parent areas (district, then region)
+                for ancestor_id in ancestor_ids:
+                    parent_eo = (
+                        self.db.query(User)
+                        .join(UserAdministrative)
+                        .filter(
+                            UserAdministrative.administrative_id == ancestor_id
+                        )
+                        .filter(User.user_type == UserType.EXTENSION_OFFICER)
+                        .filter(User.is_active == True)  # noqa: E712
+                        .first()
+                    )
+                    if parent_eo:
+                        responsible_eo = parent_eo
+                        break
+
+            # Build ticket data
+            ticket_item = {
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "customer_name": customer.name or "Unknown",
+                "customer_phone": customer.phone_number,
+                "ward_name": ward.name,
+                "ward_path": ward.path,
+                "eo_name": (
+                    responsible_eo.full_name if responsible_eo else None
+                ),
+                "eo_phone": (
+                    responsible_eo.phone_number if responsible_eo else None
+                ),
+                "assigned_to_parent": assigned_to_parent,
+                "waiting_hours": round(waiting_hours, 1),
+                "created_at": ticket.created_at.isoformat(),
+                "last_customer_message_at": (
+                    last_customer_msg.created_at.isoformat()
+                ),
+            }
+
+            tickets_data.append(ticket_item)
+
+        # Categorize by wait time
+        tickets_2_24 = [
+            t for t in tickets_data if 2 <= t["waiting_hours"] < 24
+        ]
+        tickets_24_48 = [
+            t for t in tickets_data if 24 <= t["waiting_hours"] < 48
+        ]
+        tickets_over_48 = [
+            t for t in tickets_data if t["waiting_hours"] >= 48
+        ]
+
+        # Sort each list by waiting_hours descending
+        tickets_2_24.sort(key=lambda x: x["waiting_hours"], reverse=True)
+        tickets_24_48.sort(key=lambda x: x["waiting_hours"], reverse=True)
+        tickets_over_48.sort(key=lambda x: x["waiting_hours"], reverse=True)
+
+        return {
+            "summary": {
+                "waiting_2_24_hours": len(tickets_2_24),
+                "waiting_24_48_hours": len(tickets_24_48),
+                "waiting_over_48_hours": len(tickets_over_48),
+                "total_waiting": len(tickets_data),
+            },
+            "tickets_2_24_hours": tickets_2_24,
+            "tickets_24_48_hours": tickets_24_48,
+            "tickets_over_48_hours": tickets_over_48,
+            "filters": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "administrative_id": administrative_id,
+            },
+        }

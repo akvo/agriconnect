@@ -294,3 +294,48 @@ class CropDistributionMatrixResponse(BaseModel):
     crop_types: List[str]
     level_name: str  # e.g., "Region", "District", "Ward"
     filters: CropDistributionFilters
+
+
+# Ticket waiting response schemas
+class TicketWaitingItem(BaseModel):
+    """Single ticket waiting for EO response."""
+
+    ticket_id: int
+    ticket_number: str
+    customer_name: str
+    customer_phone: str
+    ward_name: str
+    ward_path: str
+    eo_name: Optional[str] = None
+    eo_phone: Optional[str] = None
+    assigned_to_parent: bool = False
+    waiting_hours: float
+    created_at: str
+    last_customer_message_at: str
+
+
+class WaitingResponseStats(BaseModel):
+    """Summary statistics for waiting response."""
+
+    waiting_2_24_hours: int
+    waiting_24_48_hours: int
+    waiting_over_48_hours: int
+    total_waiting: int
+
+
+class TicketWaitingResponseFilters(BaseModel):
+    """Applied filters for ticket waiting response."""
+
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    administrative_id: Optional[int] = None
+
+
+class TicketWaitingResponseResponse(BaseModel):
+    """Ticket waiting response statistics."""
+
+    summary: WaitingResponseStats
+    tickets_2_24_hours: List[TicketWaitingItem]
+    tickets_24_48_hours: List[TicketWaitingItem]
+    tickets_over_48_hours: List[TicketWaitingItem]
+    filters: TicketWaitingResponseFilters
