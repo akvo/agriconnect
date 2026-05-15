@@ -1751,7 +1751,7 @@ class StatisticService:
             ticket_item = {
                 "ticket_id": ticket.id,
                 "ticket_number": ticket.ticket_number,
-                "customer_name": customer.name or "Unknown",
+                "customer_name": customer.full_name or "Unknown",
                 "customer_phone": customer.phone_number,
                 "ward_name": ward.name,
                 "ward_path": ward.path,
