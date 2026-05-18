@@ -32,21 +32,24 @@ from twilio.base.exceptions import TwilioRestException
 # =============================================================================
 
 # Path to input CSV file (will be updated with status)
-CSV_PATH = "/tmp/farmers.csv"
+CSV_PATH = "./source/farmers.csv"
 
 # Twilio WhatsApp template SID (get from Twilio Console after approval)
 # Example: "HXc3dfb3056770842dc80f57c24e5337ac"
-TEMPLATE_SID = "HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+TEMPLATE_SID = "HX4dfc3c613b848d2161833052d374a93b"
 
 # Column name containing phone numbers
 PHONE_COLUMN = "phone"
 
-# Column to use as template variable {{1}} (set to None if no variables)
-# Example: "name" to use farmer name in template
-VAR_COLUMN = None
+# Map template variables to CSV columns (set to None or {} if no variables)
+# Example: {"1": "name", "2": "company"} maps {{1}} to name, {{2}} to company
+VAR_COLUMNS = {
+    "1": "name",
+    "2": "company",
+}
 
 # Set to True to validate phones without sending messages
-DRY_RUN = True
+DRY_RUN = False
 
 # Set to True to only retry failed messages
 RETRY_FAILED_ONLY = False
@@ -113,21 +116,21 @@ def send_template_message(
             "success": True,
             "sid": message.sid,
             "status": message.status,
-            "error": None
+            "error": None,
         }
     except TwilioRestException as e:
         return {
             "success": False,
             "sid": None,
             "status": STATUS_FAILED,
-            "error": f"Twilio {e.code}: {e.msg}"
+            "error": f"Twilio {e.code}: {e.msg}",
         }
     except Exception as e:
         return {
             "success": False,
             "sid": None,
             "status": STATUS_FAILED,
-            "error": str(e)
+            "error": str(e),
         }
 
 
@@ -172,20 +175,24 @@ def main():
 
     # Add tracking columns if missing
     tracking_cols = [
-        "status", "retries", "last_batch_date", "message_sid", "error"
+        "status",
+        "retries",
+        "last_batch_date",
+        "message_sid",
+        "error",
     ]
     for col in tracking_cols:
         if col not in df.columns:
             df[col] = ""
 
-    df["retries"] = pd.to_numeric(
-        df["retries"], errors="coerce"
-    ).fillna(0).astype(int)
+    df["retries"] = (
+        pd.to_numeric(df["retries"], errors="coerce").fillna(0).astype(int)
+    )
 
     # Print config
     print(f"Total rows: {len(df)}")
     print(f"Template SID: {TEMPLATE_SID}")
-    print(f"Variable column: {VAR_COLUMN or 'None'}")
+    print(f"Variable columns: {VAR_COLUMNS or 'None'}")
     print(f"Delay: {DELAY_MS}ms")
     print(f"Max retries: {MAX_RETRIES}")
     print(f"Retry failed only: {RETRY_FAILED_ONLY}")
@@ -245,10 +252,15 @@ def main():
 
         # Build template variables
         variables = None
-        if VAR_COLUMN and VAR_COLUMN in df.columns:
-            var_value = row.get(VAR_COLUMN, "")
-            if pd.notna(var_value) and str(var_value).strip():
-                variables = {"1": str(var_value).strip()}
+        if VAR_COLUMNS:
+            variables = {}
+            for var_num, col_name in VAR_COLUMNS.items():
+                if col_name in df.columns:
+                    var_value = row.get(col_name, "")
+                    if pd.notna(var_value) and str(var_value).strip():
+                        variables[var_num] = str(var_value).strip()
+            if not variables:
+                variables = None
 
         # Send or dry run
         if DRY_RUN:
@@ -262,8 +274,11 @@ def main():
             print(msg)
         else:
             result = send_template_message(
-                client, whatsapp_number, formatted_phone,
-                TEMPLATE_SID, variables
+                client,
+                whatsapp_number,
+                formatted_phone,
+                TEMPLATE_SID,
+                variables,
             )
 
             processed += 1

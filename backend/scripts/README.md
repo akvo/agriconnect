@@ -56,7 +56,17 @@ Send bulk WhatsApp template messages to farmers from a CSV file. Tracks delivery
 2. Edit the configuration section at the top of the script:
    - `CSV_PATH` - Path to your CSV file
    - `TEMPLATE_SID` - Your approved template SID (starts with `HX...`)
+   - `VAR_COLUMNS` - Map template variables to CSV columns (see below)
    - `DRY_RUN` - Set to `False` to actually send messages
+
+**Template Variables:**
+```python
+# Map {{1}}, {{2}}, etc. to CSV columns
+VAR_COLUMNS = {
+    "1": "name",      # {{1}} = name column
+    "2": "company",   # {{2}} = company column
+}
+```
 
 **CSV Format:**
 
