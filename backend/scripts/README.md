@@ -47,6 +47,54 @@ Test script for AI callback webhook with WHISPER message type. Sends a mock AI s
     --suggestion maize
 ```
 
+### bulk_whatsapp.py
+
+Send bulk WhatsApp template messages to farmers from a CSV file. Tracks delivery status and supports retries for failed messages.
+
+**Setup:**
+1. Create and approve a WhatsApp template in [Twilio Console](https://console.twilio.com)
+2. Edit the configuration section at the top of the script:
+   - `CSV_PATH` - Path to your CSV file
+   - `TEMPLATE_SID` - Your approved template SID (starts with `HX...`)
+   - `VAR_COLUMNS` - Map template variables to CSV columns (see below)
+   - `DRY_RUN` - Set to `False` to actually send messages
+
+**Template Variables:**
+```python
+# Map {{1}}, {{2}}, etc. to CSV columns
+VAR_COLUMNS = {
+    "1": "name",      # {{1}} = name column
+    "2": "company",   # {{2}} = company column
+}
+```
+
+**CSV Format:**
+
+| Column | Description |
+|--------|-------------|
+| `id` | Unique identifier |
+| `company` | Cooperative name |
+| `name` | Farmer name (optional, for template variable) |
+| `phone` | Phone number (required) |
+| `status` | Updated by script: `queued`, `sent`, `failed`, `invalid_phone` |
+| `retries` | Number of send attempts |
+| `last_batch_date` | Timestamp of last attempt |
+| `message_sid` | Twilio message SID for tracking |
+| `error` | Error message if failed |
+
+```bash
+# Edit configuration in the script first, then:
+
+# Dry run (validate phones without sending)
+./dc.sh exec backend python scripts/bulk_whatsapp.py
+
+# After setting DRY_RUN = False, send messages
+./dc.sh exec backend python scripts/bulk_whatsapp.py
+
+# To retry failed messages, set RETRY_FAILED_ONLY = True
+./dc.sh exec backend python scripts/bulk_whatsapp.py
+```
+
 ## Running in Kubernetes
 
 ```bash
