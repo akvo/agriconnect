@@ -1,3 +1,4 @@
+import random
 from typing import List
 
 from fastapi import HTTPException, status
@@ -5,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Administrative, AdministrativeLevel, UserAdministrative
+from models.user import User, UserType
 from schemas.administrative import (
     AdministrativeAssign,
     AdministrativeCreate,
@@ -305,3 +307,62 @@ class AdministrativeService:
                 break
 
         return ancestors
+
+    @staticmethod
+    def get_extension_officers_for_area(
+        db: Session,
+        administrative_id: int,
+        min_count: int = 2,
+        randomize: bool = True,
+    ) -> List[User]:
+        """
+        Get extension officers assigned to an administrative area
+        or its ancestor areas (region/district).
+
+        Args:
+            db: Database session
+            administrative_id: ID of the administrative area (ward)
+            min_count: Minimum number of officers to return
+            randomize: Whether to shuffle and select randomly
+
+        Returns:
+            List of User objects (extension officers) with phone numbers.
+            Returns up to min_count officers if randomize is True,
+            otherwise returns all matching officers.
+        """
+        # Get all administrative IDs to check
+        # (this area + ancestors like region/district)
+        area_ids = [administrative_id]
+        ancestor_ids = AdministrativeService.get_ancestor_ids(
+            db, administrative_id
+        )
+        area_ids.extend(ancestor_ids)
+
+        # Query extension officers assigned to these areas
+        officers = (
+            db.query(User)
+            .join(UserAdministrative, User.id == UserAdministrative.user_id)
+            .filter(
+                UserAdministrative.administrative_id.in_(area_ids),
+                User.user_type == UserType.EXTENSION_OFFICER,
+                User.is_active == True,  # noqa: E712
+                User.phone_number.isnot(None),
+            )
+            .distinct()
+            .all()
+        )
+
+        if not officers:
+            return []
+
+        if randomize and len(officers) > min_count:
+            # Shuffle and return min_count officers
+            return random.sample(officers, min_count)
+        elif randomize and len(officers) <= min_count:
+            # Return all available officers (shuffled)
+            shuffled = list(officers)
+            random.shuffle(shuffled)
+            return shuffled
+        else:
+            # Return all officers without shuffling
+            return officers
