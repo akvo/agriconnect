@@ -532,6 +532,30 @@ trans: Dict[str, Any] = {
             ),
         },
     },
+    "escalation": {
+        "confirmed": {
+            "en": (
+                "Your issue has been transferred to extension service "
+                "provider. Please wait for a response from them. "
+                "For urgent issues please call:\n{eo_contacts}"
+            ),
+            "sw": (
+                "Tatizo lako limehamishwa kwa mtoa huduma wa ugani. "
+                "Tafadhali subiri jibu kutoka kwao. "
+                "Kwa masuala ya dharura tafadhali piga simu:\n{eo_contacts}"
+            ),
+        },
+        "confirmed_no_contacts": {
+            "en": (
+                "Your issue has been transferred to extension service "
+                "provider. Please wait for a response from them."
+            ),
+            "sw": (
+                "Tatizo lako limehamishwa kwa mtoa huduma wa ugani. "
+                "Tafadhali subiri jibu kutoka kwao."
+            ),
+        },
+    },
 }
 
 

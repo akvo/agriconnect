@@ -32,6 +32,8 @@ from services.socketio_service import emit_message_received
 from services.onboarding_service import get_onboarding_service
 from services.openai_service import get_openai_service
 from services.follow_up_service import get_follow_up_service
+from services.administrative_service import AdministrativeService
+from utils.i18n import t
 from schemas.callback import TwilioStatusCallback, TwilioMessageStatus
 from models.broadcast import BroadcastRecipient
 from tasks.broadcast_tasks import send_actual_message
@@ -201,8 +203,6 @@ async def whatsapp_webhook(
         # ========================================
         # ACCOUNT DELETION FLOW
         # ========================================
-        from utils.i18n import t
-
         # Define delete keywords (in supported languages)
         delete_keywords = ["delete", "futa"]
         # Define confirmation responses (in supported languages)
@@ -269,8 +269,6 @@ async def whatsapp_webhook(
             and not customer.data_consent_given
             and customer.language is not None
         ):
-            from utils.i18n import t
-
             whatsapp_service = WhatsAppService()
             lang = customer.language.value
 
@@ -366,8 +364,6 @@ async def whatsapp_webhook(
                     lang = (
                         customer.language.value if customer.language else "en"
                     )
-                    from utils.i18n import t
-
                     area_name = customer.customer_administrative[
                         0
                     ].administrative.name
@@ -543,7 +539,6 @@ async def whatsapp_webhook(
             from services.weather_subscription_service import (
                 get_weather_subscription_service,
             )
-            from utils.i18n import t
 
             weather_service = get_weather_subscription_service(db)
             lang = customer.language.value if customer.language else "en"
@@ -701,6 +696,46 @@ async def whatsapp_webhook(
                         customer_id=customer.id,
                     )
                 )
+
+            # Send escalation confirmation message to customer
+            # with extension officer phone numbers
+            whatsapp_service = WhatsAppService()
+            customer_lang = (
+                customer.language.value if customer.language else "en"
+            )
+            eo_list = AdministrativeService.get_extension_officers_for_area(
+                db=db,
+                administrative_id=ward_id,
+                min_count=2,
+                randomize=True,
+            )
+
+            if eo_list:
+                # Format EO contacts (name: phone_number)
+                eo_contacts = "\n".join(
+                    [f"- {eo.full_name}: {eo.phone_number}" for eo in eo_list]
+                )
+                confirmation_msg = t(
+                    "escalation.confirmed",
+                    customer_lang,
+                    eo_contacts=eo_contacts,
+                )
+            else:
+                # No EOs found, send message without contacts
+                confirmation_msg = t(
+                    "escalation.confirmed_no_contacts",
+                    customer_lang,
+                )
+
+            # Send WhatsApp message to customer
+            whatsapp_service.send_message(
+                to_number=customer.phone_number,
+                message_body=confirmation_msg,
+            )
+            logger.info(
+                f"Sent escalation confirmation to {customer.phone_number} "
+                f"with {len(eo_list)} EO contacts"
+            )
 
             return {"status": "success", "message": "Escalation processed"}
 
