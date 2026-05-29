@@ -13,7 +13,9 @@ import { useRouter } from "next/navigation";
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
+import AdministrativeCascadeFilter from "../../components/common/AdministrativeCascadeFilter";
 
 export default function CustomersPage() {
   const { user, loading: authLoading, refreshUser } = useAuth();
@@ -27,6 +29,8 @@ export default function CustomersPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [locationFilter, setLocationFilter] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   // Redirect non-admins (for now, both admin and eo can access customers)
   useEffect(() => {
@@ -48,21 +52,15 @@ export default function CustomersPage() {
 
     try {
       setLoading(true);
-      const response = await api.get("/customers/");
-
-      // Filter customers based on search term
-      let filteredCustomers = response.data;
-      if (searchTerm) {
-        const lowerSearchTerm = searchTerm.toLowerCase();
-        filteredCustomers = response.data.filter(
-          (customer) =>
-            customer.phone_number?.toLowerCase().includes(lowerSearchTerm) ||
-            customer.full_name?.toLowerCase().includes(lowerSearchTerm) ||
-            customer.id?.toString().includes(lowerSearchTerm)
-        );
+      const params = new URLSearchParams();
+      if (locationFilter) {
+        params.append("administrative_id", locationFilter);
       }
+      const queryString = params.toString();
+      const url = `/customers/${queryString ? `?${queryString}` : ""}`;
 
-      setCustomers(filteredCustomers);
+      const response = await api.get(url);
+      setCustomers(response.data);
       setError(null);
     } catch (err) {
       console.error("Error fetching customers:", err);
@@ -70,7 +68,7 @@ export default function CustomersPage() {
     } finally {
       setLoading(false);
     }
-  }, [authLoading, user, searchTerm]);
+  }, [authLoading, user, locationFilter]);
 
   useEffect(() => {
     if (
@@ -131,6 +129,46 @@ export default function CustomersPage() {
     }
   };
 
+  const handleLocationFilterChange = (filterData) => {
+    setLocationFilter(filterData.administrativeId);
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      setExporting(true);
+      const params = new URLSearchParams();
+      if (locationFilter) {
+        params.append("administrative_id", locationFilter);
+      }
+      if (searchTerm) {
+        params.append("search", searchTerm);
+      }
+      const queryString = params.toString();
+      const url = `/customers/export${queryString ? `?${queryString}` : ""}`;
+
+      const response = await api.get(url, {
+        responseType: "blob",
+      });
+
+      // Create download link
+      const blob = new Blob([response.data], { type: "text/csv" });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      const timestamp = new Date().toISOString().split("T")[0];
+      link.download = `customers_${timestamp}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Error exporting customers:", err);
+      alert(err.response?.data?.detail || "Failed to export customers");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Don't render if user doesn't have access
   if (user && user.user_type !== "admin" && user.user_type !== "eo") {
     return null;
@@ -158,6 +196,7 @@ export default function CustomersPage() {
     );
   }
 
+  // Client-side search filtering (location filtering is done server-side)
   const filteredCustomers = customers.filter((customer) => {
     if (!searchTerm) return true;
     const lowerSearchTerm = searchTerm.toLowerCase();
@@ -229,6 +268,23 @@ export default function CustomersPage() {
                   <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
                 </div>
               </div>
+            </div>
+
+            {/* Location Filter and Export */}
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <AdministrativeCascadeFilter
+                onChange={handleLocationFilterChange}
+                showClearButton={true}
+              />
+              <button
+                onClick={handleExportCSV}
+                disabled={exporting || filteredCustomers.length === 0}
+                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
+                style={{ borderRadius: "5px" }}
+              >
+                <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                {exporting ? "Exporting..." : "Export CSV"}
+              </button>
             </div>
           </div>
 
