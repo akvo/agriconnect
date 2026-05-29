@@ -3,7 +3,7 @@
 Export Farmer Questions to CSV
 
 This script exports all questions asked by farmers (customers) to CSV.
-Includes: Date, Farmer ID, Admin who handled, Primary crop, Farmer age, Question.
+Includes: Date, Farmer ID, Admin, Primary crop, Farmer age, Question.
 
 Admin is determined via ticket.resolved_by (if the question was escalated).
 Questions handled by AI without escalation will have NULL for admin.
@@ -81,7 +81,7 @@ def export_farmer_questions(output_path: str) -> int:
     # Print summary
     farmers = set(row[1] for row in rows)  # farmer_id
 
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  Total questions: {len(rows)}")
     print(f"  Unique farmers: {len(farmers)}")
 
