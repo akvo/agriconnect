@@ -8,6 +8,7 @@ import {
   PencilIcon,
   TrashIcon,
   UsersIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
 import DataTable from "../common/DataTable";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,6 +25,10 @@ export default function CustomerList({
     {
       title: "Customer",
       icon: UserIcon,
+    },
+    {
+      title: "Location",
+      icon: MapPinIcon,
     },
     {
       title: "Language",
@@ -70,6 +75,17 @@ export default function CustomerList({
     });
   };
 
+  const formatLocation = (administrative) => {
+    if (!administrative?.path) return null;
+    // Path format: "Country > Region > District > Ward"
+    // We want to show just the last 3 parts (Region > District > Ward)
+    const parts = administrative.path.split(" > ");
+    if (parts.length > 1) {
+      return parts.slice(1).join(" > ");
+    }
+    return administrative.name || administrative.path;
+  };
+
   const renderRow = (customer, index) => (
     <>
       <td className="px-8 py-6 whitespace-nowrap">
@@ -84,6 +100,20 @@ export default function CustomerList({
             </div>
           </div>
         </div>
+      </td>
+      <td className="px-8 py-6">
+        {customer.administrative ? (
+          <div className="text-sm text-secondary-700">
+            <div className="font-medium text-secondary-900">
+              {customer.administrative.name}
+            </div>
+            <div className="text-xs text-secondary-500 mt-0.5">
+              {formatLocation(customer.administrative)}
+            </div>
+          </div>
+        ) : (
+          <span className="text-secondary-400 text-sm italic">No location</span>
+        )}
       </td>
       <td className="px-8 py-6 whitespace-nowrap">
         {customer.language ? (

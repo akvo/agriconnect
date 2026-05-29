@@ -1,9 +1,14 @@
+import csv
+import io
+from datetime import datetime
 from typing import List, Optional
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from database import get_db
+from services.administrative_service import AdministrativeService
 from models.administrative import (
     UserAdministrative,
     CustomerAdministrative,
@@ -97,10 +102,15 @@ async def create_customer(
 
 @router.get("/", response_model=List[CustomerResponse])
 async def get_all_customers(
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter by admin area ID (includes descendants)"
+    ),
+    search: Optional[str] = Query(None, description="Search by name or phone"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get all customers"""
+    """Get all customers with optional filtering by administrative area."""
     # Load customers with administrative data
     customers = (
         db.query(Customer)
@@ -110,13 +120,37 @@ async def get_all_customers(
             )
         )
     )
+
+    # Build list of administrative IDs to filter by
+    filter_admin_ids = None
+
     if current_user.user_type != UserType.ADMIN:
-        # filter by EO's assigned administrative areas
+        # EO can only see customers in their assigned areas and descendants
         user_admin_ids = _get_user_administrative_ids(current_user, db)
+        filter_admin_ids = user_admin_ids
+    elif administrative_id:
+        # Admin filtering by specific administrative area
+        # Get all descendant ward IDs
+        descendant_ids = AdministrativeService.get_descendant_ward_ids(
+            db, administrative_id
+        )
+        # Include the selected area itself (might be a ward)
+        filter_admin_ids = list(set([administrative_id] + descendant_ids))
+
+    # Apply administrative filter if needed
+    if filter_admin_ids:
         customers = customers.join(
             Customer.customer_administrative
         ).filter(
-            CustomerAdministrative.administrative_id.in_(user_admin_ids)
+            CustomerAdministrative.administrative_id.in_(filter_admin_ids)
+        )
+
+    # Apply search filter
+    if search:
+        search_term = f"%{search.lower()}%"
+        customers = customers.filter(
+            (Customer.full_name.ilike(search_term)) |
+            (Customer.phone_number.ilike(search_term))
         )
 
     customers = customers.all()
@@ -238,6 +272,148 @@ async def get_customers_list(
 
     return CustomerListResponse(
         customers=customers, total=total, page=page, size=size
+    )
+
+
+@router.get("/export")
+async def export_customers_csv(
+    administrative_id: Optional[int] = Query(
+        None,
+        description="Filter by admin area ID (includes descendants)"
+    ),
+    search: Optional[str] = Query(None, description="Search by name or phone"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Export customers to CSV file.
+
+    - **Admin users**: Can export all customers or filter by area
+    - **EO users**: Only export customers in their assigned area(s)
+    - Supports search by name/phone
+    - Returns a downloadable CSV file
+    """
+    # Load customers with administrative data
+    customers = (
+        db.query(Customer)
+        .options(
+            joinedload(Customer.customer_administrative).joinedload(
+                CustomerAdministrative.administrative
+            )
+        )
+    )
+
+    # Build list of administrative IDs to filter by
+    filter_admin_ids = None
+
+    if current_user.user_type != UserType.ADMIN:
+        # EO can only see customers in their assigned areas and descendants
+        user_admin_ids = _get_user_administrative_ids(current_user, db)
+        filter_admin_ids = user_admin_ids
+    elif administrative_id:
+        # Admin filtering by specific administrative area
+        descendant_ids = AdministrativeService.get_descendant_ward_ids(
+            db, administrative_id
+        )
+        filter_admin_ids = list(set([administrative_id] + descendant_ids))
+
+    # Apply administrative filter if needed
+    if filter_admin_ids:
+        customers = customers.join(
+            Customer.customer_administrative
+        ).filter(
+            CustomerAdministrative.administrative_id.in_(filter_admin_ids)
+        )
+
+    # Apply search filter
+    if search:
+        search_term = f"%{search.lower()}%"
+        customers = customers.filter(
+            (Customer.full_name.ilike(search_term)) |
+            (Customer.phone_number.ilike(search_term))
+        )
+
+    customers = customers.all()
+
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow([
+        "ID",
+        "Full Name",
+        "Phone Number",
+        "Language",
+        "Crop Type",
+        "Gender",
+        "Age",
+        "Region",
+        "District",
+        "Ward",
+        "Location Path",
+        "Created At",
+        "Updated At",
+    ])
+
+    # Write data rows
+    for customer in customers:
+        # Parse administrative path for region, district, ward
+        region = ""
+        district = ""
+        ward = ""
+        location_path = ""
+
+        if customer.customer_administrative:
+            customer_admin = customer.customer_administrative[0]
+            if customer_admin.administrative:
+                admin = customer_admin.administrative
+                location_path = admin.path or ""
+                ward = admin.name or ""
+
+                # Parse path: "Country > Region > District > Ward"
+                if location_path:
+                    parts = location_path.split(" > ")
+                    if len(parts) >= 2:
+                        region = parts[1] if len(parts) > 1 else ""
+                    if len(parts) >= 3:
+                        district = parts[2] if len(parts) > 2 else ""
+                    if len(parts) >= 4:
+                        ward = parts[3] if len(parts) > 3 else ""
+
+        # Get language label
+        language = "English" if customer.language == "en" else (
+            "Swahili" if customer.language == "sw" else customer.language
+        )
+
+        writer.writerow([
+            customer.id,
+            customer.full_name or "",
+            customer.phone_number or "",
+            language or "",
+            customer.crop_type or "",
+            customer.gender or "",
+            customer.age or "",
+            region,
+            district,
+            ward,
+            location_path,
+            customer.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if customer.created_at else "",
+            customer.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            if customer.updated_at else "",
+        ])
+
+    # Prepare response
+    output.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"customers_{timestamp}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
     )
 
 
