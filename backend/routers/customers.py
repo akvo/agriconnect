@@ -227,11 +227,26 @@ async def get_customers_list(
     # Get administrative IDs based on user role
     user_administrative_ids = _get_user_administrative_ids(current_user, db)
 
+    # Expand administrative_ids filter to descendant wards if provided
+    requested_ward_ids = None
+    if administrative_ids:
+        requested_ward_ids = []
+        for admin_id in administrative_ids:
+            descendant_ids = AdministrativeService.get_descendant_ward_ids(
+                db, admin_id
+            )
+            if descendant_ids:
+                requested_ward_ids.extend(descendant_ids)
+            else:
+                # If no descendants, include the ID itself (it's a ward)
+                requested_ward_ids.append(admin_id)
+        requested_ward_ids = list(set(requested_ward_ids))
+
     # Determine which administrative IDs to filter by
     if current_user.user_type == UserType.ADMIN:
-        # Admin can optionally filter by specific ward(s)
-        if administrative_ids:
-            filter_administrative_ids = administrative_ids
+        # Admin can optionally filter by specific administrative area(s)
+        if requested_ward_ids:
+            filter_administrative_ids = requested_ward_ids
         else:
             # No filter - show all customers
             filter_administrative_ids = None
@@ -242,7 +257,18 @@ async def get_customers_list(
             return CustomerListResponse(
                 customers=[], total=0, page=page, size=size
             )
-        filter_administrative_ids = user_administrative_ids
+        if requested_ward_ids:
+            # Intersect EO's wards with the requested filter
+            filter_administrative_ids = [
+                w for w in requested_ward_ids if w in user_administrative_ids
+            ]
+            if not filter_administrative_ids:
+                # No overlap - return empty
+                return CustomerListResponse(
+                    customers=[], total=0, page=page, size=size
+                )
+        else:
+            filter_administrative_ids = user_administrative_ids
 
     # Parse filters into dict with lists
     profile_filters = None

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../lib/api";
 import CustomerList from "../../components/customers/CustomerList";
@@ -14,8 +14,12 @@ import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
   ArrowDownTrayIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import AdministrativeCascadeFilter from "../../components/common/AdministrativeCascadeFilter";
+
+const PAGE_SIZE = 10;
 
 export default function CustomersPage() {
   const { user, loading: authLoading, refreshUser } = useAuth();
@@ -24,6 +28,7 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -31,6 +36,10 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [locationFilter, setLocationFilter] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const searchTimeoutRef = useRef(null);
 
   // Redirect non-admins (for now, both admin and eo can access customers)
   useEffect(() => {
@@ -39,6 +48,27 @@ export default function CustomersPage() {
       return;
     }
   }, [user, router]);
+
+  // Debounce search term
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Reset to page 1 when location filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [locationFilter]);
 
   const fetchCustomers = useCallback(async () => {
     // Don't fetch if still loading auth or user doesn't have access
@@ -53,22 +83,28 @@ export default function CustomersPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      params.append("page", currentPage.toString());
+      params.append("size", PAGE_SIZE.toString());
       if (locationFilter) {
-        params.append("administrative_id", locationFilter);
+        params.append("administrative_ids", locationFilter);
       }
-      const queryString = params.toString();
-      const url = `/customers/${queryString ? `?${queryString}` : ""}`;
+      if (debouncedSearchTerm) {
+        params.append("search", debouncedSearchTerm);
+      }
+      const url = `/customers/list?${params.toString()}`;
 
       const response = await api.get(url);
-      setCustomers(response.data);
+      setCustomers(response.data.customers);
+      setTotalCustomers(response.data.total);
       setError(null);
+      setInitialLoadComplete(true);
     } catch (err) {
       console.error("Error fetching customers:", err);
       setError(err.response?.data?.detail || "Failed to fetch customers");
     } finally {
       setLoading(false);
     }
-  }, [authLoading, user, locationFilter]);
+  }, [authLoading, user, locationFilter, currentPage, debouncedSearchTerm]);
 
   useEffect(() => {
     if (
@@ -174,7 +210,7 @@ export default function CustomersPage() {
     return null;
   }
 
-  if (authLoading || (loading && customers.length === 0)) {
+  if (authLoading || (loading && !initialLoadComplete)) {
     return (
       <div className="min-h-screen bg-gradient-brand flex items-center justify-center">
         <div className="text-center animate-fade-in">
@@ -196,16 +232,13 @@ export default function CustomersPage() {
     );
   }
 
-  // Client-side search filtering (location filtering is done server-side)
-  const filteredCustomers = customers.filter((customer) => {
-    if (!searchTerm) return true;
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    return (
-      customer.phone_number?.toLowerCase().includes(lowerSearchTerm) ||
-      customer.full_name?.toLowerCase().includes(lowerSearchTerm) ||
-      customer.id?.toString().includes(lowerSearchTerm)
-    );
-  });
+  const totalPages = Math.ceil(totalCustomers / PAGE_SIZE);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-brand">
@@ -234,7 +267,7 @@ export default function CustomersPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-lg font-medium text-gray-900">
-                  Customers ({filteredCustomers.length})
+                  Customers ({totalCustomers})
                 </h2>
                 <p className="mt-1 text-sm text-gray-600">
                   Manage customer information and communication preferences
@@ -278,7 +311,7 @@ export default function CustomersPage() {
               />
               <button
                 onClick={handleExportCSV}
-                disabled={exporting || filteredCustomers.length === 0}
+                disabled={exporting || totalCustomers === 0}
                 className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
                 style={{ borderRadius: "5px" }}
               >
@@ -290,11 +323,52 @@ export default function CustomersPage() {
 
           {/* Customer List */}
           <CustomerList
-            customers={filteredCustomers}
+            customers={customers}
             loading={loading}
             onEditCustomer={handleEditCustomer}
             onDeleteCustomer={handleDeleteCustomer}
           />
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing{" "}
+                <span className="font-medium">
+                  {(currentPage - 1) * PAGE_SIZE + 1}
+                </span>{" "}
+                to{" "}
+                <span className="font-medium">
+                  {Math.min(currentPage * PAGE_SIZE, totalCustomers)}
+                </span>{" "}
+                of <span className="font-medium">{totalCustomers}</span>{" "}
+                customers
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  style={{ borderRadius: "5px" }}
+                >
+                  <ChevronLeftIcon className="h-4 w-4 mr-1" />
+                  Previous
+                </button>
+                <span className="px-4 py-2 text-sm text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  style={{ borderRadius: "5px" }}
+                >
+                  Next
+                  <ChevronRightIcon className="h-4 w-4 ml-1" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
