@@ -1605,14 +1605,19 @@ Birth year must be between 1900 and {current_year}."""
         # Get customer language
         lang = customer.language.value if customer.language else "en"
 
-        # Build options message
+        # Build options message with numbered candidates
         options_text = "\n".join(
             [f"{i+1}. {c.path}" for i, c in enumerate(top_candidates)]
         )
 
+        # Add "Other" option for step-by-step selection
+        other_option_num = len(top_candidates) + 1
+        other_option_text = t("onboarding.administration.other_option", lang)
+        options_text += f"\n{other_option_num}. {other_option_text}"
+
         logger.info(
             f"Ambiguous match for {field_name}, "
-            f"presenting {len(top_candidates)} options"
+            f"presenting {len(top_candidates)} options + Other"
         )
 
         return OnboardingResponse(
@@ -1661,12 +1666,31 @@ Birth year must be between 1900 and {current_year}."""
                 attempts=self._get_attempts(customer, field_name),
             )
 
+        # Check if user selected "Other" option (hierarchical selection)
+        is_other = selection_index == len(candidate_ids)
+        if is_other and field_name == "administration":
+            logger.info(
+                f"User selected 'Other' option, starting hierarchical "
+                f"selection for customer {customer.id}"
+            )
+            # Clear stored candidates before starting hierarchical selection
+            self._clear_field_state(customer, field_name)
+            self.db.commit()
+            return self._start_hierarchical_selection(customer)
+
+        # Check if selection is out of valid range
+        # Valid range: 0 to len(candidate_ids)-1 for actual candidates
+        # len(candidate_ids) is "Other" option (handled above for admin)
         if selection_index >= len(candidate_ids):
+            # For administration, include "Other" option in max count
+            max_options = len(candidate_ids)
+            if field_name == "administration":
+                max_options = len(candidate_ids) + 1  # Include "Other"
             return OnboardingResponse(
                 message=t(
                     "onboarding.common.selection_out_of_range",
                     lang,
-                    max=len(candidate_ids),
+                    max=max_options,
                 ),
                 status="awaiting_selection",
                 attempts=self._get_attempts(customer, field_name),

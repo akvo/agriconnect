@@ -223,6 +223,10 @@ trans: Dict[str, Any] = {
                     "Niruhusu kuhifadhi eneo lako kama {parent}."
                 ),
             },
+            "other_option": {
+                "en": "Other (select step by step)",
+                "sw": "Nyingine (chagua hatua kwa hatua)",
+            },
             "location_saved": {
                 "en": (
                     "Thank you! I've recorded your location as: {value}. How "
