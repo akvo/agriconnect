@@ -328,6 +328,7 @@ class CustomerService:
                 "age_group": customer.age_group,
                 "gender": customer.gender,
                 "administrative": admin_info,
+                "created_at": customer.created_at,
             }
             customer_data.append(customer_dict)
 

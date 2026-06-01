@@ -71,12 +71,13 @@ class CustomerListItem(BaseModel):
     id: int
     full_name: Optional[str] = None
     phone_number: str
-    language: CustomerLanguage
+    language: Optional[CustomerLanguage] = None
     gender: Optional[Gender] = None
     age_group: Optional[AgeGroup] = None
     birth_year: Optional[int] = None
     crop_type: Optional[str] = None
     administrative: CustomerAdministrativeInfo
+    created_at: datetime
 
     class Config:
         from_attributes = True
