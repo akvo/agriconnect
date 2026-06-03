@@ -20,6 +20,8 @@ interface MessageResponse {
   message_type: number; // 1=REPLY, 2=WHISPER
   status: number; // 1=PENDING, 2=REPLIED, 3=RESOLVED (matches backend MessageStatus)
   delivery_status: string; // PENDING, QUEUED, SENDING, SENT, DELIVERED, READ, FAILED, UNDELIVERED
+  media_url: string | null; // URL to media file (images, voice, etc.)
+  media_type: string; // TEXT, VOICE, IMAGE, etc.
   user_id: number | null; // User ID for messages from users
   user: MessageUser | null; // User details for messages from users (from_source = USER)
   created_at: string;
@@ -121,6 +123,8 @@ class MessageSyncService {
         message_type: apiMessage.message_type,
         status: apiMessage.status || 1, // Default to PENDING if not provided
         delivery_status: apiMessage.delivery_status || DeliveryStatus.PENDING,
+        media_url: apiMessage.media_url || null,
+        media_type: apiMessage.media_type || "TEXT",
         createdAt: apiMessage.created_at,
       });
     } catch (error) {

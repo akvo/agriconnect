@@ -1,5 +1,14 @@
-import React from "react";
-import { Text, View, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import {
+  Text,
+  View,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  Modal,
+  Dimensions,
+  ActivityIndicator,
+} from "react-native";
 import Avatar from "@/components/avatar";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
@@ -7,12 +16,75 @@ import { initialsFromName } from "@/utils/string";
 import { Message } from "@/utils/chat";
 import { formatMessageTimestamp } from "@/utils/time";
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
+
 interface MessageBubbleProps {
   message: Message;
 }
 
 const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isUser = message.sender === "user";
+  const isImage = message.media_type === "IMAGE" && message.media_url;
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const screenWidth = Dimensions.get("window").width;
+
+  // Build full image URL
+  const imageUrl = isImage ? `${API_BASE_URL}${message.media_url}` : null;
+
+  // Render image content
+  const renderImageContent = () => {
+    if (!isImage || !imageUrl) {
+      return null;
+    }
+
+    return (
+      <>
+        <TouchableOpacity
+          onPress={() => setImageModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.imageContainer}>
+            {imageLoading && (
+              <View style={styles.imageLoadingOverlay}>
+                <ActivityIndicator size="small" color={themeColors.dark3} />
+              </View>
+            )}
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.messageImage}
+              resizeMode="cover"
+              onLoadStart={() => setImageLoading(true)}
+              onLoadEnd={() => setImageLoading(false)}
+            />
+          </View>
+        </TouchableOpacity>
+
+        <Modal
+          visible={imageModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setImageModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setImageModalVisible(false)}
+          >
+            <Image
+              source={{ uri: imageUrl }}
+              style={{
+                width: screenWidth - 40,
+                height: screenWidth - 40,
+                borderRadius: 8,
+              }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </Modal>
+      </>
+    );
+  };
 
   if (isUser) {
     return (
@@ -41,7 +113,11 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
       <Avatar initials={initialsFromName(message?.name)} size={40} />
       <View style={[styles.bubble]}>
         <View style={[styles.bubbleLeftCustomer]}>
-          <Text style={typography.body3}>{message.text}</Text>
+          {isImage ? (
+            renderImageContent()
+          ) : (
+            <Text style={typography.body3}>{message.text}</Text>
+          )}
         </View>
         <View style={styles.footer}>
           <Text style={[typography.body4, styles.timestampSecondary]}>
@@ -128,6 +204,35 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 4,
     alignSelf: "flex-end",
+  },
+  imageContainer: {
+    position: "relative",
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+  },
+  imageLoadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: themeColors.light3,
+    zIndex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

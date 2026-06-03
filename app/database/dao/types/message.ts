@@ -4,6 +4,7 @@
 // Note: message_type (1=REPLY, 2=WHISPER)
 // Note: is_used (0=not used, 1=used) - tracks if WHISPER message has been accepted
 // Note: delivery_status - Twilio delivery tracking: PENDING, QUEUED, SENDING, SENT, DELIVERED, READ, FAILED, UNDELIVERED
+// Note: media_type - TEXT, VOICE, IMAGE, VIDEO, DOCUMENT, LOCATION, OTHER
 // Import from @/constants/messageSource and @/constants/messageStatus when needed
 export interface Message {
   id: number;
@@ -16,6 +17,8 @@ export interface Message {
   status: number; // 1=PENDING, 2=REPLIED, 3=RESOLVED
   is_used: number; // 0=not used, 1=used (for WHISPER messages)
   delivery_status: string; // Twilio delivery status: PENDING, QUEUED, SENDING, SENT, DELIVERED, READ, FAILED, UNDELIVERED
+  media_url: string | null; // URL to media file (images, voice, etc.)
+  media_type: string; // TEXT, VOICE, IMAGE, VIDEO, DOCUMENT, LOCATION, OTHER
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +34,8 @@ export interface CreateMessageData {
   status?: number; // Use MessageStatus constants (default: PENDING=1)
   is_used?: number; // 0=not used, 1=used (default: 0)
   delivery_status?: string; // Twilio delivery status (default: PENDING)
+  media_url?: string | null; // URL to media file (images, voice, etc.)
+  media_type?: string; // TEXT, VOICE, IMAGE, etc. (default: TEXT)
 }
 
 export interface UpdateMessageData {
@@ -43,9 +48,12 @@ export interface UpdateMessageData {
   status?: number; // Use MessageStatus constants
   is_used?: number; // 0=not used, 1=used
   delivery_status?: string; // Twilio delivery status
+  media_url?: string | null; // URL to media file (images, voice, etc.)
+  media_type?: string; // TEXT, VOICE, IMAGE, etc.
 }
 
 // Extended message interface with user details (for inbox/conversation views)
+// Note: Inherits media_url and media_type from Message interface
 export interface MessageWithUsers extends Message {
   customer_name: string;
   customer_phone: string;

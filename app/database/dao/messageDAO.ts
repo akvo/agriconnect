@@ -46,14 +46,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       ? db.prepareSync(
           `INSERT INTO messages (
             id, from_source, message_sid, customer_id, user_id, body,
-            message_type, status, is_used, delivery_status, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            message_type, status, is_used, delivery_status, media_url, media_type, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
       : db.prepareSync(
           `INSERT INTO messages (
             from_source, message_sid, customer_id, user_id, body,
-            message_type, status, is_used, delivery_status, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            message_type, status, is_used, delivery_status, media_url, media_type, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         );
 
     try {
@@ -69,6 +69,8 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.status || 1, // Default to PENDING (1)
             data.is_used || 0, // Default to not used (0)
             data.delivery_status || DeliveryStatus.PENDING,
+            data.media_url || null,
+            data.media_type || "TEXT", // Default to TEXT
             data.createdAt,
           ]
         : [
@@ -81,6 +83,8 @@ export class MessageDAO extends BaseDAOImpl<Message> {
             data.status || 1, // Default to PENDING (1)
             data.is_used || 0, // Default to not used (0)
             data.delivery_status || DeliveryStatus.PENDING,
+            data.media_url || null,
+            data.media_type || "TEXT", // Default to TEXT
             data.createdAt,
           ];
 
@@ -157,6 +161,14 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       if (data.delivery_status !== undefined) {
         updates.push("delivery_status = ?");
         values.push(data.delivery_status);
+      }
+      if (data.media_url !== undefined) {
+        updates.push("media_url = ?");
+        values.push(data.media_url);
+      }
+      if (data.media_type !== undefined) {
+        updates.push("media_type = ?");
+        values.push(data.media_type);
       }
 
       if (updates.length === 0) {

@@ -32,6 +32,8 @@ const convertToUIMessage = (
     text: msg.body,
     sender: isCustomerMessage ? "customer" : "user",
     timestamp: msg.createdAt,
+    media_url: msg.media_url || undefined,
+    media_type: msg.media_type || "TEXT",
   };
 };
 

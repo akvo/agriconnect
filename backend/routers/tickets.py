@@ -478,6 +478,12 @@ async def get_ticket_conversation(
                 if hasattr(m, "delivery_status") and m.delivery_status
                 else "PENDING"
             ),
+            "media_url": m.media_url,
+            "media_type": (
+                m.media_type.value
+                if hasattr(m, "media_type") and m.media_type
+                else "TEXT"
+            ),
             "user_id": m.user_id,
             "user": (
                 {

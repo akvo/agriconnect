@@ -122,6 +122,10 @@ app.include_router(statistic.router, prefix="/api")
 os.makedirs("storage", exist_ok=True)
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
+# Ensure media directory exists before mounting (for customer images)
+os.makedirs("media", exist_ok=True)
+app.mount("/media", StaticFiles(directory="media"), name="media")
+
 
 # Health check endpoint
 @app.get("/api/health-check", tags=["health-check"])

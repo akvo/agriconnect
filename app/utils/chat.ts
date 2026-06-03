@@ -7,6 +7,8 @@ export interface Message {
   text: string;
   sender: "user" | "customer";
   timestamp: string; // ISO string or formatted date
+  media_url?: string; // URL to media file (images, voice, etc.)
+  media_type?: string; // "TEXT" | "VOICE" | "IMAGE" | "VIDEO" | "DOCUMENT"
 }
 
 const groupMessagesByDate = (messages: Message[]) => {

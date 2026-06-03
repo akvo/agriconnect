@@ -144,6 +144,74 @@ async def whatsapp_webhook(
                         )
 
         # ========================================
+        # IMAGE MESSAGE HANDLING
+        # ========================================
+        is_image = (
+            NumMedia
+            and NumMedia > 0
+            and MediaContentType0
+            and "image" in MediaContentType0
+        )
+        if is_image:
+            logger.info(
+                f"Image message received from {phone_number}: "
+                f"{MediaContentType0} at {MediaUrl0}"
+            )
+
+            media_type = MediaType.IMAGE
+
+            # Determine file extension from content type
+            ext_map = {
+                "image/jpeg": "jpg",
+                "image/jpg": "jpg",
+                "image/png": "png",
+                "image/webp": "webp",
+                "image/gif": "gif",
+            }
+            ext = ext_map.get(MediaContentType0, "jpg")
+
+            # Generate unique filename
+            unique_filename = f"{uuid.uuid4().hex}.{ext}"
+            media_dir = "/app/media"
+            save_path = os.path.join(media_dir, unique_filename)
+
+            try:
+                # Ensure media directory exists
+                os.makedirs(media_dir, exist_ok=True)
+
+                # Download image from Twilio
+                whatsapp_service = WhatsAppService()
+                downloaded_path = whatsapp_service.download_twilio_media(
+                    media_url=MediaUrl0, save_path=save_path
+                )
+
+                if downloaded_path:
+                    # Set media_url to relative path for serving
+                    media_url = f"/media/{unique_filename}"
+                    logger.info(
+                        f"✓ Image saved for {phone_number}: {media_url}"
+                    )
+                    # Set fallback body text
+                    if not Body or not Body.strip():
+                        Body = "[Image]"
+                else:
+                    # Download failed
+                    logger.error(
+                        f"✗ Failed to download image from {phone_number}"
+                    )
+                    media_url = None
+                    media_type = MediaType.TEXT
+                    if not Body or not Body.strip():
+                        Body = "[Image - download failed]"
+
+            except Exception as e:
+                logger.error(f"✗ Error downloading image: {e}")
+                media_url = None
+                media_type = MediaType.TEXT
+                if not Body or not Body.strip():
+                    Body = "[Image - download error]"
+
+        # ========================================
         # CONTINUE WITH EXISTING MESSAGE FLOW
         # (Body is now either original text or transcribed text)
         # ========================================
