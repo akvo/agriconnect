@@ -11,6 +11,7 @@ import { alterTicketsAddLastMessageIdMigration } from "./010_alter_tickets_add_l
 import { customerProfileFieldsMigration } from "./011_alter_customer_add_profile";
 import { alterTicketsAddContextMessageIdMigration } from "./012_alter_tickets_add_contextMessageId";
 import { createUserStatsMigration } from "./013_create_user_stats";
+import { alterMessagesAddMediaMigration } from "./014_alter_messages_add_media";
 
 // Type definition for migration objects
 export interface Migration {
@@ -66,6 +67,11 @@ export const allMigrations: Migration[] = [
     version: 10,
     name: "create_user_stats",
     migration: createUserStatsMigration,
+  },
+  {
+    version: 11,
+    name: "alter_messages_add_media",
+    migration: alterMessagesAddMediaMigration,
   },
 ];
 

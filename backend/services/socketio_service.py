@@ -280,6 +280,8 @@ async def emit_message_received(
     sender_name: str = None,
     sender_user_id: Optional[int] = None,
     customer_id: Optional[int] = None,
+    media_url: Optional[str] = None,
+    media_type: str = "TEXT",
 ):
     """Emit message with ticket metadata for optimistic UI display"""
     event_data = {
@@ -291,6 +293,8 @@ async def emit_message_received(
         "ts": ts,
         "ticket_number": ticket_number,
         "sender_name": sender_name,
+        "media_url": media_url,
+        "media_type": media_type,
     }
 
     # Conditional field based on sender type

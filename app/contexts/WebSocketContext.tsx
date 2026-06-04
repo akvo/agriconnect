@@ -38,6 +38,9 @@ export interface MessageCreatedEvent {
   user_id?: number; // Present for admin/EO messages (from_source=2)
   customer_id?: number; // Present for customer messages (from_source=1)
   customer_name?: string;
+  // Media fields for images, voice messages, etc.
+  media_url?: string;
+  media_type?: string; // "TEXT" | "VOICE" | "IMAGE" | etc.
 }
 
 export interface TicketResolvedEvent {

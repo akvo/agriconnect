@@ -99,6 +99,7 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app:delegated
+      - media-data:/app/media
   frontend:
     depends_on:
       - backend
@@ -120,3 +121,4 @@ services:
 volumes:
   pg-data:
   redis-data:
+  media-data:
