@@ -17,6 +17,8 @@ import { Message } from "@/utils/chat";
 import { formatMessageTimestamp } from "@/utils/time";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
+// Strip /api suffix for media URLs (media is served from root, not /api)
+const MEDIA_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
 interface MessageBubbleProps {
   message: Message;
@@ -24,13 +26,16 @@ interface MessageBubbleProps {
 
 const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isUser = message.sender === "user";
+  // Check if this is an image message (either has media_type IMAGE or body is [Image])
   const isImage = message.media_type === "IMAGE" && message.media_url;
+  const isImagePending =
+    !isImage && message.text === "[Image]" && message.media_type !== "IMAGE";
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const screenWidth = Dimensions.get("window").width;
 
-  // Build full image URL
-  const imageUrl = isImage ? `${API_BASE_URL}${message.media_url}` : null;
+  // Build full image URL (media served from root, not /api)
+  const imageUrl = isImage ? `${MEDIA_BASE_URL}${message.media_url}` : null;
 
   // Render image content
   const renderImageContent = () => {
@@ -47,15 +52,16 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
           <View style={styles.imageContainer}>
             {imageLoading && (
               <View style={styles.imageLoadingOverlay}>
-                <ActivityIndicator size="small" color={themeColors.dark3} />
+                <ActivityIndicator size="large" color={themeColors["green-500"]} />
               </View>
             )}
             <Image
               source={{ uri: imageUrl }}
-              style={styles.messageImage}
+              style={[styles.messageImage, imageLoading && { opacity: 0 }]}
               resizeMode="cover"
               onLoadStart={() => setImageLoading(true)}
               onLoadEnd={() => setImageLoading(false)}
+              onError={() => setImageLoading(false)}
             />
           </View>
         </TouchableOpacity>
@@ -115,6 +121,12 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
         <View style={[styles.bubbleLeftCustomer]}>
           {isImage ? (
             renderImageContent()
+          ) : isImagePending ? (
+            <View style={styles.imageContainer}>
+              <View style={styles.imageLoadingOverlay}>
+                <ActivityIndicator size="large" color={themeColors["green-500"]} />
+              </View>
+            </View>
           ) : (
             <Text style={typography.body3}>{message.text}</Text>
           )}

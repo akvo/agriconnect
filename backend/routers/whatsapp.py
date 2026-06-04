@@ -762,6 +762,11 @@ async def whatsapp_webhook(
                         sender_name=sender_name,
                         sender_user_id=None,
                         customer_id=customer.id,
+                        media_url=message.media_url,
+                        media_type=(
+                            message.media_type.value
+                            if message.media_type else "TEXT"
+                        ),
                     )
                 )
 
@@ -997,6 +1002,8 @@ async def whatsapp_webhook(
                     sender_name=sender_name,
                     sender_user_id=None,
                     customer_id=customer.id,
+                    media_url=media_url,
+                    media_type=media_type.value if media_type else "TEXT",
                 )
             )
 

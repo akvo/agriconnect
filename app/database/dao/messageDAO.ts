@@ -604,7 +604,27 @@ export class MessageDAO extends BaseDAOImpl<Message> {
       }
 
       if (existing) {
-        // Message already exists, return it without updating
+        // Message exists - update media fields if they changed
+        // This handles the case where messages were synced before media support
+        const needsMediaUpdate =
+          (data.media_url && existing.media_url !== data.media_url) ||
+          (data.media_type &&
+            data.media_type !== "TEXT" &&
+            existing.media_type !== data.media_type);
+
+        if (needsMediaUpdate) {
+          console.log(
+            `[MessageDAO] Updating media fields for message ${existing.id}: ` +
+              `media_url=${data.media_url}, media_type=${data.media_type}`,
+          );
+          this.update(db, existing.id, {
+            media_url: data.media_url,
+            media_type: data.media_type,
+          });
+          // Return updated message
+          return this.findById(db, existing.id);
+        }
+
         console.log(`[MessageDAO] Message already exists: ${existing.id}`);
         return existing;
       } else {

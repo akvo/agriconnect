@@ -95,6 +95,8 @@ export const useChatWebSocket = ({
           user_id: event.user_id || null, // Use user_id from event for admin messages
           body: event.body,
           createdAt: event.ts,
+          media_url: event.media_url || null,
+          media_type: event.media_type || "TEXT",
         });
 
         if (savedMessage) {
