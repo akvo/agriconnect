@@ -14,7 +14,7 @@ module.exports = {
   expo: {
     name: getAppName(),
     slug: "agriconnect",
-    version: "1.4.0",
+    version: "1.4.1",
     owner: "akvo",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
