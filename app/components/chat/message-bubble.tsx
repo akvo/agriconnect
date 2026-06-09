@@ -34,11 +34,33 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   const [imageLoading, setImageLoading] = useState(true);
   const screenWidth = Dimensions.get("window").width;
 
-  // Build full image URL (media served from root, not /api)
-  const imageUrl = isImage ? `${MEDIA_BASE_URL}${message.media_url}` : null;
+  // Build full image URL
+  // For local file URIs (optimistic uploads), use as-is
+  // For server media URLs, prepend the media base URL
+  const getImageUrl = () => {
+    if (!isImage || !message.media_url) {
+      return null;
+    }
 
-  // Render image content
-  const renderImageContent = () => {
+    // Check if it's a local file URI (optimistic upload)
+    if (
+      message.media_url.startsWith("file://") ||
+      message.media_url.startsWith("content://")
+    ) {
+      return message.media_url;
+    }
+
+    // Server media URL - prepend base URL
+    return `${MEDIA_BASE_URL}${message.media_url}`;
+  };
+
+  const imageUrl = getImageUrl();
+
+  // Check if the text is just "[Image]" placeholder (should only show image, no text)
+  const isImageOnlyMessage = message.text === "[Image]" && isImage;
+
+  // Render image content (shared between user and customer messages)
+  const renderImageContent = (forUser: boolean = false) => {
     if (!isImage || !imageUrl) {
       return null;
     }
@@ -49,10 +71,18 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
           onPress={() => setImageModalVisible(true)}
           activeOpacity={0.8}
         >
-          <View style={styles.imageContainer}>
+          <View
+            style={[
+              styles.imageContainer,
+              forUser && styles.imageContainerUser,
+            ]}
+          >
             {imageLoading && (
               <View style={styles.imageLoadingOverlay}>
-                <ActivityIndicator size="large" color={themeColors["green-500"]} />
+                <ActivityIndicator
+                  size="large"
+                  color={themeColors["green-500"]}
+                />
               </View>
             )}
             <Image
@@ -93,6 +123,10 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   };
 
   if (isUser) {
+    // User message - check if it's an image message
+    const userIsImagePending =
+      !isImage && message.text === "[Image]" && message.media_type !== "IMAGE";
+
     return (
       <View style={[styles.messageRow, styles.rowRight]}>
         <View style={[styles.bubble]}>
@@ -100,11 +134,31 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
           <Text style={[typography.body4, styles.senderName]}>
             {message.name}
           </Text>
-          <View style={[styles.bubbleRight]}>
-            <Text style={[typography.body3, styles.userText]}>
-              {message.text}
-            </Text>
-          </View>
+
+          {/* Image content for user messages */}
+          {isImage && renderImageContent(true)}
+
+          {/* Image pending state (uploading) */}
+          {userIsImagePending && (
+            <View style={[styles.imageContainer, styles.imageContainerUser]}>
+              <View style={styles.imageLoadingOverlay}>
+                <ActivityIndicator
+                  size="large"
+                  color={themeColors["green-500"]}
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Text content (caption or regular text) */}
+          {!isImageOnlyMessage && !userIsImagePending && (
+            <View style={[styles.bubbleRight]}>
+              <Text style={[typography.body3, styles.userText]}>
+                {message.text}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.footer}>
             <Text style={[typography.caption1, styles.timestamp]}>
               {formatMessageTimestamp(message.timestamp)}
@@ -124,7 +178,10 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
           ) : isImagePending ? (
             <View style={styles.imageContainer}>
               <View style={styles.imageLoadingOverlay}>
-                <ActivityIndicator size="large" color={themeColors["green-500"]} />
+                <ActivityIndicator
+                  size="large"
+                  color={themeColors["green-500"]}
+                />
               </View>
             </View>
           ) : (
@@ -223,6 +280,9 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 8,
     overflow: "hidden",
+  },
+  imageContainerUser: {
+    alignSelf: "flex-end",
   },
   messageImage: {
     width: 200,

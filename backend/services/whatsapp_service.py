@@ -282,6 +282,48 @@ class WhatsAppService:
         except Exception as e:
             raise Exception(f"Failed to send WhatsApp message: {e}")
 
+    def send_message_with_media(
+        self, to_number: str, message_body: str, media_url: str
+    ) -> Dict[str, Any]:
+        """
+        Send WhatsApp message with media via Twilio.
+
+        Args:
+            to_number: Customer phone number (E.164 format)
+            message_body: Text caption for the image
+            media_url: Publicly accessible HTTPS URL to the image
+
+        Returns:
+            Dict with sid, status, to, body keys
+
+        Note:
+            - Media URL must be publicly accessible
+            - Twilio supports images up to 16MB
+            - Supported formats: jpeg, png, webp, gif
+        """
+        if self.testing_mode:
+            logger.info(
+                f"[TESTING MODE] Mocking WhatsApp message with media "
+                f"to {to_number}: {message_body[:50]}... "
+                f"media_url: {media_url}"
+            )
+
+        try:
+            message = self.client.messages.create(
+                from_=self.whatsapp_number,
+                body=message_body,
+                to=f"whatsapp:{to_number}",
+                media_url=[media_url],
+            )
+            return {
+                "sid": message.sid,
+                "status": message.status,
+                "to": message.to,
+                "body": message.body,
+            }
+        except Exception as e:
+            raise Exception(f"Failed to send WhatsApp message with media: {e}")
+
     def send_welcome_message(
         self, to_number: str, language: str = "en"
     ) -> Dict[str, Any]:

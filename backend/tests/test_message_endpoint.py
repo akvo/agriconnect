@@ -736,3 +736,196 @@ class TestMessageEndpoints:
         # The sender_name should be customer's full_name or phone_number
         assert self.customer.full_name is not None or \
             self.customer.phone_number is not None
+
+    # ============ Image Upload Tests ============
+
+    def test_upload_image_valid_jpeg(self):
+        """Test uploading a valid JPEG image"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        # Create a simple valid JPEG file (minimal JPEG header)
+        jpeg_content = (
+            b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01'
+            b'\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C'
+            + b'\x00' * 64
+            + b'\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00'
+            + b'\xff\xd9'
+        )
+
+        response = self.client.post(
+            "/api/messages/upload-image",
+            files={"file": ("test.jpg", jpeg_content, "image/jpeg")},
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "media_url" in data
+        assert data["media_url"].startswith("/media/")
+        assert data["media_url"].endswith(".jpg")
+        assert data["media_type"] == "IMAGE"
+
+    def test_upload_image_valid_png(self):
+        """Test uploading a valid PNG image"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        # Minimal valid PNG
+        png_content = (
+            b'\x89PNG\r\n\x1a\n'
+            b'\x00\x00\x00\rIHDR'
+            b'\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02'
+            b'\x00\x00\x00\x90wS\xde'
+            b'\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05'
+            b'\x18\xd8N'
+            b'\x00\x00\x00\x00IEND\xaeB`\x82'
+        )
+
+        response = self.client.post(
+            "/api/messages/upload-image",
+            files={"file": ("test.png", png_content, "image/png")},
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["media_url"].endswith(".png")
+
+    def test_upload_image_invalid_type(self):
+        """Test uploading an invalid file type"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        response = self.client.post(
+            "/api/messages/upload-image",
+            files={"file": ("test.txt", b"not an image", "text/plain")},
+            headers=headers,
+        )
+
+        assert response.status_code == 400
+        assert "Invalid image type" in response.json()["detail"]
+
+    def test_upload_image_too_large(self):
+        """Test uploading an image that exceeds size limit"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        # Create content larger than 16MB
+        large_content = b'\xff\xd8\xff\xe0' + (b'\x00' * (17 * 1024 * 1024))
+
+        response = self.client.post(
+            "/api/messages/upload-image",
+            files={"file": ("large.jpg", large_content, "image/jpeg")},
+            headers=headers,
+        )
+
+        assert response.status_code == 400
+        assert "too large" in response.json()["detail"]
+
+    def test_upload_image_without_auth(self):
+        """Test uploading image without authentication"""
+        response = self.client.post(
+            "/api/messages/upload-image",
+            files={"file": ("test.jpg", b"test", "image/jpeg")},
+        )
+
+        assert response.status_code in [401, 403]
+
+    # ============ Media Message Tests ============
+
+    @patch("routers.messages.WhatsAppService")
+    def test_create_message_with_media_sends_whatsapp_media(
+        self, mock_whatsapp_service
+    ):
+        """Test that message with media uses send_message_with_media"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message_with_media.return_value = {
+            "sid": "MM1234567890",
+            "status": "queued",
+        }
+        mock_whatsapp_service.return_value = mock_service_instance
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "[Image]",
+            "from_source": MessageFrom.USER,
+            "media_url": "/media/test123.jpg",
+            "media_type": "IMAGE",
+        }
+
+        with patch.dict("os.environ", {"WEBDOMAIN": "https://example.com"}):
+            response = self.client.post(
+                "/api/messages",
+                json=payload,
+                headers=headers,
+            )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["media_url"] == "/media/test123.jpg"
+        assert data["media_type"] == "IMAGE"
+
+        # Verify send_message_with_media was called
+        mock_service_instance.send_message_with_media.assert_called_once()
+        call_args = mock_service_instance.send_message_with_media.call_args
+        call_kwargs = call_args[1]
+        expected_url = "https://example.com/media/test123.jpg"
+        assert call_kwargs["media_url"] == expected_url
+
+    @patch("routers.messages.WhatsAppService")
+    def test_create_message_with_media_url_construction(
+        self, mock_whatsapp_service
+    ):
+        """Test that media URL is properly constructed with scheme"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        mock_service_instance = MagicMock()
+        mock_service_instance.send_message_with_media.return_value = {
+            "sid": "MM9876543210",
+        }
+        mock_whatsapp_service.return_value = mock_service_instance
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "[Image]",
+            "from_source": MessageFrom.USER,
+            "media_url": "/media/image.png",
+            "media_type": "IMAGE",
+        }
+
+        # Test with WEBDOMAIN without scheme
+        with patch.dict("os.environ", {"WEBDOMAIN": "example.com"}):
+            response = self.client.post(
+                "/api/messages",
+                json=payload,
+                headers=headers,
+            )
+
+        assert response.status_code == 201
+
+        # Verify URL has https:// scheme added
+        call_args = mock_service_instance.send_message_with_media.call_args
+        call_kwargs = call_args[1]
+        assert call_kwargs["media_url"].startswith("https://")
+        # No double slashes
+        assert "///" not in call_kwargs["media_url"]
+
+    def test_create_message_invalid_media_type(self):
+        """Test that invalid media_type returns 400 error"""
+        headers = self._get_auth_headers(self.eo_user)
+
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "Test message",
+            "from_source": MessageFrom.USER,
+            "media_url": "/media/test.jpg",
+            "media_type": "INVALID_TYPE",
+        }
+
+        response = self.client.post(
+            "/api/messages",
+            json=payload,
+            headers=headers,
+        )
+
+        assert response.status_code == 400
+        assert "Invalid media_type" in response.json()["detail"]
