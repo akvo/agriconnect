@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from typing import Optional, List
 
 from database import get_db
-from models.message import Message, MessageFrom, MessageStatus
+from models.message import Message, MessageFrom, MessageStatus, MediaType
 from models.ticket import Ticket
 from models.user import User, UserType
 from models.administrative import UserAdministrative
@@ -61,6 +64,9 @@ class MessageCreate(BaseModel):
     body: str
     # MessageFrom.USER, MessageFrom.CUSTOMER, or MessageFrom.LLM
     from_source: int
+    # Optional media fields for image messages
+    media_url: Optional[str] = None  # Relative path like /media/abc.jpg
+    media_type: Optional[str] = "TEXT"  # TEXT, IMAGE, etc.
 
 
 class MessageResponse(BaseModel):
@@ -73,6 +79,8 @@ class MessageResponse(BaseModel):
     status: int
     message_sid: str
     created_at: datetime
+    media_url: Optional[str] = None
+    media_type: str = "TEXT"
 
 
 def _check_message_access(message: Message, user: User, db: Session) -> None:
@@ -105,6 +113,77 @@ def _check_message_access(message: Message, user: User, db: Session) -> None:
                 " outside your administrative area"
             ),
         )
+
+
+# Allowed image types for upload
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
+# Max file size: 16MB (Twilio limit for WhatsApp media)
+MAX_IMAGE_SIZE = 16 * 1024 * 1024
+
+
+@router.post("/upload-image")
+async def upload_message_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Upload an image for sending via WhatsApp.
+
+    Validates image type and size, saves to /media directory,
+    and returns the media URL for use in message creation.
+
+    Supported formats: jpeg, png, webp, gif
+    Max file size: 16MB (Twilio WhatsApp limit)
+
+    Returns:
+        {"media_url": "/media/{filename}", "media_type": "IMAGE"}
+    """
+    # Validate content type
+    content_type = file.content_type
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Invalid image type: {content_type}. "
+                f"Allowed types: {list(ALLOWED_IMAGE_TYPES.keys())}"
+            ),
+        )
+
+    # Read file content
+    content = await file.read()
+
+    # Validate file size
+    if len(content) > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Image too large: {len(content) / (1024 * 1024):.2f}MB. "
+                f"Max size: 16MB"
+            ),
+        )
+
+    # Generate unique filename
+    extension = ALLOWED_IMAGE_TYPES[content_type]
+    filename = f"{uuid.uuid4().hex}.{extension}"
+
+    # Ensure media directory exists
+    media_dir = "media"
+    os.makedirs(media_dir, exist_ok=True)
+
+    # Save file
+    file_path = os.path.join(media_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    return {
+        "media_url": f"/media/{filename}",
+        "media_type": "IMAGE",
+    }
 
 
 @router.patch("/{message_id}/status", response_model=MessageResponse)
@@ -175,6 +254,13 @@ async def update_message_status(
                 resolved_by=current_user.full_name,
             )
 
+    # Get media_type value as string
+    msg_media_type = (
+        message.media_type.value
+        if message.media_type
+        else "TEXT"
+    )
+
     return MessageResponse(
         id=message.id,
         ticket_id=ticket.id if ticket else None,
@@ -185,6 +271,8 @@ async def update_message_status(
         status=message.status,
         message_sid=message.message_sid,
         created_at=message.created_at,
+        media_url=message.media_url,
+        media_type=msg_media_type,
     )
 
 
@@ -247,6 +335,15 @@ async def create_message(
 
     # Create new message
     timestamp_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+    # Determine media_type enum value
+    media_type_enum = MediaType.TEXT
+    if message_data.media_type and message_data.media_type != "TEXT":
+        try:
+            media_type_enum = MediaType[message_data.media_type]
+        except KeyError:
+            pass  # Default to TEXT if invalid
+
     new_message = Message(
         message_sid=f"USER_{current_user.id}_{timestamp_ms}",
         customer_id=ticket.customer_id,
@@ -254,6 +351,8 @@ async def create_message(
         body=message_data.body,
         from_source=message_data.from_source,
         status=MessageStatus.PENDING,  # New messages start as pending
+        media_url=message_data.media_url,
+        media_type=media_type_enum,
     )
 
     db.add(new_message)
@@ -282,15 +381,30 @@ async def create_message(
                 f"{new_message.body}\n\n— _{current_user.full_name}_"
             )
 
-            response = whatsapp_service.send_message(
-                to_number=customer_phone,
-                message_body=formatted_body,
-            )
+            # Check if this is a media message
+            if message_data.media_url and message_data.media_type == "IMAGE":
+                # Build full public URL for the media
+                web_domain = os.getenv("WEBDOMAIN", "http://localhost:8000")
+                full_media_url = f"{web_domain}{message_data.media_url}"
 
-            print(
-                f"WhatsApp reply sent to {customer_phone}: "
-                f"{response.get('sid')}"
-            )
+                response = whatsapp_service.send_message_with_media(
+                    to_number=customer_phone,
+                    message_body=formatted_body,
+                    media_url=full_media_url,
+                )
+                print(
+                    f"WhatsApp image sent to {customer_phone}: "
+                    f"{response.get('sid')} (media: {full_media_url})"
+                )
+            else:
+                response = whatsapp_service.send_message(
+                    to_number=customer_phone,
+                    message_body=formatted_body,
+                )
+                print(
+                    f"WhatsApp reply sent to {customer_phone}: "
+                    f"{response.get('sid')}"
+                )
 
             # Optional: Update message_sid with Twilio SID for tracking
             # This helps correlate backend messages with Twilio messages
@@ -335,6 +449,13 @@ async def create_message(
         customer_id=ticket.customer_id,
     )
 
+    # Get media_type value as string
+    media_type_value = (
+        new_message.media_type.value
+        if new_message.media_type
+        else "TEXT"
+    )
+
     return MessageResponse(
         id=new_message.id,
         ticket_id=ticket.id,
@@ -345,4 +466,6 @@ async def create_message(
         status=new_message.status,
         message_sid=new_message.message_sid,
         created_at=new_message.created_at,
+        media_url=new_message.media_url,
+        media_type=media_type_value,
     )

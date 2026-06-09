@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { View, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import Feathericons from "@expo/vector-icons/Feather";
 import { api } from "@/services/api";
@@ -10,6 +10,8 @@ import { useDatabase } from "@/database/context";
 import typography from "@/styles/typography";
 import themeColors from "@/styles/colors";
 import { useNetwork } from "@/contexts/NetworkContext";
+import { ImagePickerButton } from "./image-picker-button";
+import { ImagePreview } from "./image-preview";
 
 interface TicketData {
   id: number | null;
@@ -47,9 +49,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const db = useDatabase();
   const daoManager = useMemo(() => new DAOManager(db), [db]);
 
+  // Image state
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageSelected = (uri: string) => {
+    setSelectedImage(uri);
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+  };
+
   const handleSend = async () => {
+    // Allow sending if there's text OR an image
+    const hasText = text.trim().length > 0;
+    const hasImage = selectedImage !== null;
+
     if (
-      text.trim().length === 0 ||
+      (!hasText && !hasImage) ||
       !ticket?.id ||
       !ticket?.customer?.id ||
       !user?.id
@@ -57,8 +75,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       return;
     }
 
-    const messageText = text.trim();
+    const messageText = hasText ? text.trim() : "[Image]";
     setText("");
+
+    // Store selected image before clearing
+    const imageToUpload = selectedImage;
+    setSelectedImage(null);
 
     try {
       const now = new Date().toISOString();
@@ -72,6 +94,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         text: messageText,
         sender: "user",
         timestamp: now,
+        // Include image info in optimistic message if present
+        ...(imageToUpload && {
+          media_url: imageToUpload,
+          media_type: "IMAGE",
+        }),
       };
 
       // Add optimistic message to UI immediately
@@ -84,17 +111,42 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       console.log(
         `[Chat] Sending message to backend - ticket_id: ${ticket.id}, body: "${messageText}", from_source: ${MessageFrom.USER}`,
       );
+
       try {
+        let mediaUrl: string | undefined;
+        let mediaType: string | undefined;
+
+        // Upload image first if present
+        if (imageToUpload) {
+          setIsUploading(true);
+          console.log("[Chat] Uploading image...");
+          try {
+            const uploadResult = await api.uploadImage(imageToUpload);
+            mediaUrl = uploadResult.media_url;
+            mediaType = uploadResult.media_type;
+            console.log("[Chat] Image uploaded:", uploadResult);
+          } catch (uploadError) {
+            console.error("[Chat] Failed to upload image:", uploadError);
+            // Remove optimistic message on upload failure
+            setMessages((prev: Message[]) =>
+              prev.filter((msg) => msg.id !== tempId),
+            );
+            setIsUploading(false);
+            return;
+          }
+          setIsUploading(false);
+        }
+
+        // Send message with optional media
         const response = await api.sendMessage(
           ticket.id,
           messageText,
           MessageFrom.USER,
+          mediaUrl,
+          mediaType,
         );
 
-        console.log(
-          "[Chat] ✅ Message sent to backend successfully:",
-          response,
-        );
+        console.log("[Chat] Message sent to backend successfully:", response);
 
         // Save the backend message to SQLite database with the real ID and message_sid
         const savedMessage = daoManager.message.create(db, {
@@ -137,6 +189,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   text: savedMessage.body,
                   sender: "user",
                   timestamp: savedMessage.createdAt,
+                  media_url: response.media_url,
+                  media_type: response.media_type,
                 }
               : msg,
           );
@@ -155,7 +209,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           }
         }
       } catch (apiError) {
-        console.error("❌ [Chat] Failed to send message to backend:", apiError);
+        console.error("[Chat] Failed to send message to backend:", apiError);
         console.error("[Chat] Error details:", {
           message:
             apiError instanceof Error ? apiError.message : String(apiError),
@@ -176,41 +230,68 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const canSend =
+    (text.trim().length > 0 || selectedImage !== null) &&
+    isOnline &&
+    !isUploading;
+
   return (
-    <View style={styles.inputRow}>
-      <View style={styles.textInputContainer}>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          style={[
-            typography.body3,
-            styles.textInput,
-            { color: themeColors.dark3 },
-            ticket?.customer?.language &&
-              ticket?.customer?.language !== "en" && { paddingRight: 32 },
-          ]}
-          placeholder="Type a message..."
-          placeholderTextColor={themeColors.dark3}
-          multiline
+    <View style={styles.container}>
+      {/* Image preview */}
+      {selectedImage && (
+        <ImagePreview
+          imageUri={selectedImage}
+          onRemove={handleRemoveImage}
+          isUploading={isUploading}
         />
+      )}
+
+      {/* Input row */}
+      <View style={styles.inputRow}>
+        {/* Image picker button */}
+        <ImagePickerButton
+          onImageSelected={handleImageSelected}
+          disabled={!isOnline || isUploading}
+        />
+
+        <View style={styles.textInputContainer}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            style={[
+              typography.body3,
+              styles.textInput,
+              { color: themeColors.dark3 },
+              ticket?.customer?.language &&
+                ticket?.customer?.language !== "en" && { paddingRight: 32 },
+            ]}
+            placeholder="Type a message..."
+            placeholderTextColor={themeColors.dark3}
+            multiline
+            editable={!isUploading}
+          />
+        </View>
+        <TouchableOpacity
+          onPress={handleSend}
+          style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+          disabled={!canSend}
+        >
+          <Feathericons name="send" size={20} color={themeColors.white} />
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity
-        onPress={handleSend}
-        style={[styles.sendButton, !isOnline && styles.sendButtonDisabled]}
-        disabled={!isOnline}
-      >
-        <Feathericons name="send" size={20} color={themeColors.white} />
-      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    backgroundColor: themeColors.white,
+  },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     borderTopWidth: 0,
     backgroundColor: themeColors.white,
     position: "relative",

@@ -380,13 +380,27 @@ class ApiClient {
     ticketId: number,
     body: string,
     fromSource: number,
+    mediaUrl?: string,
+    mediaType?: string,
   ): Promise<any> {
     const url = `${this.baseUrl}/messages`;
-    const payload = {
+    const payload: {
+      ticket_id: number;
+      body: string;
+      from_source: number;
+      media_url?: string;
+      media_type?: string;
+    } = {
       ticket_id: ticketId,
       body,
       from_source: fromSource,
     };
+
+    // Add media fields if provided
+    if (mediaUrl) {
+      payload.media_url = mediaUrl;
+      payload.media_type = mediaType || "IMAGE";
+    }
 
     console.log("[API] Sending message:", {
       url,
@@ -414,6 +428,53 @@ class ApiClient {
 
     const responseData = await response.json();
     console.log("[API] Success response:", responseData);
+    return responseData;
+  }
+
+  /**
+   * Upload an image for sending via WhatsApp
+   * @param imageUri Local file URI (e.g., file:///path/to/image.jpg)
+   * @returns Object with media_url and media_type
+   */
+  async uploadImage(imageUri: string): Promise<{
+    media_url: string;
+    media_type: string;
+  }> {
+    const url = `${this.baseUrl}/messages/upload-image`;
+
+    // Get filename and type from URI
+    const filename = imageUri.split("/").pop() || "image.jpg";
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
+
+    // Create form data
+    const formData = new FormData();
+    formData.append("file", {
+      uri: imageUri,
+      name: filename,
+      type: type,
+    } as any);
+
+    console.log("[API] Uploading image:", { url, filename, type });
+
+    const response = await this.fetchWithRetry(url, {
+      method: "POST",
+      body: formData,
+      // Don't set Content-Type header - fetch will set it with boundary
+    });
+
+    console.log("[API] Upload response status:", response.status);
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ detail: "Failed to upload image" }));
+      console.error("[API] Upload error:", error);
+      throw new Error(error.detail || "Failed to upload image");
+    }
+
+    const responseData = await response.json();
+    console.log("[API] Upload success:", responseData);
     return responseData;
   }
 
@@ -916,7 +977,11 @@ class ApiClient {
    * Get user statistics (farmers reached, conversations resolved, messages sent)
    */
   async getUserStats(): Promise<{
-    farmers_reached: { this_week: number; this_month: number; all_time: number };
+    farmers_reached: {
+      this_week: number;
+      this_month: number;
+      all_time: number;
+    };
     conversations_resolved: {
       this_week: number;
       this_month: number;
