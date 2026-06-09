@@ -154,17 +154,15 @@ async def upload_message_image(
             ),
         )
 
-    # Read file content
-    content = await file.read()
+    # Read file content with size limit to prevent memory exhaustion
+    # Read MAX_IMAGE_SIZE + 1 bytes to detect oversized files early
+    content = await file.read(MAX_IMAGE_SIZE + 1)
 
     # Validate file size
     if len(content) > MAX_IMAGE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"Image too large: {len(content) / (1024 * 1024):.2f}MB. "
-                f"Max size: 16MB"
-            ),
+            detail="Image too large. Max size: 16MB",
         )
 
     # Generate unique filename
@@ -342,7 +340,14 @@ async def create_message(
         try:
             media_type_enum = MediaType[message_data.media_type]
         except KeyError:
-            pass  # Default to TEXT if invalid
+            valid_types = [t.name for t in MediaType]
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Invalid media_type: {message_data.media_type}. "
+                    f"Allowed types: {valid_types}"
+                ),
+            )
 
     new_message = Message(
         message_sid=f"USER_{current_user.id}_{timestamp_ms}",
@@ -385,7 +390,12 @@ async def create_message(
             if message_data.media_url and message_data.media_type == "IMAGE":
                 # Build full public URL for the media
                 web_domain = os.getenv("WEBDOMAIN", "http://localhost:8000")
-                full_media_url = f"{web_domain}{message_data.media_url}"
+                # Ensure web_domain has a scheme
+                if not web_domain.startswith(("http://", "https://")):
+                    web_domain = f"https://{web_domain}"
+                # Ensure no double slashes when joining
+                media_path = message_data.media_url.lstrip("/")
+                full_media_url = f"{web_domain.rstrip('/')}/{media_path}"
 
                 response = whatsapp_service.send_message_with_media(
                     to_number=customer_phone,
