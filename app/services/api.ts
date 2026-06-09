@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import * as FileSystem from "expo-file-system/legacy";
 import { tokenEmitter, TOKEN_CHANGED } from "@/utils/tokenEvents";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_AGRICONNECT_SERVER_URL || "";
@@ -443,39 +444,90 @@ class ApiClient {
     const url = `${this.baseUrl}/messages/upload-image`;
 
     // Get filename and type from URI
-    const filename = imageUri.split("/").pop() || "image.jpg";
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
+    const originalFilename = imageUri.split("/").pop() || "image.jpg";
+    const match = /\.(\w+)$/.exec(originalFilename);
+    const ext = match ? match[1].toLowerCase() : "jpg";
+    const type = `image/${ext === "jpg" ? "jpeg" : ext}`;
 
-    // Create form data
+    console.log("[API] Preparing image upload:", {
+      url,
+      imageUri,
+      originalFilename,
+      type,
+    });
+
+    let uploadUri = imageUri;
+    let tempFilePath: string | null = null;
+
+    try {
+      // Verify the file exists
+      const fileInfo = await FileSystem.getInfoAsync(imageUri);
+      console.log("[API] File info:", fileInfo);
+
+      if (!fileInfo.exists) {
+        throw new Error("Image file does not exist at the specified URI");
+      }
+
+      // Copy file to cache directory with a unique name for reliable access
+      // This helps on Android where the original URI might not be accessible
+      const uniqueFilename = `upload_${Date.now()}.${ext}`;
+      tempFilePath = `${FileSystem.cacheDirectory}${uniqueFilename}`;
+
+      console.log("[API] Copying file to cache:", tempFilePath);
+      await FileSystem.copyAsync({
+        from: imageUri,
+        to: tempFilePath,
+      });
+
+      uploadUri = tempFilePath;
+      console.log("[API] Using cached file for upload:", uploadUri);
+    } catch (fileError) {
+      console.error("[API] File preparation error:", fileError);
+      // Try to continue with original URI if copy fails
+      console.log("[API] Falling back to original URI");
+    }
+
+    // Create form data with the prepared URI
     const formData = new FormData();
     formData.append("file", {
-      uri: imageUri,
-      name: filename,
+      uri: uploadUri,
+      name: `image.${ext}`,
       type: type,
     } as any);
 
-    console.log("[API] Uploading image:", { url, filename, type });
+    console.log("[API] Uploading image with URI:", uploadUri);
 
-    const response = await this.fetchWithRetry(url, {
-      method: "POST",
-      body: formData,
-      // Don't set Content-Type header - fetch will set it with boundary
-    });
+    try {
+      const response = await this.fetchWithRetry(url, {
+        method: "POST",
+        body: formData,
+        // Don't set Content-Type header - fetch will set it with boundary
+      });
 
-    console.log("[API] Upload response status:", response.status);
+      console.log("[API] Upload response status:", response.status);
 
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ detail: "Failed to upload image" }));
-      console.error("[API] Upload error:", error);
-      throw new Error(error.detail || "Failed to upload image");
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ detail: "Failed to upload image" }));
+        console.error("[API] Upload error:", error);
+        throw new Error(error.detail || "Failed to upload image");
+      }
+
+      const responseData = await response.json();
+      console.log("[API] Upload success:", responseData);
+      return responseData;
+    } finally {
+      // Clean up temp file
+      if (tempFilePath) {
+        try {
+          await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
+          console.log("[API] Cleaned up temp file:", tempFilePath);
+        } catch (cleanupError) {
+          console.warn("[API] Failed to clean up temp file:", cleanupError);
+        }
+      }
     }
-
-    const responseData = await response.json();
-    console.log("[API] Upload success:", responseData);
-    return responseData;
   }
 
   async registerDevice(deviceData: {
