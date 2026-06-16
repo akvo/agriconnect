@@ -434,12 +434,12 @@ trans: Dict[str, Any] = {
     "weather_subscription": {
         "question": {
             "en": (
-                "\n\nWould you like to receive daily morning weather updates "
+                "\n\nWould you like to receive weather updates "
                 "for your area ({area_name})?"
             ),
             "sw": (
-                "\n\nJe, ungependa kupokea taarifa za hali ya anga kila "
-                "siku asubuhi kwa eneo lako ({area_name})?"
+                "\n\nJe, ungependa kupokea taarifa za hali ya anga "
+                "kwa eneo lako ({area_name})?"
             ),
         },
         "button_yes": {
@@ -452,15 +452,16 @@ trans: Dict[str, Any] = {
         },
         "subscribed": {
             "en": (
-                "Great! You will receive daily updates for {area_name}.\n\n"
-                "Please message *weather* to get weather information "
-                "on-demand."
+                "Great! You will receive automated weather broadcasts "
+                "every 3 days for {area_name}.\n\n"
+                "Don't want to wait? Just message *weather* anytime "
+                "to get your forecast instantly!"
             ),
             "sw": (
-                "Vizuri! Utapokea taarifa za hali ya hewa kila siku "
-                "kwa {area_name}.\n\n"
-                "Tafadhali tuma ujumbe *weather* kupata taarifa za hali ya "
-                "hewa wakati wowote."
+                "Vizuri! Utapokea taarifa za hali ya hewa kiotomatiki "
+                "kila siku 3 kwa {area_name}.\n\n"
+                "Hutaki kusubiri? Tuma ujumbe *weather* wakati wowote "
+                "kupata utabiri wako mara moja!"
             ),
         },
         "declined": {

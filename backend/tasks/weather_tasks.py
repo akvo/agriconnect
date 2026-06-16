@@ -403,6 +403,7 @@ def send_weather_message(
     Send actual weather message after user confirmation.
 
     Called when user clicks "Yes" on the template message.
+    Always fetches fresh weather data to ensure user gets current forecast.
 
     Args:
         recipient_id: ID of the WeatherBroadcastRecipient
@@ -438,16 +439,40 @@ def send_weather_message(
             logger.error("Customer or broadcast not found")
             return {"error": "Customer or broadcast not found"}
 
-        # Get message in customer's language
-        customer_lang = customer.language.value if customer.language else "en"
-        message_content = (
-            broadcast.generated_message_sw
-            if customer_lang == "sw"
-            else broadcast.generated_message_en
+        # Fetch FRESH weather data (not cached from broadcast)
+        weather_service = get_weather_broadcast_service()
+        area = broadcast.administrative
+
+        weather_data = weather_service.get_weather_data(
+            location=broadcast.location_name,
+            lat=area.lat if area else None,
+            lon=area.long if area else None,
         )
 
+        if not weather_data:
+            location = broadcast.location_name
+            logger.error(f"Failed to get fresh weather data for {location}")
+            return {"error": "Failed to get weather data"}
+
+        # Generate fresh message in customer's language
+        customer_lang = customer.language.value if customer.language else "en"
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            message_content = loop.run_until_complete(
+                weather_service.generate_message(
+                    location=broadcast.location_name,
+                    language=customer_lang,
+                    weather_data=weather_data,
+                    farmer_crop=customer.crop_type or broadcast.crop_type,
+                )
+            )
+        finally:
+            loop.close()
+
         if not message_content:
-            logger.error("No generated message content available")
+            logger.error("Failed to generate fresh weather message")
             return {"error": "No message content"}
 
         # Send message
