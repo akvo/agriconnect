@@ -362,12 +362,23 @@ class TestSendWeatherMessage:
         assert "error" in result
         assert "not found" in result["error"].lower()
 
+    @patch("tasks.weather_tasks.get_weather_broadcast_service")
     @patch("tasks.weather_tasks.SessionLocal")
     def test_send_weather_message_success(
-        self, mock_sl, db_session, test_weather_setup
+        self, mock_sl, mock_weather_svc, db_session, test_weather_setup
     ):
-        """Test successful weather message sending"""
+        """Test successful weather message sending with fresh weather"""
         mock_sl.return_value = db_session
+
+        # Mock weather service to return fresh data
+        mock_service = MagicMock()
+        mock_service.get_weather_data.return_value = {"temp": 25}
+
+        # Mock async generate_message using a coroutine
+        async def mock_generate(*args, **kwargs):
+            return "Fresh weather forecast for today..."
+        mock_service.generate_message = mock_generate
+        mock_weather_svc.return_value = mock_service
 
         # Get a recipient and store IDs
         broadcast_id = test_weather_setup["broadcast"].id
@@ -391,6 +402,9 @@ class TestSendWeatherMessage:
         assert "status" in result
         assert result["status"] == "sent"
 
+        # Verify weather service was called to fetch fresh data
+        assert mock_service.get_weather_data.called
+
         # Verify recipient updated
         db_session.expire_all()
         updated_recipient = db_session.query(WeatherBroadcastRecipient).get(
@@ -400,15 +414,26 @@ class TestSendWeatherMessage:
         assert updated_recipient.confirmed_at is not None
         assert updated_recipient.message_id is not None
 
+    @patch("tasks.weather_tasks.get_weather_broadcast_service")
     @patch("tasks.weather_tasks.SessionLocal")
     def test_send_weather_message_no_content(
-        self, mock_sl, db_session, test_administrative,
+        self, mock_sl, mock_weather_svc, db_session, test_administrative,
         test_customer_subscribed
     ):
-        """Test task handles missing message content"""
+        """Test task handles missing message content from weather service"""
         mock_sl.return_value = db_session
 
-        # Create broadcast without generated messages
+        # Mock weather service to return data but None for message
+        mock_service = MagicMock()
+        mock_service.get_weather_data.return_value = {"temp": 25}
+
+        # Mock async generate_message returning None
+        async def mock_generate(*args, **kwargs):
+            return None  # No message generated
+        mock_service.generate_message = mock_generate
+        mock_weather_svc.return_value = mock_service
+
+        # Create broadcast
         broadcast = WeatherBroadcast(
             administrative_id=test_administrative.id,
             location_name=test_administrative.name,
@@ -579,18 +604,29 @@ class TestWeatherTasksIntegration:
                 if original_testing:
                     os.environ["TESTING"] = original_testing
 
+    @patch("tasks.weather_tasks.get_weather_broadcast_service")
     @patch("tasks.weather_tasks.SessionLocal")
     @patch("tasks.weather_tasks.WhatsAppService")
     def test_send_weather_message_non_test_mode(
-        self, mock_ws_class, mock_sl, db_session, test_weather_setup
+        self, mock_ws_class, mock_sl, mock_weather_svc,
+        db_session, test_weather_setup
     ):
-        """Test actual weather message send"""
+        """Test actual weather message send with fresh weather"""
         mock_sl.return_value = db_session
 
         # Mock WhatsApp service
-        mock_service = MagicMock()
-        mock_service.send_message.return_value = {"sid": "SM_ACTUAL_456"}
-        mock_ws_class.return_value = mock_service
+        mock_wa_service = MagicMock()
+        mock_wa_service.send_message.return_value = {"sid": "SM_ACTUAL_456"}
+        mock_ws_class.return_value = mock_wa_service
+
+        # Mock weather service to return fresh data
+        mock_weather = MagicMock()
+        mock_weather.get_weather_data.return_value = {"temp": 25}
+
+        async def mock_generate(*args, **kwargs):
+            return "Fresh weather forecast..."
+        mock_weather.generate_message = mock_generate
+        mock_weather_svc.return_value = mock_weather
 
         # Get recipient
         recipient = db_session.query(WeatherBroadcastRecipient).filter(
@@ -614,7 +650,8 @@ class TestWeatherTasksIntegration:
             )
 
             assert "status" in result
-            assert mock_service.send_message.called
+            assert mock_wa_service.send_message.called
+            assert mock_weather.get_weather_data.called
         finally:
             # Restore test mode
             if original_testing:
