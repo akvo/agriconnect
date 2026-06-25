@@ -18,7 +18,6 @@ jobs:
   check-app-changes:
     name: Check for App Changes
     runs-on: ubuntu-latest
-    environment: Production
     outputs:
       app-changed: ${{ steps.check.outputs.app }}
     steps:
@@ -49,7 +48,7 @@ jobs:
     name: Build Mobile App (APK)
     runs-on: ubuntu-latest
     environment: Production
-    needs: [run-tests, check-app-changes]
+    needs: [run-tests, check-app-changes, build-push]
     if: needs.check-app-changes.outputs.app-changed == 'true' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
@@ -99,7 +98,6 @@ jobs:
   build-push:
     name: Build and Push to Registry
     runs-on: ubuntu-latest
-    environment: Production
     needs: [run-tests]
     if: always() && needs.run-tests.result == 'success'
     steps:
