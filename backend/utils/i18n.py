@@ -561,6 +561,18 @@ trans: Dict[str, Any] = {
             ),
         },
     },
+    "ai_response": {
+        "disclaimer": {
+            "en": (
+                "Before taking any major actions please consult with "
+                "your extension service provider"
+            ),
+            "sw": (
+                "Kabla ya kuchukua hatua yoyote kubwa tafadhali "
+                "wasiliana na mtoa huduma wako wa ugani"
+            ),
+        },
+    },
 }
 
 

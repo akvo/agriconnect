@@ -22,6 +22,7 @@ from services.twilio_status_service import TwilioStatusService
 from services.socketio_service import emit_whisper_created
 from services.socketio_service import emit_playground_response
 from services.openai_service import get_openai_service
+from utils.i18n import t
 
 router = APIRouter(prefix="/callback", tags=["callbacks"])
 logger = logging.getLogger(__name__)
@@ -223,6 +224,21 @@ async def ai_callback(
                         try:
                             whatsapp_service = WhatsAppService()
                             # CRITICAL: Send to WhatsApp BEFORE committing to database
+
+                            # Check if response has citations (from knowledge base)
+                            # If so, append disclaimer to the response
+                            has_citations = (
+                                payload.output
+                                and payload.output.citations
+                                and len(payload.output.citations) > 0
+                            )
+                            if has_citations:
+                                disclaimer_text = t(
+                                    "ai_response.disclaimer", customer_lang
+                                )
+                                disclaimer = f"\n\n— _{disclaimer_text}_"
+                                ai_response_text += disclaimer
+
                             # Step 1: Send AI answer as separate message
                             logger.info(
                                 f"Sending AI answer to {ai_message.customer.phone_number}"
