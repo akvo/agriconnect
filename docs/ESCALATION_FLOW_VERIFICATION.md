@@ -218,8 +218,8 @@ When the AI uses knowledge base content, citations are returned in this format:
 
 | Template Type | Language | Template SID | Usage |
 |--------------|----------|--------------|-------|
-| Confirmation | English | `HXc3dfb3056770842dc80f57c24e5337ac` | Escalation offer (EN) |
-| Confirmation | Swahili | `HX8427d4384a18e3a1c53741e0068d35ea` | Escalation offer (SW) |
+| Confirmation | English | `HXcac79b661eeb2dcfdf2358195969e323` | Escalation offer (EN) |
+| Confirmation | Swahili | `HXaabc2c85f8e72eb6dce8ebc948575011` | Escalation offer (SW) |
 
 **Template Button Payloads:**
 - **"Yes" button:** `ButtonPayload="escalate"` → Creates ticket
