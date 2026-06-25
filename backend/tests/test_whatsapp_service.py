@@ -431,7 +431,6 @@ class TestWhatsAppService:
         env_vars = {
             "TWILIO_ACCOUNT_SID": "test_sid",
             "TWILIO_AUTH_TOKEN": "test_token",
-            "WHATSAPP_CONFIRMATION_TEMPLATE_SID": "HX123abc456",
             "TESTING": "false",
         }
 
@@ -780,7 +779,6 @@ class TestWhatsAppService:
         env_vars = {
             "TWILIO_ACCOUNT_SID": "test_sid",
             "TWILIO_AUTH_TOKEN": "test_token",
-            "WHATSAPP_CONFIRMATION_TEMPLATE_SID": "HX123abc456",
             "TESTING": "false",
         }
 

@@ -184,8 +184,8 @@ Create a `.env` file based on `.env.example` with the following key variables:
 
 **Required for Broadcast Messaging:**
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER` - Twilio WhatsApp credentials
-- `WHATSAPP_BROADCAST_TEMPLATE_SID` - WhatsApp template for broadcast messages
 - `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB` - Redis configuration for Celery (auto-configured in Docker)
+- WhatsApp template SIDs are configured in `config.json` under `whatsapp.templates`
 
 **Optional Broadcast Configuration:**
 - `BROADCAST_BATCH_SIZE` - Recipients per batch (default: 50)

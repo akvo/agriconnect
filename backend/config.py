@@ -48,13 +48,10 @@ class Settings(BaseSettings):
     message_limit: int = _config.get("message_limit")
 
     # WhatsApp settings
-    whatsapp_confirmation_template_sid: str = os.getenv(
-        "WHATSAPP_CONFIRMATION_TEMPLATE_SID",
-        _config.get("whatsapp", {})
-        .get("templates", {})
-        .get("confirmation", {})
-        .get("sid"),
-    )
+    whatsapp_confirmation_template_sid: str = _config.get("whatsapp", {}) \
+        .get("templates", {}) \
+        .get("confirmation", {}) \
+        .get("sid", "")
     whatsapp_confirmation_template_sid_sw: str = _config.get("whatsapp", {}) \
         .get("templates", {}) \
         .get("confirmation", {}) \
@@ -74,13 +71,10 @@ class Settings(BaseSettings):
     )
 
     # Reconnection settings (24-hour inactive conversation)
-    whatsapp_reconnection_template_sid: str = os.getenv(
-        "WHATSAPP_RECONNECTION_TEMPLATE_SID",
-        _config.get("whatsapp", {})
-        .get("templates", {})
-        .get("reconnection", {})
-        .get("sid", ""),
-    )
+    whatsapp_reconnection_template_sid: str = _config.get("whatsapp", {}) \
+        .get("templates", {}) \
+        .get("reconnection", {}) \
+        .get("sid", "")
     whatsapp_reconnection_template_sid_sw: str = _config.get("whatsapp", {}) \
         .get("templates", {}) \
         .get("reconnection", {}) \
@@ -234,13 +228,10 @@ class Settings(BaseSettings):
     redis_db: int = int(os.getenv("REDIS_DB", "0"))
 
     # Broadcast settings
-    whatsapp_broadcast_template_sid: str = os.getenv(
-        "WHATSAPP_BROADCAST_TEMPLATE_SID",
-        _config.get("whatsapp", {})
-        .get("templates", {})
-        .get("broadcast", {})
-        .get("sid", ""),
-    )
+    whatsapp_broadcast_template_sid: str = _config.get("whatsapp", {}) \
+        .get("templates", {}) \
+        .get("broadcast", {}) \
+        .get("sid", "")
     whatsapp_broadcast_template_sid_sw: str = _config.get("whatsapp", {}) \
         .get("templates", {}) \
         .get("broadcast", {}) \
