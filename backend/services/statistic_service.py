@@ -1296,7 +1296,7 @@ class StatisticService:
                     .filter(
                         Message.customer_id.in_(customer_ids),
                         Message.from_source == MessageFrom.USER,
-                        Message.message_type != MessageType.BROADCAST.value,
+                        Message.message_type != MessageType.BROADCAST,
                     )
                 )
                 replies_query = self._apply_date_filter(
@@ -1681,7 +1681,7 @@ class StatisticService:
                 self.db.query(Message)
                 .filter(Message.customer_id == ticket.customer_id)
                 .filter(Message.from_source == MessageFrom.USER)
-                .filter(Message.message_type != MessageType.BROADCAST.value)
+                .filter(Message.message_type != MessageType.BROADCAST)
                 .filter(Message.created_at > last_customer_msg.created_at)
                 .first()
             )
