@@ -19,6 +19,7 @@ from models.administrative import (
 from models.broadcast import BroadcastMessage
 from models.customer import Customer, OnboardingStatus
 from models.message import Message, MessageFrom
+from schemas.callback import MessageType
 from models.ticket import Ticket
 from models.user import User, UserType
 from services.administrative_service import AdministrativeService
@@ -1289,11 +1290,13 @@ class StatisticService:
                 closed_tickets = closed_query.scalar() or 0
 
                 # Total replies from EOs to customers in this area
+                # Exclude BROADCAST messages (weather forecasts)
                 replies_query = (
                     self.db.query(func.count(Message.id))
                     .filter(
                         Message.customer_id.in_(customer_ids),
                         Message.from_source == MessageFrom.USER,
+                        Message.message_type != MessageType.BROADCAST.value,
                     )
                 )
                 replies_query = self._apply_date_filter(
@@ -1673,10 +1676,12 @@ class StatisticService:
                 continue
 
             # Check if EO has replied after last customer message
+            # Exclude BROADCAST messages (weather forecasts)
             eo_reply = (
                 self.db.query(Message)
                 .filter(Message.customer_id == ticket.customer_id)
                 .filter(Message.from_source == MessageFrom.USER)
+                .filter(Message.message_type != MessageType.BROADCAST.value)
                 .filter(Message.created_at > last_customer_msg.created_at)
                 .first()
             )
