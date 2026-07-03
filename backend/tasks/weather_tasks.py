@@ -40,15 +40,33 @@ def send_weather_broadcasts() -> Dict[str, Any]:
     Daily scheduled task to send weather broadcasts.
 
     Process:
-    1. Query administrative areas with subscribed customers
-    2. Create WeatherBroadcast record per area
-    3. Queue template sending for each area
+    1. Check if broadcast is enabled via config flag
+    2. Query administrative areas with subscribed customers
+    3. Create WeatherBroadcast record per area
+    4. Queue template sending for each area
+
+    The broadcast can be paused by setting weather.broadcast_enabled=false
+    in config.json. This is useful when hitting Twilio messaging limits.
     """
+    # Check feature flag first (allows pausing broadcasts via config)
+    if not settings.weather_broadcast_enabled:
+        logger.warning(
+            "Weather broadcast is disabled "
+            "(weather.broadcast_enabled=false). "
+            "Skipping scheduled broadcast. To resume, "
+            "set broadcast_enabled=true in config.json "
+            "and restart the backend service."
+        )
+        return {
+            "status": "disabled",
+            "message": "Broadcast disabled via config"
+        }
+
     db = SessionLocal()
     try:
         logger.info("Starting daily weather broadcast task")
 
-        # Check if weather broadcast is enabled
+        # Check if weather broadcast service is configured
         weather_service = get_weather_broadcast_service()
         if not weather_service.is_configured():
             logger.warning("Weather broadcast service not configured")
@@ -534,7 +552,18 @@ def retry_failed_weather_broadcasts() -> Dict[str, Any]:
 
     Runs every 5 minutes.
     Retries recipients with FAILED status based on retry_intervals config.
+
+    Respects the weather.broadcast_enabled flag - when disabled,
+    retries are also paused to reduce Twilio API usage.
     """
+    # Check feature flag (retries also paused when broadcasts disabled)
+    if not settings.weather_broadcast_enabled:
+        logger.info("Weather broadcast disabled. Skipping retry task.")
+        return {
+            "status": "disabled",
+            "message": "Broadcast disabled via config"
+        }
+
     db = SessionLocal()
     try:
         logger.info("Starting weather broadcast retry task")
