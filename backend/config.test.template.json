@@ -1,0 +1,93 @@
+{
+	"message_limit": 10,
+	"whatsapp": {
+		"templates": {
+			"confirmation": {
+				"sid": "HXcac79b661eeb2dcfdf2358195969e323",
+				"sid_sw": "HXaabc2c85f8e72eb6dce8ebc948575011",
+				"description": "Template sent after AI response asking if farmer needs human help"
+			},
+			"reconnection": {
+				"sid": "HXc1711d07d1b1b74589fc035fea0d4f52",
+				"sid_sw": "HXa82af425a498ab15ce2cfa0255deb4f8",
+				"description": "Template sent to reconnect with farmer after escalation"
+			},
+			"broadcast": {
+				"sid": "HX8658667a944883b1ceab9205b83d407b",
+				"sid_sw": "HX3b9f54d9b345b04f5798d655db7bbb25",
+				"description": "Template send to confirm incoming broadcast message"
+			}
+		},
+		"button_payloads": {
+			"escalate": "escalate",
+			"read_broadcast": "read_broadcast",
+			"reconnect": "reconnect"
+		}
+	},
+	"escalation": {
+		"chat_history_limit": 20,
+		"reply_history_limit": 10,
+		"description": "Number of recent messages to include in chat history for AI context"
+	},
+	"openai": {
+		"enabled": true,
+		"default_model": "gpt-4o-mini",
+		"temperature": 0.7,
+		"max_tokens": 1000,
+		"timeout": 30,
+		"max_retries": 3,
+		"models": {
+			"chat": "gpt-4o-mini",
+			"chat_advanced": "gpt-4o",
+			"transcription": "whisper-1",
+			"embedding": "text-embedding-3-small",
+			"moderation": "omni-moderation-latest"
+		},
+		"features": {
+			"speech_to_text": {
+				"enabled": true,
+				"language": "en",
+				"response_format": "json",
+				"temperature": 0,
+				"description": "Convert voice/audio to text (NOT related to WHISPER message type)"
+			},
+			"onboarding": {
+				"enabled": true,
+				"model": "gpt-4o-mini",
+				"temperature": 0.8,
+				"max_tokens": 500,
+				"system_prompt": "You are a helpful agricultural assistant helping farmers get started with AgriConnect. Be friendly, concise, and practical."
+			},
+			"content_moderation": {
+				"enabled": true,
+				"auto_flag": true
+			},
+			"structured_extraction": {
+				"enabled": true,
+				"model": "gpt-4o-mini",
+				"temperature": 0
+			}
+		},
+		"cost_tracking": {
+			"enabled": true,
+			"log_usage": true
+		}
+	},
+	"crop_types": ["Avocado", "Potato", "Dairy"],
+	"contact_info": {
+		"name": "Admin",
+		"phone_number": "+1234567891"
+	},
+	"weather": {
+		"broadcast_enabled": true,
+		"intent_enabled": true,
+		"intent_keywords": [
+			"weather",
+			"forecast",
+			"weather updates",
+			"hali ya hewa",
+			"hali ya anga"
+		],
+		"forecast_days": 6
+	}
+}

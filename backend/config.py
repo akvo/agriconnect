@@ -8,12 +8,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def load_config() -> Dict[str, Any]:
     """Load configuration from config.json file"""
+    is_test = os.getenv("TEST") or os.getenv("TESTING")
     config_path = Path(__file__).parent / "config.json"
-    if os.getenv("TEST") or os.getenv("TESTING"):
+    if is_test:
         config_path = Path(__file__).parent / "config.test.json"
     if not config_path.exists():
         # Create new from template if missing
-        template_path = Path(__file__).parent / "config.template.json"
+        # Use test-specific template for tests, production template otherwise
+        if is_test:
+            template_path = Path(__file__).parent / "config.test.template.json"
+        else:
+            template_path = Path(__file__).parent / "config.template.json"
         # Verify template exists
         if not template_path.exists():
             print("Template config not found:", template_path)
