@@ -563,9 +563,18 @@ class TestWeatherIntentService:
             patch(
                 "services.weather_intent_service.settings"
             ) as mock_settings,
+            patch(
+                "services.openai_service.get_openai_service"
+            ) as mock_openai_svc,
         ):
             # Enable weather intent for test
             mock_settings.weather_intent_enabled = True
+            mock_settings.google_weather_api_key = "test-api-key"
+
+            # Mock OpenAI service
+            mock_openai_instance = Mock()
+            mock_openai_instance.is_configured.return_value = True
+            mock_openai_svc.return_value = mock_openai_instance
 
             mock_weather_instance = Mock()
             mock_weather_instance.is_configured.return_value = True

@@ -155,15 +155,20 @@ class WeatherIntentService:
                 message="Weather intent disabled",
             )
 
-        # Check if weather service is configured
-        if not self.weather_broadcast_service.is_configured():
+        # Check if weather API is available (independent of broadcast flag)
+        from services.openai_service import get_openai_service
+
+        has_weather_key = bool(settings.google_weather_api_key)
+        has_openai = get_openai_service().is_configured()
+
+        if not has_weather_key or not has_openai:
             logger.warning(
-                "Weather broadcast service not configured, "
-                "cannot handle weather intent"
+                "Weather API not available: "
+                f"weather_key={has_weather_key}, openai={has_openai}"
             )
             return WeatherIntentResult(
                 handled=False,
-                message="Weather service not configured",
+                message="Weather API not configured",
             )
 
         # Get customer's administrative area for location
