@@ -209,8 +209,11 @@ class WeatherIntentService:
             f"Weather message sent to {phone_number} for {location}"
         )
 
-        # Show subscription buttons if NOT already subscribed
-        if customer.weather_subscribed is not True:
+        # Show subscription buttons if broadcasts enabled and not subscribed
+        if (
+            settings.weather_broadcast_enabled
+            and customer.weather_subscribed is not True
+        ):
             self._send_subscription_buttons(
                 customer, phone_number, admin_area.name, lang
             )
