@@ -227,6 +227,70 @@ export default function PlaygroundPage() {
     setCustomPrompt("");
   };
 
+  // Citation tooltip component
+  const CitationTooltip = ({ num, citation }) => {
+    const filename = citation?.document || `Source ${num}`;
+    const page = citation?.page;
+    const chunk = citation?.chunk || "";
+    const preview = chunk
+      ? chunk.substring(0, 200).replace(/\s+/g, " ").trim()
+      : "";
+
+    return (
+      <span className="relative inline-block group">
+        <sup className="text-blue-600 font-medium text-xs cursor-help hover:text-blue-800 hover:underline transition-colors">
+          [{num}]
+        </sup>
+        {/* Tooltip card */}
+        <span
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72
+                     bg-gray-800 rounded-lg shadow-xl
+                     opacity-0 invisible group-hover:opacity-100 group-hover:visible
+                     transition-all duration-200 z-50 pointer-events-none"
+        >
+          {/* Arrow - matching bg-gray-800 */}
+          <span
+            className="absolute top-full left-1/2 -translate-x-1/2
+                       border-8 border-transparent border-t-gray-800"
+          />
+
+          {/* Header */}
+          <span className="flex items-center gap-2 px-3 py-2 border-b border-gray-700">
+            <DocumentTextIcon className="h-4 w-4 text-blue-400 flex-shrink-0" />
+            <span className="text-sm font-medium text-white truncate flex-1">
+              {filename}
+            </span>
+            {page && (
+              <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                p.{page}
+              </span>
+            )}
+          </span>
+
+          {/* Content preview */}
+          {citation ? (
+            preview ? (
+              <span className="block px-3 py-2 text-xs text-gray-300 leading-relaxed">
+                {preview}
+                {chunk.length > 200 && (
+                  <span className="text-gray-500">...</span>
+                )}
+              </span>
+            ) : (
+              <span className="block px-3 py-2 text-xs text-gray-500 italic">
+                No preview available
+              </span>
+            )
+          ) : (
+            <span className="block px-3 py-2 text-xs text-amber-400">
+              Citation data not available
+            </span>
+          )}
+        </span>
+      </span>
+    );
+  };
+
   // Format citations like [citation:3] or [citation:1 2 3] into hoverable superscripts
   const formatCitations = (content, citations = []) => {
     if (!content) return content;
@@ -249,37 +313,10 @@ export default function PlaygroundPage() {
         return (
           <span key={index} className="inline-flex gap-0.5">
             {citationNums.map((num, i) => {
-              // Citation numbers are 1-indexed, array is 0-indexed
               const citationIndex = parseInt(num) - 1;
               const citation = citations[citationIndex];
-              const filename = citation?.document || `Source ${num}`;
-              const page = citation?.page;
-              const chunk = citation?.chunk || "";
-              // Use single line tooltip - browsers don't render \n in title
-              const preview = chunk
-                ? chunk.substring(0, 150).replace(/\s+/g, " ").trim()
-                : "";
-
-              // Build tooltip based on what data is available
-              let tooltip;
-              if (citation) {
-                if (preview) {
-                  tooltip = `📄 ${filename}${page ? ` (p.${page})` : ""} — ${preview}${chunk.length > 150 ? "..." : ""}`;
-                } else {
-                  tooltip = `📄 ${filename}${page ? ` (p.${page})` : ""}`;
-                }
-              } else {
-                tooltip = `Citation ${num} (no data available)`;
-              }
-
               return (
-                <sup
-                  key={i}
-                  className="text-blue-600 font-medium text-xs cursor-help hover:text-blue-800 hover:underline"
-                  title={tooltip}
-                >
-                  [{num}]
-                </sup>
+                <CitationTooltip key={i} num={num} citation={citation} />
               );
             })}
           </span>
