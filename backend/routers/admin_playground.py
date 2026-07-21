@@ -15,6 +15,7 @@ from models.playground_message import (
     PlaygroundMessageRole,
     PlaygroundMessageStatus,
 )
+from models.knowledge_base import KnowledgeBase
 from services.external_ai_service import ExternalAIService
 from services.service_token_service import ServiceTokenService
 from schemas.callback import MessageType
@@ -34,6 +35,7 @@ class ActiveServiceResponse(BaseModel):
     chat_url: str
     is_active: bool
     has_valid_token: bool
+    active_knowledge_base_id: Optional[int] = None
 
 
 class DefaultPromptResponse(BaseModel):
@@ -116,11 +118,22 @@ def get_active_service(
             detail="No active service configured",
         )
 
+    # Get active knowledge base for this service
+    active_kb = (
+        db.query(KnowledgeBase)
+        .filter(
+            KnowledgeBase.service_id == token.id,
+            KnowledgeBase.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+
     return ActiveServiceResponse(
         service_name=token.service_name,
         chat_url=token.chat_url or "",
         is_active=token.active == 1,
         has_valid_token=bool(token.access_token),
+        active_knowledge_base_id=active_kb.id if active_kb else None,
     )
 
 

@@ -26,8 +26,12 @@ class MessageType(int, Enum):
 
 
 class Citation(BaseModel):
-    document: str = Field(..., description="Title of the cited source")
-    chunk: str = Field(..., description="Content of the cited source")
+    document: Optional[str] = Field(
+        None, description="Title/filename of the cited source"
+    )
+    chunk: Optional[str] = Field(
+        None, description="Content of the cited source"
+    )
     page: Optional[str] = Field(
         None, description="Page number or identifier of the source"
     )

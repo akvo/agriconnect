@@ -98,11 +98,24 @@ async def handle_playground_callback(payload: AIWebhookCallback, db: Session):
 
         session_id = payload.callback_params.session_id
         if session_id:
+            # Convert citations to dicts for JSON serialization
+            citations = []
+            if payload.output.citations:
+                citations = [
+                    {
+                        "document": c.document,
+                        "chunk": c.chunk,
+                        "page": c.page,
+                    }
+                    for c in payload.output.citations
+                ]
+
             await emit_playground_response(
                 session_id=session_id,
                 message_id=pg_message.id,
                 content=pg_message.content,
                 response_time_ms=response_time_ms,
+                citations=citations,
             )
 
         return {"status": "received", "job_id": payload.job_id}

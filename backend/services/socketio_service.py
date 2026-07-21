@@ -348,7 +348,11 @@ async def emit_message_received(
 
 
 async def emit_playground_response(
-    session_id: str, message_id: int, content: str, response_time_ms: int
+    session_id: str,
+    message_id: int,
+    content: str,
+    response_time_ms: int,
+    citations: list = None,
 ):
     """Emit response"""
     event_data = {
@@ -358,6 +362,7 @@ async def emit_playground_response(
         "response_time_ms": response_time_ms,
         "role": "assistant",
         "status": "completed",
+        "citations": citations or [],
     }
 
     room_name = f"playground:{session_id}"

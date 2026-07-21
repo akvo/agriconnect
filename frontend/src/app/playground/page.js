@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import api from "../../lib/api";
+import knowledgeBaseApi from "../../lib/knowledgeBaseApi";
 import HeaderNav from "../../components/HeaderNav";
 import {
   PaperAirplaneIcon,
@@ -13,6 +14,7 @@ import {
   XCircleIcon,
   ClockIcon,
   TrashIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { io } from "socket.io-client";
 
@@ -31,6 +33,9 @@ export default function PlaygroundPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [knowledgeBase, setKnowledgeBase] = useState(null);
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Redirect non-admins
@@ -67,6 +72,29 @@ export default function PlaygroundPage() {
     }
   };
 
+  // Fetch documents when active knowledge base is available
+  useEffect(() => {
+    if (activeService?.active_knowledge_base_id) {
+      fetchDocuments(activeService.active_knowledge_base_id);
+    }
+  }, [activeService?.active_knowledge_base_id]);
+
+  const fetchDocuments = async (kbId) => {
+    try {
+      setLoadingDocs(true);
+      const [kbDetails, docsResponse] = await Promise.all([
+        knowledgeBaseApi.getById(kbId),
+        knowledgeBaseApi.getDocumentList(kbId, 1, 100),
+      ]);
+      setKnowledgeBase(kbDetails);
+      setDocuments(docsResponse.data || []);
+    } catch (err) {
+      console.error("Error fetching documents:", err);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
   // WebSocket setup
   useEffect(() => {
     if (!user) return;
@@ -94,6 +122,13 @@ export default function PlaygroundPage() {
     });
 
     newSocket.on("playground_response", (data) => {
+      // Debug: Log incoming WebSocket data
+      console.log("[Playground WS] Received response:", {
+        message_id: data.message_id,
+        citations_count: data.citations?.length || 0,
+        citations: data.citations,
+      });
+
       // Use functional update to avoid stale state
       setMessages((prevMessages) => {
         const updated = prevMessages.map((msg) =>
@@ -103,6 +138,7 @@ export default function PlaygroundPage() {
                 content: data.content,
                 status: "completed",
                 response_time_ms: data.response_time_ms,
+                citations: data.citations || [],
               }
             : msg
         );
@@ -147,15 +183,15 @@ export default function PlaygroundPage() {
         response.data.assistant_message,
       ];
 
-      console.log("=== SENDING MESSAGE ===");
-      console.log("Current messages count:", messages.length);
-      console.log("New messages count:", newMessages.length);
-      console.log("User message ID:", response.data.user_message.id);
-      console.log("Assistant message ID:", response.data.assistant_message.id);
-      console.log("New messages:", newMessages);
+      // Join playground room IMMEDIATELY before state updates
+      // This prevents race condition where callback arrives before useEffect runs
+      const newSessionId = response.data.session_id;
+      if (socket && isConnected && newSessionId && newSessionId !== currentSessionId) {
+        socket.emit("join_playground", { session_id: newSessionId });
+      }
 
       setMessages(newMessages);
-      setCurrentSessionId(response.data.session_id);
+      setCurrentSessionId(newSessionId);
       setInputMessage("");
     } catch (err) {
       console.error("Error sending message:", err);
@@ -189,6 +225,68 @@ export default function PlaygroundPage() {
 
   const handleClearPrompt = () => {
     setCustomPrompt("");
+  };
+
+  // Format citations like [citation:3] or [citation:1 2 3] into hoverable superscripts
+  const formatCitations = (content, citations = []) => {
+    if (!content) return content;
+
+    // Debug: Log what's being passed to formatCitations
+    if (content.includes("[citation:")) {
+      console.log("[formatCitations] Content has citations, received:", {
+        citationsLength: citations?.length || 0,
+        citations: citations,
+      });
+    }
+
+    // Match [citation:X] or [citation:X Y Z]
+    const parts = content.split(/(\[citation:[^\]]+\])/g);
+
+    return parts.map((part, index) => {
+      const match = part.match(/\[citation:([^\]]+)\]/);
+      if (match) {
+        const citationNums = match[1].trim().split(/\s+/);
+        return (
+          <span key={index} className="inline-flex gap-0.5">
+            {citationNums.map((num, i) => {
+              // Citation numbers are 1-indexed, array is 0-indexed
+              const citationIndex = parseInt(num) - 1;
+              const citation = citations[citationIndex];
+              const filename = citation?.document || `Source ${num}`;
+              const page = citation?.page;
+              const chunk = citation?.chunk || "";
+              // Use single line tooltip - browsers don't render \n in title
+              const preview = chunk
+                ? chunk.substring(0, 150).replace(/\s+/g, " ").trim()
+                : "";
+
+              // Build tooltip based on what data is available
+              let tooltip;
+              if (citation) {
+                if (preview) {
+                  tooltip = `📄 ${filename}${page ? ` (p.${page})` : ""} — ${preview}${chunk.length > 150 ? "..." : ""}`;
+                } else {
+                  tooltip = `📄 ${filename}${page ? ` (p.${page})` : ""}`;
+                }
+              } else {
+                tooltip = `Citation ${num} (no data available)`;
+              }
+
+              return (
+                <sup
+                  key={i}
+                  className="text-blue-600 font-medium text-xs cursor-help hover:text-blue-800 hover:underline"
+                  title={tooltip}
+                >
+                  [{num}]
+                </sup>
+              );
+            })}
+          </span>
+        );
+      }
+      return part;
+    });
   };
 
   // Don't render if not admin
@@ -232,37 +330,52 @@ export default function PlaygroundPage() {
               </div>
 
               {activeService ? (
-                <div className="space-y-3">
+                <div className="space-y-2 text-sm">
                   <div>
-                    <span className="text-sm text-gray-600">Service:</span>
-                    <p className="font-medium">{activeService.service_name}</p>
+                    <span className="text-gray-600">Service:</span>{" "}
+                    <span className="font-medium">{activeService.service_name}</span>
                   </div>
                   <div>
-                    <span className="text-sm text-gray-600">Status:</span>
-                    <div className="flex items-center mt-1">
-                      {activeService.is_active ? (
-                        <>
-                          <CheckCircleIcon className="h-5 w-5 text-green-600 mr-1" />
-                          <span className="text-green-600 text-sm">Active</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircleIcon className="h-5 w-5 text-red-600 mr-1" />
-                          <span className="text-red-600 text-sm">Inactive</span>
-                        </>
-                      )}
-                    </div>
+                    <span className="text-gray-600">Status:</span>{" "}
+                    {activeService.is_active ? (
+                      <span className="text-green-600">Active</span>
+                    ) : (
+                      <span className="text-red-600">Inactive</span>
+                    )}
                   </div>
-                  {isConnected && (
-                    <div>
-                      <span className="text-sm text-gray-600">WebSocket:</span>
-                      <div className="flex items-center mt-1">
-                        <div className="h-2 w-2 bg-green-500 rounded-full mr-2"></div>
-                        <span className="text-green-600 text-sm">
-                          Connected
+                  <div>
+                    <span className="text-gray-600">Socket:</span>{" "}
+                    {isConnected ? (
+                      <span className="text-green-600">Connected</span>
+                    ) : (
+                      <span className="text-gray-400">Disconnected</span>
+                    )}
+                  </div>
+                  {activeService?.active_knowledge_base_id && (
+                    <>
+                      <div>
+                        <span className="text-gray-600">Knowledge Base:</span>{" "}
+                        <span className="font-medium">
+                          {loadingDocs ? "Loading..." : knowledgeBase?.title || "-"}
                         </span>
                       </div>
-                    </div>
+                      <div>
+                        <span className="text-gray-600">Documents:</span>
+                        {loadingDocs ? (
+                          <span className="text-gray-400 ml-1">Loading...</span>
+                        ) : documents.length > 0 ? (
+                          <ul className="mt-1 space-y-0.5">
+                            {documents.map((doc) => (
+                              <li key={doc.id} className="text-xs text-gray-500 truncate" title={doc.filename}>
+                                • {doc.filename}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-gray-400 ml-1">No documents</span>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               ) : (
@@ -306,6 +419,7 @@ export default function PlaygroundPage() {
                 </button>
               </div>
             </div>
+
           </div>
 
           {/* Center Panel - Chat Interface */}
@@ -370,7 +484,7 @@ export default function PlaygroundPage() {
                             </div>
                           ) : (
                             <div className="whitespace-pre-wrap">
-                              {msg.content}
+                              {formatCitations(msg.content, msg.citations)}
                             </div>
                           )}
                           <div className="flex items-center justify-between mt-2 text-xs opacity-75">
