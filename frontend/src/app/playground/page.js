@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import api from "../../lib/api";
@@ -204,8 +205,12 @@ export default function PlaygroundPage() {
     setCustomPrompt("");
   };
 
-  // Citation tooltip component
+  // Citation tooltip component with portal
   const CitationTooltip = ({ num, citation }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+    const triggerRef = useRef(null);
+
     const filename = citation?.document || `Source ${num}`;
     const page = citation?.page;
     const chunk = citation?.chunk || "";
@@ -213,58 +218,84 @@ export default function PlaygroundPage() {
       ? chunk.substring(0, 200).replace(/\s+/g, " ").trim()
       : "";
 
+    const handleMouseEnter = () => {
+      if (triggerRef.current) {
+        const rect = triggerRef.current.getBoundingClientRect();
+        setTooltipPos({
+          top: rect.top - 8,
+          left: rect.left + rect.width / 2,
+        });
+      }
+      setIsHovered(true);
+    };
+
+    const handleMouseLeave = () => {
+      setIsHovered(false);
+    };
+
     return (
-      <span className="relative inline-block group">
-        <sup className="text-blue-600 font-medium text-xs cursor-help hover:text-blue-800 hover:underline transition-colors">
+      <>
+        <sup
+          ref={triggerRef}
+          className="text-blue-600 font-medium text-xs cursor-help hover:text-blue-800 hover:underline transition-colors"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
           [{num}]
         </sup>
-        {/* Tooltip card */}
-        <span
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72
-                     bg-gray-800 rounded-lg shadow-xl
-                     opacity-0 invisible group-hover:opacity-100 group-hover:visible
-                     transition-all duration-200 z-50 pointer-events-none"
-        >
-          {/* Arrow - matching bg-gray-800 */}
-          <span
-            className="absolute top-full left-1/2 -translate-x-1/2
-                       border-8 border-transparent border-t-gray-800"
-          />
+        {isHovered &&
+          typeof window !== "undefined" &&
+          createPortal(
+            <div
+              className="fixed z-[9999] w-72 bg-gray-800 rounded-lg shadow-xl pointer-events-none"
+              style={{
+                top: tooltipPos.top,
+                left: tooltipPos.left,
+                transform: "translate(-50%, -100%)",
+              }}
+            >
+              {/* Arrow */}
+              <div
+                className="absolute top-full left-1/2 -translate-x-1/2
+                           border-8 border-transparent border-t-gray-800"
+              />
 
-          {/* Header */}
-          <span className="flex items-center gap-2 px-3 py-2 border-b border-gray-700">
-            <DocumentTextIcon className="h-4 w-4 text-blue-400 flex-shrink-0" />
-            <span className="text-sm font-medium text-white truncate flex-1">
-              {filename}
-            </span>
-            {page && (
-              <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
-                p.{page}
-              </span>
-            )}
-          </span>
-
-          {/* Content preview */}
-          {citation ? (
-            preview ? (
-              <span className="block px-3 py-2 text-xs text-gray-300 leading-relaxed">
-                {preview}
-                {chunk.length > 200 && (
-                  <span className="text-gray-500">...</span>
+              {/* Header */}
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-700">
+                <DocumentTextIcon className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                <span className="text-sm font-medium text-white truncate flex-1">
+                  {filename}
+                </span>
+                {page && (
+                  <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                    p.{page}
+                  </span>
                 )}
-              </span>
-            ) : (
-              <span className="block px-3 py-2 text-xs text-gray-500 italic">
-                No preview available
-              </span>
-            )
-          ) : (
-            <span className="block px-3 py-2 text-xs text-amber-400">
-              Citation data not available
-            </span>
+              </div>
+
+              {/* Content preview */}
+              {citation ? (
+                preview ? (
+                  <div className="px-3 py-2 text-xs text-gray-300 leading-relaxed">
+                    {preview}
+                    {chunk.length > 200 && (
+                      <span className="text-gray-500">...</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="px-3 py-2 text-xs text-gray-500 italic">
+                    No preview available
+                  </div>
+                )
+              ) : (
+                <div className="px-3 py-2 text-xs text-amber-400">
+                  Citation data not available
+                </div>
+              )}
+            </div>,
+            document.body
           )}
-        </span>
-      </span>
+      </>
     );
   };
 
