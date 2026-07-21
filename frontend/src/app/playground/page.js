@@ -186,7 +186,12 @@ export default function PlaygroundPage() {
       // Join playground room IMMEDIATELY before state updates
       // This prevents race condition where callback arrives before useEffect runs
       const newSessionId = response.data.session_id;
-      if (socket && isConnected && newSessionId && newSessionId !== currentSessionId) {
+      if (
+        socket &&
+        isConnected &&
+        newSessionId &&
+        newSessionId !== currentSessionId
+      ) {
         socket.emit("join_playground", { session_id: newSessionId });
       }
 
@@ -315,9 +320,7 @@ export default function PlaygroundPage() {
             {citationNums.map((num, i) => {
               const citationIndex = parseInt(num) - 1;
               const citation = citations[citationIndex];
-              return (
-                <CitationTooltip key={i} num={num} citation={citation} />
-              );
+              return <CitationTooltip key={i} num={num} citation={citation} />;
             })}
           </span>
         );
@@ -370,7 +373,9 @@ export default function PlaygroundPage() {
                 <div className="space-y-2 text-sm">
                   <div>
                     <span className="text-gray-600">Service:</span>{" "}
-                    <span className="font-medium">{activeService.service_name}</span>
+                    <span className="font-medium">
+                      {activeService.service_name}
+                    </span>
                   </div>
                   <div>
                     <span className="text-gray-600">Status:</span>{" "}
@@ -393,7 +398,9 @@ export default function PlaygroundPage() {
                       <div>
                         <span className="text-gray-600">Knowledge Base:</span>{" "}
                         <span className="font-medium">
-                          {loadingDocs ? "Loading..." : knowledgeBase?.title || "-"}
+                          {loadingDocs
+                            ? "Loading..."
+                            : knowledgeBase?.title || "-"}
                         </span>
                       </div>
                       <div>
@@ -403,13 +410,19 @@ export default function PlaygroundPage() {
                         ) : documents.length > 0 ? (
                           <ul className="mt-1 space-y-0.5">
                             {documents.map((doc) => (
-                              <li key={doc.id} className="text-xs text-gray-500 truncate" title={doc.filename}>
+                              <li
+                                key={doc.id}
+                                className="text-xs text-gray-500 truncate"
+                                title={doc.filename}
+                              >
                                 • {doc.filename}
                               </li>
                             ))}
                           </ul>
                         ) : (
-                          <span className="text-gray-400 ml-1">No documents</span>
+                          <span className="text-gray-400 ml-1">
+                            No documents
+                          </span>
                         )}
                       </div>
                     </>
@@ -456,7 +469,6 @@ export default function PlaygroundPage() {
                 </button>
               </div>
             </div>
-
           </div>
 
           {/* Center Panel - Chat Interface */}
