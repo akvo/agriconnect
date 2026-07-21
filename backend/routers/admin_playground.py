@@ -15,9 +15,9 @@ from models.playground_message import (
     PlaygroundMessageRole,
     PlaygroundMessageStatus,
 )
-from models.knowledge_base import KnowledgeBase
 from services.external_ai_service import ExternalAIService
 from services.service_token_service import ServiceTokenService
+from services.knowledge_base_service import KnowledgeBaseService
 from schemas.callback import MessageType
 from utils.auth_dependencies import admin_required
 
@@ -30,12 +30,17 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
+class KnowledgeBaseInfo(BaseModel):
+    id: int
+    title: str
+
+
 class ActiveServiceResponse(BaseModel):
     service_name: str
     chat_url: str
     is_active: bool
     has_valid_token: bool
-    active_knowledge_base_id: Optional[int] = None
+    knowledge_bases: List[KnowledgeBaseInfo] = []
 
 
 class DefaultPromptResponse(BaseModel):
@@ -102,13 +107,14 @@ class SessionsResponse(BaseModel):
 
 
 @router.get("/active-service", response_model=ActiveServiceResponse)
-def get_active_service(
+async def get_active_service(
     db: Session = Depends(get_db),
     current_user: User = Depends(admin_required),
 ):
     """
     Get active service configuration (Admin only).
-    Returns information about the currently active AI service.
+    Returns information about the currently active AI service,
+    including all active knowledge bases with their documents.
     """
     token = ServiceTokenService.get_active_token(db)
 
@@ -118,22 +124,47 @@ def get_active_service(
             detail="No active service configured",
         )
 
-    # Get active knowledge base for this service
-    active_kb = (
-        db.query(KnowledgeBase)
-        .filter(
-            KnowledgeBase.service_id == token.id,
-            KnowledgeBase.is_active == True,  # noqa: E712
-        )
-        .first()
-    )
+    # Get all active knowledge bases
+    active_kbs = KnowledgeBaseService.get_active_knowledge_bases(db=db)
+
+    knowledge_bases = []
+    if active_kbs:
+        ai_service = ExternalAIService(db)
+        if ai_service.is_configured():
+            for kb in active_kbs:
+                try:
+                    # Fetch KB details from RAG service
+                    kb_details = await ai_service.manage_knowledge_base(
+                        operation="get", kb_id=kb.external_id
+                    )
+                    kb_title = (
+                        kb_details.get("name", f"KB {kb.id}")
+                        if kb_details
+                        else f"KB {kb.id}"
+                    )
+
+                    knowledge_bases.append(
+                        KnowledgeBaseInfo(
+                            id=kb.id,
+                            title=kb_title,
+                        )
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to fetch KB {kb.id} details: {e}")
+                    # Still include KB with minimal info
+                    knowledge_bases.append(
+                        KnowledgeBaseInfo(
+                            id=kb.id,
+                            title=f"KB {kb.id}",
+                        )
+                    )
 
     return ActiveServiceResponse(
         service_name=token.service_name,
         chat_url=token.chat_url or "",
         is_active=token.active == 1,
         has_valid_token=bool(token.access_token),
-        active_knowledge_base_id=active_kb.id if active_kb else None,
+        knowledge_bases=knowledge_bases,
     )
 
 

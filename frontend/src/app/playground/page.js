@@ -1,17 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import api from "../../lib/api";
-import knowledgeBaseApi from "../../lib/knowledgeBaseApi";
 import HeaderNav from "../../components/HeaderNav";
 import {
   PaperAirplaneIcon,
   ArrowPathIcon,
   BeakerIcon,
   CheckCircleIcon,
-  XCircleIcon,
   ClockIcon,
   TrashIcon,
   DocumentTextIcon,
@@ -33,9 +31,6 @@ export default function PlaygroundPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [documents, setDocuments] = useState([]);
-  const [knowledgeBase, setKnowledgeBase] = useState(null);
-  const [loadingDocs, setLoadingDocs] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Redirect non-admins
@@ -69,29 +64,6 @@ export default function PlaygroundPage() {
       }
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Fetch documents when active knowledge base is available
-  useEffect(() => {
-    if (activeService?.active_knowledge_base_id) {
-      fetchDocuments(activeService.active_knowledge_base_id);
-    }
-  }, [activeService?.active_knowledge_base_id]);
-
-  const fetchDocuments = async (kbId) => {
-    try {
-      setLoadingDocs(true);
-      const [kbDetails, docsResponse] = await Promise.all([
-        knowledgeBaseApi.getById(kbId),
-        knowledgeBaseApi.getDocumentList(kbId, 1, 100),
-      ]);
-      setKnowledgeBase(kbDetails);
-      setDocuments(docsResponse.data || []);
-    } catch (err) {
-      console.error("Error fetching documents:", err);
-    } finally {
-      setLoadingDocs(false);
     }
   };
 
@@ -393,39 +365,19 @@ export default function PlaygroundPage() {
                       <span className="text-gray-400">Disconnected</span>
                     )}
                   </div>
-                  {activeService?.active_knowledge_base_id && (
-                    <>
-                      <div>
-                        <span className="text-gray-600">Knowledge Base:</span>{" "}
-                        <span className="font-medium">
-                          {loadingDocs
-                            ? "Loading..."
-                            : knowledgeBase?.title || "-"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Documents:</span>
-                        {loadingDocs ? (
-                          <span className="text-gray-400 ml-1">Loading...</span>
-                        ) : documents.length > 0 ? (
-                          <ul className="mt-1 space-y-0.5">
-                            {documents.map((doc) => (
-                              <li
-                                key={doc.id}
-                                className="text-xs text-gray-500 truncate"
-                                title={doc.filename}
-                              >
-                                • {doc.filename}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-gray-400 ml-1">
-                            No documents
-                          </span>
-                        )}
-                      </div>
-                    </>
+                  {activeService?.knowledge_bases?.length > 0 && (
+                    <div className="border-t border-gray-100 pt-2 mt-2">
+                      <span className="text-gray-600 font-medium">
+                        Knowledge Bases:
+                      </span>
+                      <ul className="mt-1 space-y-1">
+                        {activeService.knowledge_bases.map((kb) => (
+                          <li key={kb.id} className="text-xs text-gray-700">
+                            • {kb.title}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               ) : (
