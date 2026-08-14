@@ -214,3 +214,87 @@ class TestEdgeCases:
             attempt_msg=" (attempt 2 of 3)",
         )
         assert "attempt 2 of 3" in result
+
+
+class TestDynamicLocaleLoading:
+    """Test dynamic JSON locale file loading, runtime reloads, and fallbacks"""
+
+    def test_translations_loaded_from_json_files(self):
+        """Test that en and sw locales are loaded from JSON files"""
+        from utils.i18n import _locales
+
+        assert "en" in _locales
+        assert "sw" in _locales
+        assert isinstance(_locales["en"], dict)
+        assert isinstance(_locales["sw"], dict)
+
+    def test_consent_and_account_translations(self):
+        """Test consent, account, and escalation domains load cleanly"""
+        # Consent
+        consent_en = t("consent.data_sharing.accepted", "en")
+        consent_sw = t("consent.data_sharing.accepted", "sw")
+        assert "Thank you for your consent" in consent_en
+        assert "Asante kwa kukubali" in consent_sw
+
+        # Account deletion
+        del_en = t("account.delete_confirmation", "en")
+        del_sw = t("account.delete_confirmation", "sw")
+        assert "Are you sure you want to delete your account" in del_en
+        assert "Je, una uhakika unataka kufuta akaunti yako" in del_sw
+
+        # Escalation
+        esc_en = t("escalation.confirmed_no_contacts", "en")
+        esc_sw = t("escalation.confirmed_no_contacts", "sw")
+        assert "transferred to extension service provider" in esc_en
+        assert "limehamishwa kwa mtoa huduma wa ugani" in esc_sw
+
+        # AI Response
+        ai_en = t("ai_response.disclaimer", "en")
+        ai_sw = t("ai_response.disclaimer", "sw")
+        assert "consult with your extension service provider" in ai_en
+        assert "wasiliana na mtoa huduma wako wa ugani" in ai_sw
+
+    def test_dynamic_language_addition_at_runtime(self, tmp_path):
+        """Test adding a new language JSON file dynamically without code
+        edits."""
+        import json
+        from utils.i18n import LOCALES_DIR, reload_translations
+
+        id_file = LOCALES_DIR / "id.json"
+        id_data = {
+            "consent": {
+                "data_sharing": {
+                    "accepted": "Terima kasih atas persetujuan Anda!",
+                }
+            },
+            "onboarding": {
+                "common": {
+                    "completion": "Selesai! Profil Anda sudah siap.",
+                }
+            },
+        }
+
+        try:
+            with open(id_file, "w", encoding="utf-8") as f:
+                json.dump(id_data, f)
+
+            # Reload translations from disk
+            reload_translations()
+
+            # Test target language resolution
+            res_accepted = t("consent.data_sharing.accepted", "id")
+            assert res_accepted == "Terima kasih atas persetujuan Anda!"
+
+            res_completion = t("onboarding.common.completion", "id")
+            assert res_completion == "Selesai! Profil Anda sudah siap."
+
+            # Test fallback for missing key in id.json -> resolves to en
+            res_fallback = t("account.delete_confirmation", "id")
+            assert (
+                "Are you sure you want to delete your account" in res_fallback
+            )
+
+        finally:
+            if id_file.exists():
+                id_file.unlink()
+            reload_translations()
