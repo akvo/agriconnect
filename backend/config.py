@@ -317,7 +317,14 @@ class Settings(BaseSettings):
     )
     # Keywords for detecting weather-related messages
     weather_intent_keywords: List[str] = _config.get("weather", {}).get(
-        "intent_keywords", ["weather", "forecast", "hali ya hewa"]
+        "intent_keywords",
+        [
+            "weather",
+            "forecast",
+            "weather updates",
+            "hali ya hewa",
+            "hali ya anga",
+        ],
     )
     # Weather Advisory Configuration (rule-based system)
     weather_advisory_enabled: bool = _config.get("weather", {}).get(

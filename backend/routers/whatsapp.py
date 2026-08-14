@@ -279,7 +279,7 @@ async def whatsapp_webhook(
         ]
 
         body_stripped = Body.strip().lower()
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         # Check if customer has pending delete request and is confirming
         if customer.delete_requested:
@@ -338,7 +338,7 @@ async def whatsapp_webhook(
             and customer.language is not None
         ):
             whatsapp_service = WhatsAppService()
-            lang = customer.language.value
+            lang = customer.language_code
 
             # Check for affirmative response
             consent_responses = [
@@ -429,9 +429,7 @@ async def whatsapp_webhook(
                     onboarding_response.requires_weather_buttons
                     and customer.customer_administrative
                 ):
-                    lang = (
-                        customer.language.value if customer.language else "en"
-                    )
+                    lang = customer.language_code
                     area_name = customer.customer_administrative[
                         0
                     ].administrative.name
@@ -609,7 +607,7 @@ async def whatsapp_webhook(
             )
 
             weather_service = get_weather_subscription_service(db)
-            lang = customer.language.value if customer.language else "en"
+            lang = customer.language_code
 
             if is_weather_yes:
                 weather_service.subscribe(customer)
@@ -773,9 +771,7 @@ async def whatsapp_webhook(
             # Send escalation confirmation message to customer
             # with extension officer phone numbers
             whatsapp_service = WhatsAppService()
-            customer_lang = (
-                customer.language.value if customer.language else "en"
-            )
+            customer_lang = customer.language_code
             eo_list = AdministrativeService.get_extension_officers_for_area(
                 db=db,
                 administrative_id=ward_id,
@@ -1094,7 +1090,7 @@ async def whatsapp_webhook(
         ):
             try:
                 whatsapp_service = WhatsAppService()
-                language_code = customer.language.value
+                language_code = customer.language_code
                 whatsapp_service.send_welcome_message(
                     phone_number, language_code
                 )

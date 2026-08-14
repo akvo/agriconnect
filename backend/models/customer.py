@@ -81,6 +81,11 @@ class Customer(Base):
 
     # Profile data property accessors
     @property
+    def language_code(self) -> str:
+        """Get customer language code or default from settings."""
+        return self.language or settings.default_language
+
+    @property
     def birth_year(self) -> int | None:
         """Get birth_year from profile_data"""
         if not self.profile_data:

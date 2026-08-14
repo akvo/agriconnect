@@ -209,19 +209,17 @@ async def ai_callback(
                 # Handle message_type for AI callbacks
                 if payload.callback_params.message_type:
                     # Translate AI response if needed
-                    customer_lang = (
-                        ai_message.customer.language.value
-                        if ai_message.customer.language
-                        else "en"
-                    )
+                    customer_lang = ai_message.customer.language_code
                     ai_response_text = ai_message.body
 
                     if customer_lang == "sw":
                         openai_service = get_openai_service()
-                        translated_response = await openai_service.translate_text(
-                            text=ai_response_text,
-                            target_language="sw",
-                            source_language="en",
+                        translated_response = (
+                            await openai_service.translate_text(
+                                text=ai_response_text,
+                                target_language="sw",
+                                source_language="en",
+                            )
                         )
                         if translated_response:
                             ai_response_text = translated_response
@@ -286,13 +284,13 @@ async def ai_callback(
                             if has_citations:
                                 # Select template based on customer's language
                                 customer_lang = (
-                                    ai_message.customer.language.value
-                                    if ai_message.customer.language
-                                    else "en"
+                                    ai_message.customer.language_code
                                 )
-                                template_sid = whatsapp_service.get_template_sid(
-                                    template_type="confirmation",
-                                    customer_language=customer_lang
+                                template_sid = (
+                                    whatsapp_service.get_template_sid(
+                                        template_type="confirmation",
+                                        customer_language=customer_lang,
+                                    )
                                 )
                                 if template_sid:
                                     try:

@@ -46,23 +46,22 @@ real API calls (WhatsApp/Twilio, Email, Push Notifications) during testing.
 
 import os
 
-import pytest
-import sqlalchemy as sa
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from database import Base, get_db
-from main import app
-from models.customer import AgeGroup, OnboardingStatus
-from models.message import DeliveryStatus
-from services.external_ai_service import ExternalAIService
-
 # CRITICAL: Set testing environment to prevent real API calls
-# This is the PRIMARY defense against real Twilio/WhatsApp/Email API calls
-# Set both TESTING and TEST for backward compatibility with different services
-os.environ["TESTING"] = "true"  # Used by WhatsAppService
-os.environ["TEST"] = "true"  # Used by EmailService
+# This must be set before any app/service modules are imported
+os.environ["TESTING"] = "true"
+os.environ["TEST"] = "true"
+
+import pytest  # noqa: E402
+import sqlalchemy as sa  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+from database import Base, get_db  # noqa: E402
+from main import app  # noqa: E402
+from models.customer import AgeGroup, OnboardingStatus  # noqa: E402
+from models.message import DeliveryStatus  # noqa: E402
+from services.external_ai_service import ExternalAIService  # noqa: E402
 
 # Test database URL
 TEST_DATABASE_URL = "postgresql://akvo:password@db:5432/agriconnect_test"

@@ -22,7 +22,6 @@ from models.customer import (
     Customer,
     OnboardingStatus,
     Gender,
-    CustomerLanguage,
 )
 from models.administrative import Administrative, CustomerAdministrative
 from schemas.onboarding_schemas import (
@@ -419,7 +418,7 @@ class OnboardingService:
 
         Begins at the first level (region) and shows all available options.
         """
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
         first_level = self.admin_level_order[0]
 
         # Get all areas at first level
@@ -472,7 +471,7 @@ class OnboardingService:
         - Moving to next level or saving final selection
         - Showing options at each level
         """
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         # Parse selection
         selection_index = self.parse_selection(message)
@@ -877,23 +876,19 @@ Candidates: ["Avocado", "Cacao"]
 
         if any(pattern in message_lower for pattern in english_patterns):
             logger.info("[OnboardingService] Language extracted: English")
-            return CustomerLanguage.EN
+            return "en"
 
         if any(pattern in message_lower for pattern in swahili_patterns):
             logger.info("[OnboardingService] Language extracted: Swahili")
-            return CustomerLanguage.SW
+            return "sw"
 
         # Fallback to OpenAI for unclear inputs
+        supported_codes = settings.supported_language_codes
         system_prompt = (
             "You are extracting language preference from messages.\n"
-            'Extract and normalize to one of: "en" (English), "sw" (Swahili)\n'
-            "Handle these formats:\n"
-            '1. English words: "English", "Kiingereza" → "en"\n'
-            '2. Swahili words: "Swahili", "Kiswahili" → "sw"\n'
-            '3. Numbers: 1 → "en", 2 → "sw"\n'
-            '4. Language codes: "en", "sw"\n\n'
+            f"Extract and normalize to one of: {', '.join(supported_codes)}\n"
+            "Handle numeric choices (1, 2), language names, and codes.\n\n"
             "Return a JSON object with: language field."
-            ""
         )
 
         messages = [
@@ -911,7 +906,7 @@ Candidates: ["Avocado", "Cacao"]
                 "properties": {
                     "language": {
                         "type": ["string", "null"],
-                        "enum": ["en", "sw", None],
+                        "enum": supported_codes + [None],
                     },
                 },
             },
@@ -924,12 +919,11 @@ Candidates: ["Avocado", "Cacao"]
             return None
 
         language_value = response.data["language"]
-        if language_value == "en":
-            logger.info("[OnboardingService] Extracted language: English")
-            return CustomerLanguage.EN
-        elif language_value == "sw":
-            logger.info("[OnboardingService] Extracted language: Swahili")
-            return CustomerLanguage.SW
+        if language_value in supported_codes:
+            logger.info(
+                f"[OnboardingService] Extracted language: {language_value}"
+            )
+            return language_value
 
         return None
 
@@ -1250,9 +1244,7 @@ Birth year must be between 1900 and {current_year}."""
             OnboardingResponse with status and message in customer's language
         """
         # Determine customer's language (default to EN if not set yet)
-        customer_language = (
-            customer.language.value if customer.language else "en"
-        )
+        customer_language = customer.language_code
 
         # Step 1: Translate incoming message if Swahili user
         processed_message = message
@@ -1366,7 +1358,7 @@ Birth year must be between 1900 and {current_year}."""
         )
 
         # Get customer language
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         # Get translated question
         question = t(f"onboarding.{field_name}.question", lang)
@@ -1446,7 +1438,7 @@ Birth year must be between 1900 and {current_year}."""
             return self._handle_max_attempts(customer, field_config)
 
         # Get customer language
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         # Handle crop_type number selection
         if field_name == "crop_type":
@@ -1603,7 +1595,7 @@ Birth year must be between 1900 and {current_year}."""
         self.db.commit()
 
         # Get customer language
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         # Build options message with numbered candidates
         options_text = "\n".join(
@@ -1641,7 +1633,7 @@ Birth year must be between 1900 and {current_year}."""
         field_name = field_config.field_name
 
         # Get customer language
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         # Get candidates from JSON
         if not customer.onboarding_candidates or not isinstance(
@@ -1728,7 +1720,7 @@ Birth year must be between 1900 and {current_year}."""
     ) -> OnboardingResponse:
         """Re-search locations when user types text instead of number."""
         field_name = field_config.field_name
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         # Extract location from the new text input
         location = await self.extract_location(text)
@@ -1784,13 +1776,13 @@ Birth year must be between 1900 and {current_year}."""
         field_name = field_config.field_name
 
         # Get customer language
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         try:
             # Special case: language uses direct column
             if field_name == "language":
                 customer.language = value
-                lang = value.value
+                lang = value
                 success_msg = t(f"onboarding.{field_name}.success", lang)
             # Special case: "full_name" uses direct column
             elif field_name == "full_name":
@@ -1930,7 +1922,7 @@ Birth year must be between 1900 and {current_year}."""
         field_name = field_config.field_name
 
         # Get customer language
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
         field_display = t(f"onboarding.{field_name}.field_name", lang)
 
         logger.warning(
@@ -1986,7 +1978,7 @@ Birth year must be between 1900 and {current_year}."""
         self.db.commit()
 
         # Get customer language
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         logger.info(f"✓ Onboarding completed for customer {customer.id}")
 
@@ -2053,11 +2045,17 @@ Birth year must be between 1900 and {current_year}."""
         f_gender = t("onboarding.gender.field_name", lang)
         f_age = t("onboarding.common.age", lang)
 
-        c_lang = (
-            "English"
-            if customer.language == CustomerLanguage.EN
-            else "Swahili"
+        # Look up language display name from settings.languages
+        target_lang_code = customer.language_code
+        lang_entry = next(
+            (
+                lang_item
+                for lang_item in settings.languages
+                if lang_item.get("code") == target_lang_code
+            ),
+            None,
         )
+        c_lang = lang_entry.get("name") if lang_entry else target_lang_code
         c_name = customer.full_name if customer.full_name else "N/A"
         c_crop_type = (
             t(

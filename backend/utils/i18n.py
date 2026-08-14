@@ -9,6 +9,7 @@ Usage:
 """
 
 from typing import Any, Dict
+from config import settings
 
 
 # Translation dictionary
@@ -598,8 +599,12 @@ def t(path: str, lang: str = "en", **kwargs) -> str:
         Translated and formatted string,
         fallback to English if language invalid
     """
-    # Default to English if invalid language
-    language = lang if lang in ["en", "sw"] else "en"
+    # Default to configured default language if invalid language
+    language = (
+        lang
+        if lang in settings.supported_language_codes
+        else settings.default_language
+    )
 
     # Navigate the nested dictionary
     keys = path.split(".")
@@ -638,6 +643,10 @@ def get_crop_name_translated(crop_name: str, lang: str = "en") -> str:
         lang: Language code ("en" or "sw")
 
     Returns:
-        Translated crop name in lowercase
+        Translated crop name in lowercase (or original crop_name if
+        translation not found)
     """
-    return t(f"crops.{crop_name}.name", lang)
+    translated = t(f"crops.{crop_name}.name", lang)
+    if translated == f"crops.{crop_name}.name":
+        return crop_name
+    return translated

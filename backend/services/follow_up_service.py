@@ -104,7 +104,7 @@ class FollowUpService:
 
         return FarmerContext(
             name=customer.full_name,
-            language=customer.language.value if customer.language else "en",
+            language=customer.language_code,
             crop_type=customer.crop_type,
             age=customer.age,
             gender=customer.gender,

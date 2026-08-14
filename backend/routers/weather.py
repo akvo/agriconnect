@@ -40,7 +40,11 @@ async def test_weather_message(
 
     message = await service.generate_message(
         location=request.location,
-        language=request.language.value,
+        language=(
+            request.language.value
+            if hasattr(request.language, "value")
+            else (request.language or "en")
+        ),
         weather_data=weather_data,
         farmer_crop=request.crop_type,
     )

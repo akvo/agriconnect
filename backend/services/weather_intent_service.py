@@ -143,7 +143,7 @@ class WeatherIntentService:
         # Check if weather intent is enabled
         # TODO: Remove this check when weather service accuracy is fixed
         if not settings.weather_intent_enabled:
-            lang = customer.language.value if customer.language else "en"
+            lang = customer.language_code
             unavailable_msg = t("weather.service_unavailable", lang)
             self.whatsapp_service.send_message(phone_number, unavailable_msg)
             logger.info(
@@ -176,7 +176,7 @@ class WeatherIntentService:
         location = self._build_location_path(admin_area)
 
         # Get customer's language
-        lang = customer.language.value if customer.language else "en"
+        lang = customer.language_code
 
         # Get weather data using centralized method (respects config)
         weather_svc = self.weather_broadcast_service

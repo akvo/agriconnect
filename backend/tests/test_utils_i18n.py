@@ -115,10 +115,10 @@ class TestCropNameTranslation:
         result = get_crop_name_translated("Avocado")
         assert result == "Avocado"
 
-    def test_invalid_crop_returns_path(self):
-        """Test that invalid crop name returns path"""
+    def test_invalid_crop_returns_name(self):
+        """Test that invalid crop name returns original name as fallback"""
         result = get_crop_name_translated("InvalidCrop", "en")
-        assert result == "crops.InvalidCrop.name"
+        assert result == "InvalidCrop"
 
 
 class TestTranslationDictionary:
