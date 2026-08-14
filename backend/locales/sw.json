@@ -1,0 +1,80 @@
+{
+  "onboarding": {
+    "administration": {
+      "multiple_matches": "Nimepata maeneo mengi yanayolingana. Tafadhali chagua sahihi:\n\n{options}\n\nJibu kwa namba (mfano, '1', '2', n.k.)",
+      "filtered_matches": "Nimepata maeneo haya yanayolingana na '{input}':\n\n{options}\n\nJibu kwa namba (mfano, '1', '2', n.k.)",
+      "no_filter_match": "Sikuweza kupata '{input}' katika chaguo. Tafadhali chagua kutoka:\n\n{options}\n\nJibu kwa namba (mfano, '1', '2', n.k.)",
+      "no_match": "Sikuweza kupata eneo linalingana na '{input}'. Tafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare",
+      "no_location_extracted_max": "Ninapata shida kuelewa eneo lako. Nitaendelea bila eneo kwa sasa. Unaweza kusasisha eneo lako baadaye kwenye mipangilio.",
+      "no_location_extracted_retry": "Sikuweza kutambua eneo lako kutoka ujumbe huo{attempt_msg}. Tafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare",
+      "no_matches_max": "Sikuweza kupata eneo lako kwenye mfumo wetu. Nitaendelea bila eneo kwa sasa. Unaweza kusasisha eneo lako baadaye kwenye mipangilio.",
+      "no_matches_retry": "Sikuweza kupata eneo linalingana na '{input}'. Tafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare",
+      "select_region": "Hebu tupate eneo lako hatua kwa hatua.\n\nUnatoka kaunti/mkoa gani?\n\n{options}",
+      "select_district": "Vizuri! Umechagua {parent}.\n\nUko wilaya gani ndogo?\n\n{options}",
+      "select_ward": "Uko {parent}.\n\nUko kata gani?\n\n{options}",
+      "confirm_location": "Umechagua: {location}\n\nHii ni sahihi?\n1. Ndiyo\n2. Hapana, niruhusu kuchagua tena",
+      "selection_instruction": "\nJibu kwa namba (mfano, '1', '2', n.k.)",
+      "no_children_found": "Sikupata maeneo madogo ya {parent}. Niruhusu kuhifadhi eneo lako kama {parent}.",
+      "other_option": "Nyingine (chagua hatua kwa hatua)",
+      "location_saved": "Asante! Nimerekordi eneo lako kama: {value}. Ninaweza kukusaidiaje leo?"
+    },
+    "crop_type": {
+      "extraction_failed_retry": "Bado sikuweza kutambua. Tafadhali chagua kutoka orodha:\n{available_crops}\n\nJibu kwa namba (mfano, '1', '2', n.k.)"
+    },
+    "common": {
+      "extraction_failed": "Sikuweza kutambua taarifa hiyo. {question}",
+      "selection_prompt": "Jibu kwa namba (mfano, '1', '2', n.k.)",
+      "invalid_selection": "Sikuelewa chaguo lako. Tafadhali jibu kwa namba (mfano, '1', '2', '3')",
+      "selection_out_of_range": "Tafadhali chagua namba kati ya 1 na {max}",
+      "database_error": "Samahani, kuna hitilafu. Tafadhali jaribu tena.",
+      "save_error": "Samahani, nilipata shida kuhifadhi taarifa hiyo. Tafadhali jaribu tena.",
+      "skip_instruction": "\n\n(Jibu 'ruka' ikiwa hupendelei kujibu)",
+      "max_attempts_required": "Ninapata shida kukusanya {field} yako. Tafadhali wasiliana na usaidizi, au jaribu tena baadaye.",
+      "max_attempts_optional": "Tunaruka {field} kwa sasa. Unaweza kusasisha taarifa hii baadaye.",
+      "completion": "Sawa! Wasifu wako uko tayari. Huu hapa muhtasari:\n\n{profile_summary}",
+      "lost_candidates": "Samahani, nimepoteza orodha ya chaguo. Tafadhali niambie eneo lako tena?",
+      "age": "Umri"
+    },
+    "ask_edit_profile": "Ili kuhariri wasifu wako, tafadhali wasiliana:",
+    "ask_delete_data": "Ili kuondoa usajili, tuma ujumbe *FUTA*."
+  },
+  "crops": {
+    "Avocado": { "name": "Parachichi" },
+    "Cacao": { "name": "kakao" },
+    "Potato": { "name": "viazi" },
+    "Dairy": { "name": "Maziwa" }
+  },
+  "gender": {
+    "male": "Mwanaume",
+    "female": "Mwanamke",
+    "other": "Nyingine"
+  },
+  "weather": {
+    "service_unavailable": "Huduma ya hali ya hewa haipatikani kwa sasa. Itarudi hivi karibuni."
+  },
+  "weather_subscription": {
+    "question": "\n\nJe, ungependa kupokea taarifa za hali ya anga kwa eneo lako ({area_name})?",
+    "button_yes": "Ndiyo",
+    "button_no": "Hapana",
+    "subscribed": "Vizuri! Utapokea taarifa za hali ya hewa kiotomatiki kila siku 3 kwa {area_name}.\n\nHutaki kusubiri? Tuma ujumbe *weather* wakati wowote kupata utabiri wako mara moja!",
+    "declined": "Hakuna shida! Unaweza kujisajili wakati wowote kwa kutuma ujumbe *hali ya anga*.\n\nTafadhali tuma ujumbe *hali ya anga* iliupokee taarifa unapozihitaji."
+  },
+  "consent": {
+    "data_sharing": {
+      "question": "Data yako inaweza kushirikiwa na washirika waaminifu kwa ufuatiliaji wa programu na utoaji wa huduma, na itashughulikiwa kwa usalama kulingana na viwango vya ulinzi wa data. Jibu 'Ndiyo' kukubali na kuendelea.",
+      "accepted": "Asante kwa kukubali.",
+      "declined": "Tunaelewa. Kwa bahati mbaya, hatuwezi kuendelea bila idhini yako ya kushiriki data. Ukibadili mawazo, tafadhali tutumie ujumbe tena."
+    }
+  },
+  "account": {
+    "delete_confirmation": "Je, una uhakika unataka kufuta akaunti yako? Hii itaondoa data yako yote na ujumbe milele.\n\nJibu 'Ndiyo' kuthibitisha kufuta.",
+    "deleted": "Akaunti yako na data zote zinazohusiana zimefutwa. Ukitutumia ujumbe tena, akaunti mpya itaundwa."
+  },
+  "escalation": {
+    "confirmed": "Tatizo lako limehamishwa kwa mtoa huduma wa ugani. Tafadhali subiri jibu kutoka kwao. Kwa masuala ya dharura tafadhali piga simu:\n{eo_contacts}",
+    "confirmed_no_contacts": "Tatizo lako limehamishwa kwa mtoa huduma wa ugani. Tafadhali subiri jibu kutoka kwao."
+  },
+  "ai_response": {
+    "disclaimer": "Kabla ya kuchukua hatua yoyote kubwa tafadhali wasiliana na mtoa huduma wako wa ugani"
+  }
+}
