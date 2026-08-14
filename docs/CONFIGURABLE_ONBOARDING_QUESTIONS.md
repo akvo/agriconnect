@@ -1,28 +1,36 @@
-# [MT-001] Configurable Onboarding Questions & Flow Implementation
+# [MT-001] Configurable Onboarding Questions, Flow & Model/Frontend Decoupling
 
 **Date:** 2026-08-14
 **Author:** Galih Pratama
-**Status:** Planned
-**Objective:** Pull out hardcoded onboarding questions, field definitions, priorities, and localized prompt messages from Python source code into a flexible, configurable JSON configuration schema.
+**Status:** Planned / Revised
+**Objective:** Decouple hardcoded onboarding questions, field definitions, priorities, localized prompt messages, profile summary generation, and static frontend/backend constants into dynamic JSON configuration schema and API-driven UI, backed by a one-time Alembic migration converting `customers.language` to `VARCHAR(10)` for truly generic, dynamic scaling (e.g., Agriculture EN/SW → Water Management EN/FR → Empty/Bypass).
 
 ---
 
 ## 📊 Overview
 
-### Purpose
+### Purpose & Scaling Vision
 
-Currently, AgriConnect's farmer onboarding workflow is driven by hardcoded Python dataclasses (`ONBOARDING_FIELDS` in `backend/schemas/onboarding_schemas.py`) and static translation dictionaries (`backend/utils/i18n.py`). When administrators or deployment engineers need to:
+AgriConnect's onboarding workflow must be adaptable to different deployment partners without requiring code rewrites:
+- **Partner A (Standard Agriculture - Kenya/Tanzania)**: Language (`en`/`sw`), Name, Location, Crop Types (`Avocado`, `Potato`, `Dairy`), Gender, Birth Year.
+- **Partner B (Water & Resource Management - Rwanda/DRC)**: Language (`en`/`fr`), Name, Location, Water Source (`Borehole`, `River`, `Piped`), Livestock.
+- **Partner C (Direct Advisory - No Onboarding)**: Empty onboarding field list (`"fields": []`), immediately activates conversation.
 
-1. Rephrase onboarding questions or introductory greetings for specific agricultural programs or regions,
-2. Enable, disable, or reorder onboarding fields (e.g., skip gender/age questions or prioritize crop selection),
-3. Adjust maximum retry attempts before fallback per field, or
-4. Add custom localization or prompt templates without modifying and redeploying Python code,
+To achieve this:
+1. **One-Time Language Column Migration (`customers.language` → `VARCHAR(10)`)**: Replace the restrictive PostgreSQL `customerlanguage` enum (`'EN'`, `'SW'`) with a standard `VARCHAR(10)` column. This makes `customers.language` a single source of truth capable of natively storing any ISO language code (`en`, `sw`, `fr`, `es`, `rw`, etc.) without dual-storage workarounds.
+2. **Universal Profile Storage**: Use `customers.profile_data` (JSONB column) as the store for any partner-specific profile fields (`crop_type`, `water_source`, `irrigation`, `gender`, `birth_year`, etc.).
+3. **Decouple Static Model Properties (`models/customer.py:L81-L124`)**:
+   - `birth_year`, `crop_type`, `gender`, `age`, `age_group` are retained as convenience accessors over `profile_data` for backward compatibility.
+   - Any dynamic partner field (e.g. `water_source`) is accessed universally via `customer.get_profile_field("field_name")`.
+4. **Dynamic Profile Summary Generation (`_generate_profile_summary`)**:
+   - Replace the static 6-line summary (`f_lang`, `f_name`, `f_administration`, `f_crop_type`, `f_gender`, `f_age`) in `OnboardingService`.
+   - Generate summary dynamically by iterating over **active configured fields** in `config.json`. If a field was disabled or omitted (e.g., `crop_type` or `gender` not asked), it will NOT appear in the summary.
+5. **Configurable JSON Questions & Flow**: Move all field configurations, questions, translations, retry limits, and priorities to `config.json` (`"onboarding": { "enabled": true, "fields": [...] }`). Support empty arrays `[]` to completely bypass onboarding.
+6. **Frontend Decoupling**: Remove hardcoded `CROP_TYPES` in `frontend/src/lib/config.js` and `frontend/src/components/customers/EditCustomerModal.js`, replacing it with dynamic loading from the existing backend endpoint `GET /crop-types/` (which reads from `config.json`).
 
-they are forced to make direct code edits.
+---
 
-This feature externalizes all onboarding field configurations, question prompts, localized strings (English & Swahili), and retry thresholds into `config.json` (with templates `config.template.json` and `config.test.template.json`), backed by dynamic schema loading and seamless fallback to built-in defaults.
-
-### User Experience / Workflow
+## 🔄 User Experience / Workflow Architecture
 
 ```mermaid
 sequenceDiagram
@@ -31,123 +39,158 @@ sequenceDiagram
     participant WA as WhatsApp Router
     participant OS as OnboardingService
     participant Cfg as Config/Settings Module
-    participant AI as OpenAI Service
-    participant DB as PostgreSQL DB
+    participant DB as PostgreSQL DB (customers.language VARCHAR + profile_data JSONB)
+    actor Admin as Extension Officer / Admin
+    participant FE as Frontend Dashboard
+    participant API as FastAPI Backend
 
-    Farmer->>WA: Sends message (e.g., "Hello")
+    Note over Farmer,DB: WhatsApp Dynamic Onboarding Flow
+    Farmer->>WA: Sends message (e.g., "Hello" / "Bonjour")
     WA->>OS: process_onboarding_message(customer, message)
     OS->>Cfg: get_active_onboarding_fields()
-    Cfg-->>OS: Configured active fields (sorted by priority)
-    OS->>OS: Determine current/next incomplete field
-    OS->>Cfg: get_field_question(field_name, lang)
-    Cfg-->>OS: Localized question string from JSON (or i18n fallback)
-    OS-->>WA: Return OnboardingResponse with localized question
-    WA-->>Farmer: Send onboarding question (e.g., "Welcome to AgriConnect!...")
+    alt fields is empty [] or enabled == false
+        OS->>DB: Set onboarding_status = COMPLETED
+        OS-->>WA: Return welcome / direct advisory response
+    else fields present
+        OS->>Cfg: get_field_question(field_name, customer.language or "en")
+        Cfg-->>OS: Localized question from JSON (or i18n fallback)
+        OS-->>WA: Localized onboarding question
+        Farmer->>WA: Farmer replies with answer (e.g. "fr" or "Borehole")
+        alt field is language
+            OS->>DB: UPDATE customers SET language = 'fr'
+        else profile field
+            OS->>DB: UPDATE customers SET profile_data[field_name] = value
+        end
+        alt all fields completed
+            OS->>OS: Generate dynamic summary from active fields only
+            OS-->>WA: Summary message + next step
+        else more fields
+            OS->>OS: Advance to next active field
+        end
+    end
 
-    Farmer->>WA: Farmer replies with answer
-    WA->>OS: process_onboarding_message(customer, reply)
-    OS->>OS: Execute extraction method (AI / Regex / Enum)
-    OS->>DB: Save field to Customer profile_data / DB column
-    OS->>Cfg: get_next_active_field()
-    OS->>Cfg: get_field_question(next_field, lang)
-    Cfg-->>OS: Next localized question
-    OS-->>WA: Return combined success message + next question
-    WA-->>Farmer: Deliver next onboarding step
+    Note over Admin,API: Dynamic Frontend Management
+    Admin->>FE: Opens Edit Customer Modal
+    FE->>API: GET /crop-types/
+    API-->>FE: Returns active dynamic crops from config.json
+    FE-->>Admin: Displays dynamic dropdown options
 ```
 
 ---
 
 ## 🎯 Design Principles & Constraints
 
-1. **Zero Breaking Changes / Strict Backward Compatibility**:
-   - If `onboarding` configuration is omitted or partially defined in `config.json`, the system MUST seamlessly fall back to default field definitions and existing `i18n.py` translations.
-   - All existing tests (`test_generic_onboarding.py`, `test_onboarding_service.py`, `test_whatsapp_onboarding.py`, etc.) must pass without regression.
+1. **One-Time Clean Migration**:
+   - `customers.language` becomes `VARCHAR(10)`. The old `customerlanguage` PostgreSQL enum is cleanly converted using `LOWER(language::text)` and dropped.
+   - Future partner deployments with any language code (`fr`, `es`, `de`, `rw`, etc.) require zero additional DB schema changes.
 
-2. **Hot / Warm Config Reloading**:
-   - Field configurations, questions, and retry limits are loaded via `config.py` / `Settings` and can be reloaded or mocked in tests without requiring database schema changes.
+2. **Dynamic Profile Summary**:
+   - Profile summary at onboarding completion is built dynamically from active `self.fields_config` fields only. If `gender` or `crop_type` is not configured, it is completely absent from the completion message.
 
-3. **Dynamic Field Ordering & Toggle**:
-   - Fields can be enabled/disabled (`enabled: true/false`) and re-prioritized (`priority: 0..N`) via JSON.
-   - `OnboardingService` will dynamically evaluate the sequence of active fields based on `priority` of enabled fields.
+3. **Decoupled Model Access**:
+   - `Customer` properties (`crop_type`, `gender`, `birth_year`, `age`, `age_group`) remain non-breaking convenience accessors over `profile_data`. Any generic or partner-specific field is accessible via `get_profile_field(name)` / `set_profile_field(name, value)`.
 
-4. **Multi-Language Support**:
-   - Each question and message template supports ISO language codes (e.g., `"en"`, `"sw"`).
-   - Dynamic placeholders such as `{available_crops}`, `{value}`, `{options}`, `{parent}`, `{field}` must be interpolated accurately.
+4. **Empty / Bypass Support (`"fields": []`)**:
+   - If `"fields": []` is configured or `"enabled": false`, onboarding is instantly completed on the user's first interaction.
 
----
-
-## 📐 Architecture Design
-
-### Current State: Hardcoded Paths
-
-```
-┌──────────────────────────────────────────┐
-│ schemas/onboarding_schemas.py            │
-│  ONBOARDING_FIELDS = [                   │
-│   OnboardingFieldConfig(                 │
-│    field_name="language",                │
-│    priority=0, max_attempts=3,           │  ← Hardcoded
-│    success_message_template="...",       │  ← Hardcoded
-│   ), ...                                 │
-│  ]                                       │
-└───────────────────┬──────────────────────┘
-                    │ get_fields_by_priority()
-                    ▼
-┌──────────────────────────────────────────┐
-│ services/onboarding_service.py           │
-│  _ask_initial_question():               │
-│   question = t("onboarding.X.question") │  ← Always uses i18n.py
-│  _save_field_value():                   │
-│   success_msg = t("onboarding.X.success")│ ← Always uses i18n.py
-└──────────────────────────────────────────┘
-```
-
-### Target State: Config-Driven Paths
-
-```
-┌──────────────────────────────────────────┐
-│ config.json / config.template.json       │
-│  "onboarding": {                         │
-│   "fields": [{ "field_name": "language", │
-│    "enabled": true, "priority": 0,       │
-│    "max_attempts": 3,                    │
-│    "questions": {"en": "...", "sw": "..."}│  ← Configurable
-│    "success_messages": {"en": "..."}     │  ← Configurable
-│   }]                                     │
-│  }                                       │
-└───────────────────┬──────────────────────┘
-                    │ config.py loads via _config.get("onboarding", {})
-                    ▼
-┌──────────────────────────────────────────┐
-│ schemas/onboarding_schemas.py            │
-│  load_onboarding_fields() dynamically   │
-│  builds list from config OR uses        │
-│  hardcoded defaults as fallback         │
-└───────────────────┬──────────────────────┘
-                    │
-                    ▼
-┌──────────────────────────────────────────┐
-│ services/onboarding_service.py           │
-│  _get_question(field_config, lang):     │
-│   1. field_config.questions.get(lang)   │  ← Try JSON config
-│   2. t("onboarding.X.question", lang)  │  ← Fallback to i18n.py
-│  _get_success_msg(field_config, lang):  │
-│   1. field_config.success_messages      │  ← Try JSON config
-│   2. t("onboarding.X.success", lang)   │  ← Fallback to i18n.py
-└──────────────────────────────────────────┘
-```
+5. **Multi-Language Adaptability in Config**:
+   - Supports arbitrary language codes (`en`, `sw`, `fr`, `es`, etc.) inside the `questions` and `success_messages` dictionaries in `config.json`.
 
 ---
 
-## 1. Backend Implementation (FastAPI)
+## 📐 System Audit: Models, Summaries, Migrations & Frontend
 
-### 1.1 JSON Configuration Schema
-**Files**:
-- `/backend/config.template.json`
-- `/backend/config.test.template.json`
-- `/backend/config.json` (auto-generated from template)
+### 1. Database & Alembic Migration
 
-The new top-level `onboarding` section will be added to the existing config structure alongside `openai`, `crop_types`, `weather`, etc.
+**Migration File**: `backend/alembic/versions/2026_08_14_1200-i2b3c4d5e6f7_convert_customer_language_to_string.py`
+- **Revision**: `i2b3c4d5e6f7`
+- **Revises**: `h1a2b3c4d5e6`
+
+```python
+def upgrade() -> None:
+    op.execute(
+        "ALTER TABLE customers ALTER COLUMN language TYPE VARCHAR(10) "
+        "USING LOWER(language::text)"
+    )
+    op.execute("DROP TYPE IF EXISTS customerlanguage")
+
+def downgrade() -> None:
+    op.execute("CREATE TYPE customerlanguage AS ENUM ('en', 'sw')")
+    op.execute(
+        "ALTER TABLE customers ALTER COLUMN language TYPE customerlanguage "
+        "USING language::customerlanguage"
+    )
+```
+
+### 2. Backend Models Audit (`backend/models/customer.py:L47, L81-L124`)
+
+| Element | Location | Previous Implementation | Target Dynamic Implementation |
+|---|---|---|---|
+| `Customer.language` | L47 | `Column(Enum(CustomerLanguage), ...)` | `Column(String(10), default=None, nullable=True)` |
+| `CustomerLanguage` | L17-L19 | `class CustomerLanguage(enum.Enum): EN = "en", SW = "sw"` | `class CustomerLanguage(str, enum.Enum): EN = "en", SW = "sw"` (StringEnum for full backward compatibility) |
+| `Customer.birth_year` | L83-L88 | `@property def birth_year(...)` | Keep as convenience property on `self.profile_data.get("birth_year")` |
+| `Customer.crop_type` | L90-L95 | `@property def crop_type(...)` | Keep as convenience property on `self.profile_data.get("crop_type")` |
+| `Customer.gender` | L97-L102 | `@property def gender(...)` | Keep as convenience property on `self.profile_data.get("gender")` |
+| `Customer.age` & `Customer.age_group` | L104-L124 | `@property def age(...)` & `@property def age_group(...)` | Keep as computed properties. Return `None` safely if `birth_year` is absent. |
+| Dynamic Fields Access | L226-L247 | `get_profile_field()`, `set_profile_field()` | Primary universal interface for any partner custom fields (`water_source`, `irrigation`, etc.). |
+
+### 3. Dynamic Profile Summary in `OnboardingService` (`L2047-L2090`)
+
+```python
+def _generate_profile_summary(self, customer: Customer, lang: str) -> str:
+    """Dynamically build profile summary from active configured fields only."""
+    if not self.fields_config:
+        return ""
+
+    summary_lines = []
+    for field in self.fields_config:
+        if not field.enabled:
+            continue
+
+        field_name = field.field_name
+        label = t(f"onboarding.{field_name}.field_name", lang)
+
+        # Get display value for field
+        if field_name == "language":
+            val = customer.language or "en"
+            display_val = "English" if val == "en" else ("Swahili" if val == "sw" else val)
+        elif field_name == "full_name":
+            display_val = customer.full_name or "N/A"
+        elif field_name == "administration":
+            display_val = "N/A"
+            if hasattr(customer, "customer_administrative") and customer.customer_administrative:
+                display_val = customer.customer_administrative[0].administrative.path
+        elif field_name == "crop_type":
+            display_val = t(f"crops.{customer.crop_type}.name", lang) if customer.crop_type else "N/A"
+        elif field_name == "gender":
+            display_val = t(f"gender.{customer.gender}", lang) if customer.gender else "N/A"
+        elif field_name == "birth_year":
+            label = t("onboarding.common.age", lang)
+            display_val = str(customer.age) if customer.age else "N/A"
+        else:
+            # Generic custom partner field (e.g. water_source)
+            raw_val = customer.get_profile_field(field_name)
+            display_val = str(raw_val) if raw_val is not None else "N/A"
+
+        summary_lines.append(f"{label}: {display_val}")
+
+    return "\n".join(summary_lines)
+```
+
+### 4. Frontend Decoupling Audit (`frontend/`)
+
+| File | Current Hardcoded Pattern | Target Solution |
+|---|---|---|
+| `frontend/src/lib/config.js` | `export const CROP_TYPES = ["Avocado", "Potato"];` | Deprecate static array; provide fallback only for offline / error states. |
+| `frontend/src/components/customers/EditCustomerModal.js` | Imports `CROP_TYPES` from `@/lib/config` | Fetch crop types dynamically on mount via `api.get("/crop-types/")`. Populate select options from API response. |
+| `frontend/src/components/customers/CreateCustomerModal.js` & `EditCustomerModal.js` | Hardcoded language select (`en`, `sw`) | Extensible language options with dynamic display fallback. |
+| `frontend/src/components/customers/CustomerList.js` | `getLanguageLabel()` switch case | Keep generic fallback `default: return language;` so codes like `fr` render cleanly. |
+
+---
+
+## 🛠️ Technical Specification
+
+### 1. JSON Configuration Schema (`config.json` / `config.template.json` / `config.test.template.json`)
 
 ```json
 {
@@ -163,7 +206,7 @@ The new top-level `onboarding` section will be added to the existing config stru
         "extraction_method": "extract_language",
         "matching_method": null,
         "max_attempts": 3,
-        "field_type": "enum",
+        "field_type": "string",
         "questions": {
           "en": "Welcome to AgriConnect! 🌱 Your agricultural advisory companion.\nKaribu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\nChoose your language / Chagua lugha yako:\n1. English / Kiingereza\n2. Swahili / Kiswahili",
           "sw": "Karibu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\nChagua lugha yako:\n1. Kiingereza\n2. Kiswahili"
@@ -273,362 +316,63 @@ The new top-level `onboarding` section will be added to the existing config stru
 }
 ```
 
-> [!NOTE]
-> `field_name`, `db_field`, `extraction_method`, `matching_method`, and `field_type` are **structural keys** and must match hardcoded service method names. They exist in the JSON for completeness but are NOT expected to be changed by admins. Only `enabled`, `priority`, `max_attempts`, `questions`, and `success_messages` are the "operator-configurable" surface.
-
-### 1.2 Config & Settings Updates
-**File**: `/backend/config.py`
-
-A new property is added to `Settings` to expose the raw `onboarding` dict and typed accessors:
+### 2. Backend Model Updates (`backend/models/customer.py`)
 
 ```python
-# In Settings class:
-onboarding_config: Dict[str, Any] = Field(
-    default_factory=dict
-)
+class CustomerLanguage(str, enum.Enum):
+    EN = "en"
+    SW = "sw"
 
-# At module level, below _config = load_config():
-_onboarding_cfg = _config.get("onboarding", {})
-```
+class Customer(Base):
+    __tablename__ = "customers"
 
-And in `Settings`:
-```python
-onboarding_enabled: bool = _config.get("onboarding", {}).get("enabled", True)
-onboarding_fields_config: List[Dict] = (
-    _config.get("onboarding", {}).get("fields", [])
-)
-```
-
-### 1.3 Schema Updates
-**File**: `/backend/schemas/onboarding_schemas.py`
-
-#### 1.3.1 Extend `OnboardingFieldConfig` dataclass
-
-```python
-@dataclass
-class OnboardingFieldConfig:
-    field_name: str
-    db_field: str
-    required: bool
-    priority: int
-    extraction_method: Optional[str]
-    matching_method: Optional[str]
-    max_attempts: int
-    field_type: str
-    success_message_template: str
-    # NEW FIELDS:
-    enabled: bool = True
-    questions: Optional[Dict[str, str]] = None        # {"en": "...", "sw": "..."}
-    success_messages: Optional[Dict[str, str]] = None # {"en": "...", "sw": "..."}
-```
-
-#### 1.3.2 Refactor `ONBOARDING_FIELDS` → dynamic `load_onboarding_fields()`
-
-```python
-def load_onboarding_fields() -> List[OnboardingFieldConfig]:
-    """
-    Build OnboardingFieldConfig list from config.json if present,
-    falling back to hardcoded defaults if config is absent or empty.
-    """
-    from config import settings
-    cfg_fields = settings.onboarding_fields_config  # List[Dict] from JSON
-    if not cfg_fields:
-        return _DEFAULT_ONBOARDING_FIELDS  # existing hardcoded list
-
-    result = []
-    for entry in cfg_fields:
-        # Map JSON keys → dataclass fields
-        # Non-configurable structural fields fall back to matching defaults
-        default = _get_default_field(entry["field_name"])
-        result.append(OnboardingFieldConfig(
-            field_name=entry["field_name"],
-            db_field=entry.get("db_field", default.db_field),
-            required=entry.get("required", default.required),
-            priority=entry.get("priority", default.priority),
-            extraction_method=entry.get(
-                "extraction_method", default.extraction_method
-            ),
-            matching_method=entry.get(
-                "matching_method", default.matching_method
-            ),
-            max_attempts=entry.get("max_attempts", default.max_attempts),
-            field_type=entry.get("field_type", default.field_type),
-            success_message_template=default.success_message_template,
-            enabled=entry.get("enabled", True),
-            questions=entry.get("questions"),
-            success_messages=entry.get("success_messages"),
-        ))
-    return result
-
-# Module-level constant (replaces existing ONBOARDING_FIELDS)
-ONBOARDING_FIELDS: List[OnboardingFieldConfig] = load_onboarding_fields()
-```
-
-#### 1.3.3 Update helpers to filter `enabled`
-
-```python
-def get_fields_by_priority(
-    include_disabled: bool = False,
-) -> List[OnboardingFieldConfig]:
-    """Get all fields sorted by priority, filtering disabled by default."""
-    fields = ONBOARDING_FIELDS
-    if not include_disabled:
-        fields = [f for f in fields if f.enabled]
-    return sorted(fields, key=lambda x: x.priority)
-
-def get_required_fields() -> List[OnboardingFieldConfig]:
-    return [f for f in ONBOARDING_FIELDS if f.required and f.enabled]
-
-def get_optional_fields() -> List[OnboardingFieldConfig]:
-    return [f for f in ONBOARDING_FIELDS if not f.required and f.enabled]
-```
-
-### 1.4 Service Layer Updates
-**File**: `/backend/services/onboarding_service.py`
-
-#### 1.4.1 `__init__` — refresh `fields_config` from updated helpers
-
-```python
-def __init__(self, db: Session):
-    self.db = db
-    self.openai_service = get_openai_service()
-    # Uses updated get_fields_by_priority() which filters enabled=True
-    self.fields_config = get_fields_by_priority()
-    self.supported_crops = settings.crop_types
-    # ... thresholds unchanged
-```
-
-#### 1.4.2 New private helper: `_get_question(field_config, lang) -> str`
-
-Currently, question resolution is scattered across `_ask_initial_question()`, `_process_field_value()`, and `_save_field_value()` with duplicate `t()` calls. This is centralized:
-
-```python
-def _get_question(
-    self,
-    field_config: OnboardingFieldConfig,
-    lang: str,
-) -> str:
-    """
-    Resolve question text for a field in a given language.
-
-    Priority:
-    1. field_config.questions[lang] (from JSON config)
-    2. field_config.questions["en"] (English fallback in JSON)
-    3. t("onboarding.{field_name}.question", lang) (i18n.py fallback)
-    """
-    if field_config.questions:
-        text = field_config.questions.get(lang) or field_config.questions.get("en")
-        if text:
-            return text
-    # Fallback to i18n.py static dictionary
-    return t(f"onboarding.{field_config.field_name}.question", lang)
-```
-
-#### 1.4.3 New private helper: `_get_success_message(field_config, lang, **kwargs) -> str`
-
-```python
-def _get_success_message(
-    self,
-    field_config: OnboardingFieldConfig,
-    lang: str,
-    **kwargs,
-) -> str:
-    """
-    Resolve success message for a field in a given language.
-
-    Priority:
-    1. field_config.success_messages[lang] (from JSON config)
-    2. field_config.success_messages["en"] (English fallback in JSON)
-    3. t("onboarding.{field_name}.success", lang) (i18n.py fallback)
-
-    Performs {value} and other placeholder substitution via kwargs.
-    """
-    if field_config.success_messages:
-        text = (
-            field_config.success_messages.get(lang)
-            or field_config.success_messages.get("en")
-        )
-        if text:
-            try:
-                return text.format(**kwargs)
-            except KeyError:
-                return text
-    return t(f"onboarding.{field_config.field_name}.success", lang, **kwargs)
-```
-
-#### 1.4.4 Update `_ask_initial_question()`
-
-Before (current code, L1372):
-```python
-question = t(f"onboarding.{field_name}.question", lang)
-```
-
-After:
-```python
-question = self._get_question(field_config, lang)
-```
-
-The `{available_crops}` interpolation, skip instruction appending, and response construction remain unchanged.
-
-#### 1.4.5 Update `_save_field_value()`
-
-Before (current code, L1794–L1848 — scattered `t()` calls):
-```python
-success_msg = t(f"onboarding.{field_name}.success", lang)
-# or
-success_msg = t(f"onboarding.{field_name}.success", lang, value=value)
-```
-
-After — unify to:
-```python
-success_msg = self._get_success_message(field_config, lang, value=display_value)
-```
-
-Note: The special-case branching for `language`, `full_name`, `administration` (L1791–L1848) remains structurally intact; only the `t()` calls within each branch are replaced with `_get_success_message()`.
-
-#### 1.4.6 Update extraction failure fallback paths
-
-In `_process_field_value()` (L1484, L1507, L1523) and `_handle_max_attempts()` (L1934):
-```python
-# Before:
-question = t(f"onboarding.{field_name}.question", lang)
-# After:
-question = self._get_question(next_field_config, lang)
-```
-
-Similarly for `field_display` in `_handle_max_attempts()` (uses `t("onboarding.X.field_name", lang)`) — this remains as-is, as `field_name` display labels are not part of this feature scope.
-
-### 1.5 i18n Utilities
-**File**: `/backend/utils/i18n.py`
-
-No structural changes required. The existing `t()` function remains the fallback layer. A single new public helper is added to provide a clean cross-cutting interface (optional but improves testability):
-
-```python
-def get_onboarding_text(
-    field_name: str,
-    text_type: str,  # "question" | "success" | "field_name" | etc.
-    lang: str,
-    **kwargs,
-) -> str:
-    """
-    Convenience wrapper for onboarding-specific translations.
-    Translates onboarding.{field_name}.{text_type} in the given language.
-    """
-    return t(f"onboarding.{field_name}.{text_type}", lang, **kwargs)
+    id = Column(Integer, primary_key=True, index=True)
+    phone_number = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=True)
+    # Generic string column for dynamic language codes (e.g. 'en', 'sw', 'fr', 'es')
+    language = Column(String(10), default=None, nullable=True)
+    profile_data = Column(JSON, nullable=True)
 ```
 
 ---
 
-## 2. Frontend / Mobile Impact
+## 🧪 Verification & Test Scenarios
 
-- **No direct UI changes required.** The mobile and web applications consume responses from the backend WhatsApp/API webhook endpoints, which will return the dynamically configured question texts transparently.
+### Automated Pytest Suite (`backend/tests/test_onboarding_config.py`)
 
----
-
-## 3. Database Impact
-
-- **No schema migrations required.** All changes are in Python business logic and JSON configuration files. The `Customer` model, `onboarding_status`, `current_onboarding_field`, `onboarding_attempts`, `onboarding_candidates`, and `profile_data` columns are unaffected.
-
----
-
-## 4. Key Affected Code Locations (Precise)
-
-| File | Location | Change |
-|------|----------|--------|
-| `backend/config.template.json` | Top-level JSON | Add `"onboarding": { "fields": [...] }` section |
-| `backend/config.test.template.json` | Top-level JSON | Same `onboarding` section (minimal / partial for tests) |
-| `backend/config.py` | `Settings` class | Add `onboarding_enabled` and `onboarding_fields_config` properties |
-| `backend/schemas/onboarding_schemas.py` | `OnboardingFieldConfig` dataclass | Add `enabled`, `questions`, `success_messages` fields |
-| `backend/schemas/onboarding_schemas.py` | `ONBOARDING_FIELDS` | Replace static list with `load_onboarding_fields()` call |
-| `backend/schemas/onboarding_schemas.py` | `get_fields_by_priority()` | Add `include_disabled` param, filter `enabled=True` by default |
-| `backend/schemas/onboarding_schemas.py` | `get_required_fields()` | Filter `enabled=True` |
-| `backend/schemas/onboarding_schemas.py` | `get_optional_fields()` | Filter `enabled=True` |
-| `backend/services/onboarding_service.py` | New `_get_question()` | Helper with JSON config → i18n fallback |
-| `backend/services/onboarding_service.py` | New `_get_success_message()` | Helper with JSON config → i18n fallback + placeholder format |
-| `backend/services/onboarding_service.py` | `_ask_initial_question()` L1372, L1382 | Replace `t(...)` with `_get_question()` |
-| `backend/services/onboarding_service.py` | `_save_field_value()` L1794–L1848 | Replace `t(...)` calls with `_get_success_message()` |
-| `backend/services/onboarding_service.py` | `_process_field_value()` L1484, L1507, L1523 | Replace fallback `t(...)` calls with `_get_question()` |
-| `backend/services/onboarding_service.py` | `_save_field_value()` L1881–1892 | Replace next question `t(...)` with `_get_question()` |
-| `backend/utils/i18n.py` | New `get_onboarding_text()` | Optional convenience wrapper |
-| `backend/tests/test_onboarding_config.py` | New file | Full coverage of JSON config loading, overrides, fallback |
+| Scenario | What is tested |
+|---|---|
+| `test_dynamic_language_string_storage` | Setting `"language": "fr"` saves directly to `customer.language == "fr"` via string column |
+| `test_dynamic_profile_summary_active_fields_only` | Summary at completion contains only active fields, omitting disabled ones |
+| `test_dynamic_profile_summary_empty_when_no_fields` | Summary is empty string when `"fields": []` |
+| `test_alembic_migration_language_varchar` | Alembic upgrade alters column to `VARCHAR(10)` and downgrade restores enum |
+| `test_empty_fields_bypasses_onboarding` | Setting `"fields": []` completes onboarding on message 1 without asking questions |
+| `test_onboarding_disabled_flag` | Setting `"enabled": false` immediately completes onboarding |
+| `test_default_fields_loaded_when_no_config` | Missing `onboarding` key in config loads all 6 default fields |
+| `test_custom_question_en_sw_overrides` | Custom strings in JSON `questions` are returned for EN and SW |
+| `test_custom_success_message_interpolation` | `{value}` in custom `success_messages` interpolates saved name/crop |
+| `test_arbitrary_custom_partner_field` | Configuring a new field `"water_source"` extracts and saves to `profile_data["water_source"]` |
+| `test_disabled_field_skipped` | Setting `"enabled": false` on `birth_year` skips question during active chat |
+| `test_reordered_priorities` | Changing `priority` asks fields in the new custom order |
+| `test_custom_max_attempts` | Setting `max_attempts: 1` skips/fails after 1 attempt |
+| `test_placeholder_available_crops` | `{available_crops}` is correctly populated in crop question |
+| `test_fallback_to_i18n_when_absent` | If field has `questions: null`, falls back to `i18n.py` without error |
 
 ---
 
-## 5. Verification & Testing
-
-### 5.1 Automated Tests
-
-**Commands**:
-```bash
-# Full onboarding test suite
-./dc.sh exec backend python -m pytest tests/test_generic_onboarding.py tests/test_onboarding_service.py tests/test_whatsapp_onboarding.py tests/test_onboarding_lang_pref.py tests/test_skip_optional_onboarding.py tests/test_onboarding_complete.py -v
-
-# New config test suite
-./dc.sh exec backend python -m pytest tests/test_onboarding_config.py -v
-
-# Backend lint
-./dc.sh exec backend flake8 --exclude=alembic,patches
-```
-
-**New test file `tests/test_onboarding_config.py`** — key scenarios:
-
-| Test | What it verifies |
-|------|-----------------|
-| `test_default_fields_loaded_when_no_config` | `load_onboarding_fields()` returns hardcoded defaults when JSON has no `onboarding.fields` key |
-| `test_custom_question_overrides_i18n` | `_get_question()` returns JSON-configured text over `i18n.py` for both `en` and `sw` |
-| `test_custom_success_message_overrides_i18n` | `_get_success_message()` returns JSON-configured text over `i18n.py` |
-| `test_fallback_to_i18n_when_questions_absent` | If `questions` key is missing in field JSON, falls back to `t("onboarding.X.question", lang)` |
-| `test_disabled_field_skipped_in_priority_order` | Field with `enabled: false` is excluded from `get_fields_by_priority()` |
-| `test_disabled_field_not_asked_during_onboarding` | Full onboarding flow skips `birth_year` when `enabled=false`, completes without asking |
-| `test_reordered_field_priorities` | Swapping `administration` and `crop_type` priorities causes service to ask crop first |
-| `test_custom_max_attempts_respected` | Setting `max_attempts: 1` for `gender` causes immediate skip after first failed extraction |
-| `test_partial_config_uses_defaults_for_missing_fields` | Partial `onboarding.fields` config (only 2 fields specified) still loads all 6 with defaults for unspecified |
-| `test_language_fallback_en_when_sw_missing_in_config` | If `questions` has only `"en"` key, `sw` user gets English text rather than empty string |
-| `test_placeholder_interpolation_in_custom_question` | `{available_crops}` in crop_type question is correctly substituted with numbered list |
-| `test_placeholder_interpolation_in_custom_success_message` | `{value}` in success message is correctly substituted with saved value |
-
-### 5.2 Manual Verification Steps
-
-1. **Default Config Test** (baseline — no `onboarding` key in `config.json`):
-   - Send `"Hello"` from a new phone number to the WhatsApp webhook.
-   - Verify the exact default language question from `i18n.py` is received.
-
-2. **Custom Question Override Test**:
-   - Add the `onboarding.fields` section to `config.json`. For `full_name`, override:
-     ```json
-     "questions": { "en": "Welcome! What is your lovely name?" }
-     ```
-   - Reset an existing test customer's onboarding status. Progress past language/consent steps.
-   - Verify `"Welcome! What is your lovely name?"` is received instead of the default.
-
-3. **Disabled Field Test**:
-   - Set `"enabled": false` for `birth_year` in `config.json`.
-   - Complete onboarding for a test customer. Verify `birth_year` question is never sent and profile completes after `gender`.
-   - Verify `customer.profile_data` does NOT contain `"birth_year"` key (was never asked, not skipped with `None`).
-
-4. **Field Reordering Test**:
-   - Swap `priority` of `crop_type` (set to `2`) and `administration` (set to `3`) in `config.json`.
-   - Start onboarding a new customer and verify `crop_type` question arrives before location question.
-
-5. **Swahili Custom Message Test**:
-   - Configure a custom Swahili question for `gender`.
-   - Onboard a customer who picks Swahili.
-   - Verify the custom `"sw"` text is delivered.
-
----
-
-## 6. Epic & Ballpark Estimation
+## ⏱️ Work Breakdown & Estimation
 
 - **Confidence Level**: High
-- **Dependencies**: None (purely backend configuration & onboarding service enhancement)
 
-| Task ID | Component & Description | Est. Hours (Min - Max) | Priority |
-|---------|-------------------------|------------------------|----------|
-| T-001 | **JSON Config Schema**: Add `onboarding.fields` structure to `config.template.json` and `config.test.template.json`. Add `onboarding_enabled` and `onboarding_fields_config` to `Settings` in `config.py`. | 1h - 2h | Must Have |
-| T-002 | **Schema Layer**: Extend `OnboardingFieldConfig` with `enabled`, `questions`, `success_messages`. Implement `load_onboarding_fields()` with default fallback. Update `get_fields_by_priority()` / `get_required_fields()` / `get_optional_fields()` to filter `enabled`. | 2h - 3h | Must Have |
-| T-003 | **Service Helpers**: Implement `_get_question()` and `_get_success_message()` private helpers in `OnboardingService`. Replace all scattered `t("onboarding.X.question/success", ...)` call sites (≈12 occurrences across `_ask_initial_question`, `_save_field_value`, `_process_field_value`, `_handle_max_attempts`, `_save_field_value` next-question logic). | 2h - 4h | Must Have |
-| T-004 | **i18n Utility**: Add `get_onboarding_text()` convenience wrapper to `utils/i18n.py`. | 0.5h - 1h | Nice to Have |
-| T-005 | **New Test Suite**: Implement `tests/test_onboarding_config.py` covering all 12 scenarios in §5.1. | 3h - 5h | Must Have |
-| T-006 | **Regression Verification & Lint**: Run full pytest suite and flake8 across all affected onboarding test files. Fix any regressions. | 1h - 2h | Must Have |
+| Task ID | Description | Est. Hours (Min - Max) | Priority |
+|---|---|---|---|
+| **T-001** | **Alembic Migration**: Create migration `convert_customer_language_to_string` altering `customers.language` to `VARCHAR(10)`. | 1h - 1.5h | Must Have |
+| **T-002** | **Model & Schema String Language**: Update `Customer.language` to `String(10)` and `CustomerLanguage` to `(str, Enum)`. | 1h - 1.5h | Must Have |
+| **T-003** | **Config Layer**: Add `onboarding` schema to `config.template.json`, `config.test.template.json`, and `config.py`. | 1h - 2h | Must Have |
+| **T-004** | **Schema Layer**: Update `OnboardingFieldConfig`, `load_onboarding_fields()`, and filtering in `onboarding_schemas.py`. | 2h - 3h | Must Have |
+| **T-005** | **Service Resolution & Dynamic Summary**: Add `_get_question()`, `_get_success_message()`, replace hardcoded `t()` calls, and dynamically generate `_generate_profile_summary()` from active fields. | 2.5h - 3.5h | Must Have |
+| **T-006** | **Frontend Dynamic Crops**: Update `EditCustomerModal.js` to fetch crops via `GET /crop-types/`. | 1.5h - 2.5h | Must Have |
+| **T-007** | **New Test Suite**: Implement `tests/test_onboarding_config.py` (14 comprehensive test cases). | 3h - 4h | Must Have |
+| **T-008** | **Regression Testing & Linting**: Run migration, pytest suite, and flake8/eslint. | 1.5h - 2.5h | Must Have |
 
-**Total Estimated Hours**: **9.5h - 17h**
+**Total Estimated Hours:** **13.5h - 20.5h**
