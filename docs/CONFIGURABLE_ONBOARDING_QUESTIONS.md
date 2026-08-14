@@ -1,106 +1,90 @@
-# [MT-001] Configurable Onboarding Questions, Flow & Model/Frontend Decoupling
+# [MT-001] Configurable Onboarding Questions, Languages, Age Groups & Decoupled Architecture
 
 **Date:** 2026-08-14
 **Author:** Galih Pratama
-**Status:** Planned / Comprehensive Audit
-**Objective:** Decouple hardcoded onboarding questions, field definitions, priorities, localized prompt messages, profile summary generation, static model assumptions, and hardcoded config defaults into dynamic JSON configuration schema and API-driven UI, backed by a one-time Alembic migration converting `customers.language` to `VARCHAR(10)` for truly generic multi-partner scaling (e.g., Agriculture EN/SW → Water Management EN/FR → Empty/Bypass).
+**Status:** Planned — Awaiting Implementation
+**Branch:** `feature/185-mt-001-pull-out-onboarding-question-from-code-to-configurable-json`
 
 ---
 
 ## 📊 Overview
 
-### Purpose & Scaling Vision
+AgriConnect onboarding must be 100% adaptable to different deployment partners without code rewrites or DB migrations:
 
-AgriConnect's onboarding workflow must be adaptable to different deployment partners without requiring code rewrites:
-- **Partner A (Standard Agriculture - Kenya/Tanzania)**: Language (`en`/`sw`), Name, Location, Crop Types (`Avocado`, `Potato`, `Dairy`), Gender, Birth Year.
-- **Partner B (Water & Resource Management - Rwanda/DRC)**: Language (`en`/`fr`), Name, Location, Water Source (`Borehole`, `River`, `Piped`), Livestock.
-- **Partner C (Direct Advisory - No Onboarding)**: Empty onboarding field list (`"fields": []`), immediately activates conversation.
-
-To achieve this:
-1. **One-Time Language Column Migration (`customers.language` → `VARCHAR(10)`)**: Replace the restrictive PostgreSQL `customerlanguage` enum (`'EN'`, `'SW'`) with a standard `VARCHAR(10)` column. This makes `customers.language` a single source of truth capable of natively storing any ISO language code (`en`, `sw`, `fr`, `es`, `rw`, etc.) without dual-storage workarounds.
-2. **Universal Profile Storage**: Use `customers.profile_data` (JSONB column) as the store for any partner-specific profile fields (`crop_type`, `water_source`, `irrigation`, `gender`, `birth_year`, etc.).
-3. **Decouple Static Model Properties (`models/customer.py:L81-L124`)**:
-   - `birth_year`, `crop_type`, `gender`, `age`, `age_group` are retained as convenience accessors over `profile_data` for backward compatibility.
-   - Any dynamic partner field (e.g. `water_source`) is accessed universally via `customer.get_profile_field("field_name")`.
-4. **Config Fallbacks Decoupling (`config.py:L259`)**:
-   - Change `crop_types` fallback in `config.py` from hardcoded `["Avocado", "Cacao"]` to empty list `[]` (sole source of truth is `config.json`).
-   - Fix `get_crop_name_translated` in `i18n.py` to return the crop name as-is if translation key is missing, rather than the raw `crops.X.name` path.
-5. **Dynamic Profile Summary Generation (`_generate_profile_summary`)**:
-   - Replace the static 6-line template (`Language`, `Name`, `Location`, `Crop Type`, `Gender`, `Age`) in `OnboardingService`.
-   - Generate summary dynamically by iterating over **active configured fields** in `config.json`. If a field was disabled or omitted (e.g., `crop_type` or `gender` not asked), it will NOT appear in the summary.
-6. **Configurable JSON Questions & Flow**: Move all field configurations, questions, translations, retry limits, and priorities to `config.json` (`"onboarding": { "enabled": true, "fields": [...] }`). Support empty arrays `[]` to completely bypass onboarding.
-7. **Frontend Decoupling**: Remove hardcoded `CROP_TYPES` in `frontend/src/lib/config.js` and `frontend/src/components/customers/EditCustomerModal.js`, replacing it with dynamic loading from the existing backend endpoint `GET /crop-types/` (which reads from `config.json`).
+| Partner | Languages | Age Groups | Onboarding Fields |
+|---|---|---|---|
+| Partner A (Kenya/TZ Agriculture) | `en`, `sw` | `20-35`, `36-50`, `51+` | `language`, `full_name`, `administration`, `crop_type`, `gender`, `birth_year` |
+| Partner B (Rwanda/DRC Water) | `en`, `fr` | `Youth (18-29)`, `Adult (30-59)`, `Senior (60+)` | `language`, `full_name`, `administration`, `water_source`, `livestock` |
+| Partner C (Empty/Advisory) | `en` | *(any)* | `[]` (bypass onboarding immediately) |
 
 ---
 
-## 🔄 User Experience / Workflow Architecture
+## 🔍 Full Deep-Down Audit — All Static Hardcodes Found
+
+| # | Location | Hardcoded Item | Impact & Fix |
+|---|---|---|---|
+| 1 | `backend/models/customer.py:L47` | `language = Column(Enum(CustomerLanguage), ...)` | **One-time Alembic migration** → `VARCHAR(10)`. Drops `customerlanguage` PG enum. |
+| 2 | `backend/models/customer.py:L17-L19` | `CustomerLanguage(enum.Enum): EN, SW` | Change to `CustomerLanguage(str, enum.Enum)` so `CustomerLanguage.EN == "en"` is `True`. Keeps backward compat for all existing tests. Does NOT add new languages — those come from config. |
+| 3 | `backend/models/customer.py:L22-L25` | `AgeGroup(enum.Enum): AGE_20_35, AGE_36_50, AGE_51_PLUS` | Change to `AgeGroup(str, enum.Enum)`. Seeder can continue using `AgeGroup` values. |
+| 4 | `backend/models/customer.py:L114-L124` | `age_group` property hardcodes `20-35`, `36-50`, `51+` | Update to iterate dynamically over `settings.age_groups` from config. |
+| 5 | `backend/services/onboarding_service.py` (×8 occurrences) | `customer.language.value` — calls `.value` on enum | After migration, `customer.language` is a plain `str`. Remove `.value` everywhere. Change pattern to `customer.language or "en"`. |
+| 6 | `backend/services/onboarding_service.py:L1793` | `lang = value.value` — assumes returned value is enum | `extract_language()` must return plain `str` (`"en"`, `"sw"`) not `CustomerLanguage` enum. Remove `.value` call. |
+| 7 | `backend/services/onboarding_service.py:L2058` | `customer.language == CustomerLanguage.EN` | Since `CustomerLanguage(str, enum.Enum)`: `"en" == CustomerLanguage.EN` is `True`. But the profile summary should still be refactored to look up the language name dynamically from `settings.languages`. |
+| 8 | `backend/services/onboarding_service.py:L863-L934` | `extract_language()` returns `CustomerLanguage` enum; OpenAI schema hardcodes `enum: ["en", "sw", null]` | Must return plain `str`; OpenAI schema enum built from `settings.supported_language_codes`. |
+| 9 | `backend/services/onboarding_service.py:L868-L876` | Hardcoded english/swahili patterns list | Patterns per language code should eventually come from config. For now, keep pattern matching but build result as plain string code. |
+| 10 | `backend/services/customer_service.py:L153-L193` | `_detect_language_from_message()` returns `CustomerLanguage` enum | Must return `str` (`"en"` / `"sw"`) after migration. |
+| 11 | `backend/services/customer_service.py:L415-L440` | `_filter_by_age_groups()` hardcodes `if age_group == "20-35": ...` | Dynamically match label from `settings.age_groups` to compute birth year bounds. |
+| 12 | `backend/services/follow_up_service.py:L107` | `customer.language.value` | Remove `.value` — use `customer.language or "en"`. |
+| 13 | `backend/services/weather_intent_service.py:L146,L179` | `customer.language.value` | Remove `.value` — use `customer.language or "en"`. |
+| 14 | `backend/services/reconnection_service.py:L59` | `customer.language.value` | Remove `.value` — use `customer.language or "en"`. |
+| 15 | `backend/schemas/customer.py:L12,L24,L74` | `language: Optional[CustomerLanguage] = None` | Change to `Optional[str] = None`. Pydantic will accept any ISO string. |
+| 16 | `backend/schemas/customer.py:L76` | `age_group: Optional[AgeGroup] = None` | Change to `Optional[str] = None`. Computed property returns arbitrary config-defined label. |
+| 17 | `backend/schemas/onboarding_schemas.py` | Static `_DEFAULT_ONBOARDING_FIELDS` list | Extract questions/success messages to JSON. Static defaults kept as code fallback. |
+| 18 | `backend/config.py:L259` | `crop_types: list = _config.get("crop_types", ["Avocado", "Cacao"])` | Change default fallback to `[]`. Config JSON is sole source. |
+| 19 | `backend/utils/i18n.py:L632-L644` | `get_crop_name_translated()` — missing key path crashes | Return `crop_name` as-is if translation key absent. |
+| 20 | `backend/seeder/customer.py:L73-L76` | `language = CustomerLanguage.EN if ... else CustomerLanguage.SW` | Since `CustomerLanguage(str, enum.Enum)`: `CustomerLanguage.EN == "en"`, so `language` field naturally stores `"en"` as a string — no seeder change needed for correctness. |
+| 21 | `backend/seeder/customer.py:L79-L84` | `random.choice(list(AgeGroup))` and `age_group.value.split("-")` | Since `AgeGroup(str, enum.Enum)`: `age_group.value` still returns `"20-35"` etc. No seeder change needed. |
+| 22 | `frontend/src/lib/config.js` | `export const CROP_TYPES = ["Avocado", "Potato"]` | Deprecate — provide dynamic fetch helper instead. |
+| 23 | `frontend/src/components/customers/EditCustomerModal.js:L6,L297` | Static `CROP_TYPES` import & select options | Fetch `GET /crop-types/` on component mount. |
+
+---
+
+## 🔄 Architecture Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Farmer as Farmer (WhatsApp)
-    participant WA as WhatsApp Router
     participant OS as OnboardingService
-    participant Cfg as Config/Settings Module
-    participant DB as PostgreSQL DB (customers.language VARCHAR + profile_data JSONB)
-    actor Admin as Extension Officer / Admin
-    participant FE as Frontend Dashboard
-    participant API as FastAPI Backend
+    participant Cfg as config.json → Settings
+    participant DB as PostgreSQL<br/>(language VARCHAR(10) + profile_data JSONB)
 
-    Note over Farmer,DB: WhatsApp Dynamic Onboarding Flow
-    Farmer->>WA: Sends message (e.g., "Hello" / "Bonjour")
-    WA->>OS: process_onboarding_message(customer, message)
+    Farmer->>OS: "Hello" / "Bonjour"
     OS->>Cfg: get_active_onboarding_fields()
-    alt fields is empty [] or enabled == false
-        OS->>DB: Set onboarding_status = COMPLETED
-        OS-->>WA: Return welcome / direct advisory response
+    alt fields == [] or enabled == false
+        OS->>DB: onboarding_status = COMPLETED
+        OS-->>Farmer: Welcome / direct advisory
     else fields present
-        OS->>Cfg: get_field_question(field_name, customer.language or "en")
-        Cfg-->>OS: Localized question from JSON (or i18n fallback)
-        OS-->>WA: Localized onboarding question
-        Farmer->>WA: Farmer replies with answer (e.g. "fr" or "Borehole")
-        alt field is language
-            OS->>DB: UPDATE customers SET language = 'fr'
+        OS->>Cfg: _get_question(field, lang)
+        Cfg-->>OS: Localized question from JSON (i18n fallback)
+        OS-->>Farmer: Question
+        Farmer->>OS: Answer
+        alt field == language
+            OS->>DB: UPDATE customers SET language = 'fr' (plain VARCHAR)
         else profile field
-            OS->>DB: UPDATE customers SET profile_data[field_name] = value
+            OS->>DB: UPDATE profile_data[field_name] = value
         end
-        alt all fields completed
-            OS->>OS: Generate dynamic summary from active fields only
-            OS-->>WA: Summary message + next step
-        else more fields
-            OS->>OS: Advance to next active field
-        end
+        Note over OS: All language reads use<br/>customer.language or "en"<br/>(no more .value calls)
     end
-
-    Note over Admin,API: Dynamic Frontend Management
-    Admin->>FE: Opens Edit Customer Modal
-    FE->>API: GET /crop-types/
-    API-->>FE: Returns active dynamic crops from config.json
-    FE-->>Admin: Displays dynamic dropdown options
 ```
-
----
-
-## 🔍 Deep-Down Audit: All Hardcoded / Static Configurations
-
-| Location | Static Item | Issue / Risk | Target Decoupling |
-|---|---|---|---|
-| `backend/config.py:L259` | `crop_types: list = _config.get("crop_types", ["Avocado", "Cacao"])` | Hardcoded fallback crops force agriculture onto non-crop partners (e.g. water/health) | Change default fallback to `[]`. Make `config.json` the sole source of truth. |
-| `backend/models/customer.py:L47` | `language = Column(Enum(CustomerLanguage), ...)` | Postgres enum `customerlanguage` (`'EN'`, `'SW'`) rejects any new partner language code (e.g. `'fr'`) | One-time Alembic migration alters column to `VARCHAR(10)` and drops enum. |
-| `backend/models/customer.py:L17-L19` | `class CustomerLanguage(enum.Enum): EN = "en", SW = "sw"` | Enum not string-comparable in all standard operations | Change to `class CustomerLanguage(str, enum.Enum)` for 100% backward compatibility. |
-| `backend/models/customer.py:L81-L124` | Static property getters (`birth_year`, `crop_type`, `gender`, `age`, `age_group`) | Hardcoded agricultural assumptions on Customer model | Keep properties as backward-compatible helpers; use `get_profile_field()` / `set_profile_field()` universally for arbitrary partner fields. |
-| `backend/services/onboarding_service.py:L2047-L2090` | `_generate_profile_summary()` | Hardcodes 6 static fields in summary (`Language`, `Name`, `Location`, `Crop Type`, `Gender`, `Age`), printing `N/A` for unconfigured fields | Dynamically iterate over `self.fields_config`. Only active configured fields are included. |
-| `backend/utils/i18n.py:L632-L644` | `get_crop_name_translated()` | Missing crop keys return the raw lookup string `"crops.Maize.name"` | Return `crop_name` as fallback when translation key is absent. |
-| `frontend/src/lib/config.js` | `export const CROP_TYPES = ["Avocado", "Potato"];` | Hardcoded crops in frontend config | Deprecate static array; provide dynamic fetching from `GET /crop-types/`. |
-| `frontend/src/components/customers/EditCustomerModal.js` | Static `CROP_TYPES` import & select options | Cannot reflect partner's configured crops from `config.json` | Fetch crops dynamically via `api.get("/crop-types/")` on mount. |
 
 ---
 
 ## 🛠️ Technical Specification
 
-### 1. Database & Alembic Migration
+### T-001: Alembic Migration (`customers.language` → `VARCHAR(10)`)
 
-**Migration File**: `backend/alembic/versions/2026_08_14_1200-i2b3c4d5e6f7_convert_customer_language_to_string.py`
+**File**: `backend/alembic/versions/2026_08_14_1200-i2b3c4d5e6f7_convert_customer_language_to_string.py`
 - **Revision**: `i2b3c4d5e6f7`
 - **Revises**: `h1a2b3c4d5e6`
 
@@ -120,229 +104,345 @@ def downgrade() -> None:
     )
 ```
 
-### 2. Backend Config Updates (`backend/config.py`)
+> **Why LOWER(language::text)?**
+> Existing rows store `'EN'`/`'SW'` as PostgreSQL enum labels. `USING LOWER(language::text)` converts them to `'en'`/`'sw'` in a single pass, ensuring the stored value matches ISO codes used everywhere else.
+
+---
+
+### T-002: Model Updates (`backend/models/customer.py`)
+
+**Changes**:
 
 ```python
-    # Crop types configuration (sole source of truth from config.json)
-    crop_types: list = _config.get("crop_types", [])
+# BEFORE
+class CustomerLanguage(enum.Enum):
+    EN = "en"
+    SW = "sw"
 
-    # Onboarding configuration
-    onboarding_enabled: bool = _config.get("onboarding", {}).get("enabled", True)
-    onboarding_fields_config: list = _config.get("onboarding", {}).get("fields", [])
-```
+class AgeGroup(enum.Enum):
+    AGE_20_35 = "20-35"
+    AGE_36_50 = "36-50"
+    AGE_51_PLUS = "51+"
 
-### 3. Backend Model Updates (`backend/models/customer.py`)
-
-```python
+# AFTER — inherit from (str, enum.Enum) for backward compatibility
 class CustomerLanguage(str, enum.Enum):
     EN = "en"
     SW = "sw"
 
-class Customer(Base):
-    __tablename__ = "customers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    phone_number = Column(String, unique=True, index=True, nullable=False)
-    full_name = Column(String, nullable=True)
-    # Generic string column for dynamic language codes (e.g. 'en', 'sw', 'fr', 'es', 'rw')
-    language = Column(String(10), default=None, nullable=True)
-    profile_data = Column(JSON, nullable=True)
+class AgeGroup(str, enum.Enum):
+    AGE_20_35 = "20-35"
+    AGE_36_50 = "36-50"
+    AGE_51_PLUS = "51+"
 ```
 
-### 4. Schemas (`backend/schemas/customer.py` & `backend/schemas/onboarding_schemas.py`)
+**`language` column**:
+```python
+# BEFORE
+language = Column(Enum(CustomerLanguage), default=None, nullable=True)
+
+# AFTER
+language = Column(String(10), default=None, nullable=True)
+```
+
+**`age_group` property** — dynamic from config:
+```python
+@property
+def age_group(self) -> str | None:
+    """Calculate age group dynamically from config."""
+    age = self.age
+    if age is None:
+        return None
+    from config import settings
+    for group in settings.age_groups:
+        min_a = group.get("min")
+        max_a = group.get("max")
+        if min_a is not None and age < min_a:
+            continue
+        if max_a is not None and age > max_a:
+            continue
+        return group.get("label")
+    return None
+```
+
+> **`self.birth_year` is valid** — `birth_year` remains a `@property` on `Customer` that reads from `profile_data.get("birth_year")`. The `age` property calls `self.birth_year` correctly. The `birth_year`, `crop_type`, and `gender` convenience `@property` accessors are **kept** — they are the canonical way to read these common profile fields.
+
+---
+
+### T-003: Schema Updates (`backend/schemas/customer.py`)
 
 ```python
-# In schemas/customer.py:
+# BEFORE
+from models.customer import AgeGroup, CustomerLanguage, Gender
+
 class CustomerBase(BaseModel):
-    phone_number: str
-    full_name: Optional[str] = None
+    language: Optional[CustomerLanguage] = None
+
+class CustomerUpdate(BaseModel):
+    language: Optional[CustomerLanguage] = None
+
+class CustomerListItem(BaseModel):
+    language: Optional[CustomerLanguage] = None
+    age_group: Optional[AgeGroup] = None
+
+# AFTER
+# Remove AgeGroup and CustomerLanguage from imports (keep Gender)
+from models.customer import Gender
+
+class CustomerBase(BaseModel):
     language: Optional[str] = None
-    crop_type: Optional[str] = None
-    gender: Optional[Union[Gender, str]] = None
-    age: Optional[int] = None
+
+class CustomerUpdate(BaseModel):
+    language: Optional[str] = None
+
+class CustomerListItem(BaseModel):
+    language: Optional[str] = None
+    age_group: Optional[str] = None
 ```
 
+---
+
+### T-004: Config Layer (`backend/config.py` + JSON templates)
+
+**`config.json` / `config.template.json` additions**:
+```json
+{
+  "languages": [
+    { "code": "en", "name": "English" },
+    { "code": "sw", "name": "Swahili" }
+  ],
+  "age_groups": [
+    { "label": "20-35", "min": 20, "max": 35 },
+    { "label": "36-50", "min": 36, "max": 50 },
+    { "label": "51+",   "min": 51, "max": null }
+  ],
+  "crop_types": ["Avocado", "Potato", "Dairy"],
+  "onboarding": {
+    "enabled": true,
+    "fields": [ ... ]
+  }
+}
+```
+
+**`backend/config.py`** — add to `Settings`:
 ```python
-# In schemas/onboarding_schemas.py:
+languages: list = _config.get("languages", [
+    {"code": "en", "name": "English"},
+    {"code": "sw", "name": "Swahili"},
+])
+
+@property
+def supported_language_codes(self) -> list[str]:
+    return [lang["code"] for lang in self.languages] if self.languages else ["en"]
+
+@property
+def default_language(self) -> str:
+    codes = self.supported_language_codes
+    return codes[0] if codes else "en"
+
+age_groups: list = _config.get("age_groups", [
+    {"label": "20-35", "min": 20, "max": 35},
+    {"label": "36-50", "min": 36, "max": 50},
+    {"label": "51+",   "min": 51, "max": None},
+])
+
+# CHANGED: default from ["Avocado", "Cacao"] to []
+crop_types: list = _config.get("crop_types", [])
+
+onboarding_enabled: bool = _config.get("onboarding", {}).get("enabled", True)
+onboarding_fields_config: list = _config.get("onboarding", {}).get("fields", [])
+```
+
+---
+
+### T-005: Language `.value` Cascade Fix — All Affected Files
+
+All `customer.language.value` patterns must become `customer.language or settings.default_language` (since `customer.language` is now a plain `str`):
+
+| File | Line(s) | Change |
+|---|---|---|
+| `onboarding_service.py` | L422, L475, L1254, L1369, L1449, L1606, L1644, L1731, L1787, L1933, L1989 | `customer.language.value if customer.language else "en"` → `customer.language or settings.default_language` |
+| `onboarding_service.py` | L1793 | `lang = value.value` → `lang = value` (since `extract_language` now returns str) |
+| `onboarding_service.py` | L1792 | `customer.language = value` — keep as-is (value is now a str directly) |
+| `onboarding_service.py` | L2056-L2060 | `customer.language == CustomerLanguage.EN` → look up language name from `settings.languages` by code |
+| `onboarding_service.py` | L880, L884, L929, L932 | `extract_language()` returns `CustomerLanguage.EN/.SW` → return `"en"` / `"sw"` as plain str |
+| `onboarding_service.py` | L914 | OpenAI schema `enum: ["en", "sw", null]` → `settings.supported_language_codes + [None]` |
+| `follow_up_service.py` | L107 | `customer.language.value if customer.language else "en"` → `customer.language or settings.default_language` |
+| `weather_intent_service.py` | L146, L179 | same → `customer.language or settings.default_language` |
+| `reconnection_service.py` | L59 | same → `customer.language or settings.default_language` |
+| `customer_service.py:L153-L193` | `_detect_language_from_message()` | Return `"en"` / `"sw"` as plain str instead of `CustomerLanguage` enum |
+
+---
+
+### T-006: Dynamic Onboarding Schema (`backend/schemas/onboarding_schemas.py`)
+
+Add `questions` and `success_messages` to `OnboardingFieldConfig`:
+
+```python
 @dataclass
 class OnboardingFieldConfig:
     field_name: str
     db_field: str
-    required: bool
-    priority: int
-    extraction_method: Optional[str]
-    matching_method: Optional[str]
-    max_attempts: int
-    field_type: str
-    success_message_template: str
     enabled: bool = True
-    questions: Optional[Dict[str, str]] = None
-    success_messages: Optional[Dict[str, str]] = None
-
-def load_onboarding_fields() -> List[OnboardingFieldConfig]:
-    """Load fields from config.json or fall back to defaults if missing/unspecified."""
-    from config import settings
-    cfg = settings.onboarding_fields_config
-    if not settings.onboarding_enabled or cfg is None:
-        return []
-    if len(cfg) == 0:
-        return _DEFAULT_ONBOARDING_FIELDS  # Backward-compatible default
-
-    fields = []
-    for item in cfg:
-        default = _get_default_field(item.get("field_name"))
-        fields.append(OnboardingFieldConfig(
-            field_name=item["field_name"],
-            db_field=item.get("db_field", default.db_field if default else item["field_name"]),
-            required=item.get("required", default.required if default else False),
-            priority=item.get("priority", default.priority if default else 99),
-            extraction_method=item.get("extraction_method", default.extraction_method if default else None),
-            matching_method=item.get("matching_method", default.matching_method if default else None),
-            max_attempts=item.get("max_attempts", default.max_attempts if default else 1),
-            field_type=item.get("field_type", default.field_type if default else "string"),
-            success_message_template=default.success_message_template if default else "",
-            enabled=item.get("enabled", True),
-            questions=item.get("questions"),
-            success_messages=item.get("success_messages"),
-        ))
-    return fields
+    required: bool = True
+    priority: int = 0
+    extraction_method: Optional[str] = None
+    matching_method: Optional[str] = None
+    max_attempts: int = 3
+    field_type: str = "string"
+    questions: Optional[dict] = None        # {"en": "...", "sw": "..."}
+    success_messages: Optional[dict] = None # {"en": "...", "sw": "..."}
 ```
 
-### 5. Service Resolution & Dynamic Summary (`backend/services/onboarding_service.py`)
+Add `load_onboarding_fields()` to merge config JSON fields with hardcoded defaults (config takes priority if both exist for same `field_name`).
 
+---
+
+### T-007: Dynamic Service Helpers (`backend/services/onboarding_service.py`)
+
+**`_get_question(field, lang)`**:
+1. Look for `field.questions[lang]` in config
+2. Fallback to `field.questions["en"]` if lang not found
+3. Final fallback to `t(f"onboarding.{field.field_name}.question", lang)` from `i18n.py`
+
+**`_get_success_message(field, lang, **kwargs)`**:
+1. Look for `field.success_messages[lang]` in config
+2. Fallback to `field.success_messages["en"]`
+3. Final fallback to `t(f"onboarding.{field.field_name}.success", lang)` from `i18n.py`
+4. `str.format(**kwargs)` for `{value}` interpolation
+
+**`_generate_profile_summary()` — dynamic**:
 ```python
-def _get_question(self, field_config: OnboardingFieldConfig, lang: str) -> str:
-    """Resolve question from JSON config -> English JSON config -> i18n.py."""
-    if field_config.questions:
-        text = field_config.questions.get(lang) or field_config.questions.get("en")
-        if text:
-            return text
-    return t(f"onboarding.{field_config.field_name}.question", lang)
-
-def _get_success_message(self, field_config: OnboardingFieldConfig, lang: str, **kwargs) -> str:
-    """Resolve success message with formatting parameters."""
-    if field_config.success_messages:
-        text = field_config.success_messages.get(lang) or field_config.success_messages.get("en")
-        if text:
-            try:
-                return text.format(**kwargs)
-            except KeyError:
-                return text
-    return t(f"onboarding.{field_config.field_name}.success", lang, **kwargs)
-
-def _generate_profile_summary(self, customer: Customer, lang: str) -> str:
-    """Dynamically build profile summary from active configured fields only."""
-    if not self.fields_config:
-        return ""
-
-    summary_lines = []
-    for field in self.fields_config:
+def _generate_profile_summary(self, customer: Customer) -> str:
+    lang = customer.language or settings.default_language
+    lines = []
+    for field in sorted(self.fields_config, key=lambda f: f.priority):
         if not field.enabled:
             continue
-
-        field_name = field.field_name
-        label = t(f"onboarding.{field_name}.field_name", lang)
-
-        if field_name == "language":
-            val = customer.language or "en"
-            display_val = "English" if val == "en" else ("Swahili" if val == "sw" else val)
-        elif field_name == "full_name":
-            display_val = customer.full_name or "N/A"
-        elif field_name == "administration":
-            display_val = "N/A"
-            if hasattr(customer, "customer_administrative") and customer.customer_administrative:
-                display_val = customer.customer_administrative[0].administrative.path
-        elif field_name == "crop_type":
-            display_val = get_crop_name_translated(customer.crop_type, lang) if customer.crop_type else "N/A"
-        elif field_name == "gender":
-            display_val = t(f"gender.{customer.gender}", lang) if customer.gender else "N/A"
-        elif field_name == "birth_year":
-            label = t("onboarding.common.age", lang)
-            display_val = str(customer.age) if customer.age else "N/A"
+        if field.field_name == "language":
+            # Look up human name from settings.languages
+            lang_entry = next(
+                (l for l in settings.languages if l["code"] == customer.language),
+                None
+            )
+            value = lang_entry["name"] if lang_entry else customer.language or "N/A"
+        elif field.db_field in ("full_name",):
+            value = getattr(customer, field.db_field, "N/A") or "N/A"
+        elif field.field_name == "administration":
+            value = ...  # existing admin path lookup
         else:
-            raw_val = customer.get_profile_field(field_name)
-            display_val = str(raw_val) if raw_val is not None else "N/A"
-
-        summary_lines.append(f"{label}: {display_val}")
-
-    return "\n".join(summary_lines)
+            value = customer.get_profile_field(field.field_name) or "N/A"
+        label = t(f"onboarding.{field.field_name}.field_name", lang)
+        lines.append(f"• {label}: {value}")
+    return "\n".join(lines)
 ```
 
-### 6. i18n Fix (`backend/utils/i18n.py`)
-
+**`_filter_by_age_groups()` — dynamic**:
 ```python
-def get_crop_name_translated(crop_name: str, lang: str = "en") -> str:
-    """Get translated crop name, falling back to original name if untranslated."""
-    if not crop_name:
-        return ""
-    translated = t(f"crops.{crop_name}.name", lang)
-    if translated.startswith("crops."):
-        return crop_name
-    return translated
+def _filter_by_age_groups(self, query, age_groups: List[str]):
+    current_year = datetime.now().year
+    age_conditions = []
+    for label in age_groups:
+        matched = next(
+            (g for g in settings.age_groups if g["label"] == label), None
+        )
+        if not matched:
+            continue
+        min_a = matched.get("min")  # e.g. 20
+        max_a = matched.get("max")  # e.g. 35, or None for open-ended
+
+        # birth year = current_year - age
+        min_birth = (current_year - max_a) if max_a is not None else 1900
+        max_birth = (current_year - min_a) if min_a is not None else current_year
+
+        age_conditions.append(and_(
+            cast(Customer.profile_data.op("->>")(  "birth_year"), Integer) >= min_birth,
+            cast(Customer.profile_data.op("->>")(  "birth_year"), Integer) <= max_birth,
+        ))
+    if age_conditions:
+        query = query.filter(or_(*age_conditions))
+    return query
 ```
 
-### 7. Frontend Dynamic Crop Integration (`frontend/src/components/customers/EditCustomerModal.js`)
+**`i18n.py` fix**:
+```python
+# BEFORE — crashes on missing key
+def get_crop_name_translated(crop_name: str, lang: str) -> str:
+    return t(f"crops.{crop_name}.name", lang)
 
-```javascript
+# AFTER — safe fallback
+def get_crop_name_translated(crop_name: str, lang: str) -> str:
+    key = f"crops.{crop_name}.name"
+    result = t(key, lang)
+    # t() returns the key path itself if not found — detect and fall back
+    return crop_name if result == key else result
+```
+
+---
+
+### T-008: Frontend Dynamic Crops (`frontend/src/components/customers/EditCustomerModal.js`)
+
+```js
+// BEFORE
+import { CROP_TYPES } from '../../lib/config';
+
+// AFTER — dynamic load
 const [cropTypes, setCropTypes] = useState([]);
-
 useEffect(() => {
-  const fetchCrops = async () => {
-    try {
-      const response = await api.get("/crop-types/");
-      if (response.data && Array.isArray(response.data)) {
-        setCropTypes(response.data.map((c) => c.name));
-      }
-    } catch (err) {
-      console.error("Failed to fetch crop types, using fallback:", err);
-      setCropTypes(["Avocado", "Potato"]);
-    }
-  };
-  fetchCrops();
+  api.get('/crop-types/').then(res => {
+    setCropTypes(res.data.map(c => c.name));
+  }).catch(() => setCropTypes([]));
 }, []);
 ```
 
 ---
 
-## 🧪 Verification & Test Scenarios
+## 🧪 Test Plan
 
-### Automated Pytest Suite (`backend/tests/test_onboarding_config.py`)
+### Automated Regression (existing passing tests — must stay green):
+- `tests/test_customer_list.py` — uses `CustomerLanguage.EN` (still valid: `"en" == CustomerLanguage.EN` after `str, enum.Enum`)
+- `tests/test_skip_optional_onboarding.py` — uses `CustomerLanguage.EN` — same
+- `tests/test_hierarchical_access.py` — same
 
-| Scenario | What is tested |
+### New Test Suite (`backend/tests/test_onboarding_config.py`) — 19 scenarios:
+
+| Test | What is asserted |
 |---|---|
-| `test_dynamic_language_string_storage` | Setting `"language": "fr"` saves directly to `customer.language == "fr"` via string column |
-| `test_crop_types_config_fallback_empty` | When `crop_types` absent in config, default is empty list `[]` |
-| `test_crop_name_translation_fallback` | Unlisted crop returns name as-is instead of `crops.X.name` path |
-| `test_dynamic_profile_summary_active_fields_only` | Summary at completion contains only active fields, omitting disabled ones |
-| `test_dynamic_profile_summary_empty_when_no_fields` | Summary is empty string when `"fields": []` |
-| `test_alembic_migration_language_varchar` | Alembic upgrade alters column to `VARCHAR(10)` and downgrade restores enum |
-| `test_empty_fields_bypasses_onboarding` | Setting `"fields": []` completes onboarding on message 1 without asking questions |
-| `test_onboarding_disabled_flag` | Setting `"enabled": false` immediately completes onboarding |
-| `test_default_fields_loaded_when_no_config` | Missing `onboarding` key in config loads all 6 default fields |
-| `test_custom_question_en_sw_overrides` | Custom strings in JSON `questions` are returned for EN and SW |
-| `test_custom_success_message_interpolation` | `{value}` in custom `success_messages` interpolates saved name/crop |
-| `test_arbitrary_custom_partner_field` | Configuring a new field `"water_source"` extracts and saves to `profile_data["water_source"]` |
-| `test_disabled_field_skipped` | Setting `"enabled": false` on `birth_year` skips question during active chat |
-| `test_reordered_priorities` | Changing `priority` asks fields in the new custom order |
-| `test_custom_max_attempts` | Setting `max_attempts: 1` skips/fails after 1 attempt |
-| `test_placeholder_available_crops` | `{available_crops}` is correctly populated in crop question |
-| `test_fallback_to_i18n_when_absent` | If field has `questions: null`, falls back to `i18n.py` without error |
+| `test_language_varchar_stored_as_string` | `customer.language == "fr"` after saving plain string |
+| `test_customerlanguage_str_enum_backward_compat` | `CustomerLanguage.EN == "en"` is `True` |
+| `test_customer_language_no_dot_value` | `customer.language or "en"` works when column is `"en"` str |
+| `test_dynamic_age_group_from_config` | Custom `[{"label": "Youth", "min": 18, "max": 29}]` → `customer.age_group == "Youth"` |
+| `test_dynamic_age_group_open_ended` | `max: null` in config → age 70 falls into "Senior 60+" |
+| `test_dynamic_age_group_returns_none_when_birth_year_absent` | `profile_data` has no `birth_year` → `customer.age_group is None` |
+| `test_dynamic_filter_age_group_from_config` | Filter `age_group:Youth` maps to correct birth year range via SQL |
+| `test_crop_types_default_empty_when_absent` | No `crop_types` key in config → `settings.crop_types == []` |
+| `test_crop_name_translation_fallback` | Unknown crop name returns name as-is |
+| `test_dynamic_profile_summary_active_fields_only` | Disabled field absent from summary |
+| `test_dynamic_profile_summary_empty_when_no_fields` | `"fields": []` → empty summary string |
+| `test_dynamic_profile_summary_language_name_lookup` | Summary shows `"English"` not `"en"` |
+| `test_empty_fields_config_bypasses_onboarding` | First message completes onboarding immediately |
+| `test_onboarding_disabled_flag` | `"enabled": false` → onboarding skipped |
+| `test_custom_question_override` | `questions.en` from JSON used over `i18n.py` |
+| `test_success_message_interpolation` | `{value}` in `success_messages` is interpolated |
+| `test_arbitrary_partner_field` | `"water_source"` in config → saved to `profile_data["water_source"]` |
+| `test_extract_language_returns_string` | `extract_language("1")` returns `"en"` (plain str, not enum) |
+| `test_detect_language_from_message_returns_string` | `_detect_language_from_message("hello")` returns `"en"` str |
 
 ---
 
-## ⏱️ Work Breakdown & Estimation
+## ⏱️ Estimation
 
-- **Confidence Level**: High
+| Task | Description | Est. Hours |
+|---|---|---|
+| **T-001** | Alembic Migration (`language` → VARCHAR) | 1h–1.5h |
+| **T-002** | Model: `(str, enum.Enum)`, `String(10)`, dynamic `age_group` | 1h–1.5h |
+| **T-003** | Schema: remove enum types from Pydantic schemas | 0.5h–1h |
+| **T-004** | Config layer: `languages`, `age_groups`, `crop_types`, `onboarding` | 1.5h–2h |
+| **T-005** | Language `.value` cascade fix across 5 service files | 2h–3h |
+| **T-006** | Dynamic onboarding schema + loader | 1.5h–2h |
+| **T-007** | Service helpers: `_get_question`, `_get_success_message`, `_generate_profile_summary`, `_filter_by_age_groups`, i18n fix | 2.5h–3.5h |
+| **T-008** | Frontend dynamic crops | 1h–1.5h |
+| **T-009** | New test suite (19 cases) + regression suite | 3h–4h |
+| **T-010** | Linting, integration, final verification | 1h–2h |
 
-| Task ID | Description | Est. Hours (Min - Max) | Priority |
-|---|---|---|---|
-| **T-001** | **Alembic Migration**: One-time migration converting `customers.language` to `VARCHAR(10)`. | 1h - 1.5h | Must Have |
-| **T-002** | **Model & Schema Updates**: Update `Customer.language` to `String(10)`, `CustomerLanguage` to `(str, Enum)`. Update `schemas/customer.py`. | 1h - 1.5h | Must Have |
-| **T-003** | **Config Layer & Fallbacks**: Add `onboarding` schema, decouple `crop_types` fallback to `[]` in `config.py`. | 1h - 2h | Must Have |
-| **T-004** | **Schema Layer**: Update `OnboardingFieldConfig`, `load_onboarding_fields()`, and filtering in `onboarding_schemas.py`. | 2h - 3h | Must Have |
-| **T-005** | **Service Resolution & Dynamic Summary**: Add `_get_question()`, `_get_success_message()`, replace hardcoded `t()` calls, dynamic `_generate_profile_summary()`, and `i18n.py` fallback fix. | 2.5h - 3.5h | Must Have |
-| **T-006** | **Frontend Dynamic Crops**: Update `EditCustomerModal.js` to fetch crops via `GET /crop-types/`. | 1.5h - 2.5h | Must Have |
-| **T-007** | **New Test Suite**: Implement `tests/test_onboarding_config.py` (17 comprehensive test cases). | 3h - 4h | Must Have |
-| **T-008** | **Regression Testing & Linting**: Run migration, full pytest suite, and flake8/eslint. | 1.5h - 2.5h | Must Have |
-
-**Total Estimated Hours:** **13.5h - 20.5h**
+**Total: 15h–21.5h**
+**Confidence: High**
