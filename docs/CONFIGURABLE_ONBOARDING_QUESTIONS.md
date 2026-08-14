@@ -84,6 +84,7 @@ Each element in `onboarding.fields` within `config.json` supports the following 
   "extraction_method": "string | null (method name in OnboardingService e.g. 'extract_language', 'extract_location', 'extract_crop_type', 'extract_gender', 'extract_birth_year')",
   "matching_method": "string | null (method name for ambiguity resolution e.g. 'resolve_administration_ambiguity', 'resolve_crop_ambiguity')",
   "max_attempts": "integer (optional, default: 3)",
+  "labels": "string | object (optional, human-readable label for summaries/errors e.g. {'en': 'Location', 'sw': 'Eneo'})",
   "questions": "string | object (single prompt string for bilingual welcome questions OR multilingual dict {'en': '...', 'sw': '...' })",
   "success_messages": "string | object (single message OR multilingual dict {'en': '...', 'sw': '...' } supporting {value} interpolation)"
 }

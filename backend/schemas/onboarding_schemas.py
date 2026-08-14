@@ -123,9 +123,26 @@ class OnboardingFieldConfig:
     max_attempts: int = 3  # Maximum collection attempts before skip
     field_type: str = "string"  # "string", "integer", "enum", "location"
     enabled: bool = True  # Whether field is enabled for collection
+    labels: Optional[Union[Dict[str, str], str]] = None  # Localized labels
     questions: Optional[Union[Dict[str, str], str]] = None
     success_messages: Optional[Union[Dict[str, str], str]] = None
     success_message_template: Optional[str] = None  # Legacy template fallback
+
+    def get_label(self, lang: Optional[str] = None) -> str:
+        """Get localized field label or fall back to title-cased name."""
+        if self.labels:
+            if isinstance(self.labels, str):
+                return self.labels
+            elif isinstance(self.labels, dict):
+                target_lang = lang or settings.default_language
+                lbl = (
+                    self.labels.get(target_lang)
+                    or self.labels.get("en")
+                    or self.labels.get(settings.default_language)
+                )
+                if lbl:
+                    return lbl
+        return self.field_name.replace("_", " ").title()
 
 
 # Onboarding fields registry - defines all profile fields to collect
@@ -262,6 +279,7 @@ def load_onboarding_fields() -> List[OnboardingFieldConfig]:
                 ),
                 max_attempts=cfg.get("max_attempts", base.max_attempts),
                 field_type=cfg.get("field_type", base.field_type),
+                labels=cfg.get("labels") or cfg.get("label") or base.labels,
                 questions=(
                     cfg.get("questions")
                     or cfg.get("question")
@@ -290,6 +308,7 @@ def load_onboarding_fields() -> List[OnboardingFieldConfig]:
                     matching_method=cfg.get("matching_method"),
                     max_attempts=cfg.get("max_attempts", 3),
                     field_type=cfg.get("field_type", "string"),
+                    labels=cfg.get("labels") or cfg.get("label"),
                     questions=cfg.get("questions") or cfg.get("question"),
                     success_messages=(
                         cfg.get("success_messages")

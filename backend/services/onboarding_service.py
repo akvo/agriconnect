@@ -1346,7 +1346,7 @@ Birth year must be between 1900 and {current_year}."""
     def _get_question(
         self, field_config: OnboardingFieldConfig, lang: str
     ) -> str:
-        """Get question string for a field from config or i18n."""
+        """Get question string for a field from JSON configuration."""
         if field_config.questions:
             if isinstance(field_config.questions, str):
                 return field_config.questions
@@ -1358,7 +1358,7 @@ Birth year must be between 1900 and {current_year}."""
                 )
                 if q:
                     return q
-        return t(f"onboarding.{field_config.field_name}.question", lang)
+        return ""
 
     def _get_success_message(
         self,
@@ -1367,7 +1367,7 @@ Birth year must be between 1900 and {current_year}."""
         value: Any = None,
         **kwargs,
     ) -> str:
-        """Get success message for a field from config, i18n, or template."""
+        """Get success message for a field from JSON configuration."""
         if field_config.success_messages:
             if isinstance(field_config.success_messages, str):
                 msg = field_config.success_messages
@@ -1392,15 +1392,6 @@ Birth year must be between 1900 and {current_year}."""
                         except Exception:
                             return msg
                     return msg
-
-        # Try i18n
-        key = f"onboarding.{field_config.field_name}.success"
-        if value is not None or kwargs:
-            i18n_msg = t(key, lang, value=value, **kwargs)
-        else:
-            i18n_msg = t(key, lang)
-        if i18n_msg != key:
-            return i18n_msg
 
         # Try legacy template
         if field_config.success_message_template:
@@ -1563,7 +1554,7 @@ Birth year must be between 1900 and {current_year}."""
             logger.error(
                 f"Extraction failed for {field_name}: {e}", exc_info=True
             )
-            question = t(f"onboarding.{field_name}.question", lang)
+            question = self._get_question(field_config, lang)
             if field_name == "crop_type":
                 crops_formatted = self._format_crops_numbered(lang)
                 question = question.format(available_crops=crops_formatted)
@@ -1586,7 +1577,7 @@ Birth year must be between 1900 and {current_year}."""
 
                 if current_attempts == 0:
                     # First attempt: Generic message with full question
-                    question = t(f"onboarding.{field_name}.question", lang)
+                    question = self._get_question(field_config, lang)
                     question = question.format(available_crops=crops_formatted)
                     error_message = t(
                         "onboarding.common.extraction_failed",
@@ -1602,7 +1593,7 @@ Birth year must be between 1900 and {current_year}."""
                     )
             else:
                 # Other fields: Use generic extraction failed message
-                question = t(f"onboarding.{field_name}.question", lang)
+                question = self._get_question(field_config, lang)
                 error_message = t(
                     "onboarding.common.extraction_failed",
                     lang,
@@ -1960,9 +1951,7 @@ Birth year must be between 1900 and {current_year}."""
 
             if next_field:
                 # More fields to collect - combine success msg with next Q
-                next_question = t(
-                    f"onboarding.{next_field.field_name}.question", lang
-                )
+                next_question = self._get_question(next_field, lang)
 
                 # Handle crop_type field with numbered list
                 if next_field.field_name == "crop_type":
@@ -2013,7 +2002,7 @@ Birth year must be between 1900 and {current_year}."""
 
         # Get customer language
         lang = customer.language_code
-        field_display = t(f"onboarding.{field_name}.field_name", lang)
+        field_display = field_config.get_label(lang)
 
         logger.warning(
             f"Max attempts exceeded for {field_name}, "
@@ -2126,6 +2115,81 @@ Birth year must be between 1900 and {current_year}."""
             requires_weather_buttons=requires_weather_buttons,
         )
 
+    def _get_customer_field_display_value(
+        self,
+        customer: Customer,
+        field_config: OnboardingFieldConfig,
+        lang: str,
+    ) -> str:
+        """
+        Dynamically extract and format display value for any onboarding field.
+        """
+        # 1. Location / Administrative relationship
+        if (
+            field_config.field_type == "location"
+            or field_config.db_field == "customer_administrative"
+        ):
+            if (
+                hasattr(customer, "customer_administrative")
+                and customer.customer_administrative
+            ):
+                return customer.customer_administrative[0].administrative.path
+            raw = customer.get_profile_field(field_config.field_name)
+            return str(raw) if raw is not None else "N/A"
+
+        # 2. Language selection
+        if (
+            field_config.field_name == "language"
+            or field_config.db_field == "language"
+        ):
+            target_lang_code = customer.language_code
+            lang_entry = next(
+                (
+                    item
+                    for item in settings.languages
+                    if item.get("code") == target_lang_code
+                ),
+                None,
+            )
+            return lang_entry.get("name") if lang_entry else target_lang_code
+
+        # 3. Direct model column or property on Customer
+        val = None
+        if hasattr(customer, field_config.db_field):
+            attr_val = getattr(customer, field_config.db_field)
+            if not callable(attr_val):
+                val = attr_val
+
+        # 4. JSON profile_data lookup (for custom fields or JSON-backed fields)
+        if val is None:
+            val = customer.get_profile_field(field_config.field_name)
+            if (
+                val is None
+                and field_config.db_field != field_config.field_name
+            ):
+                val = customer.get_profile_field(field_config.db_field)
+
+        if val is None or val == "":
+            return "N/A"
+
+        # 5. Type/Domain-specific formatting
+        if (
+            field_config.field_name == "birth_year"
+            and customer.age is not None
+        ):
+            return str(customer.age)
+
+        if field_config.field_name == "crop_type":
+            return get_crop_name_translated(str(val), lang)
+
+        if field_config.field_name == "gender":
+            translated = t(f"gender.{val}", lang)
+            if not translated.startswith("gender."):
+                return translated
+            return str(val).capitalize()
+
+        return str(val)
+
     def _generate_profile_summary(
         self, customer: Customer, lang: str = "en"
     ) -> str:
@@ -2133,74 +2197,19 @@ Birth year must be between 1900 and {current_year}."""
         Generate a dynamic profile summary of collected farmer attributes.
 
         Iterates over active/enabled fields in fields_config and looks up
-        display names and localized values.
+        display names and localized values dynamically.
         """
         active_fields = [f for f in self.fields_config if f.enabled]
         if not active_fields:
             return ""
 
         summary_lines = []
-        target_lang_code = customer.language_code
-        lang_entry = next(
-            (
-                lang_item
-                for lang_item in settings.languages
-                if lang_item.get("code") == target_lang_code
-            ),
-            None,
-        )
-        c_lang = lang_entry.get("name") if lang_entry else target_lang_code
-
         for field in active_fields:
-            name = field.field_name
-            if name == "language":
-                f_label = t("onboarding.language.field_name", lang)
-                summary_lines.append(f"{f_label}: {c_lang}")
-            elif name == "full_name":
-                f_label = t("onboarding.full_name.field_name", lang)
-                c_val = customer.full_name if customer.full_name else "N/A"
-                summary_lines.append(f"{f_label}: {c_val}")
-            elif name == "administration":
-                f_label = t("onboarding.administration.field_name", lang)
-                c_val = "N/A"
-                if (
-                    hasattr(customer, "customer_administrative")
-                    and len(customer.customer_administrative) > 0
-                ):
-                    c_val = customer.customer_administrative[
-                        0
-                    ].administrative.path
-                summary_lines.append(f"{f_label}: {c_val}")
-            elif name == "crop_type":
-                f_label = t("onboarding.crop_type.field_name", lang)
-                c_val = (
-                    get_crop_name_translated(customer.crop_type, lang)
-                    if customer.crop_type
-                    else "N/A"
-                )
-                summary_lines.append(f"{f_label}: {c_val}")
-            elif name == "gender":
-                f_label = t("onboarding.gender.field_name", lang)
-                c_val = (
-                    t(f"gender.{customer.gender}", lang)
-                    if customer.gender
-                    else "N/A"
-                )
-                summary_lines.append(f"{f_label}: {c_val}")
-            elif name == "birth_year":
-                f_label = t("onboarding.common.age", lang)
-                c_val = (
-                    str(customer.age) if customer.age is not None else "N/A"
-                )
-                summary_lines.append(f"{f_label}: {c_val}")
-            else:
-                f_label = name.replace("_", " ").title()
-                c_val = "N/A"
-                if customer.profile_data and isinstance(
-                    customer.profile_data, dict
-                ):
-                    c_val = str(customer.profile_data.get(name, "N/A"))
-                summary_lines.append(f"{f_label}: {c_val}")
+            f_label = field.get_label(lang)
+            c_val = self._get_customer_field_display_value(
+                customer, field, lang
+            )
+            summary_lines.append(f"{f_label}: {c_val}")
 
         return "\n".join(summary_lines).strip()
 

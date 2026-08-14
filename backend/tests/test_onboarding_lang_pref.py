@@ -12,8 +12,8 @@ Tests cover:
 import pytest
 
 from models.customer import Customer, CustomerLanguage, OnboardingStatus
+from schemas.onboarding_schemas import get_field_config
 from services.onboarding_service import OnboardingService
-from utils.i18n import t
 
 
 class TestLanguageExtraction:
@@ -239,58 +239,75 @@ class TestLanguageOnboardingFlow:
 
 
 class TestBilingualQuestion:
-    """Test bilingual language selection question"""
+    """Test bilingual language selection question from config"""
 
-    def test_english_version_has_both_languages(self):
+    def test_english_version_has_both_languages(self, db_session):
         """Test English version shows both language options"""
-        question = t("onboarding.language.question", "en")
+        service = OnboardingService(db_session)
+        cfg = get_field_config("language")
+        assert cfg is not None
+        question = service._get_question(cfg, "en")
         assert "English" in question
         assert "Swahili" in question
         assert "1." in question
         assert "2." in question
 
-    def test_swahili_version_has_both_languages(self):
+    def test_swahili_version_has_both_languages(self, db_session):
         """Test Swahili version shows both language options"""
-        question = t("onboarding.language.question", "sw")
+        service = OnboardingService(db_session)
+        cfg = get_field_config("language")
+        assert cfg is not None
+        question = service._get_question(cfg, "sw")
         assert "Kiingereza" in question or "English" in question
         assert "Kiswahili" in question or "Swahili" in question
         assert "1." in question or "1" in question
         assert "2." in question or "2" in question
 
-    def test_question_has_welcome_message(self):
+    def test_question_has_welcome_message(self, db_session):
         """Test question includes welcome message"""
-        question_en = t("onboarding.language.question", "en")
-        question_sw = t("onboarding.language.question", "sw")
+        service = OnboardingService(db_session)
+        cfg = get_field_config("language")
+        assert cfg is not None
+        question_en = service._get_question(cfg, "en")
+        question_sw = service._get_question(cfg, "sw")
 
         assert "Welcome" in question_en or "AgriConnect" in question_en
         assert "Karibu" in question_sw or "AgriConnect" in question_sw
 
 
 class TestLanguageFieldName:
-    """Test language field name translations"""
+    """Test language field label resolution"""
 
     def test_field_name_english(self):
         """Test field name in English"""
-        field_name = t("onboarding.language.field_name", "en")
-        assert field_name == "Language"
+        cfg = get_field_config("language")
+        assert cfg is not None
+        assert cfg.get_label("en") == "Language"
 
     def test_field_name_swahili(self):
         """Test field name in Swahili"""
-        field_name = t("onboarding.language.field_name", "sw")
-        assert field_name == "Lugha"
+        cfg = get_field_config("language")
+        assert cfg is not None
+        assert cfg.get_label("sw") == "Lugha"
 
 
 class TestLanguageSuccessMessage:
-    """Test language preference success messages"""
+    """Test language preference success messages from config"""
 
-    def test_success_message_english(self):
+    def test_success_message_english(self, db_session):
         """Test success message in English"""
-        message = t("onboarding.language.success", "en")
+        service = OnboardingService(db_session)
+        cfg = get_field_config("language")
+        assert cfg is not None
+        message = service._get_success_message(cfg, "en")
         assert "language preference" in message.lower()
         assert "English" in message
 
-    def test_success_message_swahili(self):
+    def test_success_message_swahili(self, db_session):
         """Test success message in Swahili"""
-        message = t("onboarding.language.success", "sw")
+        service = OnboardingService(db_session)
+        cfg = get_field_config("language")
+        assert cfg is not None
+        message = service._get_success_message(cfg, "sw")
         assert "lugha" in message.lower()
         assert "Kiswahili" in message

@@ -15,64 +15,7 @@ from config import settings
 # Translation dictionary
 trans: Dict[str, Any] = {
     "onboarding": {
-        "language": {
-            "question": {
-                "en": (
-                    "Welcome to AgriConnect! 🌱 Your agricultural advisory "
-                    "companion.\n"
-                    "Karibu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\n"
-                    "Choose your language / Chagua lugha yako:\n"
-                    "1. English / Kiingereza\n2. Swahili / Kiswahili"
-                ),
-                "sw": (
-                    "Karibu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\n"
-                    "Chagua lugha yako:\n"
-                    "1. Kiingereza\n2. Kiswahili"
-                ),
-            },
-            "success": {
-                "en": (
-                    "Great! Your language preference has been set to English."
-                ),
-                "sw": "Vizuri! Lugha uliyopendelea imewekwa kuwa Kiswahili.",
-            },
-            "field_name": {"en": "Language", "sw": "Lugha"},
-        },
-        "full_name": {
-            "question": {
-                "en": (
-                    "To get started, I need to know your full name.\n\n"
-                    "Please tell me: What is your full name?"
-                ),
-                "sw": (
-                    "Kuanza, nahitaji majina yako kamili.\n\n"
-                    "Tafadhali niambie: Jina lako kamili ni nani?"
-                ),
-            },
-            "success": {
-                "en": "Thank you, {value}!",
-                "sw": "Asante, {value}!",
-            },
-            "field_name": {"en": "Name", "sw": "Jina"},
-        },
         "administration": {
-            "question": {
-                "en": (
-                    "I need to know your location.\n\n"
-                    "Please tell me your district and ward.\n"
-                    "For example: Njoro, Lare"
-                ),
-                "sw": (
-                    "Ninahitaji kujua eneo lako.\n\n"
-                    "Tafadhali niambie wilaya na kata yako.\n"
-                    "Mfano: Njoro, Lare"
-                ),
-            },
-            "success": {
-                "en": "Location saved as {value}.",
-                "sw": "Eneo limehifadhiwa kama {value}.",
-            },
-            "field_name": {"en": "Location", "sw": "Eneo"},
             "multiple_matches": {
                 "en": (
                     "I found multiple locations that match. Please select the "
@@ -240,25 +183,6 @@ trans: Dict[str, Any] = {
             },
         },
         "crop_type": {
-            "question": {
-                "en": (
-                    "What crops do you grow?\n\n"
-                    "Please select from the list below:\n"
-                    "{available_crops}\n\n"
-                    "Reply with the number (e.g., '1', '2', etc.)"
-                ),
-                "sw": (
-                    "Unalima mazao gani?\n\n"
-                    "Tafadhali chagua kutoka orodha hapa chini:\n"
-                    "{available_crops}\n\n"
-                    "Jibu kwa namba (mfano, '1', '2', n.k.)"
-                ),
-            },
-            "success": {
-                "en": "Primary crops recorded: {value}.",
-                "sw": "Mazao makuu yamerekodiwa: {value}.",
-            },
-            "field_name": {"en": "Primary Crops", "sw": "Mazao ya msingi"},
             "extraction_failed_retry": {
                 "en": (
                     "I still couldn't identify that. Please select from "
@@ -271,44 +195,6 @@ trans: Dict[str, Any] = {
                     "Jibu kwa namba (mfano, '1', '2', n.k.)"
                 ),
             },
-        },
-        "gender": {
-            "question": {
-                "en": (
-                    "To help us serve you better, may I know your gender?\n\n"
-                    "You can say: male, female, or other"
-                ),
-                "sw": (
-                    "Ili tukusaidie vizuri zaidi, "
-                    "naweza kujua jinsia yako?\n\n"
-                    "Unaweza kusema: mwanamume, mwanamke, au nyingine"
-                ),
-            },
-            "success": {
-                "en": "Thank you for sharing.",
-                "sw": "Asante kwa kushiriki.",
-            },
-            "field_name": {"en": "Gender", "sw": "Jinsia"},
-        },
-        "birth_year": {
-            "question": {
-                "en": (
-                    "What year were you born? "
-                    "You can also tell me your age if "
-                    "that's easier.\n\n"
-                    "For example: '1980' or 'I'm 45 years old'"
-                ),
-                "sw": (
-                    "Ulizaliwa mwaka gani? "
-                    "Ama unaweza pia kuniambia umri wako.\n\n"
-                    "Kwa mfano: '1980' au 'Nina miaka 45'"
-                ),
-            },
-            "success": {
-                "en": "Got it, thank you!",
-                "sw": "Nimeelewa, asante!",
-            },
-            "field_name": {"en": "Birth Year", "sw": "Mwaka wa Kuzaliwa"},
         },
         "common": {
             "extraction_failed": {
