@@ -246,82 +246,68 @@ ONBOARDING_FIELDS: List[OnboardingFieldConfig] = [
 
 def load_onboarding_fields() -> List[OnboardingFieldConfig]:
     """
-    Load onboarding fields from settings config, merging with defaults.
+    Load onboarding fields directly from settings config.
+    If config_fields is an empty array [], returns empty list (zero
+    onboarding).
     """
-    config_fields = settings.onboarding_fields_config  # list of dicts or []
-    if not config_fields:
+    config_fields = settings.onboarding_fields_config
+    if config_fields is None:
         return [f for f in ONBOARDING_FIELDS if f.enabled]
+    if isinstance(config_fields, list) and len(config_fields) == 0:
+        return []
 
-    # Create shallow copies of defaults to allow per-field overriding
-    fields_map = {
-        f.field_name: OnboardingFieldConfig(**f.__dict__)
-        for f in ONBOARDING_FIELDS
-    }
-    custom_fields = []
+    # Map defaults for fallback attributes if needed
+    defaults_map = {f.field_name: f for f in ONBOARDING_FIELDS}
+    fields = []
 
     for cfg in config_fields:
         name = cfg.get("field_name")
         if not name:
             continue
-        base = fields_map.get(name)
-        if base:
-            fields_map[name] = OnboardingFieldConfig(
+        base = defaults_map.get(name)
+        fields.append(
+            OnboardingFieldConfig(
                 field_name=name,
-                db_field=cfg.get("db_field", base.db_field),
-                enabled=cfg.get("enabled", base.enabled),
-                required=cfg.get("required", base.required),
-                priority=cfg.get("priority", base.priority),
+                db_field=cfg.get("db_field", base.db_field if base else name),
+                enabled=cfg.get("enabled", True),
+                required=cfg.get("required", base.required if base else True),
+                priority=cfg.get("priority", base.priority if base else 99),
                 extraction_method=cfg.get(
-                    "extraction_method", base.extraction_method
+                    "extraction_method",
+                    base.extraction_method if base else None,
                 ),
                 matching_method=cfg.get(
-                    "matching_method", base.matching_method
+                    "matching_method", base.matching_method if base else None
                 ),
-                max_attempts=cfg.get("max_attempts", base.max_attempts),
-                field_type=cfg.get("field_type", base.field_type),
-                labels=cfg.get("labels") or cfg.get("label") or base.labels,
+                max_attempts=cfg.get(
+                    "max_attempts", base.max_attempts if base else 3
+                ),
+                field_type=cfg.get(
+                    "field_type", base.field_type if base else "string"
+                ),
+                labels=(
+                    cfg.get("labels")
+                    or cfg.get("label")
+                    or (base.labels if base else None)
+                ),
                 questions=(
                     cfg.get("questions")
                     or cfg.get("question")
-                    or base.questions
+                    or (base.questions if base else None)
                 ),
                 success_messages=(
                     cfg.get("success_messages")
                     or cfg.get("success_message")
-                    or base.success_messages
+                    or (base.success_messages if base else None)
                 ),
                 success_message_template=cfg.get(
                     "success_message_template",
-                    base.success_message_template,
+                    base.success_message_template if base else None,
                 ),
             )
-        else:
-            # New/custom partner field (e.g. "water_source")
-            custom_fields.append(
-                OnboardingFieldConfig(
-                    field_name=name,
-                    db_field=cfg.get("db_field", name),
-                    enabled=cfg.get("enabled", True),
-                    required=cfg.get("required", True),
-                    priority=cfg.get("priority", 99),
-                    extraction_method=cfg.get("extraction_method"),
-                    matching_method=cfg.get("matching_method"),
-                    max_attempts=cfg.get("max_attempts", 3),
-                    field_type=cfg.get("field_type", "string"),
-                    labels=cfg.get("labels") or cfg.get("label"),
-                    questions=cfg.get("questions") or cfg.get("question"),
-                    success_messages=(
-                        cfg.get("success_messages")
-                        or cfg.get("success_message")
-                    ),
-                    success_message_template=cfg.get(
-                        "success_message_template"
-                    ),
-                )
-            )
+        )
 
-    all_fields = list(fields_map.values()) + custom_fields
-    enabled_fields = [f for f in all_fields if f.enabled]
+    enabled_fields = [f for f in fields if f.enabled]
     enabled_fields.sort(key=lambda f: f.priority)
     return enabled_fields
 
