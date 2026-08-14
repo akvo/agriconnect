@@ -88,13 +88,108 @@
     "fields": [
       {
         "field_name": "language",
+        "db_field": "language",
         "enabled": true,
         "required": true,
         "priority": 0,
+        "field_type": "enum",
+        "extraction_method": "extract_language",
+        "max_attempts": 3,
         "questions": "Welcome to AgriConnect! 🌱 Your agricultural advisory companion.\nKaribu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\nChoose your language / Chagua lugha yako:\n1. English / Kiingereza\n2. Swahili / Kiswahili",
         "success_messages": {
           "en": "Great! Your language preference has been set to English.",
           "sw": "Vizuri! Lugha uliyopendelea imewekwa kuwa Kiswahili."
+        }
+      },
+      {
+        "field_name": "full_name",
+        "db_field": "full_name",
+        "enabled": true,
+        "required": true,
+        "priority": 1,
+        "field_type": "string",
+        "max_attempts": 1,
+        "questions": {
+          "en": "To get started, I need to know your full name.\n\nPlease tell me: What is your full name?",
+          "sw": "Kuanza, nahitaji majina yako kamili.\n\nTafadhali niambie: Jina lako kamili ni nani?"
+        },
+        "success_messages": {
+          "en": "Thank you, {value}!",
+          "sw": "Asante, {value}!"
+        }
+      },
+      {
+        "field_name": "administration",
+        "db_field": "customer_administrative",
+        "enabled": true,
+        "required": true,
+        "priority": 2,
+        "field_type": "location",
+        "extraction_method": "extract_location",
+        "matching_method": "resolve_administration_ambiguity",
+        "max_attempts": 3,
+        "questions": {
+          "en": "I need to know your location.\n\nPlease tell me your district and ward.\nFor example: Njoro, Lare",
+          "sw": "Ninahitaji kujua eneo lako.\n\nTafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare"
+        },
+        "success_messages": {
+          "en": "Location saved as {value}.",
+          "sw": "Eneo limehifadhiwa kama {value}."
+        }
+      },
+      {
+        "field_name": "crop_type",
+        "db_field": "crop_type",
+        "enabled": true,
+        "required": true,
+        "priority": 3,
+        "field_type": "string",
+        "extraction_method": "extract_crop_type",
+        "matching_method": "resolve_crop_ambiguity",
+        "max_attempts": 3,
+        "questions": {
+          "en": "What crops do you grow?\n\nPlease select from the list below:\n{available_crops}\n\nReply with the number (e.g., '1', '2', etc.)",
+          "sw": "Je, unalima mazao gani?\n\nTafadhali chagua kutoka kwenye orodha hapa chini:\n{available_crops}\n\nJibu kwa namba (mfano, '1', '2', n.k.)"
+        },
+        "success_messages": {
+          "en": "Crop saved as {value}.",
+          "sw": "Zao limehifadhiwa kama {value}."
+        }
+      },
+      {
+        "field_name": "gender",
+        "db_field": "gender",
+        "enabled": true,
+        "required": false,
+        "priority": 4,
+        "field_type": "enum",
+        "extraction_method": "extract_gender",
+        "max_attempts": 2,
+        "questions": {
+          "en": "What is your gender?\n1. Male\n2. Female\n3. Other",
+          "sw": "Jinsia yako ni ipi?\n1. Mwanaume\n2. Mwanamke\n3. Nyingine"
+        },
+        "success_messages": {
+          "en": "Thank you for sharing.",
+          "sw": "Asante kwa kushiriki."
+        }
+      },
+      {
+        "field_name": "birth_year",
+        "db_field": "birth_year",
+        "enabled": true,
+        "required": false,
+        "priority": 5,
+        "field_type": "integer",
+        "extraction_method": "extract_birth_year",
+        "max_attempts": 2,
+        "questions": {
+          "en": "What year were you born (or what is your age)?",
+          "sw": "Ulizaliwa mwaka gani (au una umri gani)?"
+        },
+        "success_messages": {
+          "en": "Birth year saved as {value}.",
+          "sw": "Mwaka wa kuzaliwa umehifadhiwa kama {value}."
         }
       }
     ]
