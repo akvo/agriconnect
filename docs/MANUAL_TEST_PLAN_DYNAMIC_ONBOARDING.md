@@ -75,8 +75,8 @@ Verify that if a partner disables onboarding or specifies an empty list `[]`, Ag
 #### Execution Steps:
 | Step | Action / Payload | Expected Result | Status |
 |---|---|---|---|
-| A.1 | Send: `From=+254700000001`, `Body=How do I control fall armyworm in maize?` | System **does not** prompt for name, language, or location. Immediately routes query to Knowledge Base / AI and returns advisory. | [ ] |
-| A.2 | Verify DB: `SELECT onboarding_status, language FROM customers WHERE phone_number = '+254700000001';` | `onboarding_status` is `COMPLETED` or bypassed; customer can chat freely. | [ ] |
+| A.1 | Send: `From=+254700000001`, `Body=How do I control fall armyworm in maize?` | System **does not** prompt for name, language, or location. Immediately routes query to Knowledge Base / AI and returns advisory. | [x] **PASSED** (2026-08-14) |
+| A.2 | Verify DB: `SELECT onboarding_status, language FROM customers WHERE phone_number = '+254700000001';` | `onboarding_status` is `COMPLETED` or bypassed; customer can chat freely. | [x] **PASSED** (2026-08-14) |
 
 ---
 
@@ -192,13 +192,13 @@ Verify that a partner in Indonesia can configure custom onboarding fields (`full
    ```
 
 #### Execution Steps:
-| Step | Phone & Payload | Expected Bot Response | Verification Point |
-|---|---|---|---|
-| B.1 | `+628121111111` $\rightarrow$ `Halo` | Language selection prompt: `Pilih bahasa Anda:\n1. Bahasa Indonesia\n2. English` | Correct language question from JSON config |
-| B.2 | `+628121111111` $\rightarrow$ `1` | Saves language `id` $\rightarrow$ prompts for consent (if consent enabled) or next field: `Siapa nama lengkap Anda?` | Customer `language` is set to `id` |
-| B.3 | `+628121111111` $\rightarrow$ `Budi Santoso` | Saves name `Budi Santoso` $\rightarrow$ asks: `Berapa luas lahan kopi Anda dalam hektar? (contoh: 1.5 ha)` | Direct column `full_name` populated |
-| B.4 | `+628121111111` $\rightarrow$ `2.5 ha` | Saves `farm_size_ha: 2.5 ha` into `profile_data` $\rightarrow$ asks optional field: `Apakah kebun Anda memiliki sertifikasi?... (Balas 'lewati' jika tidak ingin menjawab)` | `profile_data["farm_size_ha"] == "2.5 ha"` |
-| B.5 | `+628121111111` $\rightarrow$ `Rainforest Alliance` | Saves certification $\rightarrow$ Completes onboarding with localized summary: <br>`Selesai! Profil petani Anda telah terdaftar:`<br>`Bahasa: Bahasa Indonesia`<br>`Nama Lengkap: Budi Santoso`<br>`Luas Lahan: 2.5 ha`<br>`Sertifikasi: Rainforest Alliance` | Summary contains labels and values dynamically |
+| Step | Phone & Payload | Expected Bot Response | Verification Point | Status |
+|---|---|---|---|---|
+| B.1 | `+628121111111` $\rightarrow$ `Halo` | Language selection prompt: `Pilih bahasa Anda:\n1. Bahasa Indonesia\n2. English` | Correct language question from JSON config | [x] **PASSED** (2026-08-14) |
+| B.2 | `+628121111111` $\rightarrow$ `1` | Saves language `id` $\rightarrow$ prompts for consent (if consent enabled) or next field: `Siapa nama lengkap Anda?` | Customer `language` is set to `id` | [x] **PASSED** (2026-08-14) |
+| B.3 | `+628121111111` $\rightarrow$ `Budi Santoso` | Saves name `Budi Santoso` $\rightarrow$ asks: `Berapa luas lahan kopi Anda dalam hektar? (contoh: 1.5 ha)` | Direct column `full_name` populated | [x] **PASSED** (2026-08-14) |
+| B.4 | `+628121111111` $\rightarrow$ `2.5 ha` | Saves `farm_size_ha: 2.5 ha` into `profile_data` $\rightarrow$ asks optional field: `Apakah kebun Anda memiliki sertifikasi?... (Balas 'lewati' jika tidak ingin menjawab)` | `profile_data["farm_size_ha"] == "2.5 ha"` | [x] **PASSED** (2026-08-14) |
+| B.5 | `+628121111111` $\rightarrow$ `Rainforest Alliance` | Saves certification $\rightarrow$ Completes onboarding with localized summary: <br>`Selesai! Profil petani Anda telah terdaftar:`<br>`Bahasa: Bahasa Indonesia`<br>`Nama Lengkap: Budi Santoso`<br>`Luas Lahan: 2.5 ha`<br>`Sertifikasi: Rainforest Alliance` | Summary contains labels and values dynamically | [x] **PASSED** (2026-08-14) |
 
 ---
 
