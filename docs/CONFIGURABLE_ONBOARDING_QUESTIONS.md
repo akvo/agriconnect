@@ -2,20 +2,38 @@
 
 **Date:** 2026-08-14
 **Author:** Galih Pratama
-**Status:** Planned — Awaiting Implementation
+**Status:** In Progress / Updated Architecture Specification
 **Branch:** `feature/185-mt-001-pull-out-onboarding-question-from-code-to-configurable-json`
 
 ---
 
 ## 📊 Overview
 
-AgriConnect onboarding must be 100% adaptable to different deployment partners without code rewrites or DB migrations:
+AgriConnect onboarding must be 100% configurable and adaptable for diverse deployment partners without requiring code rewrites or database migrations. All onboarding question schemas, field definitions, multilingual question prompts, success messages, supported languages, age groups, and crop types are extracted into **JSON configuration** (`config.json`).
 
-| Partner | Languages | Age Groups | Onboarding Fields |
+### Partner Configuration Comparison
+
+| Partner | Languages | Age Groups | Onboarding Fields & Questions (JSON) |
 |---|---|---|---|
-| Partner A (Kenya/TZ Agriculture) | `en`, `sw` | `20-35`, `36-50`, `51+` | `language`, `full_name`, `administration`, `crop_type`, `gender`, `birth_year` |
-| Partner B (Rwanda/DRC Water) | `en`, `fr` | `Youth (18-29)`, `Adult (30-59)`, `Senior (60+)` | `language`, `full_name`, `administration`, `water_source`, `livestock` |
-| Partner C (Empty/Advisory) | `en` | *(any)* | `[]` (bypass onboarding immediately) |
+| **Partner A** (Kenya/TZ Agriculture) | `en`, `sw` | `20-35`, `36-50`, `51+` | `language` (bilingual welcome prompt), `full_name`, `administration`, `crop_type`, `gender`, `birth_year` |
+| **Partner B** (Rwanda/DRC Water) | `en`, `fr` | `Youth (18-29)`, `Adult (30-59)`, `Senior (60+)` | `language` (bilingual welcome prompt), `full_name`, `administration`, `water_source`, `livestock` |
+| **Partner C** (Direct Advisory) | `en` | *(any)* | `"fields": []` or `"enabled": false` (bypasses onboarding immediately) |
+
+---
+
+## 🔍 Requirements Discovery (5W1H)
+
+- **Who**: Deployment administrators, partner organizations, extension officers, and farmers interacting via WhatsApp/Twilio/chat.
+- **What**: Complete decoupling and extraction of onboarding question schemas, question text, success feedback, supported languages, age group brackets, and crop catalogs into a dynamic JSON configuration system.
+- **Where**:
+  - Configuration layer: `backend/config.json`, `config.template.json`, `config.test.json`, `config.test.template.json`, `backend/config.py`
+  - Schema & Loader layer: `backend/schemas/onboarding_schemas.py` (`OnboardingFieldConfig`, `load_onboarding_fields()`)
+  - Service layer: `backend/services/onboarding_service.py`, `backend/services/customer_service.py`, `backend/services/follow_up_service.py`, `backend/services/weather_intent_service.py`, `backend/services/reconnection_service.py`
+  - Database: `customers.language` migrated from PostgreSQL enum to `VARCHAR(10)`, arbitrary custom partner fields stored in `customers.profile_data` JSONB.
+  - Frontend: `frontend/src/components/customers/EditCustomerModal.js`
+- **When**: Executed incrementally across tasks T-001 through T-010.
+- **Why**: Eliminates hardcoded questions and static enums from application code so any organization can customize question phrasing, add partner-specific profile fields, or toggle onboarding steps directly in configuration.
+- **How**: The JSON schema loader dynamically merges runtime configuration overrides with sensible defaults; questions support both single multilingual prompt strings (e.g. initial language selection) and localized dictionaries with fallback to `i18n.py`.
 
 ---
 
@@ -29,23 +47,175 @@ AgriConnect onboarding must be 100% adaptable to different deployment partners w
 | 4 | `backend/models/customer.py:L114-L124` | `age_group` property hardcodes `20-35`, `36-50`, `51+` | Update to iterate dynamically over `settings.age_groups` from config. |
 | 5 | `backend/services/onboarding_service.py` (×8 occurrences) | `customer.language.value` — calls `.value` on enum | After migration, `customer.language` is a plain `str`. Remove `.value` everywhere. Change pattern to `customer.language or "en"`. |
 | 6 | `backend/services/onboarding_service.py:L1793` | `lang = value.value` — assumes returned value is enum | `extract_language()` must return plain `str` (`"en"`, `"sw"`) not `CustomerLanguage` enum. Remove `.value` call. |
-| 7 | `backend/services/onboarding_service.py:L2058` | `customer.language == CustomerLanguage.EN` | Since `CustomerLanguage(str, enum.Enum)`: `"en" == CustomerLanguage.EN` is `True`. But the profile summary should still be refactored to look up the language name dynamically from `settings.languages`. |
+| 7 | `backend/services/onboarding_service.py:L2058` | `customer.language == CustomerLanguage.EN` | Since `CustomerLanguage(str, enum.Enum)`: `"en" == CustomerLanguage.EN` is `True`. Refactored profile summary to look up language name dynamically from `settings.languages`. |
 | 8 | `backend/services/onboarding_service.py:L863-L934` | `extract_language()` returns `CustomerLanguage` enum; OpenAI schema hardcodes `enum: ["en", "sw", null]` | Must return plain `str`; OpenAI schema enum built from `settings.supported_language_codes`. |
-| 9 | `backend/services/onboarding_service.py:L868-L876` | Hardcoded english/swahili patterns list | Patterns per language code should eventually come from config. For now, keep pattern matching but build result as plain string code. |
-| 10 | `backend/services/customer_service.py:L153-L193` | `_detect_language_from_message()` returns `CustomerLanguage` enum | Must return `str` (`"en"` / `"sw"`) after migration. |
-| 11 | `backend/services/customer_service.py:L415-L440` | `_filter_by_age_groups()` hardcodes `if age_group == "20-35": ...` | Dynamically match label from `settings.age_groups` to compute birth year bounds. |
-| 12 | `backend/services/follow_up_service.py:L107` | `customer.language.value` | Remove `.value` — use `customer.language or "en"`. |
-| 13 | `backend/services/weather_intent_service.py:L146,L179` | `customer.language.value` | Remove `.value` — use `customer.language or "en"`. |
-| 14 | `backend/services/reconnection_service.py:L59` | `customer.language.value` | Remove `.value` — use `customer.language or "en"`. |
-| 15 | `backend/schemas/customer.py:L12,L24,L74` | `language: Optional[CustomerLanguage] = None` | Change to `Optional[str] = None`. Pydantic will accept any ISO string. |
-| 16 | `backend/schemas/customer.py:L76` | `age_group: Optional[AgeGroup] = None` | Change to `Optional[str] = None`. Computed property returns arbitrary config-defined label. |
-| 17 | `backend/schemas/onboarding_schemas.py` | Static `_DEFAULT_ONBOARDING_FIELDS` list | Extract questions/success messages to JSON. Static defaults kept as code fallback. |
-| 18 | `backend/config.py:L259` | `crop_types: list = _config.get("crop_types", ["Avocado", "Cacao"])` | Change default fallback to `[]`. Config JSON is sole source. |
-| 19 | `backend/utils/i18n.py:L632-L644` | `get_crop_name_translated()` — missing key path crashes | Return `crop_name` as-is if translation key absent. |
-| 20 | `backend/seeder/customer.py:L73-L76` | `language = CustomerLanguage.EN if ... else CustomerLanguage.SW` | Since `CustomerLanguage(str, enum.Enum)`: `CustomerLanguage.EN == "en"`, so `language` field naturally stores `"en"` as a string — no seeder change needed for correctness. |
-| 21 | `backend/seeder/customer.py:L79-L84` | `random.choice(list(AgeGroup))` and `age_group.value.split("-")` | Since `AgeGroup(str, enum.Enum)`: `age_group.value` still returns `"20-35"` etc. No seeder change needed. |
-| 22 | `frontend/src/lib/config.js` | `export const CROP_TYPES = ["Avocado", "Potato"]` | Deprecate — provide dynamic fetch helper instead. |
-| 23 | `frontend/src/components/customers/EditCustomerModal.js:L6,L297` | Static `CROP_TYPES` import & select options | Fetch `GET /crop-types/` on component mount. |
+| 9 | `backend/services/onboarding_service.py:L868-L876` | Hardcoded english/swahili patterns list | Patterns per language code should eventually come from config. Keep pattern matching but build result as plain string code. |
+| 10 | `backend/services/customer_service.py:L153-L193` | `_detect_language_from_message()` returns `CustomerLanguage` enum | Returns `str` (`"en"` / `"sw"`) after migration. |
+| 11 | `backend/services/customer_service.py:L415-L440` | `_filter_by_age_groups()` hardcodes `if age_group == "20-35": ...` | Dynamically matches label from `settings.age_groups` to compute birth year bounds. |
+| 12 | `backend/services/follow_up_service.py:L107` | `customer.language.value` | Removed `.value` — uses `customer.language or "en"`. |
+| 13 | `backend/services/weather_intent_service.py:L146,L179` | `customer.language.value` | Removed `.value` — uses `customer.language or "en"`. |
+| 14 | `backend/services/reconnection_service.py:L59` | `customer.language.value` | Removed `.value` — uses `customer.language or "en"`. |
+| 15 | `backend/schemas/customer.py:L12,L24,L74` | `language: Optional[CustomerLanguage] = None` | Changed to `Optional[str] = None`. Pydantic accepts any ISO string. |
+| 16 | `backend/schemas/customer.py:L76` | `age_group: Optional[AgeGroup] = None` | Changed to `Optional[str] = None`. Computed property returns arbitrary config-defined label. |
+| 17 | `backend/schemas/onboarding_schemas.py` | Static `_DEFAULT_ONBOARDING_FIELDS` list | Extracted questions/success messages to JSON with runtime merging via `load_onboarding_fields()`. |
+| 18 | `backend/config.py:L259` | `crop_types: list = _config.get("crop_types", ["Avocado", "Cacao"])` | Changed default fallback to `[]`. Config JSON is sole source. |
+| 19 | `backend/utils/i18n.py:L632-L644` | `get_crop_name_translated()` — missing key path crashes | Returns `crop_name` as-is if translation key absent. |
+| 20 | `backend/seeder/customer.py:L73-L76` | `language = CustomerLanguage.EN if ... else CustomerLanguage.SW` | Since `CustomerLanguage(str, enum.Enum)`: `CustomerLanguage.EN == "en"`, so `language` field naturally stores `"en"` as a string. |
+| 21 | `backend/seeder/customer.py:L79-L84` | `random.choice(list(AgeGroup))` and `age_group.value.split("-")` | Since `AgeGroup(str, enum.Enum)`: `age_group.value` still returns `"20-35"` etc. |
+| 22 | `frontend/src/lib/config.js` | `export const CROP_TYPES = ["Avocado", "Potato"]` | Deprecated — frontend dynamically loads from backend. |
+| 23 | `frontend/src/components/customers/EditCustomerModal.js:L6,L297` | Static `CROP_TYPES` import & select options | Fetches `GET /crop-types/` on component mount. |
+
+---
+
+## 📋 JSON Onboarding Question Schema Specification
+
+### 1. Field Configuration Object Schema
+
+Each element in `onboarding.fields` within `config.json` supports the following schema:
+
+```json
+{
+  "field_name": "string (required, unique field identifier e.g. 'language', 'full_name', 'administration', 'crop_type', 'gender', 'birth_year', 'water_source')",
+  "db_field": "string (optional, Customer model column or profile_data key, default: field_name)",
+  "enabled": "boolean (optional, default: true)",
+  "required": "boolean (optional, default: true)",
+  "priority": "integer (optional, collection sequence order, lower numbers collected first, default: 99)",
+  "field_type": "string ('string' | 'integer' | 'enum' | 'location', default: 'string')",
+  "extraction_method": "string | null (method name in OnboardingService e.g. 'extract_language', 'extract_location', 'extract_crop_type', 'extract_gender', 'extract_birth_year')",
+  "matching_method": "string | null (method name for ambiguity resolution e.g. 'resolve_administration_ambiguity', 'resolve_crop_ambiguity')",
+  "max_attempts": "integer (optional, default: 3)",
+  "questions": "string | object (single prompt string for bilingual welcome questions OR multilingual dict {'en': '...', 'sw': '...' })",
+  "success_messages": "string | object (single message OR multilingual dict {'en': '...', 'sw': '...' } supporting {value} interpolation)"
+}
+```
+
+### 2. Complete Production `config.json` Example
+
+```json
+{
+  "languages": [
+    { "code": "en", "name": "English" },
+    { "code": "sw", "name": "Swahili" }
+  ],
+  "age_groups": [
+    { "label": "20-35", "min": 20, "max": 35 },
+    { "label": "36-50", "min": 36, "max": 50 },
+    { "label": "51+", "min": 51, "max": null }
+  ],
+  "crop_types": ["Avocado", "Potato", "Dairy"],
+  "onboarding": {
+    "enabled": true,
+    "fields": [
+      {
+        "field_name": "language",
+        "db_field": "language",
+        "enabled": true,
+        "required": true,
+        "priority": 0,
+        "field_type": "enum",
+        "extraction_method": "extract_language",
+        "max_attempts": 3,
+        "questions": "Welcome to AgriConnect! 🌱 Your agricultural advisory companion.\nKaribu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\nChoose your language / Chagua lugha yako:\n1. English / Kiingereza\n2. Swahili / Kiswahili",
+        "success_messages": {
+          "en": "Great! Your language preference has been set to English.",
+          "sw": "Vizuri! Lugha uliyopendelea imewekwa kuwa Kiswahili."
+        }
+      },
+      {
+        "field_name": "full_name",
+        "db_field": "full_name",
+        "enabled": true,
+        "required": true,
+        "priority": 1,
+        "field_type": "string",
+        "max_attempts": 1,
+        "questions": {
+          "en": "To get started, I need to know your full name.\n\nPlease tell me: What is your full name?",
+          "sw": "Kuanza, nahitaji majina yako kamili.\n\nTafadhali niambie: Jina lako kamili ni nani?"
+        },
+        "success_messages": {
+          "en": "Thank you, {value}!",
+          "sw": "Asante, {value}!"
+        }
+      },
+      {
+        "field_name": "administration",
+        "db_field": "customer_administrative",
+        "enabled": true,
+        "required": true,
+        "priority": 2,
+        "field_type": "location",
+        "extraction_method": "extract_location",
+        "matching_method": "resolve_administration_ambiguity",
+        "max_attempts": 3,
+        "questions": {
+          "en": "I need to know your location.\n\nPlease tell me your district and ward.\nFor example: Njoro, Lare",
+          "sw": "Ninahitaji kujua eneo lako.\n\nTafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare"
+        },
+        "success_messages": {
+          "en": "Location saved as {value}.",
+          "sw": "Eneo limehifadhiwa kama {value}."
+        }
+      },
+      {
+        "field_name": "crop_type",
+        "db_field": "crop_type",
+        "enabled": true,
+        "required": true,
+        "priority": 3,
+        "field_type": "string",
+        "extraction_method": "extract_crop_type",
+        "matching_method": "resolve_crop_ambiguity",
+        "max_attempts": 3,
+        "questions": {
+          "en": "What crops do you grow?\n\nPlease select from the list below:\n{available_crops}\n\nReply with the number (e.g., '1', '2', etc.)",
+          "sw": "Je, unalima mazao gani?\n\nTafadhali chagua kutoka kwenye orodha hapa chini:\n{available_crops}\n\nJibu kwa namba (mfano, '1', '2', n.k.)"
+        },
+        "success_messages": {
+          "en": "Crop saved as {value}.",
+          "sw": "Zao limehifadhiwa kama {value}."
+        }
+      },
+      {
+        "field_name": "gender",
+        "db_field": "gender",
+        "enabled": true,
+        "required": false,
+        "priority": 4,
+        "field_type": "enum",
+        "extraction_method": "extract_gender",
+        "max_attempts": 2,
+        "questions": {
+          "en": "What is your gender?\n1. Male\n2. Female\n3. Other",
+          "sw": "Jinsia yako ni ipi?\n1. Mwanaume\n2. Mwanamke\n3. Nyingine"
+        },
+        "success_messages": {
+          "en": "Thank you for sharing.",
+          "sw": "Asante kwa kushiriki."
+        }
+      },
+      {
+        "field_name": "birth_year",
+        "db_field": "birth_year",
+        "enabled": true,
+        "required": false,
+        "priority": 5,
+        "field_type": "integer",
+        "extraction_method": "extract_birth_year",
+        "max_attempts": 2,
+        "questions": {
+          "en": "What year were you born (or what is your age)?",
+          "sw": "Ulizaliwa mwaka gani (au una umri gani)?"
+        },
+        "success_messages": {
+          "en": "Birth year saved as {value}.",
+          "sw": "Mwaka wa kuzaliwa umehifadhiwa kama {value}."
+        }
+      }
+    ]
+  }
+}
+```
 
 ---
 
@@ -56,25 +226,30 @@ sequenceDiagram
     autonumber
     actor Farmer as Farmer (WhatsApp)
     participant OS as OnboardingService
+    participant Loader as load_onboarding_fields()
     participant Cfg as config.json → Settings
     participant DB as PostgreSQL<br/>(language VARCHAR(10) + profile_data JSONB)
 
-    Farmer->>OS: "Hello" / "Bonjour"
-    OS->>Cfg: get_active_onboarding_fields()
-    alt fields == [] or enabled == false
-        OS->>DB: onboarding_status = COMPLETED
-        OS-->>Farmer: Welcome / direct advisory
-    else fields present
-        OS->>Cfg: _get_question(field, lang)
-        Cfg-->>OS: Localized question from JSON (i18n fallback)
-        OS-->>Farmer: Question
-        Farmer->>OS: Answer
+    Farmer->>OS: Incoming message
+    OS->>Loader: load_onboarding_fields()
+    Loader->>Cfg: Read settings.onboarding_fields_config
+    Loader-->>OS: Merged active List[OnboardingFieldConfig]
+
+    alt onboarding_enabled == false OR active_fields == []
+        OS->>DB: UPDATE customers SET onboarding_status = 'COMPLETED'
+        OS-->>Farmer: Complete onboarding / direct advisory
+    else has incomplete fields
+        OS->>OS: _get_question(field_config, lang)
+        Note over OS: Resolves questions as string (bilingual welcome)<br/>or dict (localized) with i18n fallback
+        OS-->>Farmer: Question prompt
+        Farmer->>OS: Response
+        OS->>OS: Extract value & format success message
         alt field == language
             OS->>DB: UPDATE customers SET language = 'fr' (plain VARCHAR)
         else profile field
             OS->>DB: UPDATE profile_data[field_name] = value
         end
-        Note over OS: All language reads use<br/>customer.language or "en"<br/>(no more .value calls)
+        OS-->>Farmer: Success message + next question
     end
 ```
 
@@ -277,9 +452,9 @@ All `customer.language.value` patterns must become `customer.language or setting
 
 ---
 
-### T-006: Dynamic Onboarding Schema (`backend/schemas/onboarding_schemas.py`)
+### T-006: Dynamic Onboarding Schema & Loader (`backend/schemas/onboarding_schemas.py`)
 
-Add `questions` and `success_messages` to `OnboardingFieldConfig`:
+Add `questions` and `success_messages` supporting `Union[Dict[str, str], str]` to `OnboardingFieldConfig`:
 
 ```python
 @dataclass
@@ -293,26 +468,82 @@ class OnboardingFieldConfig:
     matching_method: Optional[str] = None
     max_attempts: int = 3
     field_type: str = "string"
-    questions: Optional[dict] = None        # {"en": "...", "sw": "..."}
-    success_messages: Optional[dict] = None # {"en": "...", "sw": "..."}
+    questions: Optional[Union[Dict[str, str], str]] = None        # string OR {"en": "...", "sw": "..."}
+    success_messages: Optional[Union[Dict[str, str], str]] = None # string OR {"en": "...", "sw": "..."}
+    success_message_template: Optional[str] = None
 ```
 
-Add `load_onboarding_fields()` to merge config JSON fields with hardcoded defaults (config takes priority if both exist for same `field_name`).
+Implement `load_onboarding_fields()` merging runtime overrides from `settings.onboarding_fields_config` with default `ONBOARDING_FIELDS` and custom partner fields:
+
+```python
+def load_onboarding_fields() -> List[OnboardingFieldConfig]:
+    config_fields = settings.onboarding_fields_config
+    if not config_fields:
+        return [f for f in ONBOARDING_FIELDS if f.enabled]
+
+    fields_map = {
+        f.field_name: OnboardingFieldConfig(**f.__dict__)
+        for f in ONBOARDING_FIELDS
+    }
+    custom_fields = []
+
+    for cfg in config_fields:
+        name = cfg.get("field_name")
+        if not name:
+            continue
+        base = fields_map.get(name)
+        if base:
+            fields_map[name] = OnboardingFieldConfig(
+                field_name=name,
+                db_field=cfg.get("db_field", base.db_field),
+                enabled=cfg.get("enabled", base.enabled),
+                required=cfg.get("required", base.required),
+                priority=cfg.get("priority", base.priority),
+                extraction_method=cfg.get("extraction_method", base.extraction_method),
+                matching_method=cfg.get("matching_method", base.matching_method),
+                max_attempts=cfg.get("max_attempts", base.max_attempts),
+                field_type=cfg.get("field_type", base.field_type),
+                questions=(cfg.get("questions") or cfg.get("question") or base.questions),
+                success_messages=(cfg.get("success_messages") or cfg.get("success_message") or base.success_messages),
+                success_message_template=cfg.get("success_message_template", base.success_message_template),
+            )
+        else:
+            custom_fields.append(
+                OnboardingFieldConfig(
+                    field_name=name,
+                    db_field=cfg.get("db_field", name),
+                    enabled=cfg.get("enabled", True),
+                    required=cfg.get("required", True),
+                    priority=cfg.get("priority", 99),
+                    extraction_method=cfg.get("extraction_method"),
+                    matching_method=cfg.get("matching_method"),
+                    max_attempts=cfg.get("max_attempts", 3),
+                    field_type=cfg.get("field_type", "string"),
+                    questions=cfg.get("questions") or cfg.get("question"),
+                    success_messages=(cfg.get("success_messages") or cfg.get("success_message")),
+                    success_message_template=cfg.get("success_message_template"),
+                )
+            )
+
+    all_fields = list(fields_map.values()) + custom_fields
+    enabled_fields = [f for f in all_fields if f.enabled]
+    enabled_fields.sort(key=lambda f: f.priority)
+    return enabled_fields
+```
 
 ---
 
 ### T-007: Dynamic Service Helpers (`backend/services/onboarding_service.py`)
 
 **`_get_question(field, lang)`**:
-1. Look for `field.questions[lang]` in config
-2. Fallback to `field.questions["en"]` if lang not found
-3. Final fallback to `t(f"onboarding.{field.field_name}.question", lang)` from `i18n.py`
+1. Check `field.questions` (supports plain string prompt or localized dictionary `field.questions[lang]` with `"en"`/default fallback)
+2. Final fallback to `t(f"onboarding.{field.field_name}.question", lang)` from `i18n.py`
 
-**`_get_success_message(field, lang, **kwargs)`**:
-1. Look for `field.success_messages[lang]` in config
-2. Fallback to `field.success_messages["en"]`
-3. Final fallback to `t(f"onboarding.{field.field_name}.success", lang)` from `i18n.py`
-4. `str.format(**kwargs)` for `{value}` interpolation
+**`_get_success_message(field, lang, value, **kwargs)`**:
+1. Check `field.success_messages` (supports plain string or dictionary `field.success_messages[lang]`)
+2. Final fallback to `t(f"onboarding.{field.field_name}.success", lang)` from `i18n.py`
+3. Fallback to `field.success_message_template`
+4. Interpolate with `value` or kwargs
 
 **`_generate_profile_summary()` — dynamic**:
 ```python
@@ -374,7 +605,7 @@ def get_crop_name_translated(crop_name: str, lang: str) -> str:
     return t(f"crops.{crop_name}.name", lang)
 
 # AFTER — safe fallback
-def get_crop_name_translated(crop_name: str, lang: str) -> str:
+def get_crop_name_translated(crop_name: str, lang: str = "en") -> str:
     key = f"crops.{crop_name}.name"
     result = t(key, lang)
     # t() returns the key path itself if not found — detect and fall back
@@ -406,6 +637,7 @@ useEffect(() => {
 - `tests/test_customer_list.py` — uses `CustomerLanguage.EN` (still valid: `"en" == CustomerLanguage.EN` after `str, enum.Enum`)
 - `tests/test_skip_optional_onboarding.py` — uses `CustomerLanguage.EN` — same
 - `tests/test_hierarchical_access.py` — same
+- `tests/test_generic_onboarding.py` & `tests/test_onboarding_lang_pref.py` — 110 onboarding tests
 
 ### New Test Suite (`backend/tests/test_onboarding_config.py`) — 19 scenarios:
 
@@ -433,20 +665,20 @@ useEffect(() => {
 
 ---
 
-## ⏱️ Estimation
+## ⏱️ Estimation & Status
 
-| Task | Description | Est. Hours |
-|---|---|---|
-| **T-001** | Alembic Migration (`language` → VARCHAR) | 1h–1.5h |
-| **T-002** | Model: `(str, enum.Enum)`, `String(10)`, dynamic `age_group` | 1h–1.5h |
-| **T-003** | Schema: remove enum types from Pydantic schemas | 0.5h–1h |
-| **T-004** | Config layer: `languages`, `age_groups`, `crop_types`, `onboarding` | 1.5h–2h |
-| **T-005** | Language `.value` cascade fix across 5 service files | 2h–3h |
-| **T-006** | Dynamic onboarding schema + loader | 1.5h–2h |
-| **T-007** | Service helpers: `_get_question`, `_get_success_message`, `_generate_profile_summary`, `_filter_by_age_groups`, i18n fix | 2.5h–3.5h |
-| **T-008** | Frontend dynamic crops | 1h–1.5h |
-| **T-009** | New test suite (19 cases) + regression suite | 3h–4h |
-| **T-010** | Linting, integration, final verification | 1h–2h |
+| Task | Description | Status | Est. Hours |
+|---|---|---|---|
+| **T-001** | Alembic Migration (`language` → VARCHAR) | `COMPLETED` | 1h–1.5h |
+| **T-002** | Model: `(str, enum.Enum)`, `String(10)`, dynamic `age_group` | `COMPLETED` | 1h–1.5h |
+| **T-003** | Schema: remove enum types from Pydantic schemas | `COMPLETED` | 0.5h–1h |
+| **T-004** | Config layer: `languages`, `age_groups`, `crop_types`, `onboarding` | `COMPLETED` | 1.5h–2h |
+| **T-005** | Language `.value` cascade fix across 5 service files | `COMPLETED` | 2h–3h |
+| **T-006** | Dynamic onboarding schema + JSON loader | `COMPLETED` | 1.5h–2h |
+| **T-007** | Service helpers: `_get_question`, `_get_success_message`, dynamic summary & age filter | `COMPLETED` | 2.5h–3.5h |
+| **T-008** | Frontend dynamic crops (`EditCustomerModal.js`) | `READY` | 1h–1.5h |
+| **T-009** | Dedicated test suite (`tests/test_onboarding_config.py` — 19 cases) | `READY` | 3h–4h |
+| **T-010** | Full regression & verification | `READY` | 1h–2h |
 
-**Total: 15h–21.5h**
-**Confidence: High**
+**Total Estimate:** 15h–21.5h
+**Confidence Level:** High
