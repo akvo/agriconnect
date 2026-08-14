@@ -36,3 +36,6 @@ backend/config.test.json
 
 # Internal Notes
 notes/
+.agent/
+agent_docs/
+task.md
