@@ -431,32 +431,34 @@ class CustomerService:
 
         age_conditions = []
         for age_group in age_groups:
-            if age_group == "20-35":
-                min_birth_year = current_year - 35
-                max_birth_year = current_year - 20
-            elif age_group == "36-50":
-                min_birth_year = current_year - 50
-                max_birth_year = current_year - 36
-            elif age_group == "51+":
-                min_birth_year = 1900
-                max_birth_year = current_year - 51
-            else:
+            matching_group = next(
+                (
+                    g
+                    for g in settings.age_groups
+                    if g.get("label") == age_group
+                ),
+                None,
+            )
+            if not matching_group:
                 continue
 
-            age_conditions.append(
-                and_(
-                    cast(
-                        Customer.profile_data.op("->>")("birth_year"),
-                        Integer,
-                    )
-                    >= min_birth_year,
-                    cast(
-                        Customer.profile_data.op("->>")("birth_year"),
-                        Integer,
-                    )
-                    <= max_birth_year,
-                )
+            min_age = matching_group.get("min")
+            max_age = matching_group.get("max")
+
+            conditions = []
+            birth_year_expr = cast(
+                Customer.profile_data.op("->>")("birth_year"),
+                Integer,
             )
+            if max_age is not None:
+                min_birth_year = current_year - max_age
+                conditions.append(birth_year_expr >= min_birth_year)
+            if min_age is not None:
+                max_birth_year = current_year - min_age
+                conditions.append(birth_year_expr <= max_birth_year)
+
+            if conditions:
+                age_conditions.append(and_(*conditions))
 
         if age_conditions:
             query = query.filter(or_(*age_conditions))

@@ -32,8 +32,10 @@ from services.external_ai_service import ExternalAIService
 from services.socketio_service import sio_app
 from database import SessionLocal
 
-# from tasks.retry_scheduler import start_retry_scheduler, stop_retry_scheduler
-
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
