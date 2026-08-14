@@ -854,43 +854,59 @@ Candidates: ["Avocado", "Cacao"]
 
     async def extract_language(self, message: str) -> Optional[str]:
         """
-        Extract language preference from farmer's message.
+        Extract language preference dynamically from settings.languages.
 
-        Handles various input formats:
-        - Direct: "English", "Swahili", "Kiswahili"
-        - Numbers: "1" → English, "2" → Swahili
-        - Language codes: "en", "sw"
-        - Partial: "eng", "swa"
-
-        Args:
-            message: Farmer's message text
-
-        Returns:
-            CustomerLanguage enum (EN or SW) or None
+        Handles:
+        - Numbers: "1" -> first configured language, "2" -> second, etc.
+        - Direct codes or names matching settings.languages
+        - OpenAI structured extraction fallback
         """
         message_lower = message.lower().strip()
-
-        # Direct mapping for common inputs
-        english_patterns = [
-            "1",
-            "english",
-            "en",
-            "eng",
-            "ingereza",
-            "kiingereza",
-        ]
-        swahili_patterns = ["2", "swahili", "sw", "swa", "kiswahili"]
-
-        if any(pattern in message_lower for pattern in english_patterns):
-            logger.info("[OnboardingService] Language extracted: English")
-            return "en"
-
-        if any(pattern in message_lower for pattern in swahili_patterns):
-            logger.info("[OnboardingService] Language extracted: Swahili")
-            return "sw"
-
-        # Fallback to OpenAI for unclear inputs
+        configured_languages = settings.languages
         supported_codes = settings.supported_language_codes
+
+        # 1. Number selection (1-based index)
+        if message_lower.isdigit():
+            index = int(message_lower) - 1
+            if 0 <= index < len(configured_languages):
+                selected_code = configured_languages[index].get("code")
+                logger.info(
+                    f"[OnboardingService] Language selected by index "
+                    f"{index + 1}: {selected_code}"
+                )
+                return selected_code
+
+        # 2. Match against configured language code or name
+        for lang_item in configured_languages:
+            code = lang_item.get("code", "").lower()
+            name = lang_item.get("name", "").lower()
+            if code and message_lower == code:
+                return lang_item.get("code")
+            if name and name in message_lower:
+                return lang_item.get("code")
+
+        # 3. Known aliases for standard languages
+        aliases = {
+            "english": "en",
+            "eng": "en",
+            "ingereza": "en",
+            "kiingereza": "en",
+            "swahili": "sw",
+            "swa": "sw",
+            "kiswahili": "sw",
+            "indonesia": "id",
+            "bahasa": "id",
+            "bahasa indonesia": "id",
+            "indo": "id",
+        }
+        for alias, code in aliases.items():
+            if alias in message_lower and code in supported_codes:
+                logger.info(
+                    f"[OnboardingService] Language matched by alias: {code}"
+                )
+                return code
+
+        # 4. Fallback to OpenAI for unclear inputs
         system_prompt = (
             "You are extracting language preference from messages.\n"
             f"Extract and normalize to one of: {', '.join(supported_codes)}\n"
@@ -906,32 +922,64 @@ Candidates: ["Avocado", "Cacao"]
             },
         ]
 
-        response = await self.openai_service.structured_output(
-            messages=messages,
-            response_format={
-                "type": "object",
-                "properties": {
-                    "language": {
-                        "type": ["string", "null"],
-                        "enum": supported_codes + [None],
+        try:
+            response = await self.openai_service.structured_output(
+                messages=messages,
+                response_format={
+                    "type": "object",
+                    "properties": {
+                        "language": {
+                            "type": ["string", "null"],
+                            "enum": supported_codes + [None],
+                        },
                     },
                 },
-            },
-        )
-
-        if not response or not response.data.get("language"):
-            logger.info(
-                f"[OnboardingService] No language extracted from: {message}"
             )
-            return None
 
-        language_value = response.data["language"]
-        if language_value in supported_codes:
-            logger.info(
-                f"[OnboardingService] Extracted language: {language_value}"
+            if not response or not response.data.get("language"):
+                logger.info(
+                    f"[OnboardingService] No language extracted from: "
+                    f"{message}"
+                )
+                return None
+
+            language_value = response.data["language"]
+            if language_value in supported_codes:
+                logger.info(
+                    f"[OnboardingService] Extracted language: {language_value}"
+                )
+                return language_value
+        except Exception as e:
+            logger.error(
+                f"[OnboardingService] AI language extraction error: {e}"
             )
-            return language_value
 
+        return None
+
+    async def extract_name(self, message: str) -> Optional[str]:
+        """
+        Extract farmer's name from message.
+        Strips common introductory conversational phrases and trims whitespace.
+        """
+        cleaned = message.strip()
+        prefixes = [
+            "my name is ",
+            "i am ",
+            "i'm ",
+            "nama saya ",
+            "namaku ",
+            "saya ",
+            "jina langu ni ",
+            "naitwa ",
+            "mimi ni ",
+        ]
+        for prefix in prefixes:
+            if cleaned.lower().startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+                break
+
+        if cleaned:
+            return cleaned.title()
         return None
 
     async def extract_gender(self, message: str) -> Optional[str]:
@@ -1548,7 +1596,15 @@ Birth year must be between 1900 and {current_year}."""
             # No extraction method defined - save raw message
             return self._save_field_value(customer, message, field_config)
         try:
-            extraction_method = getattr(self, field_config.extraction_method)
+            extraction_method = getattr(
+                self, field_config.extraction_method, None
+            )
+            if extraction_method is None:
+                logger.warning(
+                    f"Extraction method '{field_config.extraction_method}' "
+                    f"not found on OnboardingService. Saving raw message."
+                )
+                return self._save_field_value(customer, message, field_config)
             extracted_value = await extraction_method(message)
         except Exception as e:
             logger.error(

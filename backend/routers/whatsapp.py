@@ -275,7 +275,13 @@ async def whatsapp_webhook(
         delete_keywords = ["delete", "futa"]
         # Define confirmation responses (in supported languages)
         confirm_responses = [
-            "yes", "ok", "okay", "ndio", "ndiyo", "sawa", "confirm"
+            "yes",
+            "ok",
+            "okay",
+            "ndio",
+            "ndiyo",
+            "sawa",
+            "confirm",
         ]
 
         body_stripped = Body.strip().lower()
@@ -299,7 +305,7 @@ async def whatsapp_webhook(
                 )
                 return {
                     "status": "success",
-                    "message": "Account deleted by customer request"
+                    "message": "Account deleted by customer request",
                 }
             else:
                 # Customer didn't confirm - cancel delete request
@@ -323,10 +329,7 @@ async def whatsapp_webhook(
                 f"confirmation sent"
             )
             # Don't record the "delete" message - return early
-            return {
-                "status": "success",
-                "message": "Delete confirmation sent"
-            }
+            return {"status": "success", "message": "Delete confirmation sent"}
 
         # ========================================
         # DATA CONSENT CHECK (after language, before other fields)
@@ -342,8 +345,22 @@ async def whatsapp_webhook(
 
             # Check for affirmative response
             consent_responses = [
-                "yes", "ok", "okay", "ndio", "ndiyo", "sawa", "agree",
-                "i agree", "accepted", "accept", "kubali", "nakubali"
+                "yes",
+                "ok",
+                "okay",
+                "ndio",
+                "ndiyo",
+                "sawa",
+                "agree",
+                "i agree",
+                "accepted",
+                "accept",
+                "kubali",
+                "nakubali",
+                "ya",
+                "setuju",
+                "oke",
+                "y",
             ]
             if Body.lower().strip() in consent_responses:
                 # Consent given - mark and continue to onboarding
@@ -366,7 +383,7 @@ async def whatsapp_webhook(
 
                 return {
                     "status": "success",
-                    "message": "Consent declined, customer deleted"
+                    "message": "Consent declined, customer deleted",
                 }
 
         # ========================================
@@ -490,12 +507,12 @@ async def whatsapp_webhook(
                 db.query(WeatherBroadcastRecipient)
                 .join(
                     Customer,
-                    Customer.id == WeatherBroadcastRecipient.customer_id
+                    Customer.id == WeatherBroadcastRecipient.customer_id,
                 )
                 .filter(
                     Customer.phone_number == phone_number,
                     WeatherBroadcastRecipient.status == DeliveryStatus.SENT,
-                    WeatherBroadcastRecipient.actual_message_sid.is_(None)
+                    WeatherBroadcastRecipient.actual_message_sid.is_(None),
                 )
                 .order_by(WeatherBroadcastRecipient.created_at.desc())
                 .first()
@@ -575,19 +592,13 @@ async def whatsapp_webhook(
         # NOTE: Text responses like "yes"/"no" should only be checked when
         # ButtonPayload is None to avoid conflicts with other buttons
         # (e.g., escalate button with "Yes" text triggering weather sub)
-        is_weather_yes = (
-            ButtonPayload == weather_yes_payload
-            or (
-                ButtonPayload is None
-                and Body.lower().strip() in ["1", "yes", "ndio", "ndiyo"]
-            )
+        is_weather_yes = ButtonPayload == weather_yes_payload or (
+            ButtonPayload is None
+            and Body.lower().strip() in ["1", "yes", "ndio", "ndiyo"]
         )
-        is_weather_no = (
-            ButtonPayload == weather_no_payload
-            or (
-                ButtonPayload is None
-                and Body.lower().strip() in ["2", "no", "hapana"]
-            )
+        is_weather_no = ButtonPayload == weather_no_payload or (
+            ButtonPayload is None
+            and Body.lower().strip() in ["2", "no", "hapana"]
         )
 
         # Process if customer was asked about weather subscription
@@ -763,7 +774,8 @@ async def whatsapp_webhook(
                         media_url=message.media_url,
                         media_type=(
                             message.media_type.value
-                            if message.media_type else "TEXT"
+                            if message.media_type
+                            else "TEXT"
                         ),
                     )
                 )
@@ -1043,11 +1055,11 @@ async def whatsapp_webhook(
                             reconnection_service = ReconnectionService(db)
                             reconnection_service.update_customer_last_message(
                                 customer_id=customer.id,
-                                from_source=MessageFrom.LLM
+                                from_source=MessageFrom.LLM,
                             )
                         return {
                             "status": "success",
-                            "message": "Follow-up question sent"
+                            "message": "Follow-up question sent",
                         }
 
             # Format chat history
