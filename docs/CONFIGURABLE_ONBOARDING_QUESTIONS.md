@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-14
 **Author:** Galih Pratama
-**Status:** Planned / Revised
-**Objective:** Decouple hardcoded onboarding questions, field definitions, priorities, localized prompt messages, profile summary generation, and static frontend/backend constants into dynamic JSON configuration schema and API-driven UI, backed by a one-time Alembic migration converting `customers.language` to `VARCHAR(10)` for truly generic, dynamic scaling (e.g., Agriculture EN/SW → Water Management EN/FR → Empty/Bypass).
+**Status:** Planned / Comprehensive Audit
+**Objective:** Decouple hardcoded onboarding questions, field definitions, priorities, localized prompt messages, profile summary generation, static model assumptions, and hardcoded config defaults into dynamic JSON configuration schema and API-driven UI, backed by a one-time Alembic migration converting `customers.language` to `VARCHAR(10)` for truly generic multi-partner scaling (e.g., Agriculture EN/SW → Water Management EN/FR → Empty/Bypass).
 
 ---
 
@@ -22,11 +22,14 @@ To achieve this:
 3. **Decouple Static Model Properties (`models/customer.py:L81-L124`)**:
    - `birth_year`, `crop_type`, `gender`, `age`, `age_group` are retained as convenience accessors over `profile_data` for backward compatibility.
    - Any dynamic partner field (e.g. `water_source`) is accessed universally via `customer.get_profile_field("field_name")`.
-4. **Dynamic Profile Summary Generation (`_generate_profile_summary`)**:
-   - Replace the static 6-line summary (`f_lang`, `f_name`, `f_administration`, `f_crop_type`, `f_gender`, `f_age`) in `OnboardingService`.
+4. **Config Fallbacks Decoupling (`config.py:L259`)**:
+   - Change `crop_types` fallback in `config.py` from hardcoded `["Avocado", "Cacao"]` to empty list `[]` (sole source of truth is `config.json`).
+   - Fix `get_crop_name_translated` in `i18n.py` to return the crop name as-is if translation key is missing, rather than the raw `crops.X.name` path.
+5. **Dynamic Profile Summary Generation (`_generate_profile_summary`)**:
+   - Replace the static 6-line template (`Language`, `Name`, `Location`, `Crop Type`, `Gender`, `Age`) in `OnboardingService`.
    - Generate summary dynamically by iterating over **active configured fields** in `config.json`. If a field was disabled or omitted (e.g., `crop_type` or `gender` not asked), it will NOT appear in the summary.
-5. **Configurable JSON Questions & Flow**: Move all field configurations, questions, translations, retry limits, and priorities to `config.json` (`"onboarding": { "enabled": true, "fields": [...] }`). Support empty arrays `[]` to completely bypass onboarding.
-6. **Frontend Decoupling**: Remove hardcoded `CROP_TYPES` in `frontend/src/lib/config.js` and `frontend/src/components/customers/EditCustomerModal.js`, replacing it with dynamic loading from the existing backend endpoint `GET /crop-types/` (which reads from `config.json`).
+6. **Configurable JSON Questions & Flow**: Move all field configurations, questions, translations, retry limits, and priorities to `config.json` (`"onboarding": { "enabled": true, "fields": [...] }`). Support empty arrays `[]` to completely bypass onboarding.
+7. **Frontend Decoupling**: Remove hardcoded `CROP_TYPES` in `frontend/src/lib/config.js` and `frontend/src/components/customers/EditCustomerModal.js`, replacing it with dynamic loading from the existing backend endpoint `GET /crop-types/` (which reads from `config.json`).
 
 ---
 
@@ -78,27 +81,22 @@ sequenceDiagram
 
 ---
 
-## 🎯 Design Principles & Constraints
+## 🔍 Deep-Down Audit: All Hardcoded / Static Configurations
 
-1. **One-Time Clean Migration**:
-   - `customers.language` becomes `VARCHAR(10)`. The old `customerlanguage` PostgreSQL enum is cleanly converted using `LOWER(language::text)` and dropped.
-   - Future partner deployments with any language code (`fr`, `es`, `de`, `rw`, etc.) require zero additional DB schema changes.
-
-2. **Dynamic Profile Summary**:
-   - Profile summary at onboarding completion is built dynamically from active `self.fields_config` fields only. If `gender` or `crop_type` is not configured, it is completely absent from the completion message.
-
-3. **Decoupled Model Access**:
-   - `Customer` properties (`crop_type`, `gender`, `birth_year`, `age`, `age_group`) remain non-breaking convenience accessors over `profile_data`. Any generic or partner-specific field is accessible via `get_profile_field(name)` / `set_profile_field(name, value)`.
-
-4. **Empty / Bypass Support (`"fields": []`)**:
-   - If `"fields": []` is configured or `"enabled": false`, onboarding is instantly completed on the user's first interaction.
-
-5. **Multi-Language Adaptability in Config**:
-   - Supports arbitrary language codes (`en`, `sw`, `fr`, `es`, etc.) inside the `questions` and `success_messages` dictionaries in `config.json`.
+| Location | Static Item | Issue / Risk | Target Decoupling |
+|---|---|---|---|
+| `backend/config.py:L259` | `crop_types: list = _config.get("crop_types", ["Avocado", "Cacao"])` | Hardcoded fallback crops force agriculture onto non-crop partners (e.g. water/health) | Change default fallback to `[]`. Make `config.json` the sole source of truth. |
+| `backend/models/customer.py:L47` | `language = Column(Enum(CustomerLanguage), ...)` | Postgres enum `customerlanguage` (`'EN'`, `'SW'`) rejects any new partner language code (e.g. `'fr'`) | One-time Alembic migration alters column to `VARCHAR(10)` and drops enum. |
+| `backend/models/customer.py:L17-L19` | `class CustomerLanguage(enum.Enum): EN = "en", SW = "sw"` | Enum not string-comparable in all standard operations | Change to `class CustomerLanguage(str, enum.Enum)` for 100% backward compatibility. |
+| `backend/models/customer.py:L81-L124` | Static property getters (`birth_year`, `crop_type`, `gender`, `age`, `age_group`) | Hardcoded agricultural assumptions on Customer model | Keep properties as backward-compatible helpers; use `get_profile_field()` / `set_profile_field()` universally for arbitrary partner fields. |
+| `backend/services/onboarding_service.py:L2047-L2090` | `_generate_profile_summary()` | Hardcodes 6 static fields in summary (`Language`, `Name`, `Location`, `Crop Type`, `Gender`, `Age`), printing `N/A` for unconfigured fields | Dynamically iterate over `self.fields_config`. Only active configured fields are included. |
+| `backend/utils/i18n.py:L632-L644` | `get_crop_name_translated()` | Missing crop keys return the raw lookup string `"crops.Maize.name"` | Return `crop_name` as fallback when translation key is absent. |
+| `frontend/src/lib/config.js` | `export const CROP_TYPES = ["Avocado", "Potato"];` | Hardcoded crops in frontend config | Deprecate static array; provide dynamic fetching from `GET /crop-types/`. |
+| `frontend/src/components/customers/EditCustomerModal.js` | Static `CROP_TYPES` import & select options | Cannot reflect partner's configured crops from `config.json` | Fetch crops dynamically via `api.get("/crop-types/")` on mount. |
 
 ---
 
-## 📐 System Audit: Models, Summaries, Migrations & Frontend
+## 🛠️ Technical Specification
 
 ### 1. Database & Alembic Migration
 
@@ -122,21 +120,116 @@ def downgrade() -> None:
     )
 ```
 
-### 2. Backend Models Audit (`backend/models/customer.py:L47, L81-L124`)
-
-| Element | Location | Previous Implementation | Target Dynamic Implementation |
-|---|---|---|---|
-| `Customer.language` | L47 | `Column(Enum(CustomerLanguage), ...)` | `Column(String(10), default=None, nullable=True)` |
-| `CustomerLanguage` | L17-L19 | `class CustomerLanguage(enum.Enum): EN = "en", SW = "sw"` | `class CustomerLanguage(str, enum.Enum): EN = "en", SW = "sw"` (StringEnum for full backward compatibility) |
-| `Customer.birth_year` | L83-L88 | `@property def birth_year(...)` | Keep as convenience property on `self.profile_data.get("birth_year")` |
-| `Customer.crop_type` | L90-L95 | `@property def crop_type(...)` | Keep as convenience property on `self.profile_data.get("crop_type")` |
-| `Customer.gender` | L97-L102 | `@property def gender(...)` | Keep as convenience property on `self.profile_data.get("gender")` |
-| `Customer.age` & `Customer.age_group` | L104-L124 | `@property def age(...)` & `@property def age_group(...)` | Keep as computed properties. Return `None` safely if `birth_year` is absent. |
-| Dynamic Fields Access | L226-L247 | `get_profile_field()`, `set_profile_field()` | Primary universal interface for any partner custom fields (`water_source`, `irrigation`, etc.). |
-
-### 3. Dynamic Profile Summary in `OnboardingService` (`L2047-L2090`)
+### 2. Backend Config Updates (`backend/config.py`)
 
 ```python
+    # Crop types configuration (sole source of truth from config.json)
+    crop_types: list = _config.get("crop_types", [])
+
+    # Onboarding configuration
+    onboarding_enabled: bool = _config.get("onboarding", {}).get("enabled", True)
+    onboarding_fields_config: list = _config.get("onboarding", {}).get("fields", [])
+```
+
+### 3. Backend Model Updates (`backend/models/customer.py`)
+
+```python
+class CustomerLanguage(str, enum.Enum):
+    EN = "en"
+    SW = "sw"
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    phone_number = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=True)
+    # Generic string column for dynamic language codes (e.g. 'en', 'sw', 'fr', 'es', 'rw')
+    language = Column(String(10), default=None, nullable=True)
+    profile_data = Column(JSON, nullable=True)
+```
+
+### 4. Schemas (`backend/schemas/customer.py` & `backend/schemas/onboarding_schemas.py`)
+
+```python
+# In schemas/customer.py:
+class CustomerBase(BaseModel):
+    phone_number: str
+    full_name: Optional[str] = None
+    language: Optional[str] = None
+    crop_type: Optional[str] = None
+    gender: Optional[Union[Gender, str]] = None
+    age: Optional[int] = None
+```
+
+```python
+# In schemas/onboarding_schemas.py:
+@dataclass
+class OnboardingFieldConfig:
+    field_name: str
+    db_field: str
+    required: bool
+    priority: int
+    extraction_method: Optional[str]
+    matching_method: Optional[str]
+    max_attempts: int
+    field_type: str
+    success_message_template: str
+    enabled: bool = True
+    questions: Optional[Dict[str, str]] = None
+    success_messages: Optional[Dict[str, str]] = None
+
+def load_onboarding_fields() -> List[OnboardingFieldConfig]:
+    """Load fields from config.json or fall back to defaults if missing/unspecified."""
+    from config import settings
+    cfg = settings.onboarding_fields_config
+    if not settings.onboarding_enabled or cfg is None:
+        return []
+    if len(cfg) == 0:
+        return _DEFAULT_ONBOARDING_FIELDS  # Backward-compatible default
+
+    fields = []
+    for item in cfg:
+        default = _get_default_field(item.get("field_name"))
+        fields.append(OnboardingFieldConfig(
+            field_name=item["field_name"],
+            db_field=item.get("db_field", default.db_field if default else item["field_name"]),
+            required=item.get("required", default.required if default else False),
+            priority=item.get("priority", default.priority if default else 99),
+            extraction_method=item.get("extraction_method", default.extraction_method if default else None),
+            matching_method=item.get("matching_method", default.matching_method if default else None),
+            max_attempts=item.get("max_attempts", default.max_attempts if default else 1),
+            field_type=item.get("field_type", default.field_type if default else "string"),
+            success_message_template=default.success_message_template if default else "",
+            enabled=item.get("enabled", True),
+            questions=item.get("questions"),
+            success_messages=item.get("success_messages"),
+        ))
+    return fields
+```
+
+### 5. Service Resolution & Dynamic Summary (`backend/services/onboarding_service.py`)
+
+```python
+def _get_question(self, field_config: OnboardingFieldConfig, lang: str) -> str:
+    """Resolve question from JSON config -> English JSON config -> i18n.py."""
+    if field_config.questions:
+        text = field_config.questions.get(lang) or field_config.questions.get("en")
+        if text:
+            return text
+    return t(f"onboarding.{field_config.field_name}.question", lang)
+
+def _get_success_message(self, field_config: OnboardingFieldConfig, lang: str, **kwargs) -> str:
+    """Resolve success message with formatting parameters."""
+    if field_config.success_messages:
+        text = field_config.success_messages.get(lang) or field_config.success_messages.get("en")
+        if text:
+            try:
+                return text.format(**kwargs)
+            except KeyError:
+                return text
+    return t(f"onboarding.{field_config.field_name}.success", lang, **kwargs)
+
 def _generate_profile_summary(self, customer: Customer, lang: str) -> str:
     """Dynamically build profile summary from active configured fields only."""
     if not self.fields_config:
@@ -150,7 +243,6 @@ def _generate_profile_summary(self, customer: Customer, lang: str) -> str:
         field_name = field.field_name
         label = t(f"onboarding.{field_name}.field_name", lang)
 
-        # Get display value for field
         if field_name == "language":
             val = customer.language or "en"
             display_val = "English" if val == "en" else ("Swahili" if val == "sw" else val)
@@ -161,14 +253,13 @@ def _generate_profile_summary(self, customer: Customer, lang: str) -> str:
             if hasattr(customer, "customer_administrative") and customer.customer_administrative:
                 display_val = customer.customer_administrative[0].administrative.path
         elif field_name == "crop_type":
-            display_val = t(f"crops.{customer.crop_type}.name", lang) if customer.crop_type else "N/A"
+            display_val = get_crop_name_translated(customer.crop_type, lang) if customer.crop_type else "N/A"
         elif field_name == "gender":
             display_val = t(f"gender.{customer.gender}", lang) if customer.gender else "N/A"
         elif field_name == "birth_year":
             label = t("onboarding.common.age", lang)
             display_val = str(customer.age) if customer.age else "N/A"
         else:
-            # Generic custom partner field (e.g. water_source)
             raw_val = customer.get_profile_field(field_name)
             display_val = str(raw_val) if raw_val is not None else "N/A"
 
@@ -177,161 +268,38 @@ def _generate_profile_summary(self, customer: Customer, lang: str) -> str:
     return "\n".join(summary_lines)
 ```
 
-### 4. Frontend Decoupling Audit (`frontend/`)
-
-| File | Current Hardcoded Pattern | Target Solution |
-|---|---|---|
-| `frontend/src/lib/config.js` | `export const CROP_TYPES = ["Avocado", "Potato"];` | Deprecate static array; provide fallback only for offline / error states. |
-| `frontend/src/components/customers/EditCustomerModal.js` | Imports `CROP_TYPES` from `@/lib/config` | Fetch crop types dynamically on mount via `api.get("/crop-types/")`. Populate select options from API response. |
-| `frontend/src/components/customers/CreateCustomerModal.js` & `EditCustomerModal.js` | Hardcoded language select (`en`, `sw`) | Extensible language options with dynamic display fallback. |
-| `frontend/src/components/customers/CustomerList.js` | `getLanguageLabel()` switch case | Keep generic fallback `default: return language;` so codes like `fr` render cleanly. |
-
----
-
-## 🛠️ Technical Specification
-
-### 1. JSON Configuration Schema (`config.json` / `config.template.json` / `config.test.template.json`)
-
-```json
-{
-  "onboarding": {
-    "enabled": true,
-    "fields": [
-      {
-        "field_name": "language",
-        "db_field": "language",
-        "enabled": true,
-        "required": true,
-        "priority": 0,
-        "extraction_method": "extract_language",
-        "matching_method": null,
-        "max_attempts": 3,
-        "field_type": "string",
-        "questions": {
-          "en": "Welcome to AgriConnect! 🌱 Your agricultural advisory companion.\nKaribu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\nChoose your language / Chagua lugha yako:\n1. English / Kiingereza\n2. Swahili / Kiswahili",
-          "sw": "Karibu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\nChagua lugha yako:\n1. Kiingereza\n2. Kiswahili"
-        },
-        "success_messages": {
-          "en": "Great! Your language preference has been set to English.",
-          "sw": "Vizuri! Lugha uliyopendelea imewekwa kuwa Kiswahili."
-        }
-      },
-      {
-        "field_name": "full_name",
-        "db_field": "full_name",
-        "enabled": true,
-        "required": true,
-        "priority": 1,
-        "extraction_method": null,
-        "matching_method": null,
-        "max_attempts": 1,
-        "field_type": "string",
-        "questions": {
-          "en": "To get started, I need to know your full name.\n\nPlease tell me: What is your full name?",
-          "sw": "Kuanza, nahitaji majina yako kamili.\n\nTafadhali niambie: Jina lako kamili ni nani?"
-        },
-        "success_messages": {
-          "en": "Thank you, {value}!",
-          "sw": "Asante, {value}!"
-        }
-      },
-      {
-        "field_name": "administration",
-        "db_field": "customer_administrative",
-        "enabled": true,
-        "required": true,
-        "priority": 2,
-        "extraction_method": "extract_location",
-        "matching_method": "resolve_administration_ambiguity",
-        "max_attempts": 3,
-        "field_type": "location",
-        "questions": {
-          "en": "I need to know your location.\n\nPlease tell me your district and ward.\nFor example: Njoro, Lare",
-          "sw": "Ninahitaji kujua eneo lako.\n\nTafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare"
-        },
-        "success_messages": {
-          "en": "Location saved as {value}.",
-          "sw": "Eneo limehifadhiwa kama {value}."
-        }
-      },
-      {
-        "field_name": "crop_type",
-        "db_field": "crop_type",
-        "enabled": true,
-        "required": true,
-        "priority": 3,
-        "extraction_method": "extract_crop_type",
-        "matching_method": "resolve_crop_ambiguity",
-        "max_attempts": 3,
-        "field_type": "string",
-        "questions": {
-          "en": "What crops do you grow?\n\nPlease select from the list below:\n{available_crops}\n\nReply with the number (e.g., '1', '2', etc.)",
-          "sw": "Unalima mazao gani?\n\nTafadhali chagua kutoka orodha hapa chini:\n{available_crops}\n\nJibu kwa namba (mfano, '1', '2', n.k.)"
-        },
-        "success_messages": {
-          "en": "Primary crops recorded: {value}.",
-          "sw": "Mazao makuu yamerekodiwa: {value}."
-        }
-      },
-      {
-        "field_name": "gender",
-        "db_field": "gender",
-        "enabled": true,
-        "required": false,
-        "priority": 4,
-        "extraction_method": "extract_gender",
-        "matching_method": null,
-        "max_attempts": 2,
-        "field_type": "enum",
-        "questions": {
-          "en": "To help us serve you better, may I know your gender?\n\nYou can say: male, female, or other",
-          "sw": "Ili tukusaidie vizuri zaidi, naweza kujua jinsia yako?\n\nUnaweza kusema: mwanamume, mwanamke, au nyingine"
-        },
-        "success_messages": {
-          "en": "Thank you for sharing.",
-          "sw": "Asante kwa kushiriki."
-        }
-      },
-      {
-        "field_name": "birth_year",
-        "db_field": "birth_year",
-        "enabled": true,
-        "required": false,
-        "priority": 5,
-        "extraction_method": "extract_birth_year",
-        "matching_method": null,
-        "max_attempts": 2,
-        "field_type": "integer",
-        "questions": {
-          "en": "What year were you born? You can also tell me your age if that's easier.\n\nFor example: '1980' or 'I'm 45 years old'",
-          "sw": "Ulizaliwa mwaka gani? Ama unaweza pia kuniambia umri wako.\n\nKwa mfano: '1980' au 'Nina miaka 45'"
-        },
-        "success_messages": {
-          "en": "Got it, thank you!",
-          "sw": "Nimeelewa, asante!"
-        }
-      }
-    ]
-  }
-}
-```
-
-### 2. Backend Model Updates (`backend/models/customer.py`)
+### 6. i18n Fix (`backend/utils/i18n.py`)
 
 ```python
-class CustomerLanguage(str, enum.Enum):
-    EN = "en"
-    SW = "sw"
+def get_crop_name_translated(crop_name: str, lang: str = "en") -> str:
+    """Get translated crop name, falling back to original name if untranslated."""
+    if not crop_name:
+        return ""
+    translated = t(f"crops.{crop_name}.name", lang)
+    if translated.startswith("crops."):
+        return crop_name
+    return translated
+```
 
-class Customer(Base):
-    __tablename__ = "customers"
+### 7. Frontend Dynamic Crop Integration (`frontend/src/components/customers/EditCustomerModal.js`)
 
-    id = Column(Integer, primary_key=True, index=True)
-    phone_number = Column(String, unique=True, index=True, nullable=False)
-    full_name = Column(String, nullable=True)
-    # Generic string column for dynamic language codes (e.g. 'en', 'sw', 'fr', 'es')
-    language = Column(String(10), default=None, nullable=True)
-    profile_data = Column(JSON, nullable=True)
+```javascript
+const [cropTypes, setCropTypes] = useState([]);
+
+useEffect(() => {
+  const fetchCrops = async () => {
+    try {
+      const response = await api.get("/crop-types/");
+      if (response.data && Array.isArray(response.data)) {
+        setCropTypes(response.data.map((c) => c.name));
+      }
+    } catch (err) {
+      console.error("Failed to fetch crop types, using fallback:", err);
+      setCropTypes(["Avocado", "Potato"]);
+    }
+  };
+  fetchCrops();
+}, []);
 ```
 
 ---
@@ -343,6 +311,8 @@ class Customer(Base):
 | Scenario | What is tested |
 |---|---|
 | `test_dynamic_language_string_storage` | Setting `"language": "fr"` saves directly to `customer.language == "fr"` via string column |
+| `test_crop_types_config_fallback_empty` | When `crop_types` absent in config, default is empty list `[]` |
+| `test_crop_name_translation_fallback` | Unlisted crop returns name as-is instead of `crops.X.name` path |
 | `test_dynamic_profile_summary_active_fields_only` | Summary at completion contains only active fields, omitting disabled ones |
 | `test_dynamic_profile_summary_empty_when_no_fields` | Summary is empty string when `"fields": []` |
 | `test_alembic_migration_language_varchar` | Alembic upgrade alters column to `VARCHAR(10)` and downgrade restores enum |
@@ -366,13 +336,13 @@ class Customer(Base):
 
 | Task ID | Description | Est. Hours (Min - Max) | Priority |
 |---|---|---|---|
-| **T-001** | **Alembic Migration**: Create migration `convert_customer_language_to_string` altering `customers.language` to `VARCHAR(10)`. | 1h - 1.5h | Must Have |
-| **T-002** | **Model & Schema String Language**: Update `Customer.language` to `String(10)` and `CustomerLanguage` to `(str, Enum)`. | 1h - 1.5h | Must Have |
-| **T-003** | **Config Layer**: Add `onboarding` schema to `config.template.json`, `config.test.template.json`, and `config.py`. | 1h - 2h | Must Have |
+| **T-001** | **Alembic Migration**: One-time migration converting `customers.language` to `VARCHAR(10)`. | 1h - 1.5h | Must Have |
+| **T-002** | **Model & Schema Updates**: Update `Customer.language` to `String(10)`, `CustomerLanguage` to `(str, Enum)`. Update `schemas/customer.py`. | 1h - 1.5h | Must Have |
+| **T-003** | **Config Layer & Fallbacks**: Add `onboarding` schema, decouple `crop_types` fallback to `[]` in `config.py`. | 1h - 2h | Must Have |
 | **T-004** | **Schema Layer**: Update `OnboardingFieldConfig`, `load_onboarding_fields()`, and filtering in `onboarding_schemas.py`. | 2h - 3h | Must Have |
-| **T-005** | **Service Resolution & Dynamic Summary**: Add `_get_question()`, `_get_success_message()`, replace hardcoded `t()` calls, and dynamically generate `_generate_profile_summary()` from active fields. | 2.5h - 3.5h | Must Have |
+| **T-005** | **Service Resolution & Dynamic Summary**: Add `_get_question()`, `_get_success_message()`, replace hardcoded `t()` calls, dynamic `_generate_profile_summary()`, and `i18n.py` fallback fix. | 2.5h - 3.5h | Must Have |
 | **T-006** | **Frontend Dynamic Crops**: Update `EditCustomerModal.js` to fetch crops via `GET /crop-types/`. | 1.5h - 2.5h | Must Have |
-| **T-007** | **New Test Suite**: Implement `tests/test_onboarding_config.py` (14 comprehensive test cases). | 3h - 4h | Must Have |
-| **T-008** | **Regression Testing & Linting**: Run migration, pytest suite, and flake8/eslint. | 1.5h - 2.5h | Must Have |
+| **T-007** | **New Test Suite**: Implement `tests/test_onboarding_config.py` (17 comprehensive test cases). | 3h - 4h | Must Have |
+| **T-008** | **Regression Testing & Linting**: Run migration, full pytest suite, and flake8/eslint. | 1.5h - 2.5h | Must Have |
 
 **Total Estimated Hours:** **13.5h - 20.5h**
