@@ -97,10 +97,14 @@ def upgrade() -> None:
     op.execute("DROP TYPE IF EXISTS customerlanguage")
 
 def downgrade() -> None:
-    op.execute("CREATE TYPE customerlanguage AS ENUM ('en', 'sw')")
+    op.execute("CREATE TYPE customerlanguage AS ENUM ('EN', 'SW')")
     op.execute(
         "ALTER TABLE customers ALTER COLUMN language TYPE customerlanguage "
-        "USING language::customerlanguage"
+        "USING CASE "
+        "  WHEN UPPER(language) IN ('EN', 'SW') THEN UPPER(language)::customerlanguage "
+        "  WHEN language IS NOT NULL THEN 'EN'::customerlanguage "
+        "  ELSE NULL "
+        "END"
     )
 ```
 
