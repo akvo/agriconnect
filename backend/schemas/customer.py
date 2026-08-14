@@ -3,13 +3,13 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from models.customer import AgeGroup, CustomerLanguage, Gender
+from models.customer import Gender
 
 
 class CustomerBase(BaseModel):
     phone_number: str
     full_name: Optional[str] = None
-    language: Optional[CustomerLanguage] = None
+    language: Optional[str] = None
     crop_type: Optional[str] = None
     gender: Optional[Gender] = None
     age: Optional[int] = None
@@ -21,7 +21,7 @@ class CustomerCreate(CustomerBase):
 
 class CustomerUpdate(BaseModel):
     full_name: Optional[str] = None
-    language: Optional[CustomerLanguage] = None
+    language: Optional[str] = None
     crop_type: Optional[str] = None
     gender: Optional[Gender] = None
     age: Optional[int] = None
@@ -71,9 +71,9 @@ class CustomerListItem(BaseModel):
     id: int
     full_name: Optional[str] = None
     phone_number: str
-    language: Optional[CustomerLanguage] = None
+    language: Optional[str] = None
     gender: Optional[Gender] = None
-    age_group: Optional[AgeGroup] = None
+    age_group: Optional[str] = None
     birth_year: Optional[int] = None
     crop_type: Optional[str] = None
     administrative: CustomerAdministrativeInfo
