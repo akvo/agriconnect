@@ -74,6 +74,19 @@
 		}
 	},
 	"crop_types": ["Avocado", "Potato", "Dairy"],
+	"languages": [
+		{ "code": "en", "name": "English" },
+		{ "code": "sw", "name": "Swahili" }
+	],
+	"age_groups": [
+		{ "label": "20-35", "min": 20, "max": 35 },
+		{ "label": "36-50", "min": 36, "max": 50 },
+		{ "label": "51+", "min": 51, "max": null }
+	],
+	"onboarding": {
+		"enabled": true,
+		"fields": []
+	},
 	"contact_info": {
 		"name": "Admin",
 		"phone_number": "+1234567891"

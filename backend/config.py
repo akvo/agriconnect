@@ -255,10 +255,47 @@ class Settings(BaseSettings):
         [5, 15, 60],
     )
 
-    # Crop types configuration
-    crop_types: list = _config.get(
-        "crop_types",
-        ["Avocado", "Cacao"]
+    # Dynamic Languages
+    languages: list = _config.get(
+        "languages",
+        [
+            {"code": "en", "name": "English"},
+            {"code": "sw", "name": "Swahili"},
+        ],
+    )
+
+    @property
+    def supported_language_codes(self) -> List[str]:
+        """Return list of supported language codes."""
+        if not self.languages:
+            return ["en"]
+        return [lang["code"] for lang in self.languages if "code" in lang]
+
+    @property
+    def default_language(self) -> str:
+        """Return default system language code."""
+        codes = self.supported_language_codes
+        return codes[0] if codes else "en"
+
+    # Dynamic Age Groups
+    age_groups: list = _config.get(
+        "age_groups",
+        [
+            {"label": "20-35", "min": 20, "max": 35},
+            {"label": "36-50", "min": 36, "max": 50},
+            {"label": "51+", "min": 51, "max": None},
+        ],
+    )
+
+    # Crop types configuration (sole source of truth is config JSON)
+    crop_types: list = _config.get("crop_types", [])
+
+    # Onboarding configuration
+    onboarding_enabled: bool = (
+        _config.get("onboarding", {}).get("enabled", True)
+    )
+    onboarding_fields_config: list = (
+        _config.get("onboarding", {}).get("fields", [])
     )
 
     # Contact info: Name and Phone number
