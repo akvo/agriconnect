@@ -611,6 +611,11 @@ def _get_child_level(
 
 ---
 
+## 🧪 Manual QA Test Plan
+
+Comprehensive multi-scenario manual testing procedures, WhatsApp conversation flows, and validation checklists are detailed in:
+👉 [`docs/MANUAL_TEST_PLAN_DYNAMIC_ADMIN_LEVELS.md`](./MANUAL_TEST_PLAN_DYNAMIC_ADMIN_LEVELS.md)
+
 ## ⏱️ Ballpark Estimation
 
 - **Standard Developer Estimate**: **9.0h – 13.5h**
