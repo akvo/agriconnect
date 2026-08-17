@@ -312,3 +312,171 @@ class TestAdministrativeSeeder:
         assert region is not None
         assert region.name == "Jawa Barat"
         assert region.path == "Indonesia > Jawa Barat"
+
+
+class TestOnboardingServiceDynamicLevels:
+    """Test suite for OnboardingService with dynamic administrative levels."""
+
+    def test_onboarding_service_initializes_with_dynamic_levels(
+        self, db_session: Session
+    ):
+        """Test OnboardingService uses settings.admin_level_order."""
+        from services.onboarding_service import OnboardingService
+
+        service = OnboardingService(db_session)
+        assert service.admin_level_order == settings.admin_level_order
+
+    def test_start_hierarchical_selection_with_default_kenya(
+        self, db_session: Session
+    ):
+        """Test start_hierarchical_selection uses select_region for Kenya."""
+        from services.onboarding_service import OnboardingService
+
+        # Setup country and regions
+        c_lvl = AdministrativeLevel(name="country", level_index=0)
+        r_lvl = AdministrativeLevel(name="region", level_index=1)
+        db_session.add_all([c_lvl, r_lvl])
+        db_session.commit()
+
+        country = Administrative(
+            code="KEN", name="Kenya", level_id=c_lvl.id, path="Kenya"
+        )
+        db_session.add(country)
+        db_session.commit()
+
+        reg1 = Administrative(
+            code="R1",
+            name="Central Region",
+            level_id=r_lvl.id,
+            parent_id=country.id,
+            path="Kenya > Central Region",
+        )
+        db_session.add(reg1)
+
+        cust = Customer(phone_number="+254700000005", language="en")
+        db_session.add(cust)
+        db_session.commit()
+
+        service = OnboardingService(db_session)
+        resp = service._start_hierarchical_selection(cust)
+
+        assert resp.status == "awaiting_selection"
+        assert "Which county/region are you from?" in resp.message
+        assert "1. Central Region" in resp.message
+
+    def test_start_hierarchical_selection_custom_fallback(
+        self, db_session: Session, monkeypatch
+    ):
+        """Test fallback to select_level for unlocalized level name."""
+        from services.onboarding_service import OnboardingService
+
+        custom_cfg = {
+            "country_code": "IDN",
+            "delimiter": " > ",
+            "levels": [
+                {"level_index": 0, "name": "country"},
+                {"level_index": 1, "name": "provinsi"},
+                {"level_index": 2, "name": "kabupaten"},
+                {"level_index": 3, "name": "kecamatan"},
+                {"level_index": 4, "name": "desa"},
+            ],
+        }
+        monkeypatch.setattr(
+            settings, "administrative_hierarchy", custom_cfg
+        )
+
+        c_lvl = AdministrativeLevel(name="country", level_index=0)
+        p_lvl = AdministrativeLevel(name="provinsi", level_index=1)
+        db_session.add_all([c_lvl, p_lvl])
+        db_session.commit()
+
+        country = Administrative(
+            code="IDN", name="Indonesia", level_id=c_lvl.id, path="Indonesia"
+        )
+        db_session.add(country)
+        db_session.commit()
+
+        prov = Administrative(
+            code="JB",
+            name="Jawa Barat",
+            level_id=p_lvl.id,
+            parent_id=country.id,
+            path="Indonesia > Jawa Barat",
+        )
+        db_session.add(prov)
+
+        cust = Customer(phone_number="+628123456789", language="en")
+        db_session.add(cust)
+        db_session.commit()
+
+        service = OnboardingService(db_session)
+        resp = service._start_hierarchical_selection(cust)
+
+        assert resp.status == "awaiting_selection"
+        # Uses generic fallback with level="Provinsi"
+        assert "Which Provinsi are you from?" in resp.message
+        assert "1. Jawa Barat" in resp.message
+
+    def test_process_hierarchical_selection_custom_fallback(
+        self, db_session: Session, monkeypatch
+    ):
+        """Test fallback to select_next when stepping down dynamic levels."""
+        from services.onboarding_service import OnboardingService
+
+        custom_cfg = {
+            "country_code": "IDN",
+            "delimiter": " > ",
+            "levels": [
+                {"level_index": 0, "name": "country"},
+                {"level_index": 1, "name": "provinsi"},
+                {"level_index": 2, "name": "kabupaten"},
+                {"level_index": 3, "name": "kecamatan"},
+                {"level_index": 4, "name": "desa"},
+            ],
+        }
+        monkeypatch.setattr(
+            settings, "administrative_hierarchy", custom_cfg
+        )
+
+        p_lvl = AdministrativeLevel(name="provinsi", level_index=1)
+        k_lvl = AdministrativeLevel(name="kabupaten", level_index=2)
+        db_session.add_all([p_lvl, k_lvl])
+        db_session.commit()
+
+        prov = Administrative(
+            code="JB",
+            name="Jawa Barat",
+            level_id=p_lvl.id,
+            path="Indonesia > Jawa Barat",
+        )
+        db_session.add(prov)
+        db_session.commit()
+
+        kab = Administrative(
+            code="BDG",
+            name="Bandung",
+            level_id=k_lvl.id,
+            parent_id=prov.id,
+            path="Indonesia > Jawa Barat > Bandung",
+        )
+        db_session.add(kab)
+        db_session.commit()
+
+        cust = Customer(phone_number="+628123456788", language="en")
+        db_session.add(cust)
+        db_session.commit()
+
+        service = OnboardingService(db_session)
+        # Set state as if provinsi was selected
+        service._set_admin_hierarchy_state(
+            cust, "provinsi", None, [prov.id]
+        )
+        db_session.commit()
+
+        # User chooses '1' (Jawa Barat)
+        resp = service._process_hierarchical_selection(cust, "1")
+
+        assert resp.status == "awaiting_selection"
+        assert "Great! You selected Jawa Barat." in resp.message
+        assert "Which Kabupaten are you in?" in resp.message
+        assert "1. Bandung" in resp.message

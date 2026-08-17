@@ -74,8 +74,8 @@ class OnboardingService:
         self.max_candidates = 5  # Max options to show farmer
 
         # Administrative level hierarchy (in order of selection)
-        # Skip 'country' as we assume single country
-        self.admin_level_order = ["region", "district", "ward"]
+        # Sourced dynamically from settings (levels with level_index > 0)
+        self.admin_level_order = settings.admin_level_order
 
     def _format_crops_numbered(self, lang: str = "en") -> str:
         """
@@ -380,12 +380,13 @@ class OnboardingService:
         if parent_id is not None:
             query = query.filter(Administrative.parent_id == parent_id)
         else:
-            # For root level (regions), get those under country
-            # Find country first
+            # For root level (first sub-country level), get those under country
+            # Find country using configured country level name
+            country_level = settings.admin_country_level_name
             country = (
                 self.db.query(Administrative)
                 .join(AdministrativeLevel)
-                .filter(AdministrativeLevel.name == "country")
+                .filter(AdministrativeLevel.name == country_level)
                 .first()
             )
             if country:
@@ -423,7 +424,7 @@ class OnboardingService:
         """
         Start the hierarchical location selection process.
 
-        Begins at the first level (region) and shows all available options.
+        Begins at the first sub-country level and shows all available options.
         """
         lang = customer.language_code
         first_level = self.admin_level_order[0]
@@ -432,8 +433,10 @@ class OnboardingService:
         areas = self._get_children_at_level(first_level, None)
 
         if not areas:
-            # No regions found - this shouldn't happen in production
-            logger.error("No administrative regions found in database")
+            # No areas found - this shouldn't happen in production
+            logger.error(
+                f"No administrative areas found for level '{first_level}'"
+            )
             return OnboardingResponse(
                 message=t("onboarding.common.database_error", lang),
                 status="in_progress",
@@ -448,17 +451,21 @@ class OnboardingService:
         customer.current_onboarding_field = "administration"
         self.db.commit()
 
-        # Build message
+        # Build message with dynamic key fallback
         options_text = self._build_options_text(areas, lang)
-        message = t(
-            "onboarding.administration.select_region",
-            lang,
-            options=options_text,
-        )
+        key = f"onboarding.administration.select_{first_level}"
+        message = t(key, lang, options=options_text)
+        if message == key:
+            message = t(
+                "onboarding.administration.select_level",
+                lang,
+                level=first_level.title(),
+                options=options_text,
+            )
 
         logger.info(
             f"Started hierarchical selection for customer {customer.id}, "
-            f"showing {len(areas)} regions"
+            f"showing {len(areas)} {first_level}s"
         )
 
         return OnboardingResponse(
@@ -537,19 +544,20 @@ class OnboardingService:
 
                 options_text = self._build_options_text(children, lang)
 
-                # Choose appropriate message based on level
-                if next_level == "district":
+                # Choose message based on level with generic fallback
+                key = f"onboarding.administration.select_{next_level}"
+                message = t(
+                    key,
+                    lang,
+                    parent=selected_admin.name,
+                    options=options_text,
+                )
+                if message == key:
                     message = t(
-                        "onboarding.administration.select_district",
+                        "onboarding.administration.select_next",
                         lang,
                         parent=selected_admin.name,
-                        options=options_text,
-                    )
-                else:  # ward
-                    message = t(
-                        "onboarding.administration.select_ward",
-                        lang,
-                        parent=selected_admin.name,
+                        level=next_level.title(),
                         options=options_text,
                     )
 

@@ -12,6 +12,8 @@
       "select_region": "Let's find your location step by step.\n\nWhich county/region are you from?\n\n{options}",
       "select_district": "Great! You selected {parent}.\n\nWhich sub-county/district are you in?\n\n{options}",
       "select_ward": "You're in {parent}.\n\nWhich ward are you in?\n\n{options}",
+      "select_level": "Let's find your location step by step.\n\nWhich {level} are you from?\n\n{options}",
+      "select_next": "Great! You selected {parent}.\n\nWhich {level} are you in?\n\n{options}",
       "confirm_location": "You selected: {location}\n\nIs this correct?\n1. Yes\n2. No, let me choose again",
       "selection_instruction": "\nReply with the number (e.g., '1', '2', etc.)",
       "no_children_found": "I couldn't find any sub-areas for {parent}. Let me save your location as {parent}.",
