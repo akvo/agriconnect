@@ -1,13 +1,21 @@
-#!/usr/bin/env python3
-
+import argparse
 import csv
 import os
 import sys
+from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from config import settings
 from database import SessionLocal, engine
-from models import Administrative, AdministrativeLevel, Base
+from models import (
+    Administrative,
+    AdministrativeLevel,
+    Base,
+    Customer,
+    CustomerAdministrative,
+    UserAdministrative,
+)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,19 +39,48 @@ def build_human_readable_path(parent_path: str, name: str) -> str:
     return name
 
 
-def get_or_create_level(db: Session, level_name: str) -> AdministrativeLevel:
-    """Get or create administrative level"""
+def get_or_create_level(
+    db: Session, level_name: str, level_index: Optional[int] = None
+) -> AdministrativeLevel:
+    """Get or create administrative level with optional level_index."""
     level = (
         db.query(AdministrativeLevel)
         .filter(AdministrativeLevel.name == level_name)
         .first()
     )
     if not level:
-        level = AdministrativeLevel(name=level_name)
+        level = AdministrativeLevel(name=level_name, level_index=level_index)
         db.add(level)
         db.commit()
         db.refresh(level)
+    elif level_index is not None and level.level_index != level_index:
+        level.level_index = level_index
+        db.commit()
+        db.refresh(level)
     return level
+
+
+def clear_administrative_data(db: Session) -> dict:
+    """
+    Safely remove all administrative data in FK-safe order.
+
+    Deletion sequence:
+      1. customer_administrative
+      2. user_administrative
+      3. administrative
+      4. administrative_levels
+    """
+    ca_count = db.query(CustomerAdministrative).delete()
+    ua_count = db.query(UserAdministrative).delete()
+    a_count = db.query(Administrative).delete()
+    al_count = db.query(AdministrativeLevel).delete()
+    db.commit()
+    return {
+        "customer_administrative": ca_count,
+        "user_administrative": ua_count,
+        "administrative": a_count,
+        "administrative_levels": al_count,
+    }
 
 
 def get_level_by_name(db: Session, level_name: str) -> AdministrativeLevel:
@@ -118,12 +155,19 @@ def seed_administrative_data(db: Session, rows: list) -> dict:
         "error_messages": [],
     }
 
+    # Build level_index map from settings
+    level_index_map = {}
+    for lvl in settings.administrative_hierarchy.get("levels", []):
+        if isinstance(lvl, dict) and "name" in lvl and "level_index" in lvl:
+            level_index_map[lvl["name"]] = lvl["level_index"]
+
     # Create administrative levels first
     levels = {}
     for row in rows:
         level_name = row["level"]
         if level_name not in levels:
-            level = get_or_create_level(db, level_name)
+            level_idx = level_index_map.get(level_name)
+            level = get_or_create_level(db, level_name, level_index=level_idx)
             levels[level_name] = level
 
     # Create a code_to_admin map for quick lookup
@@ -222,38 +266,71 @@ def seed_administrative_data(db: Session, rows: list) -> dict:
 
 def main():
     """Main function for administrative seeder"""
+    parser = argparse.ArgumentParser(
+        description="Seed administrative data from CSV"
+    )
+    parser.add_argument(
+        "--replace-country",
+        action="store_true",
+        help="Clear ALL existing administrative data before seeding (country swap)",  # noqa: E501
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        default=None,
+        help="Path to source CSV (default: backend/source/administrative.csv)",
+    )
+    args = parser.parse_args()
+
     try:
         # Ensure database tables exist
         Base.metadata.create_all(bind=engine)
 
-        # Define CSV path
-        csv_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "source",
-            "administrative.csv",
-        )
-
-        # Check if CSV file exists
-        if not os.path.exists(csv_path):
-            print(f"❌ CSV file not found: {csv_path}")
-            sys.exit(1)
-
-        # Process CSV file
-        print(f"📁 Reading from: {csv_path}")
-        rows = process_csv_file(csv_path)
-
-        # Validate CSV data
-        is_valid, validation_msg = validate_csv_data(rows)
-        if not is_valid:
-            print(f"❌ CSV validation failed: {validation_msg}")
-            sys.exit(1)
-
-        print(f"📊 Found {len(rows)} administrative entries")
-
-        # Create database session
         db = SessionLocal()
-
         try:
+            if args.replace_country:
+                # SAFETY GUARD: Abort if live customer records exist
+                customer_count = db.query(Customer).count()
+                if customer_count > 0:
+                    print(
+                        f"❌ ERROR: Cannot run --replace-country! Found "
+                        f"{customer_count} live customer records in database. "
+                        "Country replacement is restricted to fresh "
+                        "deployments to prevent data corruption."
+                    )
+                    sys.exit(1)
+
+                print(
+                    "⚠️  REPLACE-COUNTRY mode active: Purging all existing "
+                    "administrative entities..."
+                )
+                cleared = clear_administrative_data(db)
+                print(f"🗑️  Purged records: {cleared}")
+
+            # Define CSV path
+            csv_path = args.source or os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "source",
+                "administrative.csv",
+            )
+
+            # Check if CSV file exists
+            if not os.path.exists(csv_path):
+                print(f"❌ CSV file not found: {csv_path}")
+                sys.exit(1)
+
+            # Process CSV file
+            print(f"📁 Reading from: {csv_path}")
+            rows = process_csv_file(csv_path)
+
+            # Validate CSV data
+            is_valid, validation_msg = validate_csv_data(rows)
+            if not is_valid:
+                print(f"❌ CSV validation failed: {validation_msg}")
+                sys.exit(1)
+
+            print(f"📊 Found {len(rows)} administrative entries")
+
             # Seed administrative data
             stats = seed_administrative_data(db, rows)
 
