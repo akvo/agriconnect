@@ -13,7 +13,7 @@
 ### 1. Executive Summary
 AgriConnect's geographical and administrative boundary system was originally designed around Kenya's 4-tier administrative hierarchy (`Country` $\rightarrow$ `Region` $\rightarrow$ `District` $\rightarrow$ `Ward`). Across the codebase, level names (`"ward"`, `"region"`, `"district"`), hierarchy ordering, and leaf-node definitions are hardcoded as static string constants and fixed conditional branches in `OnboardingService`, `AdministrativeService`, and `StatisticService`.
 
-When deploying AgriConnect internationally (for example, Indonesia: `Provinsi > Kabupaten > Kecamatan > Desa` [4 levels], Rwanda: `Province > District > Sector > Cell` [4 levels], or Uganda: `Region > District > County > Sub-County > Parish > Village` [6 levels]), these hardcoded strings and fixed hierarchy levels prevent the application from functioning without direct codebase rewrites and schema modifications.
+When deploying AgriConnect internationally (for example, Indonesia: `Provinsi > Kabupaten > Kecamatan > Desa` [4 sub-levels, 5 total with Country], Rwanda: `Province > District > Sector > Cell` [4 sub-levels, 5 total with Country], or Uganda: `Region > District > County > Sub-County > Parish > Village` [6 sub-levels, 7 total with Country]), these hardcoded strings and fixed hierarchy levels prevent the application from functioning without direct codebase rewrites and schema modifications.
 
 This feature specification establishes a **config-driven, dynamic administrative hierarchy engine** and an **administrative seeder with country-swap capabilities** that:
 1. Adds an explicit integer `level_index` (`0` for root/country up to `N` for leaf wards/villages) with a `UNIQUE` database constraint to `AdministrativeLevel`.
@@ -52,7 +52,7 @@ This feature specification establishes a **config-driven, dynamic administrative
 | Country | Code | Depth | Level 0 (Root) | Level 1 | Level 2 | Level 3 (Leaf / Ward) | Level 4+ |
 |---|---|---|---|---|---|---|---|
 | **Kenya** *(Current)* | `KEN` | 4 | `country` | `region` (County) | `district` (Sub-County) | `ward` | — |
-| **Indonesia** *(Target)* | `IDN` | 4 | `country` | `province` (*Provinsi*) | `regency` (*Kabupaten/Kota*) | `district` (*Kecamatan*) | `village` (*Desa/Kelurahan*) [5-tier optional] |
+| **Indonesia** *(Target)* | `IDN` | 5 | `country` | `province` (*Provinsi*) | `regency` (*Kabupaten/Kota*) | `district` (*Kecamatan*) | `village` (*Desa/Kelurahan*) |
 | **Rwanda** | `RWA` | 5 | `country` | `province` | `district` | `sector` | `cell` |
 | **Tanzania** | `TZA` | 4 | `country` | `region` (*Mkoa*) | `district` (*Wilaya*) | `ward` (*Kata*) | — |
 
@@ -613,18 +613,19 @@ def _get_child_level(
 
 ## ⏱️ Ballpark Estimation
 
+- **Standard Developer Estimate**: **9.0h – 13.5h**
+- **Pair Programming with Vibe Coding (Accelerated)**: **3.0h – 4.5h**
 - **Confidence Level**: High
-- **Total Developer Hours**: **9h – 12h**
 
-| Task ID | Component & Description | Min Hours | Max Hours | Priority |
-|---|---|---|---|---|
-| **T-001** | Database Migration (`level_index` column & unique constraint) | 0.5h | 1.0h | Must Have |
-| **T-002** | Model Update (`AdministrativeLevel.level_index`) | 0.5h | 0.5h | Must Have |
-| **T-003** | Config Layer (`Settings` properties & JSON templates) | 1.0h | 1.5h | Must Have |
-| **T-004a**| Dynamic Seeder (`level_index` propagation & auto-backfill) | 1.0h | 1.5h | Must Have |
-| **T-004b**| Country Swap Engine (`--replace-country`, safety guards, purge) | 1.0h | 1.5h | Must Have |
-| **T-005** | `OnboardingService` Dynamic Hierarchy & Localization | 1.5h | 2.0h | Must Have |
-| **T-006** | `AdministrativeService` Dynamic Leaf Resolver | 0.5h | 1.0h | Must Have |
-| **T-007** | `StatisticService` Dynamic Hierarchy Matrix | 1.0h | 1.5h | Must Have |
-| **T-008** | Automated Test Suite (13 Scenarios) & Regression Verification | 2.0h | 3.0h | Must Have |
-| **Total** | | **9.0h** | **13.5h** | |
+| Task ID | Component & Description | Status | Standard Est. | Pair Programming (Vibe Coding) | Priority |
+| --- | --- | --- | --- | --- | --- |
+| **T-001** | Database Migration (`level_index` column & unique constraint) | `PLANNED` | 0.5h – 1.0h | 15m – 20m | Must Have |
+| **T-002** | Model Update (`AdministrativeLevel.level_index`) | `PLANNED` | 0.5h | 10m – 15m | Must Have |
+| **T-003** | Config Layer (`Settings` properties & JSON templates) | `PLANNED` | 1.0h – 1.5h | 20m – 30m | Must Have |
+| **T-004a** | Dynamic Seeder (`level_index` propagation & auto-backfill) | `PLANNED` | 1.0h – 1.5h | 25m – 35m | Must Have |
+| **T-004b** | Country Swap Engine (`--replace-country`, safety guards, purge) | `PLANNED` | 1.0h – 1.5h | 25m – 35m | Must Have |
+| **T-005** | `OnboardingService` Dynamic Hierarchy & Localization | `PLANNED` | 1.5h – 2.0h | 30m – 45m | Must Have |
+| **T-006** | `AdministrativeService` Dynamic Leaf Resolver | `PLANNED` | 0.5h – 1.0h | 15m – 20m | Must Have |
+| **T-007** | `StatisticService` Dynamic Hierarchy Matrix | `PLANNED` | 1.0h – 1.5h | 20m – 30m | Must Have |
+| **T-008** | Automated Test Suite (13 Scenarios) & Regression Verification | `PLANNED` | 2.0h – 3.0h | 40m – 60m | Must Have |
+| **Total** | | | **9.0h – 13.5h** | **3.0h – 4.5h** | |
