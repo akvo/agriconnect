@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-17
 **Author:** Galih Pratama
-**Status:** Draft – Ready for Implementation Review
+**Status:** Approved – Ready for Implementation Review
 **Branch:** `feature/187-mt-002-remove-hardcoded-administration-level-on-model-and-develop-dynamic-levels-or-administration-seeder`
 **Parent Spec:** [CONFIGURABLE_ONBOARDING_QUESTIONS.md](./CONFIGURABLE_ONBOARDING_QUESTIONS.md) (Improvement Opportunity §3)
 

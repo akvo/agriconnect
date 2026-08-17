@@ -54,3 +54,50 @@ class TestAdministrativeLevelModel:
         db_session.refresh(level)
 
         assert level.level_index is None
+
+
+class TestAdministrativeHierarchyConfig:
+    """Test suite for administrative_hierarchy configuration and properties."""
+
+    def test_default_admin_hierarchy_settings(self):
+        """Test default administrative hierarchy properties on settings."""
+        from config import settings
+
+        assert isinstance(settings.administrative_hierarchy, dict)
+        assert settings.admin_level_order == ["region", "district", "ward"]
+        assert settings.admin_country_level_name == "country"
+        assert settings.admin_leaf_level_name == "ward"
+        assert settings.admin_leaf_level_index == 3
+        assert settings.admin_delimiter == " > "
+
+    def test_custom_admin_hierarchy_properties(self, monkeypatch):
+        """
+        Test hierarchy properties with custom 4-tier IDN config.
+        """
+        from config import Settings
+
+        custom_cfg = {
+            "country_code": "IDN",
+            "delimiter": " > ",
+            "levels": [
+                {"level_index": 0, "name": "country"},
+                {"level_index": 1, "name": "provinsi"},
+                {"level_index": 2, "name": "kabupaten"},
+                {"level_index": 3, "name": "kecamatan"},
+                {"level_index": 4, "name": "desa"},
+            ],
+        }
+
+        s = Settings()
+        monkeypatch.setattr(s, "administrative_hierarchy", custom_cfg)
+
+        assert s.admin_level_order == [
+            "provinsi",
+            "kabupaten",
+            "kecamatan",
+            "desa",
+        ]
+        assert s.admin_country_level_name == "country"
+        assert s.admin_leaf_level_name == "desa"
+        assert s.admin_leaf_level_index == 4
+        assert s.admin_delimiter == " > "
