@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-14
 **Author:** Galih Pratama
-**Status:** In Progress / Updated Architecture Specification
+**Status:** Approved
 **Branch:** `feature/185-mt-001-pull-out-onboarding-question-from-code-to-configurable-json`
 
 ---
@@ -876,39 +876,4 @@ Below is the detailed architectural blueprint, code references, and implementati
       </div>
     ))}
   </div>
-  ```
-
----
-
-#### 5. Configurable Post-Onboarding Pipeline & Webhook Hooks
-
-* **Priority:** `Low`
-* **Current Limitation:**
-  Post-onboarding behaviors (specifically the Automated Weather Forecast broadcast opt-in and Extension Officer contact card injection) are hardcoded inside `routers/whatsapp.py:L580-L630` and `onboarding_service.py:_complete_onboarding`.
-
-* **Proposed Technical Approach:**
-  Refactor post-onboarding actions into an event-driven hook pipeline. After onboarding status transitions to `COMPLETED`, AgriConnect invokes a sequence of enabled hooks.
-
-* **Target Schema in `config.json`:**
-  ```json
-  "post_onboarding": {
-    "send_profile_summary": true,
-    "actions": [
-      {
-        "type": "weather_subscription_prompt",
-        "enabled": true,
-        "requires": "location"
-      },
-      {
-        "type": "send_eo_contact_card",
-        "enabled": true
-      },
-      {
-        "type": "partner_webhook",
-        "enabled": false,
-        "url": "https://partner-system.org/api/v1/farmer-registered",
-        "headers": { "Authorization": "Bearer YOUR_PARTNER_API_KEY" }
-      }
-    ]
-  }
   ```

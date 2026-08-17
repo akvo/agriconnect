@@ -85,12 +85,14 @@ backend/
 
 ## 3. Tasks & Estimates
 
-| Task ID | Component | Description | Est. Hours |
-| :--- | :--- | :--- | :--- |
-| **T-001** | `backend/locales/en.json` | Extract all English translation keys from `i18n.py` into clean JSON schema | 1.5h |
-| **T-002** | `backend/locales/sw.json` | Extract all Swahili translation keys matching `en.json` | 1.5h |
-| **T-003** | `backend/utils/i18n.py` | Implement `load_translations()`, `reload_translations()`, dynamic `t()`, and backward-compatible `trans` proxy | 2.0h |
-| **T-004** | `backend/tests/test_utils_i18n.py` | Add unit tests for dynamic locale loading, runtime reloads, multi-language fallback, and kwargs interpolation | 1.5h |
-| **T-005** | Regression & Linting | Run full pytest test suite (1,050 tests) and Flake8 compliance | 1.0h |
+| Task ID | Component | Description | Status | Est. Hours |
+| :--- | :--- | :--- | :--- | :--- |
+| **T-001** | `backend/locales/en.json` | Extract all English translation keys from `i18n.py` into clean JSON schema | `COMPLETED` | 1.5h |
+| **T-002** | `backend/locales/sw.json` | Extract all Swahili translation keys matching `en.json` | `COMPLETED` | 1.5h |
+| **T-003** | `backend/utils/i18n.py` | Implement `load_translations()`, `reload_translations()`, dynamic `t()`, and backward-compatible `trans` proxy | `COMPLETED` | 2.0h |
+| **T-004** | `backend/tests/test_utils_i18n.py` | Add unit tests for dynamic locale loading, runtime reloads, multi-language fallback, and kwargs interpolation | `COMPLETED` | 1.5h |
+| **T-005** | Regression & Linting | Run full pytest test suite (1,053 tests passing) and Flake8 compliance | `COMPLETED` | 1.0h |
 
 **Total Estimated Effort**: 7.5 developer hours (Confidence: High)
+**Status**: All tasks completed, 1,053/1,053 tests passing (100%).
+
