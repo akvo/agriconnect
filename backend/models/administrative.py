@@ -9,6 +9,7 @@ class AdministrativeLevel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(20), unique=True, nullable=False)
+    level_index = Column(Integer, unique=True, nullable=True)
 
     # Relationships
     administrative_areas = relationship(
