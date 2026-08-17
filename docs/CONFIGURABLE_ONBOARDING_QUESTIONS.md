@@ -677,9 +677,238 @@ useEffect(() => {
 | **T-005** | Language `.value` cascade fix across 5 service files | `COMPLETED` | 2h–3h |
 | **T-006** | Dynamic onboarding schema + JSON loader | `COMPLETED` | 1.5h–2h |
 | **T-007** | Service helpers: `_get_question`, `_get_success_message`, dynamic summary & age filter | `COMPLETED` | 2.5h–3.5h |
-| **T-008** | Frontend dynamic crops (`EditCustomerModal.js`) | `READY` | 1h–1.5h |
-| **T-009** | Dedicated test suite (`tests/test_onboarding_config.py` — 19 cases) | `READY` | 3h–4h |
-| **T-010** | Full regression & verification | `READY` | 1h–2h |
+| **T-008** | Frontend dynamic crops (`EditCustomerModal.js`) | `COMPLETED` | 1h–1.5h |
+| **T-009** | Dedicated test suite (`tests/test_onboarding_config.py` — 19 cases) | `COMPLETED` | 3h–4h |
+| **T-010** | Full regression & verification (1,053 tests passing) | `COMPLETED` | 1h–2h |
 
 **Total Estimate:** 15h–21.5h
+**Actual Active Time Spent:** 5.0h (Pair Programming & Live QA)
 **Confidence Level:** High
+
+---
+
+## 9. 🏗️ Post-Implementation Integration Analysis
+
+Based on real-world QA execution across Scenarios A (Zero-Onboarding), B (Indonesian Coffee Cooperative), and C (Location-Less Lightweight Profile), the following strengths and improvement opportunities have been cataloged:
+
+### 🌟 System Strengths
+
+1. **Zero-Code Multi-Partner Adaptability**:
+   - Partner organizations can alter question sequences, add custom data points (`farm_size_ha`, `certification`, `experience_years`), or disable onboarding completely (`fields: []`) without modifying Python code.
+   - Bypasses onboarding state machine cleanly when `fields: []`, instantly routing first-time farmer messages to AI advisory.
+
+2. **Flexible Hybrid Persistence Model**:
+   - Direct column mapping for core relational fields (`full_name`, `language`, `gender`, `birth_year`).
+   - Dynamic PostgreSQL JSONB overflow (`customers.profile_data`) for all partner-specific custom fields without running per-field database migrations.
+
+3. **Decoupled File-Based i18n System**:
+   - System translations decoupled into `backend/locales/*.json`.
+   - Adding a new deployment language (e.g. Indonesian `id`, French `fr`) requires only dropping a `{lang_code}.json` file into `backend/locales/`.
+   - Automatic fallback to English defaults on missing translation keys.
+
+4. **Resilient Extraction Dispatch**:
+   - Safe fallback to raw text saving (`_save_field_value`) if an extractor is missing or unmapped, preventing crashes.
+   - Smart conversational name cleaning via `extract_name()` (stripping *"My name is..."*, *"Nama saya..."*, *"Jina langu ni..."*).
+   - Dynamic 1-based numeric index resolution in `extract_language()` matching `settings.languages`.
+
+5. **Automated Localized Profile Summaries**:
+   - Dynamic `_generate_profile_summary` pulls multilingual labels, formats captured values, and renders skipped optional fields as `N/A`.
+
+---
+
+### 🛠️ Improvement Opportunities & Technical Debt Roadmap
+
+Below is the detailed architectural blueprint, code references, and implementation approaches for future iterations of the dynamic onboarding system:
+
+---
+
+#### 1. Data Consent Decoupling (`consent`)
+
+* **Priority:** `Medium`
+* **Current Limitation:**
+  In [backend/routers/whatsapp.py:L335-L370](/backend/routers/whatsapp.py#L335-L370) and [backend/services/onboarding_service.py:L1934-L1947](/backend/services/onboarding_service.py#L1934-L1947), the data privacy consent check is explicitly hardcoded to trigger when `field_name == "language"`. If a partner configures an onboarding pipeline that omits the language question (e.g. single-language deployment, or direct Name $\rightarrow$ Commodity), the consent intercept is never triggered.
+
+* **Proposed Technical Approach:**
+  Decouple the privacy consent prompt into a top-level `consent` configuration object in `config.json`. The engine checks this configuration to determine *when* and *how* to prompt for data sharing authorization.
+
+* **Target Schema in `config.json`:**
+  ```json
+  "consent": {
+    "enabled": true,
+    "trigger": "after_field", // Options: "first_message" | "after_field" | "disabled"
+    "target_field": "language", // The field after which consent is requested
+    "block_onboarding_until_accepted": true,
+    "affirmative_keywords": ["yes", "ok", "okay", "agree", "accept", "ndio", "ya", "setuju"],
+    "declined_keywords": ["no", "hapana", "tidak", "tolak"]
+  }
+  ```
+
+* **Implementation Steps:**
+  1. Add `consent_config` Pydantic model to `backend/config.py`.
+  2. In `OnboardingService._save_field_value()`, replace `if field_name == "language"` with `if settings.consent.enabled and settings.consent.target_field == field_name`.
+  3. In `routers/whatsapp.py`, pull affirmative and declined keywords dynamically from `settings.consent.affirmative_keywords` or localized locale strings (`backend/locales/{lang}.json`).
+
+---
+
+#### 2. Generic Enum & Multi-Choice Extractor (`extract_enum`)
+
+* **Priority:** `Medium`
+* **Current Limitation:**
+  Currently, specialized extractors exist for `extract_language` (matching `settings.languages`) and `extract_crop_type` (matching `settings.crop_types`). When a partner introduces an arbitrary enum question (e.g., `membership_tier: ["Gold", "Silver", "Bronze"]` or `irrigation_type: ["Drip", "Flood", "Rainfed"]`), replying with numeric indexes (`1`, `2`, `3`) either requires custom Python code or falls back to saving raw numbers as strings.
+
+* **Proposed Technical Approach:**
+  Introduce a general-purpose `extract_enum` extraction method in `OnboardingService` that dynamically resolves choices based on an `options` array defined in the field's JSON configuration.
+
+* **Target Schema in `config.json`:**
+  ```json
+  {
+    "field_name": "membership_tier",
+    "field_type": "enum",
+    "required": true,
+    "db_field": "membership_tier",
+    "extraction_method": "extract_enum",
+    "max_attempts": 3,
+    "options": [
+      { "id": "gold", "labels": { "en": "Gold", "sw": "Dhahabu", "id": "Emas" } },
+      { "id": "silver", "labels": { "en": "Silver", "sw": "Fedha", "id": "Perak" } },
+      { "id": "bronze", "labels": { "en": "Bronze", "sw": "Shaba", "id": "Perunggu" } }
+    ],
+    "questions": {
+      "en": "Select your membership tier:\n1. Gold\n2. Silver\n3. Bronze",
+      "sw": "Chagua kiwango chako cha uanachama:\n1. Dhahabu\n2. Fedha\n3. Shaba",
+      "id": "Pilih tingkatan keanggotaan Anda:\n1. Emas\n2. Perak\n3. Perunggu"
+    }
+  }
+  ```
+
+* **Implementation Pattern in `OnboardingService`:**
+  ```python
+  async def extract_enum(
+      self, message: str, field_config: OnboardingFieldConfig, lang: str = "en"
+  ) -> Optional[str]:
+      """Generic enum resolver for 1-based indexes, IDs, or localized labels."""
+      msg_clean = message.strip().lower()
+      options = getattr(field_config, "options", []) or []
+
+      # 1. Match numeric 1-based index (e.g., "1" -> options[0])
+      if msg_clean.isdigit():
+          idx = int(msg_clean) - 1
+          if 0 <= idx < len(options):
+              opt = options[idx]
+              return opt.get("id") if isinstance(opt, dict) else opt
+
+      # 2. Match localized label or raw string
+      for opt in options:
+          if isinstance(opt, dict):
+              opt_id = opt.get("id", "").lower()
+              labels = [l.lower() for l in opt.get("labels", {}).values()]
+              if msg_clean == opt_id or msg_clean in labels:
+                  return opt.get("id")
+          elif msg_clean == str(opt).lower():
+              return str(opt)
+
+      return None
+  ```
+
+---
+
+#### 3. Configurable Global Geo-Hierarchy (`extract_location`)
+
+* **Priority:** `High` *(Required for Non-Kenya Deployments)*
+* **Current Limitation:**
+  `extract_location` and `resolve_administration_ambiguity` in [backend/services/onboarding_service.py:L584-L850](/backend/services/onboarding_service.py#L584-L850) are hardcoded around Kenya's 3-level administrative tree: `Region (County)` $\rightarrow$ `District (Sub-County)` $\rightarrow$ `Ward`.
+  In international deployments (e.g., Indonesia: *Provinsi > Kabupaten > Kecamatan > Desa* [4 levels], Rwanda: *Province > District > Sector > Cell* [4 levels]), the location step cannot navigate deeper hierarchies.
+
+* **Proposed Technical Approach:**
+  1. Generalize the `administrative` table hierarchy so each node stores an explicit `level_index` (`0` = Top level, `1` = Sub-level, ..., `N` = Leaf Ward/Village).
+  2. Define the hierarchy names and delimiter in `config.json`.
+  3. Update `OnboardingService._build_location_tree_prompt()` to traverse dynamically across `N` depth levels.
+
+* **Target Schema in `config.json`:**
+  ```json
+  "administrative_hierarchy": {
+    "country_code": "ID",
+    "max_depth": 4,
+    "levels": [
+      { "level": 0, "name": { "en": "Province", "id": "Provinsi" } },
+      { "level": 1, "name": { "en": "Regency", "id": "Kabupaten" } },
+      { "level": 2, "name": { "en": "District", "id": "Kecamatan" } },
+      { "level": 3, "name": { "en": "Village", "id": "Desa" } }
+    ],
+    "delimiter": " > "
+  }
+  ```
+
+---
+
+#### 4. Web Admin Dynamic Profile Field Renderer (`frontend/`)
+
+* **Priority:** `Medium`
+* **Current Limitation:**
+  In `frontend/src/components/customers/EditCustomerModal.js`, the modal only contains static input form fields for `full_name`, `language`, `crop_type`, and `ward_id`. Custom fields saved in PostgreSQL `customers.profile_data` JSONB (such as `farm_size_ha`, `certification`, `experience_years`) are not editable via individual input controls.
+
+* **Proposed Technical Approach:**
+  1. Expose a backend endpoint `GET /api/config/onboarding/fields` returning the active field configurations.
+  2. In `EditCustomerModal.js`, dynamically render inputs for all keys present in `customer.profile_data` or defined in `onboarding.fields`.
+  3. When saving, submit updated key-values in the `profile_data` payload to `PUT /api/customers/{id}`.
+
+* **Frontend UI Implementation Sketch (`EditCustomerModal.js`):**
+  ```jsx
+  {/* Dynamic Custom Profile Fields */}
+  <div className="mt-4 border-t pt-4">
+    <h4 className="text-sm font-medium text-gray-900 mb-2">Custom Partner Attributes</h4>
+    {Object.entries(formData.profile_data || {}).map(([key, val]) => (
+      <div key={key} className="mb-3">
+        <label className="block text-xs font-semibold text-gray-700 capitalize">
+          {key.replace(/_/g, ' ')}
+        </label>
+        <input
+          type="text"
+          value={val || ''}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              profile_data: { ...formData.profile_data, [key]: e.target.value },
+            })
+          }
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+        />
+      </div>
+    ))}
+  </div>
+  ```
+
+---
+
+#### 5. Configurable Post-Onboarding Pipeline & Webhook Hooks
+
+* **Priority:** `Low`
+* **Current Limitation:**
+  Post-onboarding behaviors (specifically the Automated Weather Forecast broadcast opt-in and Extension Officer contact card injection) are hardcoded inside `routers/whatsapp.py:L580-L630` and `onboarding_service.py:_complete_onboarding`.
+
+* **Proposed Technical Approach:**
+  Refactor post-onboarding actions into an event-driven hook pipeline. After onboarding status transitions to `COMPLETED`, AgriConnect invokes a sequence of enabled hooks.
+
+* **Target Schema in `config.json`:**
+  ```json
+  "post_onboarding": {
+    "send_profile_summary": true,
+    "actions": [
+      {
+        "type": "weather_subscription_prompt",
+        "enabled": true,
+        "requires": "location"
+      },
+      {
+        "type": "send_eo_contact_card",
+        "enabled": true
+      },
+      {
+        "type": "partner_webhook",
+        "enabled": false,
+        "url": "https://partner-system.org/api/v1/farmer-registered",
+        "headers": { "Authorization": "Bearer YOUR_PARTNER_API_KEY" }
+      }
+    ]
+  }
+  ```
