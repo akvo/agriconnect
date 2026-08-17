@@ -237,11 +237,11 @@ Verify onboarding functions seamlessly when `administration` location step is **
    ```
 
 #### Execution Steps:
-| Step | Phone & Payload | Expected Bot Response | Verification Point |
-|---|---|---|---|
-| C.1 | `+254700000002` $\rightarrow$ `Hi` | `What is your full name?` | Bypasses location entirely |
-| C.2 | `+254700000002` $\rightarrow$ `John Doe` | `How many years have you been farming?\n\n(Reply 'skip' if you prefer not to answer)` | Asks experience question |
-| C.3 | `+254700000002` $\rightarrow$ `skip` | Completes onboarding with summary: <br>`Perfect! Your profile is all set up. Here's a summary:`<br>`Full Name: John Doe`<br>`Farming Experience: N/A` | Graceful skip handling with `N/A` in profile summary |
+| Step | Phone & Payload | Expected Bot Response | Verification Point | Status |
+|---|---|---|---|---|
+| C.1 | `+254700000002` $\rightarrow$ `Hi` | `What is your full name?` | Bypasses location entirely | [x] **PASSED** (2026-08-17) |
+| C.2 | `+254700000002` $\rightarrow$ `John Doe` | `How many years have you been farming?\n\n(Reply 'skip' if you prefer not to answer)` | Asks experience question | [x] **PASSED** (2026-08-17) |
+| C.3 | `+254700000002` $\rightarrow$ `skip` | Completes onboarding with summary: <br>`Perfect! Your profile is all set up. Here's a summary:`<br>`Full Name: John Doe`<br>`Farming Experience: N/A` | Graceful skip handling with `N/A` in profile summary | [x] **PASSED** (2026-08-17) |
 
 ---
 
