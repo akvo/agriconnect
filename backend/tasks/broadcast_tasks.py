@@ -121,11 +121,7 @@ def process_broadcast(broadcast_id: int) -> Dict[str, Any]:
                         continue
 
                     # Get language-specific template SID
-                    customer_lang = (
-                        customer.language.value
-                        if customer.language
-                        else "en"
-                    )
+                    customer_lang = customer.language_code
                     template_sid = whatsapp_service.get_template_sid(
                         template_type="broadcast",
                         customer_language=customer_lang
@@ -354,11 +350,7 @@ def retry_failed_broadcasts() -> Dict[str, Any]:
                         continue
 
                     # Get language-specific template SID for retry
-                    customer_lang = (
-                        customer.language.value
-                        if customer.language
-                        else "en"
-                    )
+                    customer_lang = customer.language_code
                     retry_template_sid = whatsapp_service.get_template_sid(
                         template_type="broadcast",
                         customer_language=customer_lang

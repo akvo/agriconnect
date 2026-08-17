@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import api from "../../lib/api";
-import { CROP_TYPES } from "@/lib/config";
 
 export default function EditCustomerModal({
   customer,
@@ -20,12 +19,42 @@ export default function EditCustomerModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Crop types dynamic state
+  const [cropTypes, setCropTypes] = useState([]);
+  const [loadingCrops, setLoadingCrops] = useState(false);
+
   // Administrative location states
   const [administrativeLevels, setAdministrativeLevels] = useState([]);
   const [availableLocations, setAvailableLocations] = useState({});
   const [selectedLocation, setSelectedLocation] = useState({});
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingCrops(true);
+    api
+      .get("/crop-types/")
+      .then((response) => {
+        if (isMounted) {
+          const list = Array.isArray(response.data)
+            ? response.data.map((c) => (typeof c === "string" ? c : c.name))
+            : [];
+          setCropTypes(list);
+        }
+      })
+      .catch((err) => {
+        console.error("Error loading crop types:", err);
+        if (isMounted) setCropTypes([]);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingCrops(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const loadChildLocations = useCallback(async (parentId, levelIndex) => {
     try {
@@ -290,11 +319,18 @@ export default function EditCustomerModal({
                   name="crop_type"
                   value={formData.crop_type || ""}
                   onChange={handleChange}
+                  disabled={loadingCrops}
                   className="w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
                   style={{ borderRadius: "5px" }}
                 >
                   <option value="">Select Crop Type</option>
-                  {CROP_TYPES.map((type) => (
+                  {formData.crop_type &&
+                    !cropTypes.includes(formData.crop_type) && (
+                      <option value={formData.crop_type}>
+                        {formData.crop_type}
+                      </option>
+                    )}
+                  {cropTypes.map((type) => (
                     <option key={type} value={type}>
                       {type}
                     </option>

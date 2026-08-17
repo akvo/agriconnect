@@ -1,579 +1,101 @@
 """
 Internationalization (i18n) translations for AgriConnect.
-Simple nested dictionary structure for all translations.
+Dynamic file-based locale system loading JSON translation files from
+backend/locales/ directory.
 
 Structure: trans[category][field][message_type][language]
 Usage:
-- t("onboarding.name.question", "sw") or
-- trans["onboarding"]["name"]["question"]["sw"]
+- t("onboarding.administration.select_region", "sw") or
+- trans["onboarding"]["common"]["age"]["sw"]
 """
 
+import json
+import logging
+from pathlib import Path
 from typing import Any, Dict
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+LOCALES_DIR = Path(__file__).parent.parent / "locales"
 
 
-# Translation dictionary
-trans: Dict[str, Any] = {
-    "onboarding": {
-        "language": {
-            "question": {
-                "en": (
-                    "Welcome to AgriConnect! 🌱 Your agricultural advisory "
-                    "companion.\n"
-                    "Karibu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\n"
-                    "Choose your language / Chagua lugha yako:\n"
-                    "1. English / Kiingereza\n2. Swahili / Kiswahili"
-                ),
-                "sw": (
-                    "Karibu AgriConnect! 🌱 Mshauri wako wa kilimo.\n\n"
-                    "Chagua lugha yako:\n"
-                    "1. Kiingereza\n2. Kiswahili"
-                ),
-            },
-            "success": {
-                "en": (
-                    "Great! Your language preference has been set to English."
-                ),
-                "sw": "Vizuri! Lugha uliyopendelea imewekwa kuwa Kiswahili.",
-            },
-            "field_name": {"en": "Language", "sw": "Lugha"},
-        },
-        "full_name": {
-            "question": {
-                "en": (
-                    "To get started, I need to know your full name.\n\n"
-                    "Please tell me: What is your full name?"
-                ),
-                "sw": (
-                    "Kuanza, nahitaji majina yako kamili.\n\n"
-                    "Tafadhali niambie: Jina lako kamili ni nani?"
-                ),
-            },
-            "success": {
-                "en": "Thank you, {value}!",
-                "sw": "Asante, {value}!",
-            },
-            "field_name": {"en": "Name", "sw": "Jina"},
-        },
-        "administration": {
-            "question": {
-                "en": (
-                    "I need to know your location.\n\n"
-                    "Please tell me your district and ward.\n"
-                    "For example: Njoro, Lare"
-                ),
-                "sw": (
-                    "Ninahitaji kujua eneo lako.\n\n"
-                    "Tafadhali niambie wilaya na kata yako.\n"
-                    "Mfano: Njoro, Lare"
-                ),
-            },
-            "success": {
-                "en": "Location saved as {value}.",
-                "sw": "Eneo limehifadhiwa kama {value}.",
-            },
-            "field_name": {"en": "Location", "sw": "Eneo"},
-            "multiple_matches": {
-                "en": (
-                    "I found multiple locations that match. Please select the "
-                    "correct one:\n\n{options}\n\nReply with the number "
-                    "(e.g., '1', '2', etc.)"
-                ),
-                "sw": (
-                    "Nimepata maeneo mengi yanayolingana. Tafadhali chagua "
-                    "sahihi:\n\n{options}\n\nJibu kwa namba (mfano, '1', '2', "
-                    "n.k.)"
-                ),
-            },
-            "filtered_matches": {
-                "en": (
-                    "I found these locations matching '{input}':\n\n{options}"
-                    "\n\nReply with the number (e.g., '1', '2', etc.)"
-                ),
-                "sw": (
-                    "Nimepata maeneo haya yanayolingana na '{input}':\n\n"
-                    "{options}\n\nJibu kwa namba (mfano, '1', '2', n.k.)"
-                ),
-            },
-            "no_filter_match": {
-                "en": (
-                    "I couldn't find '{input}' in the options. "
-                    "Please select from:\n\n{options}\n\n"
-                    "Reply with the number (e.g., '1', '2', etc.)"
-                ),
-                "sw": (
-                    "Sikuweza kupata '{input}' katika chaguo. "
-                    "Tafadhali chagua kutoka:\n\n{options}\n\n"
-                    "Jibu kwa namba (mfano, '1', '2', n.k.)"
-                ),
-            },
-            "no_match": {
-                "en": (
-                    "I couldn't find a matching location for '{input}'. "
-                    "Please tell me your district and ward.\n"
-                    "For example: Njoro, Lare"
-                ),
-                "sw": (
-                    "Sikuweza kupata eneo linalingana na '{input}'. "
-                    "Tafadhali niambie wilaya na kata yako.\n"
-                    "Mfano: Njoro, Lare"
-                ),
-            },
-            "no_location_extracted_max": {
-                "en": (
-                    "I'm having trouble understanding your location. I'll "
-                    "continue without it for now. You can always update your "
-                    "location later in settings."
-                ),
-                "sw": (
-                    "Ninapata shida kuelewa eneo lako. Nitaendelea bila eneo "
-                    "kwa sasa. Unaweza kusasisha eneo lako baadaye kwenye "
-                    "mipangilio."
-                ),
-            },
-            "no_location_extracted_retry": {
-                "en": (
-                    "I couldn't identify your location from that message"
-                    "{attempt_msg}. Please tell me your district and ward.\n"
-                    "For example: Njoro, Lare"
-                ),
-                "sw": (
-                    "Sikuweza kutambua eneo lako kutoka ujumbe huo"
-                    "{attempt_msg}. Tafadhali niambie wilaya na kata yako.\n"
-                    "Mfano: Njoro, Lare"
-                ),
-            },
-            "no_matches_max": {
-                "en": (
-                    "I couldn't find your location in our system. "
-                    "I'll continue without it for now. "
-                    "You can always update your location "
-                    "later in settings."
-                ),
-                "sw": (
-                    "Sikuweza kupata eneo lako kwenye mfumo wetu. Nitaendelea "
-                    "bila eneo kwa sasa. Unaweza kusasisha eneo lako baadaye "
-                    "kwenye mipangilio."
-                ),
-            },
-            "no_matches_retry": {
-                "en": (
-                    "I couldn't find a matching location for '{input}'. "
-                    "Please tell me your district and ward.\n"
-                    "For example: Njoro, Lare"
-                ),
-                "sw": (
-                    "Sikuweza kupata eneo linalingana na '{input}'. "
-                    "Tafadhali niambie wilaya na kata yako.\n"
-                    "Mfano: Njoro, Lare"
-                ),
-            },
-            # Hierarchical selection messages
-            "select_region": {
-                "en": (
-                    "Let's find your location step by step.\n\n"
-                    "Which county/region are you from?\n\n{options}"
-                ),
-                "sw": (
-                    "Hebu tupate eneo lako hatua kwa hatua.\n\n"
-                    "Unatoka kaunti/mkoa gani?\n\n{options}"
-                ),
-            },
-            "select_district": {
-                "en": (
-                    "Great! You selected {parent}.\n\n"
-                    "Which sub-county/district are you in?\n\n{options}"
-                ),
-                "sw": (
-                    "Vizuri! Umechagua {parent}.\n\n"
-                    "Uko wilaya gani ndogo?\n\n{options}"
-                ),
-            },
-            "select_ward": {
-                "en": (
-                    "You're in {parent}.\n\n"
-                    "Which ward are you in?\n\n{options}"
-                ),
-                "sw": ("Uko {parent}.\n\n" "Uko kata gani?\n\n{options}"),
-            },
-            "confirm_location": {
-                "en": (
-                    "You selected: {location}\n\n"
-                    "Is this correct?\n"
-                    "1. Yes\n"
-                    "2. No, let me choose again"
-                ),
-                "sw": (
-                    "Umechagua: {location}\n\n"
-                    "Hii ni sahihi?\n"
-                    "1. Ndiyo\n"
-                    "2. Hapana, niruhusu kuchagua tena"
-                ),
-            },
-            "selection_instruction": {
-                "en": "\nReply with the number (e.g., '1', '2', etc.)",
-                "sw": "\nJibu kwa namba (mfano, '1', '2', n.k.)",
-            },
-            "no_children_found": {
-                "en": (
-                    "I couldn't find any sub-areas for {parent}. "
-                    "Let me save your location as {parent}."
-                ),
-                "sw": (
-                    "Sikupata maeneo madogo ya {parent}. "
-                    "Niruhusu kuhifadhi eneo lako kama {parent}."
-                ),
-            },
-            "other_option": {
-                "en": "Other (select step by step)",
-                "sw": "Nyingine (chagua hatua kwa hatua)",
-            },
-            "location_saved": {
-                "en": (
-                    "Thank you! I've recorded your location as: {value}. How "
-                    "can I help you today?"
-                ),
-                "sw": (
-                    "Asante! Nimerekordi eneo lako kama: {value}. Ninaweza "
-                    "kukusaidiaje leo?"
-                ),
-            },
-        },
-        "crop_type": {
-            "question": {
-                "en": (
-                    "What crops do you grow?\n\n"
-                    "Please select from the list below:\n"
-                    "{available_crops}\n\n"
-                    "Reply with the number (e.g., '1', '2', etc.)"
-                ),
-                "sw": (
-                    "Unalima mazao gani?\n\n"
-                    "Tafadhali chagua kutoka orodha hapa chini:\n"
-                    "{available_crops}\n\n"
-                    "Jibu kwa namba (mfano, '1', '2', n.k.)"
-                ),
-            },
-            "success": {
-                "en": "Primary crops recorded: {value}.",
-                "sw": "Mazao makuu yamerekodiwa: {value}.",
-            },
-            "field_name": {"en": "Primary Crops", "sw": "Mazao ya msingi"},
-            "extraction_failed_retry": {
-                "en": (
-                    "I still couldn't identify that. Please select from "
-                    "the list:\n{available_crops}\n\n"
-                    "Reply with the number (e.g., '1', '2', etc.)"
-                ),
-                "sw": (
-                    "Bado sikuweza kutambua. Tafadhali chagua kutoka "
-                    "orodha:\n{available_crops}\n\n"
-                    "Jibu kwa namba (mfano, '1', '2', n.k.)"
-                ),
-            },
-        },
-        "gender": {
-            "question": {
-                "en": (
-                    "To help us serve you better, may I know your gender?\n\n"
-                    "You can say: male, female, or other"
-                ),
-                "sw": (
-                    "Ili tukusaidie vizuri zaidi, "
-                    "naweza kujua jinsia yako?\n\n"
-                    "Unaweza kusema: mwanamume, mwanamke, au nyingine"
-                ),
-            },
-            "success": {
-                "en": "Thank you for sharing.",
-                "sw": "Asante kwa kushiriki.",
-            },
-            "field_name": {"en": "Gender", "sw": "Jinsia"},
-        },
-        "birth_year": {
-            "question": {
-                "en": (
-                    "What year were you born? "
-                    "You can also tell me your age if "
-                    "that's easier.\n\n"
-                    "For example: '1980' or 'I'm 45 years old'"
-                ),
-                "sw": (
-                    "Ulizaliwa mwaka gani? "
-                    "Ama unaweza pia kuniambia umri wako.\n\n"
-                    "Kwa mfano: '1980' au 'Nina miaka 45'"
-                ),
-            },
-            "success": {
-                "en": "Got it, thank you!",
-                "sw": "Nimeelewa, asante!",
-            },
-            "field_name": {"en": "Birth Year", "sw": "Mwaka wa Kuzaliwa"},
-        },
-        "common": {
-            "extraction_failed": {
-                "en": "I couldn't identify that information. {question}",
-                "sw": "Sikuweza kutambua taarifa hiyo. {question}",
-            },
-            "selection_prompt": {
-                "en": "Reply with the number (e.g., '1', '2', etc.)",
-                "sw": "Jibu kwa namba (mfano, '1', '2', n.k.)",
-            },
-            "invalid_selection": {
-                "en": (
-                    "I didn't understand your selection. Please reply with a "
-                    "number (e.g., '1', '2', '3')"
-                ),
-                "sw": (
-                    "Sikuelewa chaguo lako. Tafadhali jibu kwa namba (mfano, "
-                    "'1', '2', '3')"
-                ),
-            },
-            "selection_out_of_range": {
-                "en": "Please select a number between 1 and {max}",
-                "sw": "Tafadhali chagua namba kati ya 1 na {max}",
-            },
-            "database_error": {
-                "en": "Sorry, something went wrong. Please try again.",
-                "sw": "Samahani, kuna hitilafu. Tafadhali jaribu tena.",
-            },
-            "save_error": {
-                "en": (
-                    "Sorry, I had trouble saving that information. Please try "
-                    "again."
-                ),
-                "sw": (
-                    "Samahani, nilipata shida kuhifadhi taarifa hiyo. "
-                    "Tafadhali jaribu tena."
-                ),
-            },
-            "skip_instruction": {
-                "en": "\n\n(Reply 'skip' if you prefer not to answer)",
-                "sw": "\n\n(Jibu 'ruka' ikiwa hupendelei kujibu)",
-            },
-            "max_attempts_required": {
-                "en": (
-                    "I'm having trouble collecting your {field}. "
-                    "Please contact "
-                    "support for assistance, or try again later."
-                ),
-                "sw": (
-                    "Ninapata shida kukusanya {field} yako. "
-                    "Tafadhali wasiliana "
-                    "na usaidizi, au jaribu tena baadaye."
-                ),
-            },
-            "max_attempts_optional": {
-                "en": (
-                    "Skipping {field} for now."
-                    "You can update this information later."
-                ),
-                "sw": (
-                    "Tunaruka {field} kwa sasa."
-                    "Unaweza kusasisha taarifa hii baadaye."
-                ),
-            },
-            "completion": {
-                "en": (
-                    "Perfect! Your profile is all set up. Here's a summary:"
-                    "\n\n{profile_summary}"
-                ),
-                "sw": (
-                    "Sawa! Wasifu wako uko tayari. Huu hapa muhtasari:"
-                    "\n\n{profile_summary}"
-                ),
-            },
-            "lost_candidates": {
-                "en": (
-                    "Sorry, I lost track of the options. "
-                    "Could you please tell me your location again?"
-                ),
-                "sw": (
-                    "Samahani, nimepoteza orodha ya chaguo. "
-                    "Tafadhali niambie eneo lako tena?"
-                ),
-            },
-            "age": {
-                "en": "Age",
-                "sw": "Umri",
-            },
-        },
-        "ask_edit_profile": {
-            "en": "To edit your profile, please contact support below:",
-            "sw": "Ili kuhariri wasifu wako, tafadhali wasiliana:",
-        },
-        "ask_delete_data": {
-            "en": (
-                "To remove yourself from AgriConnect please message *DELETE*."
-            ),
-            "sw": "Ili kuondoa usajili, tuma ujumbe *FUTA*.",
-        },
-    },
-    "crops": {
-        "Avocado": {"name": {"en": "Avocado", "sw": "Parachichi"}},
-        "Cacao": {"name": {"en": "cacao", "sw": "kakao"}},
-        "Potato": {"name": {"en": "potato", "sw": "viazi"}},
-        "Dairy": {"name": {"en": "Dairy", "sw": "Maziwa"}},
-    },
-    "gender": {
-        "male": {"en": "Male", "sw": "Mwanaume"},
-        "female": {"en": "Female", "sw": "Mwanamke"},
-        "other": {"en": "Other", "sw": "Nyingine"},
-    },
-    "weather": {
-        "service_unavailable": {
-            "en": (
-                "Weather service is currently unavailable. "
-                "It will be back soon."
-            ),
-            "sw": (
-                "Huduma ya hali ya hewa haipatikani kwa sasa. "
-                "Itarudi hivi karibuni."
-            ),
-        },
-    },
-    "weather_subscription": {
-        "question": {
-            "en": (
-                "\n\nWould you like to receive weather updates "
-                "for your area ({area_name})?"
-            ),
-            "sw": (
-                "\n\nJe, ungependa kupokea taarifa za hali ya anga "
-                "kwa eneo lako ({area_name})?"
-            ),
-        },
-        "button_yes": {
-            "en": "Yes",
-            "sw": "Ndiyo",
-        },
-        "button_no": {
-            "en": "No",
-            "sw": "Hapana",
-        },
-        "subscribed": {
-            "en": (
-                "Great! You will receive automated weather broadcasts "
-                "every 3 days for {area_name}.\n\n"
-                "Don't want to wait? Just message *weather* anytime "
-                "to get your forecast instantly!"
-            ),
-            "sw": (
-                "Vizuri! Utapokea taarifa za hali ya hewa kiotomatiki "
-                "kila siku 3 kwa {area_name}.\n\n"
-                "Hutaki kusubiri? Tuma ujumbe *weather* wakati wowote "
-                "kupata utabiri wako mara moja!"
-            ),
-        },
-        "declined": {
-            "en": (
-                "No problem! You can subscribe anytime by messaging "
-                "'weather updates'.\n\n"
-                "Please message *weather* to get weather information "
-                "on-demand."
-            ),
-            "sw": (
-                "Hakuna shida! Unaweza kujisajili wakati wowote kwa kutuma "
-                "ujumbe *hali ya anga*.\n\n"
-                "Tafadhali tuma ujumbe *hali ya anga* iliupokee taarifa "
-                "unapozihitaji."
-            ),
-        },
-    },
-    "consent": {
-        "data_sharing": {
-            "question": {
-                "en": (
-                    "Your data may be shared with trusted partners for "
-                    "program monitoring and service delivery, and will be "
-                    "handled securely in line with data protection standards. "
-                    "Reply 'Yes' to accept and continue."
-                ),
-                "sw": (
-                    "Data yako inaweza kushirikiwa na washirika waaminifu "
-                    "kwa ufuatiliaji wa programu na utoaji wa huduma, na "
-                    "itashughulikiwa kwa usalama kulingana na viwango vya "
-                    "ulinzi wa data. Jibu 'Ndiyo' kukubali na kuendelea."
-                ),
-            },
-            "accepted": {
-                "en": "Thank you for your consent!",
-                "sw": "Asante kwa kukubali.",
-            },
-            "declined": {
-                "en": (
-                    "We understand. Unfortunately, we cannot proceed without "
-                    "your consent to data sharing. If you change your mind, "
-                    "please message us again."
-                ),
-                "sw": (
-                    "Tunaelewa. Kwa bahati mbaya, hatuwezi kuendelea bila "
-                    "idhini yako ya kushiriki data. Ukibadili mawazo, "
-                    "tafadhali tutumie ujumbe tena."
-                ),
-            },
-        },
-    },
-    "account": {
-        "delete_confirmation": {
-            "en": (
-                "Are you sure you want to delete your account? "
-                "This will permanently remove all your data and messages.\n\n"
-                "Reply 'Yes' to confirm deletion."
-            ),
-            "sw": (
-                "Je, una uhakika unataka kufuta akaunti yako? "
-                "Hii itaondoa data yako yote na ujumbe milele.\n\n"
-                "Jibu 'Ndiyo' kuthibitisha kufuta."
-            ),
-        },
-        "deleted": {
-            "en": (
-                "Your account and all associated data have been deleted. "
-                "If you message us again, a new account will be created."
-            ),
-            "sw": (
-                "Akaunti yako na data zote zinazohusiana zimefutwa. "
-                "Ukitutumia ujumbe tena, akaunti mpya itaundwa."
-            ),
-        },
-    },
-    "escalation": {
-        "confirmed": {
-            "en": (
-                "Your issue has been transferred to extension service "
-                "provider. Please wait for a response from them. "
-                "For urgent issues please call:\n{eo_contacts}"
-            ),
-            "sw": (
-                "Tatizo lako limehamishwa kwa mtoa huduma wa ugani. "
-                "Tafadhali subiri jibu kutoka kwao. "
-                "Kwa masuala ya dharura tafadhali piga simu:\n{eo_contacts}"
-            ),
-        },
-        "confirmed_no_contacts": {
-            "en": (
-                "Your issue has been transferred to extension service "
-                "provider. Please wait for a response from them."
-            ),
-            "sw": (
-                "Tatizo lako limehamishwa kwa mtoa huduma wa ugani. "
-                "Tafadhali subiri jibu kutoka kwao."
-            ),
-        },
-    },
-    "ai_response": {
-        "disclaimer": {
-            "en": (
-                "Before taking any major actions please consult with "
-                "your extension service provider"
-            ),
-            "sw": (
-                "Kabla ya kuchukua hatua yoyote kubwa tafadhali "
-                "wasiliana na mtoa huduma wako wa ugani"
-            ),
-        },
-    },
-}
+def load_translations() -> Dict[str, Dict[str, Any]]:
+    """
+    Load all JSON locale files from backend/locales/ directory.
+
+    Returns:
+        Dict mapping language code to nested translation dictionary.
+        e.g. {"en": {...}, "sw": {...}}
+    """
+    translations: Dict[str, Dict[str, Any]] = {}
+    if not LOCALES_DIR.exists():
+        logger.warning(f"[i18n] Locales directory not found: {LOCALES_DIR}")
+        return translations
+
+    for filepath in LOCALES_DIR.glob("*.json"):
+        lang_code = filepath.stem
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                translations[lang_code] = json.load(f)
+        except Exception as e:
+            logger.error(
+                f"[i18n] Failed to load locale file {filepath}: {e}",
+                exc_info=True,
+            )
+
+    return translations
+
+
+def _build_trans_dict(locales: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Build nested trans dictionary from locales for backward compatibility.
+    Structure: trans[category][...][language] = text
+    """
+    result: Dict[str, Any] = {}
+
+    def _insert(target: Dict[str, Any], keys: list, lang: str, value: Any):
+        if not keys:
+            return
+        key = keys[0]
+        if len(keys) == 1:
+            if key not in target or not isinstance(target[key], dict):
+                target[key] = {}
+            target[key][lang] = value
+        else:
+            if key not in target or not isinstance(target[key], dict):
+                target[key] = {}
+            _insert(target[key], keys[1:], lang, value)
+
+    def _traverse(data: Dict[str, Any], path: list, lang: str):
+        for k, v in data.items():
+            current_path = path + [k]
+            if isinstance(v, dict):
+                _traverse(v, current_path, lang)
+            else:
+                _insert(result, current_path, lang, v)
+
+    for lang, content in locales.items():
+        if isinstance(content, dict):
+            _traverse(content, [], lang)
+
+    return result
+
+
+# In-memory translation storage
+_locales: Dict[str, Dict[str, Any]] = load_translations()
+trans: Dict[str, Any] = _build_trans_dict(_locales)
+
+
+def reload_translations() -> None:
+    """
+    Reload all translation files from disk.
+    Used for testing and runtime locale updates without server restart.
+    """
+    global _locales, trans
+    _locales = load_translations()
+    trans.clear()
+    trans.update(_build_trans_dict(_locales))
 
 
 def t(path: str, lang: str = "en", **kwargs) -> str:
@@ -581,52 +103,57 @@ def t(path: str, lang: str = "en", **kwargs) -> str:
     Get translation by dot-notation path.
 
     Usage:
-        t("onboarding.name.question", "sw")
-        t(
-            "onboarding.common.extraction_failed",
-            "en",
-            question="What is your name?"
-        )
+        t("consent.data_sharing.question", "sw")
+        t("onboarding.common.extraction_failed", "en", question="...")
         t("crops.Avocado.name", "sw")
 
     Args:
-        path: Dot-notation path (e.g., "onboarding.name.question")
-        lang: Language code ("en" or "sw"), defaults to "en"
+        path: Dot-notation path (e.g., "consent.data_sharing.question")
+        lang: Language code ("en", "sw", "id", etc.), defaults to "en"
         **kwargs: Variables to format into the translation string
 
     Returns:
-        Translated and formatted string,
-        fallback to English if language invalid
+        Translated and formatted string, fallback to default language if
+        missing.
     """
-    # Default to English if invalid language
-    language = lang if lang in ["en", "sw"] else "en"
+    target_lang = (
+        lang
+        if lang in _locales
+        else (
+            settings.default_language
+            if settings.default_language in _locales
+            else "en"
+        )
+    )
 
-    # Navigate the nested dictionary
     keys = path.split(".")
-    value = trans
 
-    try:
-        for key in keys:
-            value = value[key]
+    def _lookup(locale_data: Dict[str, Any], key_list: list) -> Any:
+        current = locale_data
+        for k in key_list:
+            if not isinstance(current, dict) or k not in current:
+                return None
+            current = current[k]
+        return current
 
-        # Get translation for language (fallback to English)
-        if isinstance(value, dict):
-            text = value.get(language, value.get("en", ""))
-        else:
-            text = str(value)
+    # 1. Try target language
+    value = _lookup(_locales.get(target_lang, {}), keys)
 
-        # Format with kwargs if provided
-        if kwargs:
-            try:
-                text = text.format(**kwargs)
-            except KeyError:
-                pass  # Return unformatted if formatting fails
+    # 2. Fallback to default language ("en") if missing
+    if value is None and target_lang != "en":
+        value = _lookup(_locales.get("en", {}), keys)
 
-        return text
-
-    except (KeyError, TypeError):
-        # Path not found, return the path itself as fallback
+    if value is None:
         return path
+
+    text = str(value)
+    if kwargs:
+        try:
+            text = text.format(**kwargs)
+        except (KeyError, IndexError):
+            pass
+
+    return text
 
 
 def get_crop_name_translated(crop_name: str, lang: str = "en") -> str:
@@ -635,9 +162,12 @@ def get_crop_name_translated(crop_name: str, lang: str = "en") -> str:
 
     Args:
         crop_name: Crop name in English (e.g., "Avocado")
-        lang: Language code ("en" or "sw")
+        lang: Language code ("en", "sw", etc.)
 
     Returns:
-        Translated crop name in lowercase
+        Translated crop name (or original crop_name if translation not found)
     """
-    return t(f"crops.{crop_name}.name", lang)
+    translated = t(f"crops.{crop_name}.name", lang)
+    if translated == f"crops.{crop_name}.name":
+        return crop_name
+    return translated

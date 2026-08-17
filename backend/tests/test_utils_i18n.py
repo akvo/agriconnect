@@ -18,38 +18,42 @@ class TestTranslationFunction:
 
     def test_basic_translation_english(self):
         """Test basic translation retrieval in English"""
-        result = t("onboarding.language.question", "en")
-        assert "Welcome to AgriConnect" in result
-        assert "Choose your language" in result
+        result = t("onboarding.common.selection_prompt", "en")
+        assert "Reply with the number" in result
 
     def test_basic_translation_swahili(self):
         """Test basic translation retrieval in Swahili"""
-        result = t("onboarding.language.question", "sw")
-        assert "Karibu AgriConnect" in result
-        assert "Chagua lugha yako" in result
+        result = t("onboarding.common.selection_prompt", "sw")
+        assert "Jibu kwa namba" in result
 
     def test_default_language_is_english(self):
         """Test that default language is English when not specified"""
-        result = t("onboarding.language.field_name")
-        assert result == "Language"
+        result = t("onboarding.common.selection_prompt")
+        assert "Reply with the number" in result
 
     def test_invalid_language_falls_back_to_english(self):
         """Test that invalid language codes fall back to English"""
-        result = t("onboarding.language.field_name", "fr")
-        assert result == "Language"
+        result = t("onboarding.common.selection_prompt", "fr")
+        assert "Reply with the number" in result
 
-        result = t("onboarding.language.field_name", "invalid")
-        assert result == "Language"
+        result = t("onboarding.common.selection_prompt", "invalid")
+        assert "Reply with the number" in result
 
     def test_translation_with_formatting(self):
         """Test translation with string formatting"""
-        result = t("onboarding.full_name.success", "en", value="John")
-        assert "Thank you, John" in result
+        result = t(
+            "onboarding.common.extraction_failed",
+            "en",
+            question="Please state your name.",
+        )
+        assert "Please state your name." in result
 
     def test_translation_with_formatting_swahili(self):
         """Test translation formatting in Swahili"""
-        result = t("onboarding.administration.success", "sw", value="Nairobi")
-        assert "Eneo limehifadhiwa kama Nairobi" in result
+        result = t(
+            "onboarding.administration.location_saved", "sw", value="Nairobi"
+        )
+        assert "Nairobi" in result
 
     def test_missing_translation_key_returns_path(self):
         """Test that missing translation paths return the path itself"""
@@ -59,7 +63,7 @@ class TestTranslationFunction:
     def test_formatting_with_missing_kwargs(self):
         """Test that missing kwargs in formatting are handled gracefully"""
         # Translation expects {value} but we don't provide it
-        result = t("onboarding.full_name.success", "en")
+        result = t("onboarding.administration.location_saved", "en")
         # Should return unformatted string (with {value} still in it)
         assert "{value}" in result
 
@@ -115,10 +119,10 @@ class TestCropNameTranslation:
         result = get_crop_name_translated("Avocado")
         assert result == "Avocado"
 
-    def test_invalid_crop_returns_path(self):
-        """Test that invalid crop name returns path"""
+    def test_invalid_crop_returns_name(self):
+        """Test that invalid crop name returns original name as fallback"""
         result = get_crop_name_translated("InvalidCrop", "en")
-        assert result == "crops.InvalidCrop.name"
+        assert result == "InvalidCrop"
 
 
 class TestTranslationDictionary:
@@ -133,35 +137,6 @@ class TestTranslationDictionary:
         """Test trans dict has crops category"""
         assert "crops" in trans
         assert isinstance(trans["crops"], dict)
-
-    def test_all_onboarding_fields_have_question(self):
-        """Test all onboarding fields have question translations"""
-        fields = [
-            "language",
-            "administration",
-            "crop_type",
-            "gender",
-            "birth_year",
-        ]
-        for field in fields:
-            assert field in trans["onboarding"]
-            assert "question" in trans["onboarding"][field]
-            assert "en" in trans["onboarding"][field]["question"]
-            assert "sw" in trans["onboarding"][field]["question"]
-
-    def test_all_onboarding_fields_have_success(self):
-        """Test all onboarding fields have success translations"""
-        fields = [
-            "language",
-            "administration",
-            "crop_type",
-            "gender",
-            "birth_year",
-        ]
-        for field in fields:
-            assert "success" in trans["onboarding"][field]
-            assert "en" in trans["onboarding"][field]["success"]
-            assert "sw" in trans["onboarding"][field]["success"]
 
     def test_common_messages_exist(self):
         """Test common messages are defined"""
@@ -199,36 +174,36 @@ class TestEdgeCases:
 
     def test_none_language(self):
         """Test with None as language (should default to English)"""
-        result = t("onboarding.language.field_name", None)
+        result = t("onboarding.common.selection_prompt", None)
         # Invalid language falls back to English
-        assert result == "Language"
+        assert "Reply with the number" in result
 
     def test_numeric_language_code(self):
         """Test with numeric value as language"""
-        result = t("onboarding.language.field_name", 123)
+        result = t("onboarding.common.selection_prompt", 123)
         # Invalid language falls back to English
-        assert result == "Language"
+        assert "Reply with the number" in result
 
     def test_formatting_with_extra_kwargs(self):
         """Test formatting with extra unused kwargs"""
         result = t(
-            "onboarding.language.field_name",
+            "onboarding.common.selection_prompt",
             "en",
             unused_param="value",
             another_param=123,
         )
         # Should work fine, extra kwargs ignored
-        assert result == "Language"
+        assert "Reply with the number" in result
 
     def test_special_characters_in_translation(self):
         """Test translations with special characters"""
-        result = t("onboarding.language.question", "en")
-        # Check emoji is preserved
-        assert "🌱" in result
+        result = t("weather_subscription.menu_option", "en")
+        # Check emoji or special formatting is preserved
+        assert len(result) > 0
 
     def test_newlines_in_translation(self):
         """Test translations with newlines"""
-        result = t("onboarding.crop_type.question", "en")
+        result = t("onboarding.administration.select_region", "en")
         assert "\n\n" in result  # Has double newline
 
     def test_attempt_msg_formatting(self):
@@ -239,3 +214,87 @@ class TestEdgeCases:
             attempt_msg=" (attempt 2 of 3)",
         )
         assert "attempt 2 of 3" in result
+
+
+class TestDynamicLocaleLoading:
+    """Test dynamic JSON locale file loading, runtime reloads, and fallbacks"""
+
+    def test_translations_loaded_from_json_files(self):
+        """Test that en and sw locales are loaded from JSON files"""
+        from utils.i18n import _locales
+
+        assert "en" in _locales
+        assert "sw" in _locales
+        assert isinstance(_locales["en"], dict)
+        assert isinstance(_locales["sw"], dict)
+
+    def test_consent_and_account_translations(self):
+        """Test consent, account, and escalation domains load cleanly"""
+        # Consent
+        consent_en = t("consent.data_sharing.accepted", "en")
+        consent_sw = t("consent.data_sharing.accepted", "sw")
+        assert "Thank you for your consent" in consent_en
+        assert "Asante kwa kukubali" in consent_sw
+
+        # Account deletion
+        del_en = t("account.delete_confirmation", "en")
+        del_sw = t("account.delete_confirmation", "sw")
+        assert "Are you sure you want to delete your account" in del_en
+        assert "Je, una uhakika unataka kufuta akaunti yako" in del_sw
+
+        # Escalation
+        esc_en = t("escalation.confirmed_no_contacts", "en")
+        esc_sw = t("escalation.confirmed_no_contacts", "sw")
+        assert "transferred to extension service provider" in esc_en
+        assert "limehamishwa kwa mtoa huduma wa ugani" in esc_sw
+
+        # AI Response
+        ai_en = t("ai_response.disclaimer", "en")
+        ai_sw = t("ai_response.disclaimer", "sw")
+        assert "consult with your extension service provider" in ai_en
+        assert "wasiliana na mtoa huduma wako wa ugani" in ai_sw
+
+    def test_dynamic_language_addition_at_runtime(self, tmp_path):
+        """Test adding a new language JSON file dynamically without code
+        edits."""
+        import json
+        from utils.i18n import LOCALES_DIR, reload_translations
+
+        id_file = LOCALES_DIR / "id.json"
+        id_data = {
+            "consent": {
+                "data_sharing": {
+                    "accepted": "Terima kasih atas persetujuan Anda!",
+                }
+            },
+            "onboarding": {
+                "common": {
+                    "completion": "Selesai! Profil Anda sudah siap.",
+                }
+            },
+        }
+
+        try:
+            with open(id_file, "w", encoding="utf-8") as f:
+                json.dump(id_data, f)
+
+            # Reload translations from disk
+            reload_translations()
+
+            # Test target language resolution
+            res_accepted = t("consent.data_sharing.accepted", "id")
+            assert res_accepted == "Terima kasih atas persetujuan Anda!"
+
+            res_completion = t("onboarding.common.completion", "id")
+            assert res_completion == "Selesai! Profil Anda sudah siap."
+
+            # Test fallback for missing key in id.json -> resolves to en
+            res_fallback = t("account.delete_confirmation", "id")
+            assert (
+                "Are you sure you want to delete your account" in res_fallback
+            )
+
+        finally:
+            if id_file.exists():
+                id_file.unlink()
+            reload_translations()

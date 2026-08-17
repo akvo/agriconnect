@@ -1,9 +1,11 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
+from datetime import datetime, timezone
 
 from sqlalchemy import or_, and_, Integer, cast
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from config import settings
 from models.administrative import (
     Administrative,
     AdministrativeLevel,
@@ -11,7 +13,6 @@ from models.administrative import (
 )
 from models.customer import (
     Customer,
-    CustomerLanguage,
     OnboardingStatus,
 )
 from models.ticket import Ticket
@@ -19,14 +20,15 @@ from models.message import Message
 from schemas.callback import MessageType
 from models.broadcast import BroadcastGroupContact, BroadcastRecipient
 from models.weather_broadcast import WeatherBroadcastRecipient
-from datetime import datetime, timezone
 
 
 class CustomerService:
+    """Service for managing customers and customer profile data."""
+
     def __init__(self, db: Session):
         self.db = db
 
-    def get_customer_by_phone(self, phone_number: str) -> Customer:
+    def get_customer_by_phone(self, phone_number: str) -> Optional[Customer]:
         """Get customer by phone number."""
         return (
             self.db.query(Customer)
@@ -37,7 +39,7 @@ class CustomerService:
     def create_customer(
         self,
         phone_number: str,
-        language: CustomerLanguage = None,
+        language: Optional[str] = None,
     ) -> Customer:
         """Create a new customer with minimal fields."""
         customer = Customer(phone_number=phone_number, language=language)
@@ -78,10 +80,7 @@ class CustomerService:
                 self.db.flush()
                 cust_admin = (
                     self.db.query(CustomerAdministrative)
-                    .filter(
-                        CustomerAdministrative.customer_id
-                        == customer.id
-                    )
+                    .filter(CustomerAdministrative.customer_id == customer.id)
                     .first()
                 )
                 if cust_admin:
@@ -109,7 +108,7 @@ class CustomerService:
                         continue
                     # Convert enum values to their string value
                     # for JSON serialization
-                    if hasattr(value, 'value'):
+                    if hasattr(value, "value"):
                         profile_data[key] = value.value
                     else:
                         profile_data[key] = value
@@ -148,12 +147,10 @@ class CustomerService:
         self.db.refresh(customer)
         return customer
 
-    def _detect_language_from_message(
-        self, message_text: str
-    ) -> CustomerLanguage:
+    def _detect_language_from_message(self, message_text: str) -> str:
         """Detect language from greeting message."""
         if not message_text:
-            return CustomerLanguage.EN
+            return settings.default_language
 
         message_lower = message_text.lower().strip()
 
@@ -184,13 +181,13 @@ class CustomerService:
 
         for greeting in swahili_greetings:
             if greeting in message_lower:
-                return CustomerLanguage.SW
+                return "sw"
 
         for greeting in english_greetings:
             if greeting in message_lower:
-                return CustomerLanguage.EN
+                return "en"
 
-        return CustomerLanguage.EN
+        return settings.default_language
 
     def delete_customer(self, customer_id: int) -> bool:
         """Delete a customer and all associated data."""
@@ -301,7 +298,10 @@ class CustomerService:
         for customer in customers:
             # Get administrative info (ward)
             admin_info = {
-                "id": None, "name": None, "path": None, "level": None
+                "id": None,
+                "name": None,
+                "path": None,
+                "level": None,
             }
             if customer.customer_administrative:
                 # Get the first administrative assignment
@@ -313,10 +313,14 @@ class CustomerService:
                         "id": admin.id,
                         "name": admin.name,
                         "path": self._build_administrative_path(admin.id),
-                        "level": {
-                            "id": admin.level.id,
-                            "name": admin.level.name,
-                        } if admin.level else None,
+                        "level": (
+                            {
+                                "id": admin.level.id,
+                                "name": admin.level.name,
+                            }
+                            if admin.level
+                            else None
+                        ),
                     }
 
             customer_dict = {
@@ -427,36 +431,34 @@ class CustomerService:
 
         age_conditions = []
         for age_group in age_groups:
-            if age_group == "20-35":
-                min_birth_year = current_year - 35
-                max_birth_year = current_year - 20
-            elif age_group == "36-50":
-                min_birth_year = current_year - 50
-                max_birth_year = current_year - 36
-            elif age_group == "51+":
-                min_birth_year = 1900
-                max_birth_year = current_year - 51
-            else:
+            matching_group = next(
+                (
+                    g
+                    for g in settings.age_groups
+                    if g.get("label") == age_group
+                ),
+                None,
+            )
+            if not matching_group:
                 continue
 
-            age_conditions.append(
-                and_(
-                    cast(
-                        Customer.profile_data.op("->>")(
-                            "birth_year"
-                        ),
-                        Integer,
-                    )
-                    >= min_birth_year,
-                    cast(
-                        Customer.profile_data.op("->>")(
-                            "birth_year"
-                        ),
-                        Integer,
-                    )
-                    <= max_birth_year,
-                )
+            min_age = matching_group.get("min")
+            max_age = matching_group.get("max")
+
+            conditions = []
+            birth_year_expr = cast(
+                Customer.profile_data.op("->>")("birth_year"),
+                Integer,
             )
+            if max_age is not None:
+                min_birth_year = current_year - max_age
+                conditions.append(birth_year_expr >= min_birth_year)
+            if min_age is not None:
+                max_birth_year = current_year - min_age
+                conditions.append(birth_year_expr <= max_birth_year)
+
+            if conditions:
+                age_conditions.append(and_(*conditions))
 
         if age_conditions:
             query = query.filter(or_(*age_conditions))

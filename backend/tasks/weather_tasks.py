@@ -341,11 +341,7 @@ def send_weather_templates(weather_broadcast_id: int) -> Dict[str, Any]:
                     db.flush()
 
                     # Get language-specific template SID
-                    customer_lang = (
-                        customer.language.value
-                        if customer.language
-                        else "en"
-                    )
+                    customer_lang = customer.language_code
                     template_sid = whatsapp_service.get_template_sid(
                         template_type="broadcast",
                         customer_language=customer_lang
@@ -473,7 +469,7 @@ def send_weather_message(
             return {"error": "Failed to get weather data"}
 
         # Generate fresh message in customer's language
-        customer_lang = customer.language.value if customer.language else "en"
+        customer_lang = customer.language_code
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -610,11 +606,7 @@ def retry_failed_weather_broadcasts() -> Dict[str, Any]:
                         continue
 
                     # Get language-specific template SID
-                    customer_lang = (
-                        customer.language.value
-                        if customer.language
-                        else "en"
-                    )
+                    customer_lang = customer.language_code
                     template_sid = whatsapp_service.get_template_sid(
                         template_type="broadcast",
                         customer_language=customer_lang

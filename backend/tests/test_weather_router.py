@@ -15,12 +15,17 @@ class TestWeatherRouter:
 
     def _create_admin_and_login(self, client, db_session):
         """Helper to create admin user and get token"""
+        import uuid
+        from utils.auth import create_access_token
+
+        uid = uuid.uuid4().hex[:8]
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         hashed_password = pwd_context.hash("testpass123")
 
+        email = f"weatheradmin_{uid}@test.com"
         admin_user = User(
-            email="weatheradmin@test.com",
-            phone_number="+1234567899",
+            email=email,
+            phone_number=f"+12345{uid[:5]}",
             hashed_password=hashed_password,
             full_name="Weather Admin",
             user_type=UserType.ADMIN,
@@ -29,11 +34,7 @@ class TestWeatherRouter:
         db_session.add(admin_user)
         db_session.commit()
 
-        login_response = client.post(
-            "/api/auth/login/",
-            json={"email": "weatheradmin@test.com", "password": "testpass123"},
-        )
-        return login_response.json()["access_token"]
+        return create_access_token({"sub": admin_user.email})
 
     def test_test_message_requires_auth(self, client):
         """Test that endpoint requires authentication"""
@@ -60,11 +61,9 @@ class TestWeatherRouter:
         db_session.add(eo_user)
         db_session.commit()
 
-        login_response = client.post(
-            "/api/auth/login/",
-            json={"email": "eo@test.com", "password": "testpass123"},
-        )
-        token = login_response.json()["access_token"]
+        from utils.auth import create_access_token
+
+        token = create_access_token({"sub": eo_user.email})
 
         response = client.post(
             "/api/admin/weather/test-message",
@@ -251,11 +250,9 @@ class TestWeatherRouter:
         db_session.add(eo_user)
         db_session.commit()
 
-        login_response = client.post(
-            "/api/auth/login/",
-            json={"email": "eo_trigger@test.com", "password": "testpass123"},
-        )
-        token = login_response.json()["access_token"]
+        from utils.auth import create_access_token
+
+        token = create_access_token({"sub": eo_user.email})
 
         response = client.post(
             "/api/admin/weather/trigger-broadcast",

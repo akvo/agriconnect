@@ -12,14 +12,15 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from database import Base
+from config import settings
 
 
-class CustomerLanguage(enum.Enum):
+class CustomerLanguage(str, enum.Enum):
     EN = "en"
     SW = "sw"
 
 
-class AgeGroup(enum.Enum):
+class AgeGroup(str, enum.Enum):
     AGE_20_35 = "20-35"
     AGE_36_50 = "36-50"
     AGE_51_PLUS = "51+"
@@ -44,7 +45,7 @@ class Customer(Base):
     id = Column(Integer, primary_key=True, index=True)
     phone_number = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=True)
-    language = Column(Enum(CustomerLanguage), default=None, nullable=True)
+    language = Column(String(10), default=None, nullable=True)
     # JSON object with profile fields
     profile_data = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -80,6 +81,11 @@ class Customer(Base):
 
     # Profile data property accessors
     @property
+    def language_code(self) -> str:
+        """Get customer language code or default from settings."""
+        return self.language or settings.default_language
+
+    @property
     def birth_year(self) -> int | None:
         """Get birth_year from profile_data"""
         if not self.profile_data:
@@ -112,16 +118,20 @@ class Customer(Base):
 
     @property
     def age_group(self) -> str | None:
-        """Calculate age group from birth_year"""
+        """Calculate age group dynamically from config."""
         age = self.age
         if age is None:
             return None
-        if 20 <= age <= 35:
-            return "20-35"
-        elif 36 <= age <= 50:
-            return "36-50"
-        else:
-            return "51+"
+
+        for group in settings.age_groups:
+            min_a = group.get("min")
+            max_a = group.get("max")
+            if min_a is not None and age < min_a:
+                continue
+            if max_a is not None and age > max_a:
+                continue
+            return group.get("label")
+        return None
 
     # Weather subscription properties
     @property
