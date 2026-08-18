@@ -91,6 +91,10 @@ jobs:
     environment: CoM-Hydroponics
     needs: [run-tests]
     if: always() && needs.run-tests.result == 'success'
+    env:
+      # branch is tenant/com; the composite tags images with $GITHUB_REF_NAME,
+      # and a slash is an invalid docker tag. Sanitize to a slash-free value.
+      GITHUB_REF_NAME: tenant-com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -202,6 +206,9 @@ jobs:
     needs: build-push
     runs-on: ubuntu-latest
     environment: CoM-Hydroponics
+    env:
+      # must match the tag built/pushed by build-push (see note there)
+      GITHUB_REF_NAME: tenant-com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
