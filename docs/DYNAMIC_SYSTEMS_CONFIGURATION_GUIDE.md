@@ -400,8 +400,8 @@ To connect the dynamic administrative hierarchy to onboarding, declare a field w
     "sw": "Eneo"
   },
   "questions": {
-    "en": "Where is your farm located?\n\nPlease select your area:\n{options}",
-    "sw": "Shamba lako liko wapi?\n\nTafadhali chagua eneo lako:\n{options}"
+    "en": "Where is your farm located?\n\nPlease tell me your area (e.g. district, ward, or village):",
+    "sw": "Shamba lako liko wapi?\n\nTafadhali niambie eneo lako (mfano wilaya, wadi, au kijiji):"
   },
   "success_messages": {
     "en": "Location saved as {value}.",
@@ -410,9 +410,10 @@ To connect the dynamic administrative hierarchy to onboarding, declare a field w
 }
 ```
 
-* When the state machine reaches `administration`, it **directly initiates hierarchical selection** (`status = 'awaiting_selection'`).
-* Shows the top-level areas (Level 1) and guides the farmer level-by-level down to the leaf node.
-* On reaching the leaf node, it creates the `CustomerAdministrative` record and seamlessly transitions to the next field.
+* When the state machine reaches `administration`, it asks the configured location question.
+* If the farmer replies with their location name, smart fuzzy matching detects the candidate matches directly.
+* If multiple areas match, it presents candidate options + an `"Other (select step by step)"` option.
+* If no match is found or the farmer selects `"Other"`, it automatically guides the farmer through step-by-step hierarchical selection.
 
 ---
 

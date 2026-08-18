@@ -76,6 +76,29 @@ class OnboardingService:
         # Administrative level hierarchy (in order of selection)
         # Sourced dynamically from settings (levels with level_index > 0)
         self.admin_level_order = settings.admin_level_order
+        self._admin_level_suffixes = self._build_admin_level_suffixes()
+
+    def _build_admin_level_suffixes(self) -> List[str]:
+        """
+        Dynamically build administrative level suffix tokens from config.json.
+        """
+        tokens = set()
+        hierarchy = settings.administrative_hierarchy
+        if hierarchy and isinstance(hierarchy, dict):
+            for level in hierarchy.get("levels", []):
+                name = level.get("name")
+                if name:
+                    tokens.add(name.lower().strip())
+                display = level.get("display")
+                if isinstance(display, dict):
+                    for label in display.values():
+                        if label:
+                            tokens.add(label.lower().strip())
+                elif isinstance(display, str) and display:
+                    tokens.add(display.lower().strip())
+
+        # Return formatted suffixes sorted by length descending
+        return [f" {t}" for t in sorted(tokens, key=len, reverse=True)]
 
     def _format_crops_numbered(self, lang: str = "en") -> str:
         """
@@ -1172,30 +1195,29 @@ Birth year must be between 1900 and {current_year}."""
         Returns:
             Score from 0-100
         """
-        # Parse hierarchical path (e.g., "Kenya > Nairobi Region > Central District > Westlands Ward")  # noqa: E501
+        # Parse hierarchical path (e.g. "Kenya > Nairobi > Central")
         path_parts = [p.strip() for p in admin.path.split(">")]
 
-        # Extract hierarchy levels (assuming 4 levels: country, region, district, ward)  # noqa: E501
-        if len(path_parts) < 4:
-            # If less than 4 levels, adjust logic
-            db_ward = path_parts[-1] if len(path_parts) >= 1 else ""
-            db_district = path_parts[-2] if len(path_parts) >= 2 else ""
-            db_province = path_parts[-3] if len(path_parts) >= 3 else ""
-        else:
-            db_province = path_parts[1]  # Region level
-            db_district = path_parts[2]  # District level
-            db_ward = path_parts[3]  # Ward level
+        # Extract hierarchy levels dynamically from the path parts
+        # Leaf is always path_parts[-1], parent is path_parts[-2], etc.
+        db_ward = (
+            path_parts[-1]
+            if len(path_parts) >= 2
+            else (path_parts[0] if path_parts else "")
+        )
+        db_district = path_parts[-2] if len(path_parts) >= 3 else ""
+        db_province = path_parts[-3] if len(path_parts) >= 4 else ""
 
         scores = []
         weights = []
 
-        # Ward score (weight 3)
+        # Ward / Leaf score (weight 3)
         if location.ward:
             ward_score = fuzz.ratio(location.ward.lower(), db_ward.lower())
             scores.append(ward_score)
             weights.append(3)
 
-        # District score (weight 2)
+        # District / Intermediate score (weight 2)
         if location.district:
             district_score = fuzz.ratio(
                 location.district.lower(), db_district.lower()
@@ -1203,7 +1225,7 @@ Birth year must be between 1900 and {current_year}."""
             scores.append(district_score)
             weights.append(2)
 
-        # Province score (weight 1)
+        # Province / Top-level score (weight 1)
         if location.province:
             province_score = fuzz.ratio(
                 location.province.lower(), db_province.lower()
@@ -1212,13 +1234,15 @@ Birth year must be between 1900 and {current_year}."""
             weights.append(1)
 
         # Fallback: if no structured fields, try matching full_text against
-        # ward name directly (handles typos like "Ithnga" -> "Ithanga")
+        # leaf name directly (handles typos and raw names)
         if not scores and location.full_text:
-            # Extract just the ward name without suffix for better matching
-            db_ward_name = db_ward.lower().replace(" ward", "").strip()
+            # Extract clean leaf name without standard administrative suffixes
+            db_ward_clean = db_ward.lower()
+            for suffix in self._admin_level_suffixes:
+                db_ward_clean = db_ward_clean.replace(suffix, "")
+            db_ward_clean = db_ward_clean.strip()
             full_text_lower = location.full_text.lower().strip()
-            # Use fuzz.ratio for accurate typo detection (92% for small typos)
-            fallback_score = fuzz.ratio(full_text_lower, db_ward_name)
+            fallback_score = fuzz.ratio(full_text_lower, db_ward_clean)
             scores.append(fallback_score)
             weights.append(3)
 
@@ -1517,10 +1541,6 @@ Birth year must be between 1900 and {current_year}."""
 
         # Get customer language
         lang = customer.language_code
-
-        # Special case: administration uses dynamic hierarchical selection
-        if field_config.field_name == "administration":
-            return self._start_hierarchical_selection(customer)
 
         # Get question from config or i18n
         question = self._get_question(field_config, lang)
@@ -2046,16 +2066,6 @@ Birth year must be between 1900 and {current_year}."""
             next_field = self._get_next_incomplete_field(customer)
 
             if next_field:
-                # Special case: administration uses hierarchical selection
-                if next_field.field_name == "administration":
-                    admin_resp = self._start_hierarchical_selection(customer)
-                    combined_message = f"{success_msg}\n\n{admin_resp.message}"
-                    return OnboardingResponse(
-                        message=combined_message,
-                        status=admin_resp.status,
-                        attempts=admin_resp.attempts,
-                    )
-
                 # More fields to collect - combine success msg with next Q
                 next_question = self._get_question(next_field, lang)
 

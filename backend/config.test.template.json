@@ -151,8 +151,8 @@
           "sw": "Eneo"
         },
         "questions": {
-          "en": "Where is your farm located?\n\nPlease select your area:\n{options}",
-          "sw": "Shamba lako liko wapi?\n\nTafadhali chagua eneo lako:\n{options}"
+          "en": "Where is your farm located?\n\nPlease tell me your area (e.g. district, ward, or village):",
+          "sw": "Shamba lako liko wapi?\n\nTafadhali niambie eneo lako (mfano wilaya, wadi, au kijiji):"
         },
         "success_messages": {
           "en": "Location saved as {value}.",

@@ -621,7 +621,10 @@ class TestGenericOnboardingService:
         # Location selection status depends on whether
         # hierarchical flow is active
         assert response.status in ["awaiting_selection", "in_progress"]
-        assert "location" in response.message.lower()
+        assert (
+            "location" in response.message.lower()
+            or "located" in response.message.lower()
+        )
         assert customer.current_onboarding_field == "administration"
 
         # STEP 2: Skip location selection for this test by directly
@@ -1148,9 +1151,12 @@ class TestGenericOnboardingService:
 
         # Failed status doesn't prevent onboarding from continuing
         # It will find the first incomplete field (administration) and
-        # directly start hierarchical selection
-        assert response.status == "awaiting_selection"
-        assert "Nairobi" in response.message or "Murang'a" in response.message
+        # ask the initial location question
+        assert response.status == "in_progress"
+        assert (
+            "location" in response.message.lower()
+            or "located" in response.message.lower()
+        )
 
 
 # ============================================================================
@@ -1574,10 +1580,11 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # First message for location field
-        # directly starts hierarchical selection
+        # First message asks initial location question
+        await onboarding_service.process_onboarding_message(customer, "Hello")
+        # Non-matching location triggers hierarchical selection
         response = await onboarding_service.process_onboarding_message(
-            customer, "Hello"
+            customer, "unknown place"
         )
 
         # Should show regions in awaiting_selection status
@@ -1598,8 +1605,11 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # First message starts hierarchical selection showing regions
+        # Start location flow and trigger hierarchical fallback
         await onboarding_service.process_onboarding_message(customer, "Hello")
+        await onboarding_service.process_onboarding_message(
+            customer, "unknown place"
+        )
 
         # Select Murang'a (first option in alphabetical order: M < N)
         response = await onboarding_service.process_onboarding_message(
@@ -1624,8 +1634,11 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # Start hierarchical selection
+        # Start location flow and trigger hierarchical fallback
         await onboarding_service.process_onboarding_message(customer, "Hello")
+        await onboarding_service.process_onboarding_message(
+            customer, "unknown place"
+        )
         # Select Murang'a (option 1, alphabetical: M < N)
         await onboarding_service.process_onboarding_message(customer, "1")
         # Select Gatanga (first option alphabetically: G < K)
@@ -1650,8 +1663,11 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # Start hierarchical selection
+        # Start location flow and trigger hierarchical fallback
         await onboarding_service.process_onboarding_message(customer, "Hello")
+        await onboarding_service.process_onboarding_message(
+            customer, "unknown place"
+        )
 
         # Navigate through hierarchy (alphabetical order)
         # Regions: 1.Murang'a 2.Nairobi
@@ -1688,9 +1704,11 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # First message directly starts hierarchical selection in Swahili
+        # First message asks location in Swahili
+        await onboarding_service.process_onboarding_message(customer, "Habari")
+        # Non-matching location triggers hierarchical fallback in Swahili
         response = await onboarding_service.process_onboarding_message(
-            customer, "Habari"
+            customer, "mahali pasipojulikana"
         )
 
         # Should show Swahili message with hierarchical selection
