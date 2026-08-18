@@ -23,7 +23,7 @@ def get_administrative_levels(
     try:
         levels = (
             db.query(AdministrativeLevel.name)
-            .order_by(AdministrativeLevel.id)
+            .order_by(AdministrativeLevel.level_index.asc())
             .all()
         )
         return [level[0] for level in levels]
