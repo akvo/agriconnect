@@ -286,6 +286,109 @@ Verify that `AdministrativeService` and `StatisticService` correctly resolve lea
 
 ---
 
+### 🧪 Scenario 8: Combined Dynamic Onboarding Fields with Dynamic Hierarchy (Custom Partner Flow)
+
+#### Goal:
+Verify that deployment partners can configure both **custom onboarding fields** (e.g. custom enum for farm size, optional irrigation source) and **dynamic administrative hierarchy** simultaneously in `config.json`, and that farmers seamlessly progress through the combined flow.
+
+#### Setup:
+1. Update `backend/config.json` with Indonesia 5-tier hierarchy and custom onboarding fields:
+   ```json
+   "administrative_hierarchy": {
+     "country_code": "IDN",
+     "delimiter": " > ",
+     "levels": [
+       { "level_index": 0, "name": "country", "display": { "en": "Country" } },
+       { "level_index": 1, "name": "provinsi", "display": { "en": "Provinsi" } },
+       { "level_index": 2, "name": "kabupaten", "display": { "en": "Kabupaten" } },
+       { "level_index": 3, "name": "kecamatan", "display": { "en": "Kecamatan" } },
+       { "level_index": 4, "name": "desa", "display": { "en": "Desa" } }
+     ]
+   },
+   "onboarding": {
+     "enabled": true,
+     "fields": [
+       { "field_name": "language", "enabled": true, "required": true, "priority": 0, "field_type": "enum", "options": ["en", "id"] },
+       { "field_name": "full_name", "enabled": true, "required": true, "priority": 1, "field_type": "string", "extraction_method": "extract_full_name" },
+       { "field_name": "administration", "enabled": true, "required": true, "priority": 2, "field_type": "location", "extraction_method": "extract_location" },
+       {
+         "field_name": "farm_size",
+         "db_field": "farm_size",
+         "enabled": true,
+         "required": true,
+         "priority": 3,
+         "field_type": "enum",
+         "extraction_method": "extract_enum",
+         "options": [
+           { "id": "small", "labels": { "en": "< 1 Hectare", "id": "< 1 Hektar" } },
+           { "id": "medium", "labels": { "en": "1 - 5 Hectares", "id": "1 - 5 Hektar" } },
+           { "id": "large", "labels": { "en": "> 5 Hectares", "id": "> 5 Hektar" } }
+         ],
+         "questions": {
+           "en": "What is the size of your farm?\n1. < 1 Hectare\n2. 1 - 5 Hectares\n3. > 5 Hectares",
+           "id": "Berapa luas lahan pertanian Anda?\n1. < 1 Hektar\n2. 1 - 5 Hektar\n3. > 5 Hektar"
+         },
+         "labels": { "en": "Farm Size", "id": "Luas Lahan" }
+       },
+       {
+         "field_name": "water_source",
+         "db_field": "water_source",
+         "enabled": true,
+         "required": false,
+         "priority": 4,
+         "field_type": "string",
+         "extraction_method": "extract_string",
+         "questions": {
+           "en": "What is your main water source? (e.g. Well, River, Rainfed)",
+           "id": "Apa sumber air utama pertanian Anda? (contoh: Sumur, Sungai, Tadah Hujan)"
+         },
+         "labels": { "en": "Water Source", "id": "Sumber Air" }
+       },
+       { "field_name": "crop_type", "enabled": true, "required": true, "priority": 5, "field_type": "string", "extraction_method": "extract_crop_type" }
+     ]
+   }
+   ```
+
+#### Execution Steps:
+| Step | Action / User Message | Expected System Response | DB & State Verification |
+|---|---|---|---|
+| **8.1** | Send Greeting:<br>`Body=Halo` | Welcome prompt + Language selection (`1. English`, `2. Bahasa Indonesia`). | Customer created with `status='in_progress'`. |
+| **8.2** | Select Language & Name:<br>`Body=1` $\rightarrow$ `Body=Ahmad Dahlan` | Name confirmed (`Thank you, Ahmad Dahlan!`) and **immediately transitions** to dynamic Level 1 (Provinsi):<br>`"Where is your farm located?\n\nPlease select your area:\n\n1. Jawa Barat\n2. Jawa Tengah"` | `customer.full_name = 'Ahmad Dahlan'`, `current_onboarding_field = 'administration'`. |
+| **8.3** | Traverse 4-Level Location:<br>`Body=1` (Jawa Barat)<br>`Body=1` (Kabupaten Bandung)<br>`Body=1` (Kecamatan Cileunyi)<br>`Body=1` (Desa Cibiruhilir) | Progresses through all 4 levels. On reaching leaf `Desa Cibiruhilir`, confirms location and transitions to **custom field `farm_size`**:<br>`"What is the size of your farm?\n1. < 1 Hectare\n2. 1 - 5 Hectares\n3. > 5 Hectares"` | `customer_administrative` linked to `Desa Cibiruhilir` (`level_index: 4`). `_admin_hierarchy` state cleared. |
+| **8.4** | Select Custom Enum:<br>`Body=2` (1 - 5 Hectares) | Saves `farm_size='medium'` and asks optional `water_source` question:<br>`"What is your main water source? (e.g. Well, River, Rainfed)\n\n(Reply 'skip' if you prefer not to answer)"` | `customer.profile_data['farm_size'] = 'medium'`. |
+| **8.5** | Skip Optional Field:<br>`Body=skip` | Acknowledges skip and advances to `crop_type` list. | `water_source` omitted cleanly from `profile_data`. |
+| **8.6** | Select Crop:<br>`Body=1` (e.g. Potato) | Onboarding completes! Displays summary with both custom fields and dynamic location path. | `status = 'completed'`. Profile displays `Location: Indonesia > Jawa Barat > ... > Desa Cibiruhilir`, `Farm Size: 1 - 5 Hectares`, `Primary Crops: potato`. |
+
+---
+
+### 🧪 Scenario 9: Dynamic Question Re-ordering (Location Precedence)
+
+#### Goal:
+Verify that if `administration` is configured with `priority: 1` (asked before `full_name` or after demographics), the onboarding state machine handles the flow seamlessly without assuming hardcoded question sequences.
+
+#### Execution Steps:
+| Step | Configuration & Action | Expected Result | DB Verification |
+|---|---|---|---|
+| **9.1** | Configure `administration` with `priority: 1` and `full_name` with `priority: 2` in `config.json`. | System begins location questionnaire immediately after language choice. | `current_onboarding_field = 'administration'`. |
+| **9.2** | Complete hierarchical location selection (`1` $\rightarrow$ `1` $\rightarrow$ `1` $\rightarrow$ `1`). | On saving leaf area, system advances to `full_name` (`"What is your full name?"`). | `customer_administrative` saved while `full_name` is still pending. |
+| **9.3** | Enter name (`Body=Dewi Sartika`) $\rightarrow$ complete remaining questions. | Flow completes normally with full summary. | Customer record has both name and administrative location. |
+
+---
+
+### 🧪 Scenario 10: In-Flight Location Skip & Session Recovery
+
+#### Goal:
+Verify that if a farmer sends `"skip"` while in the middle of a multi-tier location questionnaire (e.g. at Level 2 Kabupaten), the system cleans up the in-flight `_admin_hierarchy` candidate state, proceeds to the next onboarding question, and allows subsequent profile completion without corrupted state.
+
+#### Execution Steps:
+| Step | Action / Message | Expected Result | DB Verification |
+|---|---|---|---|
+| **10.1** | Farmer at Level 1 selects `1` (Jawa Barat). System shows Level 2 Kabupaten options. | State has `_admin_hierarchy` with candidate Kabupaten IDs. | `customer.profile_data['_admin_hierarchy']` present. |
+| **10.2** | Farmer replies `Body=skip` (or `Body=lewati`). | System skips location step, clears `_admin_hierarchy`, and advances to next field (e.g. `crop_type`). | `_admin_hierarchy` deleted from `profile_data`. No orphaned `customer_administrative` record. |
+| **10.3** | Complete remaining questions. | Profile completes successfully with Location marked as not specified. | `customer.onboarding_status = 'completed'`. |
+
+---
+
 ## 5. QA Verification & Sign-Off Matrix
 
 | Scenario ID | Test Scenario Description | Pass Criteria | Tester | Status |
@@ -300,3 +403,6 @@ Verify that `AdministrativeService` and `StatisticService` correctly resolve lea
 | **TC-08** | Input Validation (Out of Range & Non-Numeric) | Localized error message re-prompts choice | | [ ] Pending |
 | **TC-09** | Swahili Locale Dynamic Prompts | Correct Swahili phrasing for custom level names | | [ ] Pending |
 | **TC-10** | Statistics API Leaf & Drilldown Resolution | Dynamic level naming and accurate descendant rollups | | [ ] Pending |
+| **TC-11** | Combined Dynamic Hierarchy + Custom Questions (Scenario 8) | Custom enum/optional fields + 4-tier traversal in single flow | | [ ] Pending |
+| **TC-12** | Dynamic Question Re-ordering (Scenario 9) | Location prompt before full name executes cleanly | | [ ] Pending |
+| **TC-13** | In-Flight Location Skip & Session Recovery (Scenario 10) | Mid-hierarchy skip purges state and advances without error | | [ ] Pending |
