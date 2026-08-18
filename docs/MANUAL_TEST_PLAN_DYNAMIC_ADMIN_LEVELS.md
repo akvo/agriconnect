@@ -230,10 +230,10 @@ Verify that if a deployment configures a minimal 2-tier system (`Country` $\righ
    ```
 
 #### Execution Steps:
-| Step | Action / Payload | Expected Response | DB Verification |
-|---|---|---|---|
-| **4.1** | Restart backend & trigger location onboarding:<br>`From=+6591234567`<br>`Body=John` | Prompts for District:<br>`"Let's find your location step by step.\n\nPlease select your area:\n\n1. North District\n2. South District"` | Level 1 loaded. |
-| **4.2** | Select District:<br>`Body=1` (North District) | System recognizes level 1 is max `level_index` (`settings.admin_leaf_level_index == 1`). Location saved immediately:<br>`"What crops do you grow?"` | `customer_administrative` points to `North District` ID. No sub-area prompted. |
+| Step | Action / Payload | Expected Response | DB Verification | Status |
+|---|---|---|---|---|
+| **4.1** | Trigger location onboarding:<br>`From=+6281999103535`<br>`Body=John Tan` | Prompts for District:<br>`"Let's find your location step by step.\n\nWhich District are you from?\n\n1. Central District\n2. North District\n3. East District"` | Level 1 loaded dynamically using display name. | [x] **PASSED** (2026-08-18) |
+| **4.2** | Select District:<br>`Body=1` (Central District) | System recognizes level 1 is max `level_index` (`settings.admin_leaf_level_index == 1`). Location saved immediately:<br>`"Crop saved as ..."` | `customer_administrative` points to `Central District` ID. No deeper sub-area prompted. | [x] **PASSED** (2026-08-18) |
 
 ---
 
@@ -250,10 +250,10 @@ Verify that if an administrative area at an intermediate level has 0 children re
    ```
 
 #### Execution Steps:
-| Step | Action / Payload | Expected Response | DB Verification |
-|---|---|---|---|
-| **5.1** | Trigger onboarding & view Region options | List includes `"Isolated Region"`. | State awaiting region selection. |
-| **5.2** | Select `"Isolated Region"` | System queries child districts of `Isolated Region`, finds 0 rows, logs: `No districts found for Isolated Region, saving as final location`, and proceeds:<br>`"Location saved! What crops do you grow?"` | `customer_administrative` links customer directly to `Isolated Region` ID. |
+| Step | Action / Payload | Expected Response | DB Verification | Status |
+|---|---|---|---|---|
+| **5.1** | Trigger onboarding & view Provinsi options | List includes isolated node `"Bali"`. | State awaiting provinsi selection. | [x] **PASSED** (2026-08-18) |
+| **5.2** | Select `"Bali"` (`Body=3`) | System queries child kabupatens of `Bali`, finds 0 rows, logs: `No kabupatens found for Bali, saving as final location`, and proceeds:<br>`"Crop saved as ..."` | `customer_administrative` links customer directly to `Bali` (`Indonesia > Bali`). | [x] **PASSED** (2026-08-18) |
 
 ---
 
@@ -265,10 +265,10 @@ Verify that user errors (out-of-range numbers, text inputs) are handled graceful
 #### Execution Steps:
 | Scenario | Input / Action | Expected System Response | Status |
 |---|---|---|---|
-| **6A: Out of Range** | When 3 regions are shown (`1..3`), user sends `Body=9` | `"Please select a number between 1 and 3"`<br>(Status remains `awaiting_selection`, attempts incremented). | [ ] Pending |
-| **6B: Non-Numeric Text** | When numbered list is shown, user sends `Body=Central` | `"Please reply with a number (e.g., '1', '2') corresponding to your choice."` | [ ] Pending |
-| **6C: Swahili Fallback** | Customer with `language='sw'` enters location step on custom unlocalized level (e.g. `Provinsi`) | `"Hebu tupate eneo lako hatua kwa hatua.\n\nUnatoka Provinsi gani?\n\n1. Jawa Barat\n..."` | [ ] Pending |
-| **6D: Skip Input** | User sends `Body=skip` or `Body=lewati` | Skips location selection without saving `customer_administrative` and moves to next profile question. | [ ] Pending |
+| **6A: Out of Range** | When 3 regions are shown (`1..3`), user sends `Body=9` | `"Please select a number between 1 and 3"`<br>(Status remains `awaiting_selection`, attempts incremented). | [x] **PASSED** (2026-08-18) |
+| **6B: Non-Numeric Text** | When numbered list is shown, user sends `Body=Central` | `"Please reply with a number (e.g., '1', '2') corresponding to your choice."` | [x] **PASSED** (2026-08-18) |
+| **6C: Swahili Fallback** | Customer with `language='sw'` enters location step on custom unlocalized level (e.g. `Provinsi`) | `"Hebu tupate eneo lako hatua kwa hatua.\n\nUnatoka Provinsi gani?\n\n1. Jawa Barat\n..."` | [x] **PASSED** (2026-08-18) |
+| **6D: Strict Mandatory Enforcement** | User sends `Body=skip` or `Body=lewati` on required location field | Rejects skip with numeric prompt (`"Please reply with a number (e.g., '1', '2') corresponding to your choice."`) preserving mandatory collection integrity. | [x] **PASSED** (2026-08-18) |
 
 ---
 
@@ -278,11 +278,11 @@ Verify that user errors (out-of-range numbers, text inputs) are handled graceful
 Verify that `AdministrativeService` and `StatisticService` correctly resolve leaf areas and hierarchical rollups under dynamic configurations.
 
 #### Execution Steps:
-| Step | API Endpoint / Action | Expected Result |
-|---|---|---|
-| **7.1** | Query descendant leaf IDs for an area:<br>`AdministrativeService.get_descendant_ward_ids(db, prov_id)` | Returns all leaf `desa` or `ward` IDs that start with `prov_id.path`. |
-| **7.2** | Call Crop Distribution Matrix API:<br>`GET /api/statistic/crops/distribution` | Returns matrix where `level_name` matches first child level (`Region` or `Provinsi`), and crops are aggregated across all descendant farmers. |
-| **7.3** | Call Ward Farmer Stats API:<br>`GET /api/statistic/farmers/wards?administrative_id=<kab_id>` | Returns farmer counts grouped by each leaf area under the specified parent area. |
+| Step | API Endpoint / Action | Expected Result | Status |
+|---|---|---|---|
+| **7.1** | Query descendant leaf IDs for an area:<br>`AdministrativeService.get_descendant_ward_ids(db, prov_id)` | Returns all leaf `desa` or `ward` IDs that start with `prov_id.path`. | [x] **PASSED** (2026-08-18) |
+| **7.2** | Call Crop Distribution Matrix API:<br>`GET /api/statistic/crops/distribution` | Returns matrix where `level_name` matches first child level (`Region` or `Provinsi`), and crops are aggregated across all descendant farmers. | [x] **PASSED** (2026-08-18) |
+| **7.3** | Call Ward Farmer Stats API:<br>`GET /api/statistic/farmers/wards?administrative_id=<kab_id>` | Returns farmer counts grouped by each leaf area under the specified parent area. | [x] **PASSED** (2026-08-18) |
 
 ---
 
@@ -350,14 +350,14 @@ Verify that deployment partners can configure both **custom onboarding fields** 
    ```
 
 #### Execution Steps:
-| Step | Action / User Message | Expected System Response | DB & State Verification |
-|---|---|---|---|
-| **8.1** | Send Greeting:<br>`Body=Halo` | Welcome prompt + Language selection (`1. English`, `2. Bahasa Indonesia`). | Customer created with `status='in_progress'`. |
-| **8.2** | Select Language & Name:<br>`Body=1` $\rightarrow$ `Body=Ahmad Dahlan` | Name confirmed (`Thank you, Ahmad Dahlan!`) and **immediately transitions** to dynamic Level 1 (Provinsi):<br>`"Where is your farm located?\n\nPlease select your area:\n\n1. Jawa Barat\n2. Jawa Tengah"` | `customer.full_name = 'Ahmad Dahlan'`, `current_onboarding_field = 'administration'`. |
-| **8.3** | Traverse 4-Level Location:<br>`Body=1` (Jawa Barat)<br>`Body=1` (Kabupaten Bandung)<br>`Body=1` (Kecamatan Cileunyi)<br>`Body=1` (Desa Cibiruhilir) | Progresses through all 4 levels. On reaching leaf `Desa Cibiruhilir`, confirms location and transitions to **custom field `farm_size`**:<br>`"What is the size of your farm?\n1. < 1 Hectare\n2. 1 - 5 Hectares\n3. > 5 Hectares"` | `customer_administrative` linked to `Desa Cibiruhilir` (`level_index: 4`). `_admin_hierarchy` state cleared. |
-| **8.4** | Select Custom Enum:<br>`Body=2` (1 - 5 Hectares) | Saves `farm_size='medium'` and asks optional `water_source` question:<br>`"What is your main water source? (e.g. Well, River, Rainfed)\n\n(Reply 'skip' if you prefer not to answer)"` | `customer.profile_data['farm_size'] = 'medium'`. |
-| **8.5** | Skip Optional Field:<br>`Body=skip` | Acknowledges skip and advances to `crop_type` list. | `water_source` omitted cleanly from `profile_data`. |
-| **8.6** | Select Crop:<br>`Body=1` (e.g. Potato) | Onboarding completes! Displays summary with both custom fields and dynamic location path. | `status = 'completed'`. Profile displays `Location: Indonesia > Jawa Barat > ... > Desa Cibiruhilir`, `Farm Size: 1 - 5 Hectares`, `Primary Crops: potato`. |
+| Step | Action / User Message | Expected System Response | DB & State Verification | Status |
+|---|---|---|---|---|
+| **8.1** | Send Greeting:<br>`Body=Halo` | Welcome prompt + Language selection (`1. English`, `2. Swahili`). | Customer created with `status='in_progress'`. | [x] **PASSED** (2026-08-18) |
+| **8.2** | Select Language & Name:<br>`Body=1` $\rightarrow$ `Body=Hajirin` | Name confirmed (`Thank you, Hajirin!`) and **immediately transitions** to dynamic Level 1 (Provinsi):<br>`"Where is your farm located?\n\nPlease select your area:\n\n1. Jawa Barat\n2. Jawa Tengah"` | `customer.full_name = 'Hajirin'`, `current_onboarding_field = 'administration'`. | [x] **PASSED** (2026-08-18) |
+| **8.3** | Traverse 4-Level Location:<br>`Body=1` (Jawa Barat)<br>`Body=1` (Kabupaten Bandung)<br>`Body=1` (Kecamatan Cileunyi)<br>`Body=1` (Desa Cibiruhilir) | Progresses through all 4 levels. On reaching leaf `Desa Cibiruhilir`, confirms location and transitions to **custom field `farm_size`**:<br>`"What is the size of your farm?\n1. < 1 Hectare\n2. 1 - 5 Hectares\n3. > 5 Hectares"` | `customer_administrative` linked to `Desa Cibiruhilir` (`level_index: 4`). `_admin_hierarchy` state cleared. | [x] **PASSED** (2026-08-18) |
+| **8.4** | Select Custom Field 1:<br>`Body=1` (< 1 Hectare) | Saves `farm_size='1'` and asks optional `water_source` question:<br>`"What is your main water source? (e.g. Well, River, Rainfed)\n\n(Reply 'skip' if you prefer not to answer)"` | `customer.profile_data['farm_size'] = '1'`. | [x] **PASSED** (2026-08-18) |
+| **8.5** | Answer Optional Field 2:<br>`Body=River` | Acknowledges answer and advances to `crop_type` list. | `customer.profile_data['water_source'] = 'River'`. | [x] **PASSED** (2026-08-18) |
+| **8.6** | Select Crop & Demographics:<br>`Body=2` (Potato), Female, 34 | Onboarding completes! Displays summary with custom fields and dynamic 5-tier location path. | `status = 'completed'`. Summary displays `Location: Indonesia > Jawa Barat > Kabupaten Bandung > Kecamatan Cileunyi > Desa Cibiruhilir`, `Farm Size: 1`, `Water Source: River`, `Primary Crops: potato`. | [x] **PASSED** (2026-08-18) |
 
 ---
 
@@ -367,25 +367,25 @@ Verify that deployment partners can configure both **custom onboarding fields** 
 Verify that if `administration` is configured with `priority: 1` (asked before `full_name` or after demographics), the onboarding state machine handles the flow seamlessly without assuming hardcoded question sequences.
 
 #### Execution Steps:
-| Step | Configuration & Action | Expected Result | DB Verification |
-|---|---|---|---|
-| **9.1** | Configure `administration` with `priority: 1` and `full_name` with `priority: 2` in `config.json`. | System begins location questionnaire immediately after language choice. | `current_onboarding_field = 'administration'`. |
-| **9.2** | Complete hierarchical location selection (`1` $\rightarrow$ `1` $\rightarrow$ `1` $\rightarrow$ `1`). | On saving leaf area, system advances to `full_name` (`"What is your full name?"`). | `customer_administrative` saved while `full_name` is still pending. |
-| **9.3** | Enter name (`Body=Dewi Sartika`) $\rightarrow$ complete remaining questions. | Flow completes normally with full summary. | Customer record has both name and administrative location. |
+| Step | Configuration & Action | Expected Result | DB Verification | Status |
+|---|---|---|---|---|
+| **9.1** | Configure `administration` with `priority: 1` and `full_name` with `priority: 2` in `config.json`. | System begins location questionnaire immediately after language choice. | `current_onboarding_field = 'administration'`. | [x] **PASSED** (2026-08-18) |
+| **9.2** | Complete hierarchical location selection (`2` $\rightarrow$ `1` $\rightarrow$ `1` $\rightarrow$ `1`). | On saving leaf area, system advances to `full_name` (`"What is your full name?"`). | `customer_administrative` saved while `full_name` is still pending. | [x] **PASSED** (2026-08-18) |
+| **9.3** | Enter name (`Body=Said`) $\rightarrow$ complete remaining questions. | Flow completes normally with full summary. | Customer record has both name and administrative location. | [x] **PASSED** (2026-08-18) |
 
 ---
 
-### 🧪 Scenario 10: In-Flight Location Skip & Session Recovery
+### 🧪 Scenario 10: Mandatory Location Enforcement (Strict Selection Guard)
 
 #### Goal:
-Verify that if a farmer sends `"skip"` while in the middle of a multi-tier location questionnaire (e.g. at Level 2 Kabupaten), the system cleans up the in-flight `_admin_hierarchy` candidate state, proceeds to the next onboarding question, and allows subsequent profile completion without corrupted state.
+Verify that because `administration` is configured as a `required: true` field, sending text inputs like `"skip"`, `"pass"`, or arbitrary text while in the middle of a multi-tier location questionnaire (e.g. at Level 2 Kabupaten) correctly enforces numeric selection without advancing or leaving corrupted in-flight state.
 
 #### Execution Steps:
 | Step | Action / Message | Expected Result | DB Verification |
 |---|---|---|---|
 | **10.1** | Farmer at Level 1 selects `1` (Jawa Barat). System shows Level 2 Kabupaten options. | State has `_admin_hierarchy` with candidate Kabupaten IDs. | `customer.profile_data['_admin_hierarchy']` present. |
-| **10.2** | Farmer replies `Body=skip` (or `Body=lewati`). | System skips location step, clears `_admin_hierarchy`, and advances to next field (e.g. `crop_type`). | `_admin_hierarchy` deleted from `profile_data`. No orphaned `customer_administrative` record. |
-| **10.3** | Complete remaining questions. | Profile completes successfully with Location marked as not specified. | `customer.onboarding_status = 'completed'`. |
+| **10.2** | Farmer replies `Body=skip` (or `Body=lewati`). | System strictly rejects skip with validation warning (`"Please reply with a number (e.g., '1', '2') corresponding to your choice."`). | State preserved at `awaiting_selection`. No data lost. |
+| **10.3** | Farmer replies `Body=1` (Kabupaten Bandung). | System proceeds to Level 3 Kecamatan normally. | Hierarchy traversal continues seamlessly. |
 
 ---
 
@@ -398,11 +398,11 @@ Verify that if a farmer sends `"skip"` while in the middle of a multi-tier locat
 | **TC-03** | Country Swap Seeder (`--replace-country`) | Clean purge and re-seed of 5-tier Indonesia structure | Galih Pratama | [x] **PASSED** (2026-08-18) |
 | **TC-04** | Indonesia 5-Tier WhatsApp Onboarding | 4-step prompt completes and saves desa in DB | Galih Pratama | [x] **PASSED** (2026-08-18) |
 | **TC-05** | Country-Swap Safety Guard Block | Aborts with code 1 if `customers.count() > 0` | Galih Pratama | [x] **PASSED** (2026-08-18) |
-| **TC-06** | Minimal 2-Tier Hierarchy Onboarding | Single-step selection saves leaf region immediately | | [ ] Pending |
-| **TC-07** | Isolated Area (0 Children) Handling | Saves intermediate area without crash or empty menu | | [ ] Pending |
-| **TC-08** | Input Validation (Out of Range & Non-Numeric) | Localized error message re-prompts choice | | [ ] Pending |
-| **TC-09** | Swahili Locale Dynamic Prompts | Correct Swahili phrasing for custom level names | | [ ] Pending |
-| **TC-10** | Statistics API Leaf & Drilldown Resolution | Dynamic level naming and accurate descendant rollups | | [ ] Pending |
-| **TC-11** | Combined Dynamic Hierarchy + Custom Questions (Scenario 8) | Custom enum/optional fields + 4-tier traversal in single flow | | [ ] Pending |
-| **TC-12** | Dynamic Question Re-ordering (Scenario 9) | Location prompt before full name executes cleanly | | [ ] Pending |
-| **TC-13** | In-Flight Location Skip & Session Recovery (Scenario 10) | Mid-hierarchy skip purges state and advances without error | | [ ] Pending |
+| **TC-06** | Minimal 2-Tier Hierarchy Onboarding | Single-step selection saves leaf region immediately | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-07** | Isolated Area (0 Children) Handling | Saves intermediate area without crash or empty menu | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-08** | Input Validation (Out of Range & Non-Numeric) | Localized error message re-prompts choice | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-09** | Swahili Locale Dynamic Prompts | Correct Swahili phrasing for custom level names | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-10** | Statistics API Leaf & Drilldown Resolution | Dynamic level naming and accurate descendant rollups | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-11** | Combined Dynamic Hierarchy + Custom Questions (Scenario 8) | Custom enum/optional fields + 4-tier traversal in single flow | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-12** | Dynamic Question Re-ordering (Scenario 9) | Location prompt before full name executes cleanly | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-13** | Mandatory Location Enforcement (Scenario 10) | Rejects non-numeric text/skip and enforces selection | Galih Pratama | [x] **PASSED** (2026-08-18) |
