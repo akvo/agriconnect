@@ -329,6 +329,8 @@ class CustomerService:
                 "phone_number": customer.phone_number,
                 "language": customer.language,
                 "crop_type": customer.crop_type,
+                "age": customer.age,
+                "birth_year": customer.birth_year,
                 "age_group": customer.age_group,
                 "gender": customer.gender,
                 "administrative": admin_info,

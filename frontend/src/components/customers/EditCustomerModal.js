@@ -4,20 +4,29 @@ import { useState, useEffect, useCallback } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import api from "../../lib/api";
 
+const getInitialFormData = (customer) => ({
+  full_name: customer?.full_name || "",
+  language: customer?.language || "en",
+  crop_type: customer?.crop_type || "",
+  gender: customer?.gender || "",
+  age:
+    typeof customer?.age !== "undefined" && customer?.age !== null
+      ? customer.age
+      : "",
+});
+
 export default function EditCustomerModal({
   customer,
   onClose,
   onCustomerUpdated,
 }) {
-  const [formData, setFormData] = useState({
-    full_name: customer.full_name || "",
-    language: customer.language || "en",
-    crop_type: customer.crop_type || "",
-    gender: customer.gender || "",
-    age: customer.age || "",
-  });
+  const [formData, setFormData] = useState(() => getInitialFormData(customer));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setFormData(getInitialFormData(customer));
+  }, [customer]);
 
   // Crop types dynamic state
   const [cropTypes, setCropTypes] = useState([]);
@@ -199,10 +208,11 @@ export default function EditCustomerModal({
         age: formData.age ? parseInt(formData.age) : null,
       };
 
-      // Add ward_id from the last selected location (ward level)
-      const wardLevelIndex = 3; // Assuming Region(1), District(2), Ward(3)
-      if (selectedLocation[wardLevelIndex]) {
-        submitData.ward_id = selectedLocation[wardLevelIndex];
+      // Add ward_id from the last selected location (leaf level)
+      const leafLevelIndex =
+        administrativeLevels.length > 0 ? administrativeLevels.length - 1 : 3;
+      if (selectedLocation[leafLevelIndex]) {
+        submitData.ward_id = selectedLocation[leafLevelIndex];
       }
 
       await api.put(`/customers/${customer.id}`, submitData);
@@ -372,7 +382,7 @@ export default function EditCustomerModal({
                   type="number"
                   id="age"
                   name="age"
-                  value={formData.age || ""}
+                  value={formData.age ?? ""}
                   onChange={handleChange}
                   placeholder="Customer's age"
                   className="w-full px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-green-500 focus:border-green-500"
