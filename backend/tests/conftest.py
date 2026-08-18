@@ -139,30 +139,35 @@ def db_session(test_db):
         )
 
         # Delete in correct order to respect foreign key constraints
-        db.query(UserAdministrative).delete()
-        db.query(CustomerAdministrative).delete()
-        db.query(Ticket).delete()
+        db.query(UserAdministrative).delete(synchronize_session=False)
+        db.query(CustomerAdministrative).delete(synchronize_session=False)
+        db.query(Ticket).delete(synchronize_session=False)
         # Weather broadcast recipients must be deleted BEFORE messages
-        db.query(WeatherBroadcastRecipient).delete()
+        db.query(WeatherBroadcastRecipient).delete(synchronize_session=False)
         # Broadcast recipients must be deleted BEFORE messages (FK: message_id)
-        db.query(BroadcastRecipient).delete()
-        db.query(Message).delete()
-        db.query(PlaygroundMessage).delete()  # Playground messages
+        db.query(BroadcastRecipient).delete(synchronize_session=False)
+        db.query(Message).delete(synchronize_session=False)
+        db.query(PlaygroundMessage).delete(synchronize_session=False)
         # Weather broadcasts must be deleted before Administrative
-        db.query(WeatherBroadcast).delete()
+        db.query(WeatherBroadcast).delete(synchronize_session=False)
         # Broadcast tables must be deleted before Customer and Administrative
-        db.query(BroadcastMessageGroup).delete()
-        db.query(BroadcastMessage).delete()
-        db.query(BroadcastGroupContact).delete()
-        db.query(BroadcastGroup).delete()
-        db.query(Customer).delete()
-        db.query(KnowledgeBase).delete()
+        db.query(BroadcastMessageGroup).delete(synchronize_session=False)
+        db.query(BroadcastMessage).delete(synchronize_session=False)
+        db.query(BroadcastGroupContact).delete(synchronize_session=False)
+        db.query(BroadcastGroup).delete(synchronize_session=False)
+        db.query(Customer).delete(synchronize_session=False)
+        db.query(KnowledgeBase).delete(synchronize_session=False)
         # Device must be deleted before Administrative (foreign key)
-        db.query(Device).delete()
-        db.query(Administrative).delete()
-        db.query(AdministrativeLevel).delete()
-        db.query(ServiceToken).delete()
-        db.query(User).delete()
+        db.query(Device).delete(synchronize_session=False)
+        # Nullify self-referential parent_id before deleting administrative
+        db.query(Administrative).update(
+            {Administrative.parent_id: None},
+            synchronize_session=False,
+        )
+        db.query(Administrative).delete(synchronize_session=False)
+        db.query(AdministrativeLevel).delete(synchronize_session=False)
+        db.query(ServiceToken).delete(synchronize_session=False)
+        db.query(User).delete(synchronize_session=False)
         db.commit()
         db.close()
 
