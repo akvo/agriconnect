@@ -7,7 +7,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-to-test
+  # per-branch/tenant: each tenant deploys to its own namespace, so a tenant
+  # deploy must not serialize behind main (agriconnect2) or other tenants.
+  group: deploy-to-test-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
