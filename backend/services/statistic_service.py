@@ -993,9 +993,13 @@ class StatisticService:
             Dict with data, filters, and available options
         """
         # Validate level
-        valid_levels = ["region", "district", "ward"]
+        valid_levels = settings.admin_level_order or [
+            "region",
+            "district",
+            "ward",
+        ]
         if level not in valid_levels:
-            level = "region"
+            level = valid_levels[0]
 
         # Get the level object
         admin_level = (
@@ -1040,8 +1044,8 @@ class StatisticService:
         results = []
 
         for area in areas:
-            # Get ward IDs under this area
-            if level == "ward":
+            # Get ward/leaf IDs under this area
+            if admin_level.level_index == settings.admin_leaf_level_index:
                 ward_ids = [area.id]
             else:
                 ward_ids = AdministrativeService.get_descendant_ward_ids(
@@ -1179,9 +1183,13 @@ class StatisticService:
             Dict with data, filters, and available options
         """
         # Validate level
-        valid_levels = ["region", "district", "ward"]
+        valid_levels = settings.admin_level_order or [
+            "region",
+            "district",
+            "ward",
+        ]
         if level not in valid_levels:
-            level = "region"
+            level = valid_levels[0]
 
         # Get the level object
         admin_level = (
@@ -1224,9 +1232,11 @@ class StatisticService:
 
         results = []
 
+        is_leaf = admin_level.level_index == settings.admin_leaf_level_index
+
         for area in areas:
             # Get all area IDs under this area (including itself)
-            if level == "ward":
+            if is_leaf:
                 area_ids = [area.id]
             else:
                 ward_ids = AdministrativeService.get_descendant_ward_ids(
@@ -1255,17 +1265,22 @@ class StatisticService:
             )
 
             # Get customer IDs in these areas for ticket queries
+            ticket_area_ids = (
+                area_ids
+                if is_leaf
+                else (
+                    AdministrativeService.get_descendant_ward_ids(
+                        self.db, area.id
+                    )
+                    or [area.id]
+                )
+            )
             customer_ids = [
                 ca.customer_id
                 for ca in self.db.query(CustomerAdministrative)
                 .filter(
                     CustomerAdministrative.administrative_id.in_(
-                        area_ids
-                        if level == "ward"
-                        else AdministrativeService.get_descendant_ward_ids(
-                            self.db, area.id
-                        )
-                        or [area.id]
+                        ticket_area_ids
                     )
                 )
                 .all()
@@ -1565,8 +1580,8 @@ class StatisticService:
         matrix_data = []
 
         for area in areas:
-            # Get ward IDs under this area (or itself if it's a ward)
-            if target_level.name == "ward":
+            # Get ward/leaf IDs under this area (or itself if it's a leaf)
+            if target_level.level_index == settings.admin_leaf_level_index:
                 ward_ids = [area.id]
             else:
                 ward_ids = AdministrativeService.get_descendant_ward_ids(
