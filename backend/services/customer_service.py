@@ -329,6 +329,8 @@ class CustomerService:
                 "phone_number": customer.phone_number,
                 "language": customer.language,
                 "crop_type": customer.crop_type,
+                "age": customer.age,
+                "birth_year": customer.birth_year,
                 "age_group": customer.age_group,
                 "gender": customer.gender,
                 "administrative": admin_info,
@@ -366,15 +368,25 @@ class CustomerService:
             self.db.query(Administrative)
             .join(AdministrativeLevel)
             .filter(Administrative.code.in_(path_parts))
-            .order_by(AdministrativeLevel.id)
+            .order_by(
+                AdministrativeLevel.level_index.asc().nullslast(),
+                AdministrativeLevel.id.asc(),
+            )
             .all()
         )
 
         # Build the path string, excluding country level
         path_names = []
         for area in areas:
-            # Skip country level (identified by level name)
-            if area.level and area.level.name != "country":
+            if area.level:
+                # Exclude country level by index (0) or name ("country")
+                if (
+                    area.level.level_index is not None
+                    and area.level.level_index == 0
+                ) or (
+                    area.level.name and area.level.name.lower() == "country"
+                ):
+                    continue
                 path_names.append(area.name)
 
         return " - ".join(path_names) if path_names else None

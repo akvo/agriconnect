@@ -1,0 +1,11 @@
+code,name,level,parent_code
+IDN,Indonesia,country,
+IDN-JB,Jawa Barat,provinsi,IDN
+IDN-JB-BDG,Kabupaten Bandung,kabupaten,IDN-JB
+IDN-JB-BDG-CLY,Kecamatan Cileunyi,kecamatan,IDN-JB-BDG
+IDN-JB-BDG-CLY-CBR,Desa Cibiruhilir,desa,IDN-JB-BDG-CLY
+IDN-JB-BDG-CLY-CNN,Desa Cinunuk,desa,IDN-JB-BDG-CLY
+IDN-JT,Jawa Tengah,provinsi,IDN
+IDN-JT-SMG,Kota Semarang,kabupaten,IDN-JT
+IDN-JT-SMG-SMT,Kecamatan Semarang Timur,kecamatan,IDN-JT-SMG
+IDN-JT-SMG-SMT-KRT,Kelurahan Karangturi,desa,IDN-JT-SMG-SMT

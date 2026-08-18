@@ -10,6 +10,7 @@ from typing import Optional, List, Tuple
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
 
+from config import settings
 from models.administrative import (
     Administrative,
     AdministrativeLevel,
@@ -247,14 +248,13 @@ class StatisticService:
                 func.avg(
                     func.extract(
                         "epoch",
-                        first_messages.c.first_message_at - Customer.created_at
-                    ) / 86400  # Convert seconds to days
+                        first_messages.c.first_message_at
+                        - Customer.created_at,
+                    )
+                    / 86400  # Convert seconds to days
                 )
             )
-            .join(
-                first_messages,
-                Customer.id == first_messages.c.customer_id
-            )
+            .join(first_messages, Customer.id == first_messages.c.customer_id)
             .filter(Customer.id.in_(customer_ids))
             .scalar()
         )
@@ -356,10 +356,19 @@ class StatisticService:
         Returns:
             List of ward statistics dictionaries
         """
-        # Get all wards (level_id = 4 for ward level)
+        # Get leaf level from settings (by level_index or fallback by name)
+        leaf_level_index = settings.admin_leaf_level_index
+        leaf_level_name = settings.admin_leaf_level_name
+
         ward_level = (
             self.db.query(AdministrativeLevel)
-            .filter(AdministrativeLevel.name == "Ward")
+            .filter(
+                (AdministrativeLevel.level_index == leaf_level_index)
+                | (
+                    func.lower(AdministrativeLevel.name)
+                    == leaf_level_name.lower()
+                )
+            )
             .first()
         )
 
@@ -373,7 +382,7 @@ class StatisticService:
                 self.db.query(Administrative)
                 .filter(
                     Administrative.level_id == ward_level.id,
-                    Administrative.id.in_(ward_ids)
+                    Administrative.id.in_(ward_ids),
                 )
                 .all()
             )
@@ -388,10 +397,9 @@ class StatisticService:
 
         for ward in wards:
             # Get customer IDs in this ward
-            customer_admin_query = (
-                self.db.query(CustomerAdministrative.customer_id)
-                .filter(CustomerAdministrative.administrative_id == ward.id)
-            )
+            customer_admin_query = self.db.query(
+                CustomerAdministrative.customer_id
+            ).filter(CustomerAdministrative.administrative_id == ward.id)
 
             # Apply filters
             base_customer_query = self.db.query(Customer.id).filter(
@@ -433,10 +441,12 @@ class StatisticService:
                 self.db.query(func.count(Customer.id))
                 .filter(
                     Customer.id.in_(customer_ids),
-                    Customer.onboarding_status.in_([
-                        OnboardingStatus.IN_PROGRESS,
-                        OnboardingStatus.FAILED,
-                    ]),
+                    Customer.onboarding_status.in_(
+                        [
+                            OnboardingStatus.IN_PROGRESS,
+                            OnboardingStatus.FAILED,
+                        ]
+                    ),
                 )
                 .scalar()
                 or 0
@@ -480,17 +490,19 @@ class StatisticService:
                 or 0
             )
 
-            results.append({
-                "ward_id": ward.id,
-                "ward_name": ward.name,
-                "ward_path": ward.path,
-                "registered_farmers": registered_farmers,
-                "incomplete_registration": incomplete_registration,
-                "farmers_with_questions": farmers_with_questions,
-                "total_questions": total_questions,
-                "farmers_who_escalated": farmers_who_escalated,
-                "total_escalations": total_escalations,
-            })
+            results.append(
+                {
+                    "ward_id": ward.id,
+                    "ward_name": ward.name,
+                    "ward_path": ward.path,
+                    "registered_farmers": registered_farmers,
+                    "incomplete_registration": incomplete_registration,
+                    "farmers_with_questions": farmers_with_questions,
+                    "total_questions": total_questions,
+                    "farmers_who_escalated": farmers_who_escalated,
+                    "total_escalations": total_escalations,
+                }
+            )
 
         return results
 
@@ -564,10 +576,12 @@ class StatisticService:
             date_str = row.date.strftime("%Y-%m-%d") if row.date else None
             count = row.count or 0
             total += count
-            data.append({
-                "date": date_str,
-                "count": count,
-            })
+            data.append(
+                {
+                    "date": date_str,
+                    "count": count,
+                }
+            )
 
         return data, total
 
@@ -599,9 +613,8 @@ class StatisticService:
             )
 
         # Open tickets
-        open_tickets_query = (
-            self.db.query(func.count(Ticket.id))
-            .filter(Ticket.resolved_at.is_(None))
+        open_tickets_query = self.db.query(func.count(Ticket.id)).filter(
+            Ticket.resolved_at.is_(None)
         )
         if customer_ids is not None:
             open_tickets_query = open_tickets_query.filter(
@@ -631,10 +644,8 @@ class StatisticService:
         # Average response time (in hours)
         response_time_query = self.db.query(
             func.avg(
-                func.extract(
-                    "epoch",
-                    Ticket.resolved_at - Ticket.created_at
-                ) / 3600  # Convert to hours
+                func.extract("epoch", Ticket.resolved_at - Ticket.created_at)
+                / 3600  # Convert to hours
             )
         ).filter(Ticket.resolved_at.isnot(None))
 
@@ -750,12 +761,9 @@ class StatisticService:
                         district_name = admin.name
 
             # Total replies from this EO
-            replies_query = (
-                self.db.query(func.count(Message.id))
-                .filter(
-                    Message.user_id == eo.id,
-                    Message.from_source == MessageFrom.USER,
-                )
+            replies_query = self.db.query(func.count(Message.id)).filter(
+                Message.user_id == eo.id,
+                Message.from_source == MessageFrom.USER,
             )
 
             replies_query = self._apply_date_filter(
@@ -765,12 +773,9 @@ class StatisticService:
             total_replies = replies_query.scalar() or 0
 
             # Tickets closed by this EO
-            tickets_query = (
-                self.db.query(func.count(Ticket.id))
-                .filter(
-                    Ticket.resolved_by == eo.id,
-                    Ticket.resolved_at.isnot(None),
-                )
+            tickets_query = self.db.query(func.count(Ticket.id)).filter(
+                Ticket.resolved_by == eo.id,
+                Ticket.resolved_at.isnot(None),
             )
 
             tickets_query = self._apply_date_filter(
@@ -779,13 +784,15 @@ class StatisticService:
 
             tickets_closed = tickets_query.scalar() or 0
 
-            results.append({
-                "eo_id": eo.id,
-                "eo_name": eo.full_name,
-                "district": district_name,
-                "total_replies": total_replies,
-                "tickets_closed": tickets_closed,
-            })
+            results.append(
+                {
+                    "eo_id": eo.id,
+                    "eo_name": eo.full_name,
+                    "district": district_name,
+                    "total_replies": total_replies,
+                    "tickets_closed": tickets_closed,
+                }
+            )
 
         return results
 
@@ -840,10 +847,7 @@ class StatisticService:
             .all()
         )
 
-        return [
-            {"id": eo.id, "name": eo.full_name}
-            for eo in eos
-        ]
+        return [{"id": eo.id, "name": eo.full_name} for eo in eos]
 
     def _get_available_filters(
         self,
@@ -856,9 +860,8 @@ class StatisticService:
         that have at least one farmer.
         """
         # Base query for customers with completed onboarding
-        base_customer_ids = (
-            self.db.query(Customer.id)
-            .filter(Customer.onboarding_status == OnboardingStatus.COMPLETED)
+        base_customer_ids = self.db.query(Customer.id).filter(
+            Customer.onboarding_status == OnboardingStatus.COMPLETED
         )
 
         # Apply crop_type filter if provided
@@ -910,15 +913,17 @@ class StatisticService:
                             self.db.query(Administrative)
                             .filter(
                                 Administrative.name == region_name,
-                                Administrative.level.has(name="region")
+                                Administrative.level.has(name="region"),
                             )
                             .first()
                         )
                         if region_admin:
-                            regions.append({
-                                "id": region_admin.id,
-                                "name": region_admin.name
-                            })
+                            regions.append(
+                                {
+                                    "id": region_admin.id,
+                                    "name": region_admin.name,
+                                }
+                            )
                             seen_regions.add(region_name)
 
                 if len(path_parts) >= 3:
@@ -932,15 +937,17 @@ class StatisticService:
                             self.db.query(Administrative)
                             .filter(
                                 Administrative.name == district_name,
-                                Administrative.level.has(name="district")
+                                Administrative.level.has(name="district"),
                             )
                             .first()
                         )
                         if district_admin:
-                            districts.append({
-                                "id": district_admin.id,
-                                "name": district_admin.name
-                            })
+                            districts.append(
+                                {
+                                    "id": district_admin.id,
+                                    "name": district_admin.name,
+                                }
+                            )
                             seen_districts.add(district_name)
 
         # Get unique crop types from farmers
@@ -986,9 +993,13 @@ class StatisticService:
             Dict with data, filters, and available options
         """
         # Validate level
-        valid_levels = ["region", "district", "ward"]
+        valid_levels = settings.admin_level_order or [
+            "region",
+            "district",
+            "ward",
+        ]
         if level not in valid_levels:
-            level = "region"
+            level = valid_levels[0]
 
         # Get the level object
         admin_level = (
@@ -1011,9 +1022,8 @@ class StatisticService:
             }
 
         # Get administrative areas at this level
-        areas_query = (
-            self.db.query(Administrative)
-            .filter(Administrative.level_id == admin_level.id)
+        areas_query = self.db.query(Administrative).filter(
+            Administrative.level_id == admin_level.id
         )
 
         # Filter by parent administrative area
@@ -1034,8 +1044,8 @@ class StatisticService:
         results = []
 
         for area in areas:
-            # Get ward IDs under this area
-            if level == "ward":
+            # Get ward/leaf IDs under this area
+            if admin_level.level_index == settings.admin_leaf_level_index:
                 ward_ids = [area.id]
             else:
                 ward_ids = AdministrativeService.get_descendant_ward_ids(
@@ -1086,10 +1096,12 @@ class StatisticService:
                 self.db.query(func.count(Customer.id))
                 .filter(
                     Customer.id.in_(customer_ids),
-                    Customer.onboarding_status.in_([
-                        OnboardingStatus.IN_PROGRESS,
-                        OnboardingStatus.FAILED,
-                    ]),
+                    Customer.onboarding_status.in_(
+                        [
+                            OnboardingStatus.IN_PROGRESS,
+                            OnboardingStatus.FAILED,
+                        ]
+                    ),
                 )
                 .scalar()
                 or 0
@@ -1125,17 +1137,19 @@ class StatisticService:
                 or 0
             )
 
-            results.append({
-                "id": area.id,
-                "name": area.name,
-                "path": area.path,
-                "farmer_count": farmer_count,
-                "completed_onboarding": completed_onboarding,
-                "incomplete_onboarding": incomplete_onboarding,
-                "questions_count": questions_count,
-                "escalations_count": escalations_count,
-                "weather_subscribers": weather_subscribers,
-            })
+            results.append(
+                {
+                    "id": area.id,
+                    "name": area.name,
+                    "path": area.path,
+                    "farmer_count": farmer_count,
+                    "completed_onboarding": completed_onboarding,
+                    "incomplete_onboarding": incomplete_onboarding,
+                    "questions_count": questions_count,
+                    "escalations_count": escalations_count,
+                    "weather_subscribers": weather_subscribers,
+                }
+            )
 
         return {
             "data": results,
@@ -1169,9 +1183,13 @@ class StatisticService:
             Dict with data, filters, and available options
         """
         # Validate level
-        valid_levels = ["region", "district", "ward"]
+        valid_levels = settings.admin_level_order or [
+            "region",
+            "district",
+            "ward",
+        ]
         if level not in valid_levels:
-            level = "region"
+            level = valid_levels[0]
 
         # Get the level object
         admin_level = (
@@ -1194,9 +1212,8 @@ class StatisticService:
             }
 
         # Get administrative areas at this level
-        areas_query = (
-            self.db.query(Administrative)
-            .filter(Administrative.level_id == admin_level.id)
+        areas_query = self.db.query(Administrative).filter(
+            Administrative.level_id == admin_level.id
         )
 
         # Filter by parent administrative area
@@ -1215,9 +1232,11 @@ class StatisticService:
 
         results = []
 
+        is_leaf = admin_level.level_index == settings.admin_leaf_level_index
+
         for area in areas:
             # Get all area IDs under this area (including itself)
-            if level == "ward":
+            if is_leaf:
                 area_ids = [area.id]
             else:
                 ward_ids = AdministrativeService.get_descendant_ward_ids(
@@ -1246,15 +1265,22 @@ class StatisticService:
             )
 
             # Get customer IDs in these areas for ticket queries
+            ticket_area_ids = (
+                area_ids
+                if is_leaf
+                else (
+                    AdministrativeService.get_descendant_ward_ids(
+                        self.db, area.id
+                    )
+                    or [area.id]
+                )
+            )
             customer_ids = [
                 ca.customer_id
                 for ca in self.db.query(CustomerAdministrative)
                 .filter(
                     CustomerAdministrative.administrative_id.in_(
-                        area_ids if level == "ward"
-                        else AdministrativeService.get_descendant_ward_ids(
-                            self.db, area.id
-                        ) or [area.id]
+                        ticket_area_ids
                     )
                 )
                 .all()
@@ -1277,12 +1303,9 @@ class StatisticService:
                 )
 
                 # Closed tickets with date filters
-                closed_query = (
-                    self.db.query(func.count(Ticket.id))
-                    .filter(
-                        Ticket.customer_id.in_(customer_ids),
-                        Ticket.resolved_at.isnot(None),
-                    )
+                closed_query = self.db.query(func.count(Ticket.id)).filter(
+                    Ticket.customer_id.in_(customer_ids),
+                    Ticket.resolved_at.isnot(None),
                 )
                 closed_query = self._apply_date_filter(
                     closed_query, Ticket.resolved_at, start_date, end_date
@@ -1291,13 +1314,10 @@ class StatisticService:
 
                 # Total replies from EOs to customers in this area
                 # Exclude BROADCAST messages (weather forecasts)
-                replies_query = (
-                    self.db.query(func.count(Message.id))
-                    .filter(
-                        Message.customer_id.in_(customer_ids),
-                        Message.from_source == MessageFrom.USER,
-                        Message.message_type != MessageType.BROADCAST,
-                    )
+                replies_query = self.db.query(func.count(Message.id)).filter(
+                    Message.customer_id.in_(customer_ids),
+                    Message.from_source == MessageFrom.USER,
+                    Message.message_type != MessageType.BROADCAST,
                 )
                 replies_query = self._apply_date_filter(
                     replies_query, Message.created_at, start_date, end_date
@@ -1307,15 +1327,17 @@ class StatisticService:
             if eo_count == 0 and open_tickets == 0 and closed_tickets == 0:
                 continue
 
-            results.append({
-                "id": area.id,
-                "name": area.name,
-                "path": area.path,
-                "eo_count": eo_count,
-                "open_tickets": open_tickets,
-                "closed_tickets": closed_tickets,
-                "total_replies": total_replies,
-            })
+            results.append(
+                {
+                    "id": area.id,
+                    "name": area.name,
+                    "path": area.path,
+                    "eo_count": eo_count,
+                    "open_tickets": open_tickets,
+                    "closed_tickets": closed_tickets,
+                    "total_replies": total_replies,
+                }
+            )
 
         return {
             "data": results,
@@ -1382,9 +1404,11 @@ class StatisticService:
         )
 
         # Group by crop type and execute
-        results = query.group_by(crop_type_col).order_by(
-            func.count(Customer.id).desc()
-        ).all()
+        results = (
+            query.group_by(crop_type_col)
+            .order_by(func.count(Customer.id).desc())
+            .all()
+        )
 
         # Build response
         crops = []
@@ -1407,34 +1431,51 @@ class StatisticService:
         self, administrative_id: Optional[int]
     ) -> Tuple[Optional[AdministrativeLevel], str]:
         """
-        Determine the child level based on administrative_id.
+        Determine the child level based on administrative_id using dynamic
+        hierarchy.
 
         Args:
             administrative_id: The parent administrative area ID
 
         Returns:
             Tuple of (child_level, level_name)
-            - No filter → Region level
-            - Region filter → District level
-            - District filter → Ward level
-            - Ward filter → Ward level (same)
+            - No filter → First sub-country level (e.g. Region or Provinsi)
+            - Parent filter → Immediate child level
+            - Leaf filter → Leaf level (returns itself)
         """
-        # Level hierarchy mapping: parent level -> child level name
-        level_hierarchy = {
-            "country": "region",
-            "region": "district",
-            "district": "ward",
-            "ward": "ward",  # Ward has no children, show itself
-        }
+        levels = settings.administrative_hierarchy.get("levels", [])
+        sorted_levels = sorted(
+            [lvl for lvl in levels if isinstance(lvl, dict) and "name" in lvl],
+            key=lambda x: x.get("level_index", 0),
+        )
+
+        level_names = [lvl["name"].lower() for lvl in sorted_levels]
+        first_child_name = (
+            settings.admin_level_order[0]
+            if settings.admin_level_order
+            else "region"
+        )
+
+        # Build dynamic parent -> child level hierarchy mapping
+        level_hierarchy = {}
+        for i, lvl_name in enumerate(level_names):
+            if i + 1 < len(level_names):
+                level_hierarchy[lvl_name] = level_names[i + 1]
+            else:
+                # Leaf level returns itself
+                level_hierarchy[lvl_name] = lvl_name
 
         if not administrative_id:
-            # No filter: show regions
+            # No filter: show first sub-country level
             child_level = (
                 self.db.query(AdministrativeLevel)
-                .filter(AdministrativeLevel.name == "region")
+                .filter(
+                    func.lower(AdministrativeLevel.name)
+                    == first_child_name.lower()
+                )
                 .first()
             )
-            return child_level, "Region"
+            return child_level, first_child_name.capitalize()
 
         # Get the parent administrative area
         parent_admin = (
@@ -1444,20 +1485,28 @@ class StatisticService:
         )
 
         if not parent_admin or not parent_admin.level:
-            # Fallback to region
+            # Fallback to first sub-country level
             child_level = (
                 self.db.query(AdministrativeLevel)
-                .filter(AdministrativeLevel.name == "region")
+                .filter(
+                    func.lower(AdministrativeLevel.name)
+                    == first_child_name.lower()
+                )
                 .first()
             )
-            return child_level, "Region"
+            return child_level, first_child_name.capitalize()
 
         parent_level_name = parent_admin.level.name.lower()
-        child_level_name = level_hierarchy.get(parent_level_name, "region")
+        child_level_name = level_hierarchy.get(
+            parent_level_name, first_child_name
+        )
 
         child_level = (
             self.db.query(AdministrativeLevel)
-            .filter(AdministrativeLevel.name == child_level_name)
+            .filter(
+                func.lower(AdministrativeLevel.name)
+                == child_level_name.lower()
+            )
             .first()
         )
 
@@ -1507,9 +1556,8 @@ class StatisticService:
             }
 
         # Get areas at the target level
-        areas_query = (
-            self.db.query(Administrative)
-            .filter(Administrative.level_id == target_level.id)
+        areas_query = self.db.query(Administrative).filter(
+            Administrative.level_id == target_level.id
         )
 
         # Filter areas by parent administrative area
@@ -1532,8 +1580,8 @@ class StatisticService:
         matrix_data = []
 
         for area in areas:
-            # Get ward IDs under this area (or itself if it's a ward)
-            if target_level.name == "ward":
+            # Get ward/leaf IDs under this area (or itself if it's a leaf)
+            if target_level.level_index == settings.admin_leaf_level_index:
                 ward_ids = [area.id]
             else:
                 ward_ids = AdministrativeService.get_descendant_ward_ids(
@@ -1584,12 +1632,14 @@ class StatisticService:
                 all_crop_types.add(crop)
 
             if total_in_area > 0:
-                matrix_data.append({
-                    "county": area.name,
-                    "county_id": area.id,
-                    "crops": crop_counts,
-                    "total": total_in_area,
-                })
+                matrix_data.append(
+                    {
+                        "county": area.name,
+                        "county_id": area.id,
+                        "crops": crop_counts,
+                        "total": total_in_area,
+                    }
+                )
 
         # Sort crop types alphabetically
         sorted_crop_types = sorted(list(all_crop_types))
@@ -1637,10 +1687,7 @@ class StatisticService:
         now = datetime.now(timezone.utc)
 
         # Base query: open tickets only
-        query = (
-            self.db.query(Ticket)
-            .filter(Ticket.resolved_at.is_(None))
-        )
+        query = self.db.query(Ticket).filter(Ticket.resolved_at.is_(None))
 
         # Note: Date filters are NOT applied to this query
         # We want to see ALL open tickets regardless of creation date
@@ -1771,15 +1818,11 @@ class StatisticService:
             tickets_data.append(ticket_item)
 
         # Categorize by wait time (starting from 0 hours)
-        tickets_0_24 = [
-            t for t in tickets_data if t["waiting_hours"] < 24
-        ]
+        tickets_0_24 = [t for t in tickets_data if t["waiting_hours"] < 24]
         tickets_24_48 = [
             t for t in tickets_data if 24 <= t["waiting_hours"] < 48
         ]
-        tickets_over_48 = [
-            t for t in tickets_data if t["waiting_hours"] >= 48
-        ]
+        tickets_over_48 = [t for t in tickets_data if t["waiting_hours"] >= 48]
 
         # Sort each list by waiting_hours descending
         tickets_0_24.sort(key=lambda x: x["waiting_hours"], reverse=True)

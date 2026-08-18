@@ -83,6 +83,16 @@
     { "label": "36-50", "min": 36, "max": 50 },
     { "label": "51+", "min": 51, "max": null }
   ],
+  "administrative_hierarchy": {
+    "country_code": "KEN",
+    "delimiter": " > ",
+    "levels": [
+      { "level_index": 0, "name": "country", "display": { "en": "Country" } },
+      { "level_index": 1, "name": "region", "display": { "en": "Region", "sw": "Mkoa" } },
+      { "level_index": 2, "name": "district", "display": { "en": "District", "sw": "Wilaya" } },
+      { "level_index": 3, "name": "ward", "display": { "en": "Ward", "sw": "Kata" } }
+    ]
+  },
   "onboarding": {
     "enabled": true,
     "fields": [
@@ -141,8 +151,8 @@
           "sw": "Eneo"
         },
         "questions": {
-          "en": "I need to know your location.\n\nPlease tell me your district and ward.\nFor example: Njoro, Lare",
-          "sw": "Ninahitaji kujua eneo lako.\n\nTafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare"
+          "en": "Where is your farm located?\n\nPlease tell me your area (e.g. district, ward, or village):",
+          "sw": "Shamba lako liko wapi?\n\nTafadhali niambie eneo lako (mfano wilaya, wadi, au kijiji):"
         },
         "success_messages": {
           "en": "Location saved as {value}.",
