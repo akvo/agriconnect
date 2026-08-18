@@ -131,14 +131,14 @@ Verify that the default Kenya administrative hierarchy (`country` $\rightarrow$ 
    ```
 
 #### Execution Steps:
-| Step | Action / Payload | Expected Response | DB Verification |
-|---|---|---|---|
-| **1.1** | Verify seeded levels | Seeder logs: `Seeded 4 administrative levels, 1 countries, ...` | `SELECT name, level_index FROM administrative_levels ORDER BY level_index;`<br>$\rightarrow$ `country: 0`, `region: 1`, `district: 2`, `ward: 3` |
-| **1.2** | Send WhatsApp message:<br>`From=+254700000101`<br>`Body=Hello` | Welcome greeting + Language selection (or direct name prompt). | Customer row created with `onboarding_status='in_progress'`. |
-| **1.3** | Send Name:<br>`Body=John Doe` | Asks for Region:<br>`"Where is your farm located?\n\nPlease select your region:\n\n1. Central\n2. Coast\n..."` | Customer `full_name` updated. Onboarding field advances to `administration`. |
-| **1.4** | Send Region selection:<br>`Body=1` (Central) | Asks for District under Central:<br>`"Great! You selected Central.\n\nPlease choose your district:\n\n1. Murang'a\n2. Kiambu\n..."` | Temporary hierarchy state stored in `customer.profile_data["_admin_hierarchy"]`. |
-| **1.5** | Send District selection:<br>`Body=1` (Murang'a) | Asks for Ward under Murang'a:<br>`"Great! You selected Murang'a.\n\nPlease choose your ward:\n\n1. Kiharu\n2. Kangema\n..."` | Hierarchy state advances to level index 2. |
-| **1.6** | Send Ward selection:<br>`Body=1` (Kiharu) | Location saved confirmation and advances to next question (e.g. crop type):<br>`"What crops do you grow?"` | `SELECT * FROM customer_administrative WHERE customer_id = <cust_id>;`<br>Points to `Kiharu` ward ID. `_admin_hierarchy` cleaned up. |
+| Step | Action / Payload | Expected Response | DB Verification | Status |
+|---|---|---|---|---|
+| **1.1** | Verify seeded levels | Seeder logs: `Seeded 4 administrative levels, 1 countries, ...` | `SELECT name, level_index FROM administrative_levels ORDER BY level_index;`<br>$\rightarrow$ `country: 0`, `region: 1`, `district: 2`, `ward: 3` | [x] **PASSED** (2026-08-18) |
+| **1.2** | Send WhatsApp message:<br>`From=+254700000101`<br>`Body=Hello` | Welcome greeting + Language selection (or direct name prompt). | Customer row created with `onboarding_status='in_progress'`. | [x] **PASSED** (2026-08-18) |
+| **1.3** | Send Name:<br>`Body=John Doe` | Asks for Region:<br>`"Where is your farm located?\n\nPlease select your region:\n\n1. Central\n2. Coast\n..."` | Customer `full_name` updated. Onboarding field advances to `administration`. | [x] **PASSED** (2026-08-18) |
+| **1.4** | Send Region selection:<br>`Body=1` (Central) | Asks for District under Central:<br>`"Great! You selected Central.\n\nPlease choose your district:\n\n1. Murang'a\n2. Kiambu\n..."` | Temporary hierarchy state stored in `customer.profile_data["_admin_hierarchy"]`. | [x] **PASSED** (2026-08-18) |
+| **1.5** | Send District selection:<br>`Body=1` (Murang'a) | Asks for Ward under Murang'a:<br>`"Great! You selected Murang'a.\n\nPlease choose your ward:\n\n1. Kiharu\n2. Kangema\n..."` | Hierarchy state advances to level index 2. | [x] **PASSED** (2026-08-18) |
+| **1.6** | Send Ward selection:<br>`Body=1` (Kiharu) | Location saved confirmation and advances to next question (e.g. crop type):<br>`"What crops do you grow?"` | `SELECT * FROM customer_administrative WHERE customer_id = <cust_id>;`<br>Points to `Kiharu` ward ID. `_admin_hierarchy` cleaned up. | [x] **PASSED** (2026-08-18) |
 
 ---
 
@@ -178,15 +178,15 @@ Verify that on a fresh deployment, AgriConnect can replace the entire national a
    ```
 
 #### Execution Steps:
-| Step | Action / Payload | Expected Response | DB Verification |
-|---|---|---|---|
-| **2.1** | Verify Country Swap Execution | CLI Output:<br>`REPLACE-COUNTRY mode active: Purging all existing administrative entities...`<br>`Purged records: {...}`<br>`Successfully seeded administrative data for Indonesia` | `SELECT count(*) FROM administrative WHERE path LIKE 'Indonesia%';`<br>Returns 6 rows. Kenya rows are completely purged. |
-| **2.2** | Send WhatsApp message:<br>`From=+628123456789`<br>`Body=Halo` | Greeting prompt + Name inquiry. | New customer created with phone `+628123456789`. |
-| **2.3** | Send Name:<br>`Body=Budi Santoso` | Asks for Level 1 (Provinsi):<br>`"Let's find your location step by step.\n\nPlease select your area:\n\n1. Jawa Barat"` | Hierarchy starts dynamically at `settings.admin_level_order[0]` (`provinsi`). |
-| **2.4** | Select Provinsi:<br>`Body=1` (Jawa Barat) | Asks for Level 2 (Kabupaten):<br>`"Great! You selected Jawa Barat.\n\nPlease choose your sub-area:\n\n1. Kabupaten Bandung"` | Candidate IDs stored for level 2. |
-| **2.5** | Select Kabupaten:<br>`Body=1` (Kabupaten Bandung) | Asks for Level 3 (Kecamatan):<br>`"Great! You selected Kabupaten Bandung.\n\nPlease choose your sub-area:\n\n1. Kecamatan Cileunyi"` | Candidate IDs stored for level 3. |
-| **2.6** | Select Kecamatan:<br>`Body=1` (Kecamatan Cileunyi) | Asks for Level 4 (Desa):<br>`"Great! You selected Kecamatan Cileunyi.\n\nPlease choose your sub-area:\n\n1. Desa Cibiruhilir\n2. Desa Cinunuk"` | Candidate IDs stored for leaf level 4. |
-| **2.7** | Select Desa:<br>`Body=1` (Desa Cibiruhilir) | Leaf reached! Saves location and advances to crop question:<br>`"Location saved! What crops do you grow?"` | `SELECT a.name, a.path, al.level_index FROM customer_administrative ca JOIN administrative a ON ca.administrative_id = a.id JOIN administrative_levels al ON a.level_id = al.id WHERE ca.customer_id = <cust_id>;`<br>Returns `Desa Cibiruhilir`, `level_index: 4`. |
+| Step | Action / Payload | Expected Response | DB Verification | Status |
+|---|---|---|---|---|
+| **2.1** | Verify Country Swap Execution | CLI Output:<br>`REPLACE-COUNTRY mode active: Purging all existing administrative entities...`<br>`Purged records: {...}`<br>`Successfully seeded administrative data for Indonesia` | `SELECT count(*) FROM administrative WHERE path LIKE 'Indonesia%';`<br>Returns 10 rows. Kenya rows are completely purged. | [x] **PASSED** (2026-08-18) |
+| **2.2** | Send WhatsApp message:<br>`From=+628123456789`<br>`Body=Halo` | Greeting prompt + Name inquiry. | New customer created with phone `+6281999103535`. | [x] **PASSED** (2026-08-18) |
+| **2.3** | Send Name:<br>`Body=Pratama` | Asks for Level 1 (Provinsi):<br>`"Let's find your location step by step.\n\nPlease select your area:\n\n1. Jawa Barat"` | Hierarchy starts dynamically at `settings.admin_level_order[0]` (`provinsi`). | [x] **PASSED** (2026-08-18) |
+| **2.4** | Select Provinsi:<br>`Body=1` (Jawa Barat) | Asks for Level 2 (Kabupaten):<br>`"Great! You selected Jawa Barat.\n\nPlease choose your sub-area:\n\n1. Kabupaten Bandung"` | Candidate IDs stored for level 2. | [x] **PASSED** (2026-08-18) |
+| **2.5** | Select Kabupaten:<br>`Body=1` (Kabupaten Bandung) | Asks for Level 3 (Kecamatan):<br>`"Great! You selected Kabupaten Bandung.\n\nPlease choose your sub-area:\n\n1. Kecamatan Cileunyi"` | Candidate IDs stored for level 3. | [x] **PASSED** (2026-08-18) |
+| **2.6** | Select Kecamatan:<br>`Body=1` (Kecamatan Cileunyi) | Asks for Level 4 (Desa):<br>`"Great! You selected Kecamatan Cileunyi.\n\nPlease choose your sub-area:\n\n1. Desa Cibiruhilir\n2. Desa Cinunuk"` | Candidate IDs stored for leaf level 4. | [x] **PASSED** (2026-08-18) |
+| **2.7** | Select Desa:<br>`Body=1` (Desa Cibiruhilir) | Leaf reached! Saves location and advances to crop question:<br>`"Location saved! What crops do you grow?"` | `SELECT a.name, a.path, al.level_index FROM customer_administrative ca JOIN administrative a ON ca.administrative_id = a.id JOIN administrative_levels al ON a.level_id = al.id WHERE ca.customer_id = <cust_id>;`<br>Returns `Desa Cibiruhilir`, `level_index: 4`. | [x] **PASSED** (2026-08-18) |
 
 ---
 
@@ -204,10 +204,10 @@ Verify that the `--replace-country` flag is strictly forbidden on non-fresh depl
    ```
 
 #### Execution Steps:
-| Step | Action / Command | Expected Result |
-|---|---|---|
-| **3.1** | Run Country-Swap Seeder:<br>`./dc.sh exec backend python -m seeder.administrative --replace-country --source source/indonesia_sample.csv` | **Execution ABORTS immediately** with error output:<br>`❌ ERROR: Cannot run --replace-country! Found 1 live customer records in database.`<br>`Country replacement is restricted to fresh deployments to prevent data corruption.`<br>Exit code: `1`. |
-| **3.2** | Check DB integrity:<br>`SELECT count(*) FROM customers;`<br>`SELECT count(*) FROM administrative;` | All existing customers and administrative areas remain completely intact and untouched. |
+| Step | Action / Command | Expected Result | Status |
+|---|---|---|---|
+| **3.1** | Run Country-Swap Seeder:<br>`./dc.sh exec backend python -m seeder.administrative --replace-country --source source/indonesia_sample.csv` | **Execution ABORTS immediately** with error output:<br>`❌ ERROR: Cannot run --replace-country! Found 21 live customer records in database.`<br>`Country replacement is restricted to fresh deployments to prevent data corruption.`<br>Exit code: `1`. | [x] **PASSED** (2026-08-18) |
+| **3.2** | Check DB integrity:<br>`SELECT count(*) FROM customers;`<br>`SELECT count(*) FROM administrative;` | All existing customers (21) and administrative areas (332) remain completely intact and untouched. | [x] **PASSED** (2026-08-18) |
 
 ---
 
@@ -290,11 +290,11 @@ Verify that `AdministrativeService` and `StatisticService` correctly resolve lea
 
 | Scenario ID | Test Scenario Description | Pass Criteria | Tester | Status |
 |---|---|---|---|---|
-| **TC-01** | Kenya 4-Tier Seeder & `level_index` Assignment | Levels 0, 1, 2, 3 persisted with unique constraint | | [ ] Pending |
-| **TC-02** | Kenya 4-Tier WhatsApp Onboarding | 3-step prompt completes and saves ward in DB | | [ ] Pending |
-| **TC-03** | Country Swap Seeder (`--replace-country`) | Clean purge and re-seed of 5-tier Indonesia structure | | [ ] Pending |
-| **TC-04** | Indonesia 5-Tier WhatsApp Onboarding | 4-step prompt completes and saves desa in DB | | [ ] Pending |
-| **TC-05** | Country-Swap Safety Guard Block | Aborts with code 1 if `customers.count() > 0` | | [ ] Pending |
+| **TC-01** | Kenya 4-Tier Seeder & `level_index` Assignment | Levels 0, 1, 2, 3 persisted with unique constraint | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-02** | Kenya 4-Tier WhatsApp Onboarding | 3-step prompt completes and saves ward in DB | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-03** | Country Swap Seeder (`--replace-country`) | Clean purge and re-seed of 5-tier Indonesia structure | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-04** | Indonesia 5-Tier WhatsApp Onboarding | 4-step prompt completes and saves desa in DB | Galih Pratama | [x] **PASSED** (2026-08-18) |
+| **TC-05** | Country-Swap Safety Guard Block | Aborts with code 1 if `customers.count() > 0` | Galih Pratama | [x] **PASSED** (2026-08-18) |
 | **TC-06** | Minimal 2-Tier Hierarchy Onboarding | Single-step selection saves leaf region immediately | | [ ] Pending |
 | **TC-07** | Isolated Area (0 Children) Handling | Saves intermediate area without crash or empty menu | | [ ] Pending |
 | **TC-08** | Input Validation (Out of Range & Non-Numeric) | Localized error message re-prompts choice | | [ ] Pending |

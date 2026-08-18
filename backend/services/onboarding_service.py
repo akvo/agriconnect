@@ -1490,6 +1490,10 @@ Birth year must be between 1900 and {current_year}."""
         # Get customer language
         lang = customer.language_code
 
+        # Special case: administration uses dynamic hierarchical selection
+        if field_config.field_name == "administration":
+            return self._start_hierarchical_selection(customer)
+
         # Get question from config or i18n
         question = self._get_question(field_config, lang)
 
@@ -2014,6 +2018,18 @@ Birth year must be between 1900 and {current_year}."""
             next_field = self._get_next_incomplete_field(customer)
 
             if next_field:
+                # Special case: administration uses hierarchical selection
+                if next_field.field_name == "administration":
+                    admin_resp = self._start_hierarchical_selection(customer)
+                    combined_message = (
+                        f"{success_msg}\n\n{admin_resp.message}"
+                    )
+                    return OnboardingResponse(
+                        message=combined_message,
+                        status=admin_resp.status,
+                        attempts=admin_resp.attempts,
+                    )
+
                 # More fields to collect - combine success msg with next Q
                 next_question = self._get_question(next_field, lang)
 

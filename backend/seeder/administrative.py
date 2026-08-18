@@ -14,8 +14,11 @@ from models import (
     Base,
     Customer,
     CustomerAdministrative,
+    Device,
     UserAdministrative,
+    WeatherBroadcast,
 )
+from models.broadcast import BroadcastGroup
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -67,17 +70,28 @@ def clear_administrative_data(db: Session) -> dict:
     Deletion sequence:
       1. customer_administrative
       2. user_administrative
-      3. administrative
-      4. administrative_levels
+      3. devices
+      4. weather_broadcasts
+      5. broadcast_groups (nullify administrative_id)
+      6. administrative
+      7. administrative_levels
     """
     ca_count = db.query(CustomerAdministrative).delete()
     ua_count = db.query(UserAdministrative).delete()
+    dev_count = db.query(Device).delete()
+    wb_count = db.query(WeatherBroadcast).delete()
+    db.query(BroadcastGroup).update(
+        {BroadcastGroup.administrative_id: None},
+        synchronize_session=False,
+    )
     a_count = db.query(Administrative).delete()
     al_count = db.query(AdministrativeLevel).delete()
     db.commit()
     return {
         "customer_administrative": ca_count,
         "user_administrative": ua_count,
+        "devices": dev_count,
+        "weather_broadcasts": wb_count,
         "administrative": a_count,
         "administrative_levels": al_count,
     }

@@ -151,8 +151,8 @@
           "sw": "Eneo"
         },
         "questions": {
-          "en": "I need to know your location.\n\nPlease tell me your district and ward.\nFor example: Njoro, Lare",
-          "sw": "Ninahitaji kujua eneo lako.\n\nTafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare"
+          "en": "Where is your farm located?\n\nPlease select your area:\n{options}",
+          "sw": "Shamba lako liko wapi?\n\nTafadhali chagua eneo lako:\n{options}"
         },
         "success_messages": {
           "en": "Location saved as {value}.",
