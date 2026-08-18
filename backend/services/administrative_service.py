@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from config import settings
 from models import Administrative, AdministrativeLevel, UserAdministrative
 from models.user import User, UserType
 from schemas.administrative import (
@@ -221,7 +222,8 @@ class AdministrativeService:
         db: Session, administrative_id: int
     ) -> List[int]:
         """
-        Get all ward IDs that are descendants of the given administrative area.
+        Get all leaf administrative area IDs (e.g. wards) that are descendants
+        of the given administrative area.
         Uses path-based LIKE query for efficient traversal.
 
         Args:
@@ -229,8 +231,8 @@ class AdministrativeService:
             administrative_id: ID of the administrative area
 
         Returns:
-            List of ward IDs that are descendants of the given area.
-            If the area is already a ward, returns just itself.
+            List of leaf area IDs that are descendants of the given area.
+            If the area is already a leaf area, returns just itself.
         """
         # Get the administrative area
         admin = (
@@ -241,30 +243,43 @@ class AdministrativeService:
         if not admin:
             return [administrative_id]
 
-        # Get the ward level (case-insensitive)
-        ward_level = (
+        leaf_level_index = settings.admin_leaf_level_index
+        leaf_level_name = settings.admin_leaf_level_name
+
+        # Get the leaf level (by level_index or fallback by name)
+        leaf_level = (
             db.query(AdministrativeLevel)
-            .filter(func.lower(AdministrativeLevel.name) == "ward")
+            .filter(
+                (AdministrativeLevel.level_index == leaf_level_index)
+                | (
+                    func.lower(AdministrativeLevel.name)
+                    == leaf_level_name.lower()
+                )
+            )
             .first()
         )
 
-        # If this is already a ward (lowest level), return just itself
-        if ward_level and admin.level_id == ward_level.id:
+        # If this is already a leaf area (lowest level), return just itself
+        if leaf_level and admin.level_id == leaf_level.id:
             return [administrative_id]
 
-        # Find all wards whose path starts with this admin's path
-        # Path format: "Kenya > Murang'a > Kiharu > Ward" (human-readable)
-        descendant_wards = (
+        # Find all leaf areas whose path starts with this admin's path
+        delimiter = settings.admin_delimiter
+        descendant_leafs = (
             db.query(Administrative.id)
             .join(AdministrativeLevel)
             .filter(
-                Administrative.path.like(f"{admin.path} > %"),
-                func.lower(AdministrativeLevel.name) == "ward"
+                Administrative.path.like(f"{admin.path}{delimiter}%"),
+                (AdministrativeLevel.level_index == leaf_level_index)
+                | (
+                    func.lower(AdministrativeLevel.name)
+                    == leaf_level_name.lower()
+                ),
             )
             .all()
         )
 
-        return [w.id for w in descendant_wards]
+        return [w.id for w in descendant_leafs]
 
     @staticmethod
     def get_ancestor_ids(

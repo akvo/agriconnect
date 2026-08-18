@@ -32,7 +32,9 @@ backend/storage/
 
 # Configuration files
 backend/config.json
+backend/config.*.bak
 backend/config.test.json
+*.bak
 
 # Internal Notes
 notes/

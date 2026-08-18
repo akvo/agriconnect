@@ -83,6 +83,19 @@
     { "label": "36-50", "min": 36, "max": 50 },
     { "label": "51+", "min": 51, "max": null }
   ],
+  "administrative_hierarchy": {
+    "country_code": "FSM",
+    "delimiter": " > ",
+    "levels": [
+      { "level_index": 0, "name": "country", "display": { "en": "Country" } },
+      { "level_index": 1, "name": "state", "display": { "en": "State" } },
+      {
+        "level_index": 2,
+        "name": "municipality",
+        "display": { "en": "Municipality" }
+      }
+    ]
+  },
   "onboarding": {
     "enabled": true,
     "fields": [
@@ -141,8 +154,8 @@
           "sw": "Eneo"
         },
         "questions": {
-          "en": "I need to know your location.\n\nPlease tell me your district and ward.\nFor example: Njoro, Lare",
-          "sw": "Ninahitaji kujua eneo lako.\n\nTafadhali niambie wilaya na kata yako.\nMfano: Njoro, Lare"
+          "en": "Where is your farm located?\n\nPlease tell me your area (e.g. state or municipality):",
+          "sw": "Shamba lako liko wapi?\n\nTafadhali niambie eneo lako:"
         },
         "success_messages": {
           "en": "Location saved as {value}.",

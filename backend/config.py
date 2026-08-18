@@ -53,14 +53,18 @@ class Settings(BaseSettings):
     message_limit: int = _config.get("message_limit")
 
     # WhatsApp settings
-    whatsapp_confirmation_template_sid: str = _config.get("whatsapp", {}) \
-        .get("templates", {}) \
-        .get("confirmation", {}) \
+    whatsapp_confirmation_template_sid: str = (
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("confirmation", {})
         .get("sid", "")
-    whatsapp_confirmation_template_sid_sw: str = _config.get("whatsapp", {}) \
-        .get("templates", {}) \
-        .get("confirmation", {}) \
+    )
+    whatsapp_confirmation_template_sid_sw: str = (
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("confirmation", {})
         .get("sid_sw", "")
+    )
     whatsapp_escalate_button_payload: str = (
         _config.get("whatsapp", {})
         .get("button_payloads", {})
@@ -76,14 +80,18 @@ class Settings(BaseSettings):
     )
 
     # Reconnection settings (24-hour inactive conversation)
-    whatsapp_reconnection_template_sid: str = _config.get("whatsapp", {}) \
-        .get("templates", {}) \
-        .get("reconnection", {}) \
+    whatsapp_reconnection_template_sid: str = (
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("reconnection", {})
         .get("sid", "")
-    whatsapp_reconnection_template_sid_sw: str = _config.get("whatsapp", {}) \
-        .get("templates", {}) \
-        .get("reconnection", {}) \
+    )
+    whatsapp_reconnection_template_sid_sw: str = (
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("reconnection", {})
         .get("sid_sw", "")
+    )
     whatsapp_reconnection_threshold_hours: int = (
         _config.get("whatsapp", {})
         .get("reconnection", {})
@@ -132,13 +140,9 @@ class Settings(BaseSettings):
     openai_temperature: float = _config.get("openai", {}).get(
         "temperature", 0.7
     )
-    openai_max_tokens: int = _config.get("openai", {}).get(
-        "max_tokens", 1000
-    )
+    openai_max_tokens: int = _config.get("openai", {}).get("max_tokens", 1000)
     openai_timeout: int = _config.get("openai", {}).get("timeout", 30)
-    openai_max_retries: int = _config.get("openai", {}).get(
-        "max_retries", 3
-    )
+    openai_max_retries: int = _config.get("openai", {}).get("max_retries", 3)
 
     # Model configurations
     openai_chat_model: str = (
@@ -233,14 +237,18 @@ class Settings(BaseSettings):
     redis_db: int = int(os.getenv("REDIS_DB", "0"))
 
     # Broadcast settings
-    whatsapp_broadcast_template_sid: str = _config.get("whatsapp", {}) \
-        .get("templates", {}) \
-        .get("broadcast", {}) \
+    whatsapp_broadcast_template_sid: str = (
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("broadcast", {})
         .get("sid", "")
-    whatsapp_broadcast_template_sid_sw: str = _config.get("whatsapp", {}) \
-        .get("templates", {}) \
-        .get("broadcast", {}) \
+    )
+    whatsapp_broadcast_template_sid_sw: str = (
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("broadcast", {})
         .get("sid_sw", "")
+    )
     broadcast_confirmation_button_payload: str = (
         _config.get("whatsapp", {})
         .get("button_payloads", {})
@@ -291,12 +299,85 @@ class Settings(BaseSettings):
     crop_types: list = _config.get("crop_types", [])
 
     # Onboarding configuration
-    onboarding_enabled: bool = (
-        _config.get("onboarding", {}).get("enabled", True)
+    onboarding_enabled: bool = _config.get("onboarding", {}).get(
+        "enabled", True
     )
-    onboarding_fields_config: list = (
-        _config.get("onboarding", {}).get("fields", [])
+    onboarding_fields_config: list = _config.get("onboarding", {}).get(
+        "fields", []
     )
+
+    # Administrative hierarchy configuration defaults (Kenya 4-level standard)
+    administrative_hierarchy: dict = _config.get(
+        "administrative_hierarchy",
+        {
+            "country_code": "KEN",
+            "delimiter": " > ",
+            "levels": [
+                {
+                    "level_index": 0,
+                    "name": "country",
+                    "display": {"en": "Country"},
+                },
+                {
+                    "level_index": 1,
+                    "name": "region",
+                    "display": {"en": "Region", "sw": "Mkoa"},
+                },
+                {
+                    "level_index": 2,
+                    "name": "district",
+                    "display": {"en": "District", "sw": "Wilaya"},
+                },
+                {
+                    "level_index": 3,
+                    "name": "ward",
+                    "display": {"en": "Ward", "sw": "Kata"},
+                },
+            ],
+        },
+    )
+
+    @property
+    def admin_level_order(self) -> List[str]:
+        """Ordered list of level names excluding root country (level_index > 0)."""  # noqa: E501
+        levels = self.administrative_hierarchy.get("levels", [])
+        filtered = [lvl for lvl in levels if lvl.get("level_index", 0) > 0]
+        filtered.sort(key=lambda lvl: lvl.get("level_index", 99))
+        return [lvl["name"] for lvl in filtered]
+
+    @property
+    def admin_country_level_name(self) -> str:
+        """Name of the root country level (level_index == 0)."""
+        levels = self.administrative_hierarchy.get("levels", [])
+        root = next(
+            (lvl for lvl in levels if lvl.get("level_index") == 0),
+            None,
+        )
+        return root["name"] if root and "name" in root else "country"
+
+    @property
+    def admin_leaf_level_name(self) -> str:
+        """Name of the deepest (leaf) administrative level."""
+        levels = self.administrative_hierarchy.get("levels", [])
+        if not levels:
+            return "ward"
+        leaf = max(levels, key=lambda lvl: lvl.get("level_index", 0))
+        return leaf.get("name", "ward")
+
+    @property
+    def admin_leaf_level_index(self) -> int:
+        """level_index of the deepest (leaf) administrative level."""
+        levels = self.administrative_hierarchy.get("levels", [])
+        if not levels:
+            return 3
+        return max(levels, key=lambda lvl: lvl.get("level_index", 0)).get(
+            "level_index", 3
+        )
+
+    @property
+    def admin_delimiter(self) -> str:
+        """Delimiter used in human-readable path strings."""
+        return self.administrative_hierarchy.get("delimiter", " > ")
 
     # Contact info: Name and Phone number
     contact_name: str = _config.get("contact_info", {}).get("name", "Admin")

@@ -73,6 +73,7 @@ class CustomerListItem(BaseModel):
     phone_number: str
     language: Optional[str] = None
     gender: Optional[Gender] = None
+    age: Optional[int] = None
     age_group: Optional[str] = None
     birth_year: Optional[int] = None
     crop_type: Optional[str] = None

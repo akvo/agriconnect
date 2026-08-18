@@ -74,8 +74,31 @@ class OnboardingService:
         self.max_candidates = 5  # Max options to show farmer
 
         # Administrative level hierarchy (in order of selection)
-        # Skip 'country' as we assume single country
-        self.admin_level_order = ["region", "district", "ward"]
+        # Sourced dynamically from settings (levels with level_index > 0)
+        self.admin_level_order = settings.admin_level_order
+        self._admin_level_suffixes = self._build_admin_level_suffixes()
+
+    def _build_admin_level_suffixes(self) -> List[str]:
+        """
+        Dynamically build administrative level suffix tokens from config.json.
+        """
+        tokens = set()
+        hierarchy = settings.administrative_hierarchy
+        if hierarchy and isinstance(hierarchy, dict):
+            for level in hierarchy.get("levels", []):
+                name = level.get("name")
+                if name:
+                    tokens.add(name.lower().strip())
+                display = level.get("display")
+                if isinstance(display, dict):
+                    for label in display.values():
+                        if label:
+                            tokens.add(label.lower().strip())
+                elif isinstance(display, str) and display:
+                    tokens.add(display.lower().strip())
+
+        # Return formatted suffixes sorted by length descending
+        return [f" {t}" for t in sorted(tokens, key=len, reverse=True)]
 
     def _format_crops_numbered(self, lang: str = "en") -> str:
         """
@@ -380,12 +403,13 @@ class OnboardingService:
         if parent_id is not None:
             query = query.filter(Administrative.parent_id == parent_id)
         else:
-            # For root level (regions), get those under country
-            # Find country first
+            # For root level (first sub-country level), get those under country
+            # Find country using configured country level name
+            country_level = settings.admin_country_level_name
             country = (
                 self.db.query(Administrative)
                 .join(AdministrativeLevel)
-                .filter(AdministrativeLevel.name == "country")
+                .filter(AdministrativeLevel.name == country_level)
                 .first()
             )
             if country:
@@ -417,13 +441,28 @@ class OnboardingService:
         )
         return f"{options_text}{instruction}"
 
+    def _get_level_display_name(
+        self, level_name: str, lang: str = "en"
+    ) -> str:
+        """Get translated display name for an administrative level."""
+        if hasattr(settings, "administrative_hierarchy"):
+            levels = settings.administrative_hierarchy.get("levels", [])
+            for lvl in levels:
+                if lvl.get("name") == level_name:
+                    display = lvl.get("display", {})
+                    if isinstance(display, dict):
+                        return display.get(lang, level_name.title())
+                    elif isinstance(display, str):
+                        return display
+        return level_name.title()
+
     def _start_hierarchical_selection(
         self, customer: Customer
     ) -> OnboardingResponse:
         """
         Start the hierarchical location selection process.
 
-        Begins at the first level (region) and shows all available options.
+        Begins at the first sub-country level and shows all available options.
         """
         lang = customer.language_code
         first_level = self.admin_level_order[0]
@@ -432,8 +471,10 @@ class OnboardingService:
         areas = self._get_children_at_level(first_level, None)
 
         if not areas:
-            # No regions found - this shouldn't happen in production
-            logger.error("No administrative regions found in database")
+            # No areas found - this shouldn't happen in production
+            logger.error(
+                f"No administrative areas found for level '{first_level}'"
+            )
             return OnboardingResponse(
                 message=t("onboarding.common.database_error", lang),
                 status="in_progress",
@@ -448,17 +489,27 @@ class OnboardingService:
         customer.current_onboarding_field = "administration"
         self.db.commit()
 
-        # Build message
+        # Build message with dynamic key fallback
         options_text = self._build_options_text(areas, lang)
-        message = t(
-            "onboarding.administration.select_region",
-            lang,
-            options=options_text,
-        )
+        level_display = self._get_level_display_name(first_level, lang)
+
+        if first_level == "region":
+            message = t(
+                "onboarding.administration.select_region",
+                lang,
+                options=options_text,
+            )
+        else:
+            message = t(
+                "onboarding.administration.select_level",
+                lang,
+                level=level_display,
+                options=options_text,
+            )
 
         logger.info(
             f"Started hierarchical selection for customer {customer.id}, "
-            f"showing {len(areas)} regions"
+            f"showing {len(areas)} {first_level}s"
         )
 
         return OnboardingResponse(
@@ -536,20 +587,28 @@ class OnboardingService:
                 self.db.commit()
 
                 options_text = self._build_options_text(children, lang)
+                level_display = self._get_level_display_name(next_level, lang)
 
-                # Choose appropriate message based on level
-                if next_level == "district":
+                if next_level == "district" and current_level == "region":
                     message = t(
                         "onboarding.administration.select_district",
                         lang,
                         parent=selected_admin.name,
                         options=options_text,
                     )
-                else:  # ward
+                elif next_level == "ward" and current_level == "district":
                     message = t(
                         "onboarding.administration.select_ward",
                         lang,
                         parent=selected_admin.name,
+                        options=options_text,
+                    )
+                else:
+                    message = t(
+                        "onboarding.administration.select_next",
+                        lang,
+                        parent=selected_admin.name,
+                        level=level_display,
                         options=options_text,
                     )
 
@@ -975,7 +1034,7 @@ Candidates: ["Avocado", "Cacao"]
         ]
         for prefix in prefixes:
             if cleaned.lower().startswith(prefix):
-                cleaned = cleaned[len(prefix):].strip()
+                cleaned = cleaned[len(prefix) :].strip()  # noqa
                 break
 
         if cleaned:
@@ -1136,30 +1195,29 @@ Birth year must be between 1900 and {current_year}."""
         Returns:
             Score from 0-100
         """
-        # Parse hierarchical path (e.g., "Kenya > Nairobi Region > Central District > Westlands Ward")  # noqa: E501
+        # Parse hierarchical path (e.g. "Kenya > Nairobi > Central")
         path_parts = [p.strip() for p in admin.path.split(">")]
 
-        # Extract hierarchy levels (assuming 4 levels: country, region, district, ward)  # noqa: E501
-        if len(path_parts) < 4:
-            # If less than 4 levels, adjust logic
-            db_ward = path_parts[-1] if len(path_parts) >= 1 else ""
-            db_district = path_parts[-2] if len(path_parts) >= 2 else ""
-            db_province = path_parts[-3] if len(path_parts) >= 3 else ""
-        else:
-            db_province = path_parts[1]  # Region level
-            db_district = path_parts[2]  # District level
-            db_ward = path_parts[3]  # Ward level
+        # Extract hierarchy levels dynamically from the path parts
+        # Leaf is always path_parts[-1], parent is path_parts[-2], etc.
+        db_ward = (
+            path_parts[-1]
+            if len(path_parts) >= 2
+            else (path_parts[0] if path_parts else "")
+        )
+        db_district = path_parts[-2] if len(path_parts) >= 3 else ""
+        db_province = path_parts[-3] if len(path_parts) >= 4 else ""
 
         scores = []
         weights = []
 
-        # Ward score (weight 3)
+        # Ward / Leaf score (weight 3)
         if location.ward:
             ward_score = fuzz.ratio(location.ward.lower(), db_ward.lower())
             scores.append(ward_score)
             weights.append(3)
 
-        # District score (weight 2)
+        # District / Intermediate score (weight 2)
         if location.district:
             district_score = fuzz.ratio(
                 location.district.lower(), db_district.lower()
@@ -1167,7 +1225,7 @@ Birth year must be between 1900 and {current_year}."""
             scores.append(district_score)
             weights.append(2)
 
-        # Province score (weight 1)
+        # Province / Top-level score (weight 1)
         if location.province:
             province_score = fuzz.ratio(
                 location.province.lower(), db_province.lower()
@@ -1176,13 +1234,15 @@ Birth year must be between 1900 and {current_year}."""
             weights.append(1)
 
         # Fallback: if no structured fields, try matching full_text against
-        # ward name directly (handles typos like "Ithnga" -> "Ithanga")
+        # leaf name directly (handles typos and raw names)
         if not scores and location.full_text:
-            # Extract just the ward name without suffix for better matching
-            db_ward_name = db_ward.lower().replace(" ward", "").strip()
+            # Extract clean leaf name without standard administrative suffixes
+            db_ward_clean = db_ward.lower()
+            for suffix in self._admin_level_suffixes:
+                db_ward_clean = db_ward_clean.replace(suffix, "")
+            db_ward_clean = db_ward_clean.strip()
             full_text_lower = location.full_text.lower().strip()
-            # Use fuzz.ratio for accurate typo detection (92% for small typos)
-            fallback_score = fuzz.ratio(full_text_lower, db_ward_name)
+            fallback_score = fuzz.ratio(full_text_lower, db_ward_clean)
             scores.append(fallback_score)
             weights.append(3)
 
