@@ -1,0 +1,5 @@
+code,name,level,parent_code
+SGP,Singapore,country,
+SGP-CD,Central District,district,SGP
+SGP-ND,North District,district,SGP
+SGP-ED,East District,district,SGP

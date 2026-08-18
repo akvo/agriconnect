@@ -418,6 +418,21 @@ class OnboardingService:
         )
         return f"{options_text}{instruction}"
 
+    def _get_level_display_name(
+        self, level_name: str, lang: str = "en"
+    ) -> str:
+        """Get translated display name for an administrative level."""
+        if hasattr(settings, "administrative_hierarchy"):
+            levels = settings.administrative_hierarchy.get("levels", [])
+            for lvl in levels:
+                if lvl.get("name") == level_name:
+                    display = lvl.get("display", {})
+                    if isinstance(display, dict):
+                        return display.get(lang, level_name.title())
+                    elif isinstance(display, str):
+                        return display
+        return level_name.title()
+
     def _start_hierarchical_selection(
         self, customer: Customer
     ) -> OnboardingResponse:
@@ -453,13 +468,19 @@ class OnboardingService:
 
         # Build message with dynamic key fallback
         options_text = self._build_options_text(areas, lang)
-        key = f"onboarding.administration.select_{first_level}"
-        message = t(key, lang, options=options_text)
-        if message == key:
+        level_display = self._get_level_display_name(first_level, lang)
+
+        if first_level == "region":
+            message = t(
+                "onboarding.administration.select_region",
+                lang,
+                options=options_text,
+            )
+        else:
             message = t(
                 "onboarding.administration.select_level",
                 lang,
-                level=first_level.title(),
+                level=level_display,
                 options=options_text,
             )
 
@@ -543,21 +564,28 @@ class OnboardingService:
                 self.db.commit()
 
                 options_text = self._build_options_text(children, lang)
+                level_display = self._get_level_display_name(next_level, lang)
 
-                # Choose message based on level with generic fallback
-                key = f"onboarding.administration.select_{next_level}"
-                message = t(
-                    key,
-                    lang,
-                    parent=selected_admin.name,
-                    options=options_text,
-                )
-                if message == key:
+                if next_level == "district" and current_level == "region":
+                    message = t(
+                        "onboarding.administration.select_district",
+                        lang,
+                        parent=selected_admin.name,
+                        options=options_text,
+                    )
+                elif next_level == "ward" and current_level == "district":
+                    message = t(
+                        "onboarding.administration.select_ward",
+                        lang,
+                        parent=selected_admin.name,
+                        options=options_text,
+                    )
+                else:
                     message = t(
                         "onboarding.administration.select_next",
                         lang,
                         parent=selected_admin.name,
-                        level=next_level.title(),
+                        level=level_display,
                         options=options_text,
                     )
 
@@ -983,7 +1011,7 @@ Candidates: ["Avocado", "Cacao"]
         ]
         for prefix in prefixes:
             if cleaned.lower().startswith(prefix):
-                cleaned = cleaned[len(prefix):].strip()
+                cleaned = cleaned[len(prefix) :].strip()  # noqa
                 break
 
         if cleaned:
@@ -2021,9 +2049,7 @@ Birth year must be between 1900 and {current_year}."""
                 # Special case: administration uses hierarchical selection
                 if next_field.field_name == "administration":
                     admin_resp = self._start_hierarchical_selection(customer)
-                    combined_message = (
-                        f"{success_msg}\n\n{admin_resp.message}"
-                    )
+                    combined_message = f"{success_msg}\n\n{admin_resp.message}"
                     return OnboardingResponse(
                         message=combined_message,
                         status=admin_resp.status,

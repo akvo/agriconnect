@@ -7,6 +7,7 @@ Tests the complete multi-field onboarding flow:
 - Gender
 - Birth year
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime
@@ -1146,10 +1147,10 @@ class TestGenericOnboardingService:
         )
 
         # Failed status doesn't prevent onboarding from continuing
-        # It will find the first incomplete field (administration) and ask
-        # the free-text question first (fuzzy match attempt)
-        assert response.status == "in_progress"
-        assert "location" in response.message.lower()
+        # It will find the first incomplete field (administration) and
+        # directly start hierarchical selection
+        assert response.status == "awaiting_selection"
+        assert "Nairobi" in response.message or "Murang'a" in response.message
 
 
 # ============================================================================
@@ -1564,8 +1565,7 @@ class TestHierarchicalLocationSelection:
     async def test_hierarchical_selection_starts_with_regions(
         self, db_session, onboarding_service, sample_administrative_data
     ):
-        """Test that hierarchical selection starts by showing all regions
-        after fuzzy match fails"""
+        """Test that hierarchical selection starts by showing all regions"""
         customer = Customer(
             full_name="John Doe",
             phone_number="+254700000001",
@@ -1574,16 +1574,10 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # First message - asks free-text location question
+        # First message for location field
+        # directly starts hierarchical selection
         response = await onboarding_service.process_onboarding_message(
             customer, "Hello"
-        )
-        assert response.status == "in_progress"
-        assert "location" in response.message.lower()
-
-        # Provide non-matching location - triggers hierarchical fallback
-        response = await onboarding_service.process_onboarding_message(
-            customer, "xyzabc unknown village"
         )
 
         # Should show regions in awaiting_selection status
@@ -1604,12 +1598,8 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # First message - asks free-text location question
+        # First message starts hierarchical selection showing regions
         await onboarding_service.process_onboarding_message(customer, "Hello")
-        # Provide non-matching location - triggers hierarchical fallback
-        await onboarding_service.process_onboarding_message(
-            customer, "xyzabc unknown"
-        )
 
         # Select Murang'a (first option in alphabetical order: M < N)
         response = await onboarding_service.process_onboarding_message(
@@ -1634,12 +1624,8 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # First message - asks free-text location question
+        # Start hierarchical selection
         await onboarding_service.process_onboarding_message(customer, "Hello")
-        # Provide non-matching location - triggers hierarchical fallback
-        await onboarding_service.process_onboarding_message(
-            customer, "xyzabc unknown"
-        )
         # Select Murang'a (option 1, alphabetical: M < N)
         await onboarding_service.process_onboarding_message(customer, "1")
         # Select Gatanga (first option alphabetically: G < K)
@@ -1664,12 +1650,8 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # First message - asks free-text location question
+        # Start hierarchical selection
         await onboarding_service.process_onboarding_message(customer, "Hello")
-        # Provide non-matching location - triggers hierarchical fallback
-        await onboarding_service.process_onboarding_message(
-            customer, "xyzabc unknown"
-        )
 
         # Navigate through hierarchy (alphabetical order)
         # Regions: 1.Murang'a 2.Nairobi
@@ -1706,15 +1688,9 @@ class TestHierarchicalLocationSelection:
         db_session.add(customer)
         db_session.commit()
 
-        # First message - asks free-text location question in Swahili
+        # First message directly starts hierarchical selection in Swahili
         response = await onboarding_service.process_onboarding_message(
             customer, "Habari"
-        )
-        assert response.status == "in_progress"
-
-        # Provide non-matching location - triggers hierarchical fallback
-        response = await onboarding_service.process_onboarding_message(
-            customer, "xyzabc unknown"
         )
 
         # Should show Swahili message with hierarchical selection
@@ -1723,6 +1699,7 @@ class TestHierarchicalLocationSelection:
         assert (
             "eneo" in response.message.lower()
             or "kaunti" in response.message.lower()
+            or "mkoa" in response.message.lower()
         )
 
     @pytest.mark.asyncio
