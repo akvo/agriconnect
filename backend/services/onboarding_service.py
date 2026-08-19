@@ -151,9 +151,20 @@ class OnboardingService:
         if not enabled_fields:
             return False
 
-        # TAC-7: If language is NULL, always trigger language selection
-        if customer.language is None:
-            return True
+        # In single-language mode, auto-backfill customer.language if missing
+        if settings.is_single_language and customer.language is None:
+            customer.language = settings.default_language
+            self.db.commit()
+
+        # In multi-language mode, if language is NULL and language field is
+        # enabled, trigger language selection
+        if not settings.is_single_language and customer.language is None:
+            language_field = next(
+                (f for f in enabled_fields if f.field_name == "language"),
+                None,
+            )
+            if language_field is not None:
+                return True
 
         # If onboarding previously failed, do not retry
         if customer.onboarding_status == OnboardingStatus.FAILED:
@@ -213,6 +224,11 @@ class OnboardingService:
 
         # Special case: language uses direct column
         if field_name == "language":
+            if settings.is_single_language:
+                if customer.language is None:
+                    customer.language = settings.default_language
+                    self.db.commit()
+                return True
             return customer.language is not None
 
         # Special case: full_name uses direct column
