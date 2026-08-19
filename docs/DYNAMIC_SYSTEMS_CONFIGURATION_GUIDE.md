@@ -169,6 +169,20 @@ The `t(path, lang, **kwargs)` resolver safely replaces format placeholders:
    ./dc.sh restart backend
    ```
 
+### 2.5 Single-Language Deployments & Automatic Bypass
+
+For deployments operating in a single language (e.g., English-only in Micronesia or Swahili-only programs):
+1. Specify only one language entry in `backend/config.json`:
+   ```json
+   {
+     "languages": [
+       { "code": "en", "name": "English", "active": true }
+     ]
+   }
+   ```
+2. **Automatic Language Assignment**: When a new farmer arrives via WhatsApp, `CustomerService.create_customer()` immediately assigns `customer.language = settings.default_language` (e.g. `"en"`).
+3. **Seamless Onboarding Bypass**: `OnboardingService` detects `settings.is_single_language == True` and automatically marks the `language` question as satisfied without asking the farmer to choose a language, immediately presenting the first actionable question (e.g. `full_name`).
+
 ---
 
 ## 3. Pillar 2: Dynamic Administrative Hierarchy System

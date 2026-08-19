@@ -285,6 +285,11 @@ class Settings(BaseSettings):
         codes = self.supported_language_codes
         return codes[0] if codes else "en"
 
+    @property
+    def is_single_language(self) -> bool:
+        """Return True if 1 or 0 supported languages are configured."""
+        return len(self.supported_language_codes) <= 1
+
     # Dynamic Age Groups
     age_groups: list = _config.get(
         "age_groups",

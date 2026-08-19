@@ -151,9 +151,20 @@ class OnboardingService:
         if not enabled_fields:
             return False
 
-        # TAC-7: If language is NULL, always trigger language selection
-        if customer.language is None:
-            return True
+        # In single-language mode, auto-backfill customer.language if missing
+        if settings.is_single_language and customer.language is None:
+            customer.language = settings.default_language
+            self.db.commit()
+
+        # In multi-language mode, if language is NULL and language field is
+        # enabled, trigger language selection
+        if not settings.is_single_language and customer.language is None:
+            language_field = next(
+                (f for f in enabled_fields if f.field_name == "language"),
+                None,
+            )
+            if language_field is not None:
+                return True
 
         # If onboarding previously failed, do not retry
         if customer.onboarding_status == OnboardingStatus.FAILED:
@@ -174,16 +185,10 @@ class OnboardingService:
         Find the next field that needs to be collected (by priority order).
 
         Checks all required fields first, then optional fields.
-        If consent was asked but not given, returns None (wait for consent).
 
         Returns:
             OnboardingFieldConfig for next field, or None if all fields done
         """
-        # If consent was asked but not given, don't proceed
-        # (consent response is handled in whatsapp router)
-        if customer.data_consent_asked and not customer.data_consent_given:
-            return None  # Wait for consent
-
         # First check required fields
         for field_config in self.fields_config:
             if field_config.required and not self._is_field_complete(
@@ -213,7 +218,18 @@ class OnboardingService:
 
         # Special case: language uses direct column
         if field_name == "language":
+            if settings.is_single_language:
+                if customer.language is None:
+                    customer.language = settings.default_language
+                    self.db.commit()
+                return True
             return customer.language is not None
+
+        # Special case: consent uses data_consent properties
+        if field_name == "consent":
+            if not field_config.required:
+                return customer.data_consent_asked
+            return customer.data_consent_given is True
 
         # Special case: full_name uses direct column
         if field_name == "full_name":
@@ -1171,6 +1187,127 @@ Birth year must be between 1900 and {current_year}."""
         logger.info(f"[OnboardingService] Extracted birth year: {birth_year}")
         return birth_year
 
+    async def extract_consent(
+        self,
+        message: str,
+        field_config: Optional[OnboardingFieldConfig] = None,
+        lang: Optional[str] = None,
+    ) -> Optional[bool]:
+        """
+        Extract data sharing consent response from farmer's message.
+
+        Checks affirmative and declined keywords configured in field_config
+        (or loaded from self.fields_config). Supports flat lists (e.g. ["yes",
+        "oui", "1"]) and localized dictionaries (e.g. {"en": ["yes"], "fr":
+        ["oui"]}).
+
+        Falls back to default multilingual keyword sets if not configured.
+
+        Returns:
+            True if consent given, False if declined, None if unrecognized.
+        """
+        msg = message.strip().lower()
+
+        # Find field configuration if not directly provided
+        if field_config is None and hasattr(self, "fields_config"):
+            for fc in self.fields_config:
+                if fc.field_name == "consent":
+                    field_config = fc
+                    break
+
+        # 1. Resolve affirmative keywords
+        affirmative: set[str] = set()
+        if field_config and field_config.affirmative_keywords:
+            ak = field_config.affirmative_keywords
+            if isinstance(ak, list):
+                affirmative = {
+                    k.strip().lower() for k in ak if isinstance(k, str)
+                }
+            elif isinstance(ak, dict):
+                if lang and lang in ak and isinstance(ak[lang], list):
+                    affirmative = {
+                        k.strip().lower()
+                        for k in ak[lang]
+                        if isinstance(k, str)
+                    }
+                else:
+                    for k_list in ak.values():
+                        if isinstance(k_list, list):
+                            affirmative.update(
+                                k.strip().lower()
+                                for k in k_list
+                                if isinstance(k, str)
+                            )
+
+        if not affirmative:
+            affirmative = {
+                "yes",
+                "ok",
+                "okay",
+                "ndio",
+                "ndiyo",
+                "sawa",
+                "agree",
+                "i agree",
+                "accepted",
+                "accept",
+                "kubali",
+                "nakubali",
+                "ya",
+                "setuju",
+                "oke",
+                "y",
+                "1",
+            }
+
+        # 2. Resolve declined keywords
+        declined: set[str] = set()
+        if field_config and field_config.declined_keywords:
+            dk = field_config.declined_keywords
+            if isinstance(dk, list):
+                declined = {
+                    k.strip().lower() for k in dk if isinstance(k, str)
+                }
+            elif isinstance(dk, dict):
+                if lang and lang in dk and isinstance(dk[lang], list):
+                    declined = {
+                        k.strip().lower()
+                        for k in dk[lang]
+                        if isinstance(k, str)
+                    }
+                else:
+                    for k_list in dk.values():
+                        if isinstance(k_list, list):
+                            declined.update(
+                                k.strip().lower()
+                                for k in k_list
+                                if isinstance(k, str)
+                            )
+
+        if not declined:
+            declined = {
+                "no",
+                "hapana",
+                "tidak",
+                "tolak",
+                "decline",
+                "reject",
+                "n",
+                "2",
+            }
+
+        if msg in affirmative:
+            logger.info(f"[OnboardingService] Consent granted: '{message}'")
+            return True
+        if msg in declined:
+            logger.info(f"[OnboardingService] Consent declined: '{message}'")
+            return False
+
+        logger.info(
+            f"[OnboardingService] Unrecognized consent response: '{message}'"
+        )
+        return None
+
     # ================================================================
     # MATCHING METHODS
     # ================================================================
@@ -1659,13 +1796,12 @@ Birth year must be between 1900 and {current_year}."""
             extraction_method = getattr(
                 self, field_config.extraction_method, None
             )
-            if extraction_method is None:
-                logger.warning(
-                    f"Extraction method '{field_config.extraction_method}' "
-                    f"not found on OnboardingService. Saving raw message."
+            if field_name == "consent":
+                extracted_value = await extraction_method(
+                    message, field_config, lang
                 )
-                return self._save_field_value(customer, message, field_config)
-            extracted_value = await extraction_method(message)
+            else:
+                extracted_value = await extraction_method(message)
         except Exception as e:
             logger.error(
                 f"Extraction failed for {field_name}: {e}", exc_info=True
@@ -1990,6 +2126,21 @@ Birth year must be between 1900 and {current_year}."""
                     field_config, lang, value=value
                 )
 
+            # Special case: "consent" uses customer data consent flags
+            elif field_name == "consent":
+                customer.data_consent_asked = True
+                customer.data_consent_given = bool(value)
+                if value is False and field_config.required:
+                    customer.onboarding_status = OnboardingStatus.FAILED
+                    self.db.commit()
+                    decline_msg = t("consent.data_sharing.declined", lang)
+                    return OnboardingResponse(
+                        message=decline_msg,
+                        status="aborted",
+                        attempts=0,
+                    )
+                success_msg = self._get_success_message(field_config, lang)
+
             # Special case: administration uses relationship table
             elif field_name == "administration":
                 # value is an Administrative object
@@ -2045,22 +2196,6 @@ Birth year must be between 1900 and {current_year}."""
             logger.info(
                 f"Saved {field_name} for customer {customer.id}: {value}"
             )
-
-            # After language is saved, ask for consent if not given
-            if field_name == "language" and not customer.data_consent_given:
-                # Mark consent as asked
-                customer.data_consent_asked = True
-                self.db.commit()
-
-                # Return consent question
-                consent_question = t("consent.data_sharing.question", lang)
-                combined_message = f"{success_msg}\n\n{consent_question}"
-
-                return OnboardingResponse(
-                    message=combined_message,
-                    status="awaiting_consent",
-                    attempts=0,
-                )
 
             # Check if there are more fields
             next_field = self._get_next_incomplete_field(customer)
@@ -2288,7 +2423,21 @@ Birth year must be between 1900 and {current_year}."""
         if val is None or val == "":
             return "N/A"
 
-        # 5. Type/Domain-specific formatting
+        # 5 Type/Domain-specific formatting
+        if isinstance(val, bool):
+            if val is True:
+                if lang == "sw":
+                    return "Ndio"
+                elif lang == "id":
+                    return "Ya"
+                return "Yes"
+            else:
+                if lang == "sw":
+                    return "Hapana"
+                elif lang == "id":
+                    return "Tidak"
+                return "No"
+
         if (
             field_config.field_name == "birth_year"
             and customer.age is not None
@@ -2312,10 +2461,15 @@ Birth year must be between 1900 and {current_year}."""
         """
         Generate a dynamic profile summary of collected farmer attributes.
 
-        Iterates over active/enabled fields in fields_config and looks up
-        display names and localized values dynamically.
+        Iterates over active/enabled fields in fields_config (excluding
+        gateway consent fields) and looks up display names and localized
+        values.
         """
-        active_fields = [f for f in self.fields_config if f.enabled]
+        active_fields = [
+            f
+            for f in self.fields_config
+            if f.enabled and f.field_name != "consent"
+        ]
         if not active_fields:
             return ""
 

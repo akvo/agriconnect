@@ -127,6 +127,10 @@ class OnboardingFieldConfig:
     questions: Optional[Union[Dict[str, str], str]] = None
     success_messages: Optional[Union[Dict[str, str], str]] = None
     success_message_template: Optional[str] = None  # Legacy template fallback
+    affirmative_keywords: Optional[Union[Dict[str, List[str]], List[str]]] = (
+        None
+    )
+    declined_keywords: Optional[Union[Dict[str, List[str]], List[str]]] = None
 
     def get_label(self, lang: Optional[str] = None) -> str:
         """Get localized field label or fall back to title-cased name."""
@@ -303,6 +307,14 @@ def load_onboarding_fields() -> List[OnboardingFieldConfig]:
                 success_message_template=cfg.get(
                     "success_message_template",
                     base.success_message_template if base else None,
+                ),
+                affirmative_keywords=(
+                    cfg.get("affirmative_keywords")
+                    or (base.affirmative_keywords if base else None)
+                ),
+                declined_keywords=(
+                    cfg.get("declined_keywords")
+                    or (base.declined_keywords if base else None)
                 ),
             )
         )

@@ -173,6 +173,15 @@ class Customer(Base):
     def data_consent_given(self, value: bool | None):
         self.set_profile_field("data_consent_given", value)
 
+    @property
+    def data_consent(self) -> bool | None:
+        """Alias for data_consent_given for dynamic field lookups."""
+        return self.data_consent_given
+
+    @data_consent.setter
+    def data_consent(self, value: bool | None):
+        self.data_consent_given = value
+
     # Account deletion request tracking
     @property
     def delete_requested(self) -> bool:
