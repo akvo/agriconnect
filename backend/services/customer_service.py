@@ -42,6 +42,9 @@ class CustomerService:
         language: Optional[str] = None,
     ) -> Customer:
         """Create a new customer with minimal fields."""
+        if language is None and settings.is_single_language:
+            language = settings.default_language
+
         customer = Customer(phone_number=phone_number, language=language)
         try:
             self.db.add(customer)

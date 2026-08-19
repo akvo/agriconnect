@@ -119,11 +119,51 @@
         }
       },
       {
+        "field_name": "consent",
+        "db_field": "data_consent",
+        "enabled": true,
+        "required": true,
+        "priority": 1,
+        "field_type": "boolean",
+        "extraction_method": "extract_consent",
+        "max_attempts": 3,
+        "labels": {
+          "en": "Data Consent",
+          "sw": "Idhini ya Data"
+        },
+        "questions": {
+          "en": "Before we begin, do you agree to allow us to store and use your information to provide personalized agricultural advice and support?\n\nReply with *Yes* to continue or *No* to decline.",
+          "sw": "Kabla ya kuanza, je, unakubali kuturuhusu kuhifadhi na kutumia taarifa zako ili kutoa ushauri na usaidizi wa kibinafsi wa kilimo?\n\nJibu *Ndio* kuendelea au *Hapana* kukataa."
+        },
+        "affirmative_keywords": {
+          "en": [
+            "yes",
+            "ok",
+            "okay",
+            "agree",
+            "i agree",
+            "accepted",
+            "accept",
+            "1",
+            "y"
+          ],
+          "sw": ["ndio", "ndiyo", "sawa", "kubali", "nakubali", "1"]
+        },
+        "declined_keywords": {
+          "en": ["no", "decline", "reject", "2", "n"],
+          "sw": ["hapana", "2"]
+        },
+        "success_messages": {
+          "en": "Thank you for your consent!",
+          "sw": "Asante kwa idhini yako!"
+        }
+      },
+      {
         "field_name": "full_name",
         "db_field": "full_name",
         "enabled": true,
         "required": true,
-        "priority": 1,
+        "priority": 2,
         "field_type": "string",
         "max_attempts": 1,
         "labels": {
@@ -144,7 +184,7 @@
         "db_field": "customer_administrative",
         "enabled": true,
         "required": true,
-        "priority": 2,
+        "priority": 3,
         "field_type": "location",
         "extraction_method": "extract_location",
         "matching_method": "resolve_administration_ambiguity",
@@ -167,7 +207,7 @@
         "db_field": "crop_type",
         "enabled": true,
         "required": true,
-        "priority": 3,
+        "priority": 4,
         "field_type": "string",
         "extraction_method": "extract_crop_type",
         "matching_method": "resolve_crop_ambiguity",
@@ -190,7 +230,7 @@
         "db_field": "gender",
         "enabled": true,
         "required": false,
-        "priority": 4,
+        "priority": 5,
         "field_type": "enum",
         "extraction_method": "extract_gender",
         "max_attempts": 2,
@@ -212,7 +252,7 @@
         "db_field": "birth_year",
         "enabled": true,
         "required": false,
-        "priority": 5,
+        "priority": 6,
         "field_type": "integer",
         "extraction_method": "extract_birth_year",
         "max_attempts": 2,

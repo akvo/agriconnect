@@ -724,42 +724,54 @@ Below is the detailed architectural blueprint, code references, and implementati
 
 #### 1. Data Consent Decoupling (`consent`)
 
-* **Priority:** `Medium`
-* **Current Limitation:**
-  In [backend/routers/whatsapp.py:L335-L370](/backend/routers/whatsapp.py#L335-L370) and [backend/services/onboarding_service.py:L1934-L1947](/backend/services/onboarding_service.py#L1934-L1947), the data privacy consent check is explicitly hardcoded to trigger when `field_name == "language"`. If a partner configures an onboarding pipeline that omits the language question (e.g. single-language deployment, or direct Name $\rightarrow$ Commodity), the consent intercept is never triggered.
+- **Specification**: [`docs/CONFIGURABLE_DATA_CONSENT.md`](/docs/CONFIGURABLE_DATA_CONSENT.md)
+- **Status**: `IMPLEMENTED` (MT-004)
+- **Priority:** `Medium`
+- **Current Limitation:**
+  In [backend/routers/whatsapp.py:L335-L370](/backend/routers/whatsapp.py#L335-L370) and [backend/services/onboarding_service.py:L1934-L1947](/backend/services/onboarding_service.py#L1934-L1947), the data privacy consent check was explicitly hardcoded to trigger when `field_name == "language"`. If a partner configured an onboarding pipeline that omitted the language question (e.g. single-language deployment, or direct Name $\rightarrow$ Commodity), the consent intercept was never triggered.
 
-* **Proposed Technical Approach:**
-  Decouple the privacy consent prompt into a top-level `consent` configuration object in `config.json`. The engine checks this configuration to determine *when* and *how* to prompt for data sharing authorization.
+- **Implemented Technical Approach:**
+  Implemented as a **First-Class Configurable Field** (`field_name: "consent"`, `extraction_method: "extract_consent"`, `field_type: "boolean"`) in `config.json` with customizable `affirmative_keywords`, `declined_keywords`, multilingual questions, and graceful decline/abort customer cleanup.
 
-* **Target Schema in `config.json`:**
+- **Target Schema in `config.json`:**
   ```json
-  "consent": {
+  {
+    "field_name": "consent",
+    "db_field": "data_consent",
     "enabled": true,
-    "trigger": "after_field", // Options: "first_message" | "after_field" | "disabled"
-    "target_field": "language", // The field after which consent is requested
-    "block_onboarding_until_accepted": true,
-    "affirmative_keywords": ["yes", "ok", "okay", "agree", "accept", "ndio", "ya", "setuju"],
-    "declined_keywords": ["no", "hapana", "tidak", "tolak"]
+    "required": true,
+    "priority": 1,
+    "field_type": "boolean",
+    "extraction_method": "extract_consent",
+    "max_attempts": 3,
+    "questions": {
+      "en": "Before we begin, do you agree to our data privacy policy to receive personalized farm advice?\n\nReply *Yes* to continue or *No* to decline.",
+      "sw": "Kabla ya kuanza, je, unakubali kuturuhusu kuhifadhi taarifa zako?\n\nJibu *Ndio* kuendelea au *Hapana* kukataa."
+    },
+    "affirmative_keywords": {
+      "en": ["yes", "ok", "okay", "agree", "accept", "1", "y"],
+      "sw": ["ndio", "ndiyo", "sawa", "kubali", "nakubali", "1"]
+    },
+    "declined_keywords": {
+      "en": ["no", "decline", "reject", "2", "n"],
+      "sw": ["hapana", "2"]
+    }
   }
   ```
-
-* **Implementation Steps:**
-  1. Add `consent_config` Pydantic model to `backend/config.py`.
-  2. In `OnboardingService._save_field_value()`, replace `if field_name == "language"` with `if settings.consent.enabled and settings.consent.target_field == field_name`.
-  3. In `routers/whatsapp.py`, pull affirmative and declined keywords dynamically from `settings.consent.affirmative_keywords` or localized locale strings (`backend/locales/{lang}.json`).
 
 ---
 
 #### 2. Generic Enum & Multi-Choice Extractor (`extract_enum`)
 
-* **Priority:** `Medium`
-* **Current Limitation:**
+- **Priority:** `Medium`
+- **Status:** `PLANNED`
+- **Current Limitation:**
   Currently, specialized extractors exist for `extract_language` (matching `settings.languages`) and `extract_crop_type` (matching `settings.crop_types`). When a partner introduces an arbitrary enum question (e.g., `membership_tier: ["Gold", "Silver", "Bronze"]` or `irrigation_type: ["Drip", "Flood", "Rainfed"]`), replying with numeric indexes (`1`, `2`, `3`) either requires custom Python code or falls back to saving raw numbers as strings.
 
-* **Proposed Technical Approach:**
+- **Proposed Technical Approach:**
   Introduce a general-purpose `extract_enum` extraction method in `OnboardingService` that dynamically resolves choices based on an `options` array defined in the field's JSON configuration.
 
-* **Target Schema in `config.json`:**
+- **Target Schema in `config.json`:**
   ```json
   {
     "field_name": "membership_tier",
@@ -781,7 +793,7 @@ Below is the detailed architectural blueprint, code references, and implementati
   }
   ```
 
-* **Implementation Pattern in `OnboardingService`:**
+- **Implementation Pattern in `OnboardingService`:**
   ```python
   async def extract_enum(
       self, message: str, field_config: OnboardingFieldConfig, lang: str = "en"
@@ -814,17 +826,19 @@ Below is the detailed architectural blueprint, code references, and implementati
 
 #### 3. Configurable Global Geo-Hierarchy (`extract_location`)
 
-* **Priority:** `High` *(Required for Non-Kenya Deployments)*
-* **Current Limitation:**
-  `extract_location` and `resolve_administration_ambiguity` in [backend/services/onboarding_service.py:L584-L850](/backend/services/onboarding_service.py#L584-L850) are hardcoded around Kenya's 3-level administrative tree: `Region (County)` $\rightarrow$ `District (Sub-County)` $\rightarrow$ `Ward`.
-  In international deployments (e.g., Indonesia: *Provinsi > Kabupaten > Kecamatan > Desa* [4 levels], Rwanda: *Province > District > Sector > Cell* [4 levels]), the location step cannot navigate deeper hierarchies.
+- **Specification**: [`docs/DYNAMIC_ADMIN_LEVELS.md`](/docs/DYNAMIC_ADMIN_LEVELS.md)
+- **Status**: `IMPLEMENTED` (MT-002)
+- **Priority:** `High` *(Required for Non-Kenya Deployments)*
+- **Current Limitation:**
+  `extract_location` and `resolve_administration_ambiguity` were previously hardcoded around Kenya's 3-level administrative tree: `Region (County)` $\rightarrow$ `District (Sub-County)` $\rightarrow$ `Ward`.
+  In international deployments (e.g., Indonesia: *Provinsi > Kabupaten > Kecamatan > Desa* [4 levels], Rwanda: *Province > District > Sector > Cell* [4 levels]), the location step could not navigate deeper hierarchies.
 
-* **Proposed Technical Approach:**
-  1. Generalize the `administrative` table hierarchy so each node stores an explicit `level_index` (`0` = Top level, `1` = Sub-level, ..., `N` = Leaf Ward/Village).
-  2. Define the hierarchy names and delimiter in `config.json`.
-  3. Update `OnboardingService._build_location_tree_prompt()` to traverse dynamically across `N` depth levels.
+- **Implemented Technical Approach:**
+  1. Generalized `administrative_levels` with explicit numeric `level_index` constraints (0 = root country up to $N$ for leaf wards/villages).
+  2. Defined hierarchy names, localized display labels, and delimiters in `config.json` under `administrative_hierarchy`.
+  3. Dynamic seeder supporting country dataset swaps (`--replace-country`).
 
-* **Target Schema in `config.json`:**
+- **Target Schema in `config.json`:**
   ```json
   "administrative_hierarchy": {
     "country_code": "ID",
@@ -843,16 +857,18 @@ Below is the detailed architectural blueprint, code references, and implementati
 
 #### 4. Web Admin Dynamic Profile Field Renderer (`frontend/`)
 
-* **Priority:** `Medium`
-* **Current Limitation:**
+- **Priority:** `Medium`
+- **Status:** `PLANNED`
+- **Current Limitation:**
   In `frontend/src/components/customers/EditCustomerModal.js`, the modal only contains static input form fields for `full_name`, `language`, `crop_type`, and `ward_id`. Custom fields saved in PostgreSQL `customers.profile_data` JSONB (such as `farm_size_ha`, `certification`, `experience_years`) are not editable via individual input controls.
 
-* **Proposed Technical Approach:**
+- **Proposed Technical Approach:**
+
   1. Expose a backend endpoint `GET /api/config/onboarding/fields` returning the active field configurations.
   2. In `EditCustomerModal.js`, dynamically render inputs for all keys present in `customer.profile_data` or defined in `onboarding.fields`.
   3. When saving, submit updated key-values in the `profile_data` payload to `PUT /api/customers/{id}`.
 
-* **Frontend UI Implementation Sketch (`EditCustomerModal.js`):**
+- **Frontend UI Implementation Sketch (`EditCustomerModal.js`):**
   ```jsx
   {/* Dynamic Custom Profile Fields */}
   <div className="mt-4 border-t pt-4">
@@ -877,3 +893,11 @@ Below is the detailed architectural blueprint, code references, and implementati
     ))}
   </div>
   ```
+
+---
+
+#### 5. Single-Language Auto-Configuration & Dynamic Onboarding Bypass
+
+* **Specification**: [`docs/SINGLE_LANGUAGE_ONBOARDING.md`](/docs/SINGLE_LANGUAGE_ONBOARDING.md)
+* **Status**: `IMPLEMENTED` (MT-003)
+* **Overview**: When only a single language is defined in `config.json` (e.g. `[{"code": "en", ...}]`), `CustomerService` auto-assigns `customer.language = settings.default_language` upon creation, and `OnboardingService` automatically marks the `language` question as satisfied without asking the farmer to choose a language, immediately presenting the first actionable question (e.g. `full_name`).
