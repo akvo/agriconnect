@@ -332,61 +332,6 @@ async def whatsapp_webhook(
             return {"status": "success", "message": "Delete confirmation sent"}
 
         # ========================================
-        # DATA CONSENT CHECK (after language, before other fields)
-        # ========================================
-        # Handle consent response if consent was asked (language already set)
-        if (
-            customer.data_consent_asked
-            and not customer.data_consent_given
-            and customer.language is not None
-        ):
-            whatsapp_service = WhatsAppService()
-            lang = customer.language_code
-
-            # Check for affirmative response
-            consent_responses = [
-                "yes",
-                "ok",
-                "okay",
-                "ndio",
-                "ndiyo",
-                "sawa",
-                "agree",
-                "i agree",
-                "accepted",
-                "accept",
-                "kubali",
-                "nakubali",
-                "ya",
-                "setuju",
-                "oke",
-                "y",
-            ]
-            if Body.lower().strip() in consent_responses:
-                # Consent given - mark and continue to onboarding
-                customer.data_consent_given = True
-                db.commit()
-
-                whatsapp_service.send_message(
-                    phone_number, t("consent.data_sharing.accepted", lang)
-                )
-                # Fall through to continue onboarding
-            else:
-                # Not affirmative - send decline message and DELETE customer
-                whatsapp_service.send_message(
-                    phone_number, t("consent.data_sharing.declined", lang)
-                )
-
-                # Delete customer row (fresh start on next message)
-                db.delete(customer)
-                db.commit()
-
-                return {
-                    "status": "success",
-                    "message": "Consent declined, customer deleted",
-                }
-
-        # ========================================
         # GENERIC ONBOARDING: Collect all required profile fields
         # ========================================
         onboarding_service = get_onboarding_service(db)
@@ -419,6 +364,16 @@ async def whatsapp_webhook(
                 f"(status: {onboarding_response.status}, "
                 f"field: {customer.current_onboarding_field})"
             )
+
+            # If onboarding was aborted (e.g. consent declined),
+            # delete customer
+            if onboarding_response.status == "aborted":
+                db.delete(customer)
+                db.commit()
+                return {
+                    "status": "success",
+                    "message": "Onboarding aborted, customer deleted",
+                }
 
             # If onboarding still in progress, don't process message further
             # Note: "awaiting_selection" is a response status,
