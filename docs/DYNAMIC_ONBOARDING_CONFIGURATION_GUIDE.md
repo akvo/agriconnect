@@ -310,6 +310,52 @@ When a deployment operates in a single language (e.g. Micronesia / Pohnpei Engli
 
 ---
 
+### Recipe 5: Single-Language Program with Configurable Data Consent (`consent`)
+
+When GDPR/privacy compliance requires explicit farmer consent even in single-language programs:
+
+```json
+{
+  "default_language": "en",
+  "languages": [
+    { "code": "en", "name": "English", "active": true }
+  ],
+  "onboarding": {
+    "enabled": true,
+    "fields": [
+      {
+        "field_name": "consent",
+        "field_type": "boolean",
+        "required": true,
+        "db_field": "data_consent",
+        "priority": 0,
+        "extraction_method": "extract_consent",
+        "max_attempts": 3,
+        "questions": {
+          "en": "Welcome to AgriConnect! Do you agree to our data privacy policy to receive personalized farm advice?\n\nReply *Yes* to continue or *No* to decline."
+        },
+        "affirmative_keywords": ["yes", "ok", "agree", "1", "y"],
+        "declined_keywords": ["no", "decline", "reject", "2", "n"],
+        "labels": { "en": "Data Consent" },
+        "success_messages": { "en": "Thank you for consenting!" }
+      },
+      {
+        "field_name": "full_name",
+        "field_type": "string",
+        "required": true,
+        "db_field": "full_name",
+        "priority": 1,
+        "questions": { "en": "What is your full name?" },
+        "labels": { "en": "Full Name" },
+        "success_messages": { "en": "Thank you, {value}!" }
+      }
+    ]
+  }
+}
+```
+
+---
+
 ## 7. Inspecting Custom Fields in Database
 
 All custom fields defined in `config.json` that do not map to hardcoded columns are persisted inside PostgreSQL `customers.profile_data` JSONB column.
