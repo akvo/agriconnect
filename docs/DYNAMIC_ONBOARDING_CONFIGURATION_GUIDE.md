@@ -26,6 +26,7 @@ graph TD
 
 ### Key Capabilities:
 - **Zero-Code Customization**: Add new questions, change order, remove fields, or adjust retry limits without touching Python code.
+- **Single-Language Auto-Bypass**: When only one language is configured (`languages: [{"code": "en", ...}]`), the system automatically assigns the default language to customer profiles and bypasses the language prompt so farmers jump straight to the first question (e.g. `full_name`).
 - **Zero-Onboarding Mode**: Bypass onboarding completely (`fields: []`) for instant agricultural advisory.
 - **Dynamic Field Storage**: Known columns (`full_name`, `language`, `gender`, `birth_year`) map to direct database columns; all custom partner fields (e.g., `farm_size_ha`, `certification`, `coop_member_id`) are automatically saved into `customers.profile_data` (PostgreSQL JSONB).
 - **File-Based i18n**: Add new languages (e.g., Indonesian, French, Spanish, Oromo) in minutes by dropping a `{lang_code}.json` file into `backend/locales/`.
@@ -258,6 +259,49 @@ Collects Full Name and Farming Experience without prompting for counties/wards.
         "extraction_method": null,
         "questions": { "en": "How many years have you been farming?" },
         "labels": { "en": "Farming Experience" }
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Recipe 4: Single-Language Program (Zero Language Friction)
+
+When a deployment operates in a single language (e.g. Micronesia / Pohnpei English-only), define only 1 language in `languages`. AgriConnect automatically assigns the language to incoming farmers and starts onboarding directly at the first question without prompting to choose a language.
+
+```json
+{
+  "default_language": "en",
+  "languages": [
+    { "code": "en", "name": "English", "active": true }
+  ],
+  "onboarding": {
+    "enabled": true,
+    "fields": [
+      {
+        "field_name": "full_name",
+        "field_type": "string",
+        "required": true,
+        "db_field": "full_name",
+        "priority": 0,
+        "extraction_method": "extract_name",
+        "questions": { "en": "What is your full name?" },
+        "labels": { "en": "Full Name" },
+        "success_messages": { "en": "Thank you, {value}!" }
+      },
+      {
+        "field_name": "administration",
+        "field_type": "location",
+        "required": true,
+        "db_field": "customer_administrative",
+        "priority": 1,
+        "extraction_method": "extract_location",
+        "matching_method": "resolve_administration_ambiguity",
+        "questions": { "en": "Where is your farm located? (e.g. municipality, village)" },
+        "labels": { "en": "Location" },
+        "success_messages": { "en": "Location saved: {value}." }
       }
     ]
   }

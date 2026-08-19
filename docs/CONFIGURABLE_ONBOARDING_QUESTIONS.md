@@ -877,3 +877,11 @@ Below is the detailed architectural blueprint, code references, and implementati
     ))}
   </div>
   ```
+
+---
+
+#### 5. Single-Language Auto-Configuration & Dynamic Onboarding Bypass
+
+* **Specification**: [`docs/SINGLE_LANGUAGE_ONBOARDING.md`](/docs/SINGLE_LANGUAGE_ONBOARDING.md)
+* **Status**: `IMPLEMENTED` (MT-003)
+* **Overview**: When only a single language is defined in `config.json` (e.g. `[{"code": "en", ...}]`), `CustomerService` auto-assigns `customer.language = settings.default_language` upon creation, and `OnboardingService` automatically marks the `language` question as satisfied without asking the farmer to choose a language, immediately presenting the first actionable question (e.g. `full_name`).
