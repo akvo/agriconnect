@@ -9,12 +9,18 @@ concurrency:
   group: deploy-to-production
   cancel-in-progress: false
 
-jobs:
-  run-tests:
-    name: Run Tests
-    uses: ./.github/workflows/test-reusable.yml # Calls the reusable test workflow
-    secrets: inherit
+# Production deploy reuses the container image already built and tested by the
+# "Deploy to Test Cluster" pipeline (which runs on every push to main). Instead
+# of re-running tests and rebuilding/pushing images, we retag the existing
+# test-built image (main.<sha>) to the production tags and roll it out.
+# The agriconnect2 images are environment-agnostic: no domain/env is baked at
+# build time (frontend does not read WEBDOMAIN/NEXT_PUBLIC_*, nginx uses
+# server_name _ and internal upstreams, backend/celery read config at runtime
+# from the Vault-injected Secret), so the test image is byte-identical to what a
+# production rebuild would produce. Production ENV is applied at runtime by the
+# production k8s manifests + Secret.
 
+jobs:
   check-app-changes:
     name: Check for App Changes
     runs-on: ubuntu-latest
@@ -44,11 +50,46 @@ jobs:
             echo "app=true" >> $GITHUB_OUTPUT
           fi
 
+  promote:
+    name: Promote Tested Image to Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Container Registry
+        run: |
+          echo "${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}" | base64 --decode > gcp.json
+          gcloud auth activate-service-account --key-file=gcp.json
+          gcloud config set project akvo-lumen
+
+      - name: Retag test-built images for production
+        run: |
+          set -euo pipefail
+          REGISTRY="eu.gcr.io/akvo-lumen/agriconnect2"
+          # The test pipeline (push to main) builds and pushes main.<sha>.
+          # For a release, GITHUB_SHA is the released commit (which was on main),
+          # so main.<sha> already exists in the registry, tested.
+          SRC_TAG="main.${GITHUB_SHA}"
+          # k8s-rollout deploys <ref>.<sha>; recreate that tag so rollout finds it.
+          VERSION_TAG="${GITHUB_REF_NAME}.${GITHUB_SHA}"
+          SERVICES="nginx frontend backend celery-worker celery-beat"
+          for svc in ${SERVICES}; do
+            EXTRA=""
+            if [ "${VERSION_TAG}" != "${SRC_TAG}" ]; then
+              EXTRA="${REGISTRY}/${svc}:${VERSION_TAG}"
+            fi
+            echo "Promoting ${svc}: ${SRC_TAG} -> latest-production ${EXTRA:+and ${VERSION_TAG}}"
+            # add-tag only moves manifest pointers (no layer pull/push) and fails
+            # loudly if the tested source image does not exist for this commit.
+            gcloud container images add-tag --quiet \
+              "${REGISTRY}/${svc}:${SRC_TAG}" \
+              "${REGISTRY}/${svc}:latest-production" \
+              ${EXTRA}
+          done
+
   build-mobile:
     name: Build Mobile App (APK)
     runs-on: ubuntu-latest
     environment: Production
-    needs: [run-tests, check-app-changes, build-push]
+    needs: [check-app-changes, promote]
     if: needs.check-app-changes.outputs.app-changed == 'true' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
@@ -95,120 +136,9 @@ jobs:
             -F "filename=agriconnect-${APK_VERSION}.apk" \
             ${{ secrets.STORAGE_UPLOAD_URL }}
 
-  build-push:
-    name: Build and Push to Registry
-    runs-on: ubuntu-latest
-    needs: [run-tests]
-    if: always() && needs.run-tests.result == 'success'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          path: src
-
-      - name: Checkout Akvo composite actions
-        uses: actions/checkout@v4
-        with:
-          repository: akvo/composite-actions
-          token: ${{ secrets.GH_PAT }}
-          path: composite-actions
-          ref: 0.0.10
-
-      - name: Prepare Frontend Build
-        run: |
-          mv src/frontend/next.config.prod.mjs src/frontend/next.config.mjs
-          echo 'WEBDOMAIN=${{ secrets.WEBDOMAIN }}' >> src/frontend/.env
-        shell: bash
-
-      - name: Node Operations
-        uses: ./composite-actions/.github/actions/node-operation
-        with:
-          node-version: "20"
-          node-command: "yarn install --no-progress --frozen-lock && yarn build"
-
-      - name: Docker Build Nginx
-        uses: ./composite-actions/.github/actions/docker-build
-        with:
-          app-name: "agriconnect2"
-          service-name: "nginx"
-          dockerfile-location: "nginx"
-          cluster-name: "production"
-
-      - name: Docker Build Frontend
-        uses: ./composite-actions/.github/actions/docker-build
-        with:
-          app-name: "agriconnect2"
-          service-name: "frontend"
-          dockerfile-location: "frontend"
-          cluster-name: "production"
-
-      - name: Docker Build Backend
-        uses: ./composite-actions/.github/actions/docker-build
-        with:
-          app-name: "agriconnect2"
-          service-name: "backend"
-          dockerfile-location: "backend/Dockerfile"
-          cluster-name: "production"
-
-      - name: Docker Build Celery Worker
-        uses: ./composite-actions/.github/actions/docker-build
-        with:
-          app-name: "agriconnect2"
-          service-name: "celery-worker"
-          dockerfile-location: "backend/Dockerfile"
-          cluster-name: "production"
-
-      - name: Docker Build Celery Beat
-        uses: ./composite-actions/.github/actions/docker-build
-        with:
-          app-name: "agriconnect2"
-          service-name: "celery-beat"
-          dockerfile-location: "backend/Dockerfile"
-          cluster-name: "production"
-
-      - name: Docker Push Nginx
-        uses: ./composite-actions/.github/actions/docker-push
-        with:
-          app-name: "agriconnect2"
-          service-name: "nginx"
-          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
-          cluster-name: "production"
-
-      - name: Docker Push Frontend
-        uses: ./composite-actions/.github/actions/docker-push
-        with:
-          app-name: "agriconnect2"
-          service-name: "frontend"
-          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
-          cluster-name: "production"
-
-      - name: Docker Push Backend
-        uses: ./composite-actions/.github/actions/docker-push
-        with:
-          app-name: "agriconnect2"
-          service-name: "backend"
-          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
-          cluster-name: "production"
-
-      - name: Docker Push Celery Worker
-        uses: ./composite-actions/.github/actions/docker-push
-        with:
-          app-name: "agriconnect2"
-          service-name: "celery-worker"
-          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
-          cluster-name: "production"
-
-      - name: Docker Push Celery Beat
-        uses: ./composite-actions/.github/actions/docker-push
-        with:
-          app-name: "agriconnect2"
-          service-name: "celery-beat"
-          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
-          cluster-name: "production"
-
   rollout:
     name: Rollout to the server
-    needs: build-push
+    needs: [promote]
     runs-on: ubuntu-latest
     environment: Production
     steps:
