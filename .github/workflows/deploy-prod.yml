@@ -54,36 +54,27 @@ jobs:
     name: Promote Tested Image to Production
     runs-on: ubuntu-latest
     steps:
-      - name: Authenticate to Google Container Registry
-        run: |
-          echo "${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}" | base64 --decode > gcp.json
-          gcloud auth activate-service-account --key-file=gcp.json
-          gcloud config set project akvo-lumen
+      - name: Checkout Akvo composite actions
+        uses: actions/checkout@v4
+        with:
+          repository: akvo/composite-actions
+          token: ${{ secrets.GH_PAT }}
+          path: composite-actions
+          ref: 0.0.11
 
-      - name: Retag test-built images for production
-        run: |
-          set -euo pipefail
-          REGISTRY="eu.gcr.io/akvo-lumen/agriconnect2"
-          # The test pipeline (push to main) builds and pushes main.<sha>.
-          # For a release, GITHUB_SHA is the released commit (which was on main),
-          # so main.<sha> already exists in the registry, tested.
-          SRC_TAG="main.${GITHUB_SHA}"
-          # k8s-rollout deploys <ref>.<sha>; recreate that tag so rollout finds it.
-          VERSION_TAG="${GITHUB_REF_NAME}.${GITHUB_SHA}"
-          SERVICES="nginx frontend backend celery-worker celery-beat"
-          for svc in ${SERVICES}; do
-            EXTRA=""
-            if [ "${VERSION_TAG}" != "${SRC_TAG}" ]; then
-              EXTRA="${REGISTRY}/${svc}:${VERSION_TAG}"
-            fi
-            echo "Promoting ${svc}: ${SRC_TAG} -> latest-production ${EXTRA:+and ${VERSION_TAG}}"
-            # add-tag only moves manifest pointers (no layer pull/push) and fails
-            # loudly if the tested source image does not exist for this commit.
-            gcloud container images add-tag --quiet \
-              "${REGISTRY}/${svc}:${SRC_TAG}" \
-              "${REGISTRY}/${svc}:latest-production" \
-              ${EXTRA}
-          done
+      # Retag the image already built and tested by the "Deploy to Test Cluster"
+      # pipeline (main.<sha>) to the production tags. add-tag only moves manifest
+      # pointers (no rebuild) and fails loudly if the tested image is absent for
+      # this commit. version-tag recreates <ref>.<sha> so the rollout job finds it.
+      - name: Promote tested image to production
+        uses: ./composite-actions/.github/actions/promote
+        with:
+          app-name: "agriconnect2"
+          services: "nginx frontend backend celery-worker celery-beat"
+          source-tag: "main.${{ github.sha }}"
+          version-tag: "${{ github.ref_name }}.${{ github.sha }}"
+          cluster-name: "production"
+          gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
 
   build-mobile:
     name: Build Mobile App (APK)
