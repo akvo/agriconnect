@@ -22,7 +22,7 @@
     }
   },
   "escalation": {
-    "enabled": true,
+    "enabled": false,
     "chat_history_limit": 20,
     "reply_history_limit": 10,
     "description": "Number of recent messages to include in chat history for AI context"
@@ -72,9 +72,7 @@
     }
   },
   "crop_types": ["Avocado", "Potato", "Dairy"],
-  "languages": [
-    { "code": "en", "name": "English" }
-  ],
+  "languages": [{ "code": "en", "name": "English" }],
   "age_groups": [
     { "label": "20-35", "min": 20, "max": 35 },
     { "label": "36-50", "min": 36, "max": 50 },
@@ -181,11 +179,7 @@
   "weather": {
     "broadcast_enabled": false,
     "intent_enabled": true,
-    "intent_keywords": [
-      "weather",
-      "forecast",
-      "weather updates"
-    ],
+    "intent_keywords": ["weather", "forecast", "weather updates"],
     "forecast_days": 6
   }
 }
