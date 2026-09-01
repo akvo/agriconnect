@@ -25,6 +25,7 @@
     }
   },
   "escalation": {
+    "enabled": true,
     "chat_history_limit": 20,
     "reply_history_limit": 10,
     "description": "Number of recent messages to include in chat history for AI context"
