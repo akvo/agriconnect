@@ -238,13 +238,13 @@ async def ai_callback(
                             # CRITICAL: Send to WhatsApp BEFORE committing to database
 
                             # Check if response has citations (from knowledge base)
-                            # If so, append disclaimer to the response
+                            # If so and escalation is enabled, append disclaimer to consult extension officer
                             has_citations = (
                                 payload.output
                                 and payload.output.citations
                                 and len(payload.output.citations) > 0
                             )
-                            if has_citations:
+                            if settings.escalation_enabled and has_citations:
                                 disclaimer_text = t(
                                     "ai_response.disclaimer", customer_lang
                                 )

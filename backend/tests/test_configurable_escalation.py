@@ -131,12 +131,27 @@ class TestConfigurableEscalation:
             "job": "chat",
         }
 
-        with patch(
-            "routers.callbacks.WhatsAppService.send_template_message"
-        ) as mock_send_tpl:
+        with (
+            patch(
+                "routers.callbacks.WhatsAppService.send_template_message"
+            ) as mock_send_tpl,
+            patch(
+                "routers.callbacks.WhatsAppService.send_message_with_tracking",
+                return_value={"sid": "SM_test_answer", "status": "sent"},
+            ) as mock_send_msg,
+        ):
             response = client.post("/api/callback/ai", json=payload)
             assert response.status_code == 200
             mock_send_tpl.assert_not_called()
+            # Verify disclaimer is omitted from the message body
+            call_kwargs = mock_send_msg.call_args[1]
+            assert (
+                "consult with your extension"
+                not in call_kwargs["message_body"].lower()
+            )
+            assert (
+                call_kwargs["message_body"] == "Use copper-based fungicides."
+            )
 
     def test_whatsapp_webhook_escalate_button_ignored_when_disabled(
         self,
