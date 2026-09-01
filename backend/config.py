@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     )
 
     # Escalation settings
+    escalation_enabled: bool = _config.get("escalation", {}).get(
+        "enabled", True
+    )
     escalation_chat_history_limit: int = _config.get("escalation", {}).get(
         "chat_history_limit"
     )
