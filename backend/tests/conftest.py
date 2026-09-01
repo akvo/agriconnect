@@ -307,6 +307,14 @@ def mock_websocket_emitters(monkeypatch):
         def send_welcome_message(self, *args, **kwargs):
             return {"sid": self._generate_unique_sid(), "status": "sent"}
 
+        def get_template_sid(self, template_type, customer_language):
+            return f"HX_mock_{template_type}_{customer_language}"
+
+        @staticmethod
+        def sanitize_whatsapp_content(text):
+            import re
+            return re.sub(r"\[citation:\d+\]", "", text)
+
     # Mock EmailService to prevent actual email sending
     class MockEmailService:
         def __init__(self, *args, **kwargs):
