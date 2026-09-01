@@ -606,6 +606,16 @@ async def whatsapp_webhook(
         # FLOW 2C: Handle "escalate" button response
         # ========================================
         if ButtonPayload == escalate_payload:
+            if not settings.escalation_enabled:
+                logger.info(
+                    f"Customer {phone_number} clicked 'escalate' button, "
+                    "but escalation feature is disabled in configuration"
+                )
+                return {
+                    "status": "ignored",
+                    "message": "Escalation feature is disabled",
+                }
+
             logger.info(f"Customer {phone_number} clicked 'escalate' button")
 
             # Create message with ESCALATED status

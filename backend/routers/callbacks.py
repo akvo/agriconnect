@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from twilio.base.exceptions import TwilioRestException
 
+from config import settings
 from database import get_db
 from models.ticket import Ticket
 from models.message import DeliveryStatus, MessageFrom
@@ -272,7 +273,7 @@ async def ai_callback(
                                 f"✓ AI answer sent successfully: {answer_response['sid']}"
                             )
 
-                            # Step 2: Send confirmation template only if citations exist
+                            # Step 2: Send confirmation template only if citations exist and escalation is enabled
                             # Citations indicate the response is from knowledge base
                             # (relevant agricultural content worth escalating)
                             has_citations = (
@@ -281,7 +282,7 @@ async def ai_callback(
                                 and len(payload.output.citations) > 0
                             )
 
-                            if has_citations:
+                            if settings.escalation_enabled and has_citations:
                                 # Select template based on customer's language
                                 customer_lang = (
                                     ai_message.customer.language_code
@@ -307,6 +308,10 @@ async def ai_callback(
                                             f"Failed to send confirmation template (non-critical): {e}"
                                         )
                                         # Template failure is non-fatal
+                            elif not settings.escalation_enabled:
+                                logger.info(
+                                    "Skipping confirmation template: escalation is disabled in configuration"
+                                )
                             else:
                                 logger.info(
                                     "Skipping confirmation template: no citations in AI response"
