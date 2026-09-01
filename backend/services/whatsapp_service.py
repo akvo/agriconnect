@@ -360,6 +360,16 @@ class WhatsAppService:
         # Sanitize AI answer to prevent Twilio error 63013
         sanitized_answer = self.sanitize_whatsapp_content(ai_answer)
 
+        if not settings.escalation_enabled:
+            logger.info(
+                "Skipping send_confirmation_template: "
+                "escalation disabled in configuration"
+            )
+            return {
+                "status": "skipped",
+                "message": "Escalation feature is disabled",
+            }
+
         if self.testing_mode:
             # Skip sending messages in testing mode - NO REAL API CALLS
             logger.info(
