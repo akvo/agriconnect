@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriConnect — System Overview (Proposal)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 24px;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .logo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #027E5D;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    padding: 5px 14px;
+    border-radius: 100px;
+    margin-bottom: 12px;
+  }
+  h1 { font-size: 22px; font-weight: 700; color: #014533; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #777; }
+  .diagram-wrap {
+    background: #fff;
+    border: 1px solid #B1D7CD;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 4px 20px rgba(2,126,93,.07);
+    max-width: 720px;
+    width: 100%;
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .header { margin-bottom: 16px; }
+    .diagram-wrap { box-shadow: none; border: 1px solid #B1D7CD; padding: 16px; max-width: 170mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-pill">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    AgriConnect
+  </div>
+  <h1>System Overview</h1>
+  <p class="subtitle">Multi-platform agricultural extension platform</p>
+</div>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 664 308" xmlns="http://www.w3.org/2000/svg" width="100%"
+     style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <marker id="a" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+      <polygon points="0 0,7 2.5,0 5" fill="#027E5D"/>
+    </marker>
+    <marker id="a2" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+      <polygon points="0 0,7 2.5,0 5" fill="#8BC4B4"/>
+    </marker>
+    <filter id="s"><feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#027E5D" flood-opacity="0.12"/></filter>
+    <linearGradient id="gh" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#014533"/>
+      <stop offset="100%" stop-color="#027E5D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ── Background zones ── -->
+  <!-- Client zone -->
+  <rect x="2" y="2" width="660" height="88" rx="10" fill="#E6F2EF" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="12" y="16" font-size="8" font-weight="700" fill="#35987D" letter-spacing="1">CHANNELS</text>
+
+  <!-- Backend zone -->
+  <rect x="2" y="102" width="660" height="96" rx="10" fill="#f0faf6" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="12" y="116" font-size="8" font-weight="700" fill="#35987D" letter-spacing="1">PLATFORM</text>
+
+  <!-- External zone -->
+  <rect x="2" y="210" width="660" height="96" rx="10" fill="#fafffe" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="12" y="224" font-size="8" font-weight="700" fill="#35987D" letter-spacing="1">INTEGRATIONS</text>
+
+  <!-- ══════════════════ CLIENT ROW ══════════════════ -->
+  <!-- Farmer -->
+  <rect x="18" y="22" width="164" height="60" rx="9" fill="#027E5D" filter="url(#s)"/>
+  <text x="100" y="44" text-anchor="middle" font-size="20">🌾</text>
+  <text x="100" y="62" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Farmer</text>
+  <text x="100" y="76" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">WhatsApp</text>
+
+  <!-- EO -->
+  <rect x="250" y="22" width="164" height="60" rx="9" fill="#014533" filter="url(#s)"/>
+  <text x="332" y="44" text-anchor="middle" font-size="20">📱</text>
+  <text x="332" y="62" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Extension Officer</text>
+  <text x="332" y="76" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Mobile App</text>
+
+  <!-- Admin -->
+  <rect x="482" y="22" width="164" height="60" rx="9" fill="#015942" filter="url(#s)"/>
+  <text x="564" y="44" text-anchor="middle" font-size="20">🖥</text>
+  <text x="564" y="62" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Administrator</text>
+  <text x="564" y="76" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Web Dashboard</text>
+
+  <!-- ── Arrows: channels → backend ── -->
+  <line x1="100" y1="90" x2="100" y2="110" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a)"/>
+  <line x1="332" y1="90" x2="332" y2="110" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a)"/>
+  <line x1="564" y1="90" x2="564" y2="110" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a)"/>
+
+  <!-- ══════════════════ BACKEND ROW ══════════════════ -->
+  <!-- API -->
+  <rect x="18" y="120" width="116" height="66" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#s)"/>
+  <text x="76" y="141" text-anchor="middle" font-size="16">⚙️</text>
+  <text x="76" y="158" text-anchor="middle" font-size="10" font-weight="700" fill="#014533">REST API</text>
+  <text x="76" y="172" text-anchor="middle" font-size="8.5" fill="#555">FastAPI · Python</text>
+  <text x="76" y="183" text-anchor="middle" font-size="8.5" fill="#555">40+ endpoints</text>
+
+  <!-- Socket.IO -->
+  <rect x="148" y="120" width="116" height="66" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#s)"/>
+  <text x="206" y="141" text-anchor="middle" font-size="16">⚡</text>
+  <text x="206" y="158" text-anchor="middle" font-size="10" font-weight="700" fill="#014533">Real-Time</text>
+  <text x="206" y="172" text-anchor="middle" font-size="8.5" fill="#555">Socket.IO</text>
+  <text x="206" y="183" text-anchor="middle" font-size="8.5" fill="#555">WebSocket events</text>
+
+  <!-- Database -->
+  <rect x="278" y="120" width="108" height="66" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#s)"/>
+  <text x="332" y="141" text-anchor="middle" font-size="16">🗄</text>
+  <text x="332" y="158" text-anchor="middle" font-size="10" font-weight="700" fill="#014533">Database</text>
+  <text x="332" y="172" text-anchor="middle" font-size="8.5" fill="#555">PostgreSQL 17</text>
+  <text x="332" y="183" text-anchor="middle" font-size="8.5" fill="#555">+ Redis / Celery</text>
+
+  <!-- Auth -->
+  <rect x="400" y="120" width="108" height="66" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#s)"/>
+  <text x="454" y="141" text-anchor="middle" font-size="16">🔐</text>
+  <text x="454" y="158" text-anchor="middle" font-size="10" font-weight="700" fill="#014533">Auth</text>
+  <text x="454" y="172" text-anchor="middle" font-size="8.5" fill="#555">JWT · bcrypt</text>
+  <text x="454" y="183" text-anchor="middle" font-size="8.5" fill="#555">Admin · EO roles</text>
+
+  <!-- SQLite Mobile -->
+  <rect x="522" y="120" width="124" height="66" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#s)"/>
+  <text x="584" y="141" text-anchor="middle" font-size="16">📦</text>
+  <text x="584" y="158" text-anchor="middle" font-size="10" font-weight="700" fill="#014533">Mobile Cache</text>
+  <text x="584" y="172" text-anchor="middle" font-size="8.5" fill="#555">SQLite (offline)</text>
+  <text x="584" y="183" text-anchor="middle" font-size="8.5" fill="#555">DAO pattern</text>
+
+  <!-- ── Arrows: backend → integrations ── -->
+  <line x1="76" y1="194" x2="76" y2="216" stroke="#8BC4B4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a2)"/>
+  <line x1="206" y1="194" x2="206" y2="216" stroke="#8BC4B4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a2)"/>
+  <line x1="332" y1="194" x2="332" y2="216" stroke="#8BC4B4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a2)"/>
+  <line x1="454" y1="194" x2="454" y2="216" stroke="#8BC4B4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a2)"/>
+  <line x1="564" y1="194" x2="564" y2="216" stroke="#8BC4B4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a2)"/>
+
+  <!-- ══════════════════ INTEGRATIONS ROW ══════════════════ -->
+  <!-- Twilio -->
+  <rect x="18" y="228" width="112" height="62" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1" filter="url(#s)"/>
+  <text x="74" y="248" text-anchor="middle" font-size="16">📞</text>
+  <text x="74" y="264" text-anchor="middle" font-size="9.5" font-weight="700" fill="#014533">Twilio</text>
+  <text x="74" y="278" text-anchor="middle" font-size="8" fill="#777">WhatsApp API</text>
+
+  <!-- OpenAI -->
+  <rect x="144" y="228" width="112" height="62" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1" filter="url(#s)"/>
+  <text x="200" y="248" text-anchor="middle" font-size="16">🧠</text>
+  <text x="200" y="264" text-anchor="middle" font-size="9.5" font-weight="700" fill="#014533">OpenAI</text>
+  <text x="200" y="278" text-anchor="middle" font-size="8" fill="#777">STT · chat · moderation</text>
+
+  <!-- Akvo RAG -->
+  <rect x="270" y="228" width="124" height="62" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1" filter="url(#s)"/>
+  <text x="332" y="248" text-anchor="middle" font-size="16">🔍</text>
+  <text x="332" y="264" text-anchor="middle" font-size="9.5" font-weight="700" fill="#014533">Akvo RAG</text>
+  <text x="332" y="278" text-anchor="middle" font-size="8" fill="#777">AI answers · knowledge base</text>
+
+  <!-- Google Weather -->
+  <rect x="408" y="228" width="112" height="62" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1" filter="url(#s)"/>
+  <text x="464" y="248" text-anchor="middle" font-size="16">🌤</text>
+  <text x="464" y="264" text-anchor="middle" font-size="9.5" font-weight="700" fill="#014533">Weather API</text>
+  <text x="464" y="278" text-anchor="middle" font-size="8" fill="#777">Daily advisories</text>
+
+  <!-- Firebase -->
+  <rect x="534" y="228" width="112" height="62" rx="8" fill="#fff" stroke="#B1D7CD" stroke-width="1" filter="url(#s)"/>
+  <text x="590" y="248" text-anchor="middle" font-size="16">🔔</text>
+  <text x="590" y="264" text-anchor="middle" font-size="9.5" font-weight="700" fill="#014533">Firebase FCM</text>
+  <text x="590" y="278" text-anchor="middle" font-size="8" fill="#777">Push notifications</text>
+</svg>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriConnect — Data Flows</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .logo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #027E5D;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    padding: 6px 16px;
+    border-radius: 100px;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #014533;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #777;
+  }
+  .diagram-wrap {
+    background: #fff;
+    border: 1px solid #B1D7CD;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(2,126,93,.08);
+    max-width: 960px;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo-pill">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    AgriConnect
+  </div>
+  <h1>Core Data Flows</h1>
+  <p class="subtitle">End-to-end message journeys across the three main workflows</p>
+</div>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 880 1060" xmlns="http://www.w3.org/2000/svg" width="100%" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <!-- Arrow markers -->
+    <marker id="arr-g" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#027E5D"/>
+    </marker>
+    <marker id="arr-d" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#014533"/>
+    </marker>
+    <marker id="arr-m" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#35987D"/>
+    </marker>
+    <marker id="arr-o" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#c47c00"/>
+    </marker>
+    <filter id="sh">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#027E5D" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- ══════════════════════════════════════════════════
+       SWIMLANE HEADERS
+  ══════════════════════════════════════════════════ -->
+  <!-- Column headers -->
+  <rect x="0" y="0" width="880" height="40" rx="8" fill="#014533"/>
+  <!-- Column dividers (vertical, subtle) -->
+  <line x1="176" y1="40" x2="176" y2="1060" stroke="#E6F2EF" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="352" y1="40" x2="352" y2="1060" stroke="#E6F2EF" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="528" y1="40" x2="528" y2="1060" stroke="#E6F2EF" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="704" y1="40" x2="704" y2="1060" stroke="#E6F2EF" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- Column labels -->
+  <text x="88" y="25" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" letter-spacing=".5">FARMER</text>
+  <text x="264" y="25" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" letter-spacing=".5">TWILIO</text>
+  <text x="440" y="25" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" letter-spacing=".5">BACKEND (FastAPI)</text>
+  <text x="616" y="25" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" letter-spacing=".5">AI SERVICES</text>
+  <text x="792" y="25" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" letter-spacing=".5">EO / MOBILE</text>
+
+  <!-- ══════════════════════════════════════════════════
+       FLOW 1 — STANDARD AI REPLY
+  ══════════════════════════════════════════════════ -->
+  <!-- Section header -->
+  <rect x="0" y="48" width="880" height="26" fill="#027E5D"/>
+  <text x="16" y="65" font-size="11" font-weight="700" fill="#fff">FLOW 1 — Farmer Question → AI Answer</text>
+
+  <!-- Step boxes: use compact pills -->
+  <!-- F1: Farmer sends message -->
+  <rect x="8" y="84" width="156" height="34" rx="8" fill="#027E5D" filter="url(#sh)"/>
+  <text x="86" y="99" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Farmer sends WhatsApp</text>
+  <text x="86" y="112" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">"My avocado leaves are yellow"</text>
+
+  <!-- Arrow F→Twilio -->
+  <line x1="164" y1="101" x2="194" y2="101" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Twilio delivers -->
+  <rect x="196" y="84" width="152" height="34" rx="8" fill="#35987D" filter="url(#sh)"/>
+  <text x="272" y="99" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Twilio delivers</text>
+  <text x="272" y="112" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">POST /api/whatsapp/webhook</text>
+
+  <!-- Arrow Twilio→Backend -->
+  <line x1="348" y1="101" x2="370" y2="101" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Backend: dedup + customer resolve -->
+  <rect x="372" y="84" width="152" height="34" rx="8" fill="#014533" filter="url(#sh)"/>
+  <text x="448" y="99" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Dedup + customer</text>
+  <text x="448" y="112" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">get_or_create · check onboarding</text>
+
+  <!-- Step 2 row: onboarding check -->
+  <rect x="372" y="128" width="152" height="34" rx="8" fill="#015942" filter="url(#sh)"/>
+  <text x="448" y="143" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Onboarding complete?</text>
+  <text x="448" y="157" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">Ward + crop collected → yes</text>
+
+  <!-- Arrow down -->
+  <line x1="448" y1="118" x2="448" y2="128" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Step 3: follow-up check -->
+  <rect x="372" y="172" width="152" height="34" rx="8" fill="#014533" filter="url(#sh)"/>
+  <text x="448" y="187" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Follow-up asked?</text>
+  <text x="448" y="201" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">If no → generate via OpenAI</text>
+
+  <line x1="448" y1="162" x2="448" y2="172" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- OpenAI follow-up (right side) -->
+  <rect x="548" y="172" width="152" height="34" rx="8" fill="#c47c00" filter="url(#sh)"/>
+  <text x="624" y="187" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">OpenAI GPT-4o-mini</text>
+  <text x="624" y="201" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">Generate follow-up question</text>
+  <line x1="524" y1="189" x2="548" y2="189" stroke="#c47c00" stroke-width="1.5" marker-end="url(#arr-o)"/>
+  <!-- Back to Twilio (send follow-up) -->
+  <line x1="700" y1="189" x2="700" y2="195" stroke="#c47c00" stroke-width="1" stroke-dasharray="3,2"/>
+  <line x1="272" y1="195" x2="700" y2="195" stroke="#c47c00" stroke-width="1" stroke-dasharray="3,2"/>
+  <line x1="272" y1="195" x2="272" y2="206" stroke="#c47c00" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr-o)"/>
+
+  <!-- Farmer receives follow-up -->
+  <rect x="8" y="206" width="156" height="26" rx="8" fill="#E6F2EF" stroke="#027E5D" stroke-width="1"/>
+  <text x="86" y="218" text-anchor="middle" font-size="9" fill="#014533" font-weight="600">Farmer receives follow-up Q</text>
+  <text x="86" y="228" text-anchor="middle" font-size="8" fill="#555">Replies with more detail</text>
+  <line x1="164" y1="219" x2="194" y2="219" stroke="#027E5D" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr-g)"/>
+
+  <!-- Step 4: Queue AI job -->
+  <rect x="372" y="242" width="152" height="34" rx="8" fill="#027E5D" filter="url(#sh)"/>
+  <text x="448" y="257" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Queue REPLY job</text>
+  <text x="448" y="271" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">POST to Akvo RAG chat_url</text>
+  <line x1="448" y1="232" x2="448" y2="242" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Arrow → Akvo RAG -->
+  <line x1="524" y1="259" x2="548" y2="259" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="548" y="242" width="152" height="34" rx="8" fill="#2d6a4f" filter="url(#sh)"/>
+  <text x="624" y="257" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Akvo RAG</text>
+  <text x="624" y="271" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">KB query + AI answer (async)</text>
+
+  <!-- Callback arrow back -->
+  <line x1="624" y1="276" x2="624" y2="290" stroke="#35987D" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="448" y1="290" x2="624" y2="290" stroke="#35987D" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="448" y1="290" x2="448" y2="296" stroke="#35987D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-m)"/>
+
+  <!-- Step 5: Backend receives callback -->
+  <rect x="372" y="296" width="152" height="34" rx="8" fill="#015942" filter="url(#sh)"/>
+  <text x="448" y="311" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Callback /api/callback/ai</text>
+  <text x="448" y="325" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">Store + send via Twilio</text>
+
+  <!-- Arrow → Twilio send -->
+  <line x1="372" y1="313" x2="348" y2="313" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="196" y="296" width="152" height="34" rx="8" fill="#35987D" filter="url(#sh)"/>
+  <text x="272" y="311" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Twilio sends reply</text>
+  <text x="272" y="325" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">+ escalate button</text>
+
+  <!-- Arrow → Farmer receives -->
+  <line x1="196" y1="313" x2="174" y2="313" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="8" y="296" width="156" height="34" rx="8" fill="#027E5D" filter="url(#sh)"/>
+  <text x="86" y="311" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Farmer receives AI reply</text>
+  <text x="86" y="325" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">"Spider mites — use neem oil…"</text>
+
+  <!-- Divider -->
+  <line x1="0" y1="342" x2="880" y2="342" stroke="#B1D7CD" stroke-width="1.5"/>
+
+  <!-- ══════════════════════════════════════════════════
+       FLOW 2 — ESCALATION TO EO
+  ══════════════════════════════════════════════════ -->
+  <rect x="0" y="344" width="880" height="26" fill="#014533"/>
+  <text x="16" y="361" font-size="11" font-weight="700" fill="#fff">FLOW 2 — Farmer Escalation → Extension Officer Reply</text>
+
+  <!-- Farmer taps escalate -->
+  <rect x="8" y="380" width="156" height="34" rx="8" fill="#027E5D" filter="url(#sh)"/>
+  <text x="86" y="395" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Farmer taps</text>
+  <text x="86" y="409" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">"Talk to an expert" button</text>
+
+  <line x1="164" y1="397" x2="194" y2="397" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <rect x="196" y="380" width="152" height="34" rx="8" fill="#35987D" filter="url(#sh)"/>
+  <text x="272" y="395" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Twilio: ButtonPayload</text>
+  <text x="272" y="409" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">"escalate" → webhook</text>
+
+  <line x1="348" y1="397" x2="370" y2="397" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Backend creates ticket -->
+  <rect x="372" y="380" width="152" height="34" rx="8" fill="#014533" filter="url(#sh)"/>
+  <text x="448" y="395" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Create ticket</text>
+  <text x="448" y="409" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">TKT-0042 · ward assigned</text>
+
+  <!-- Queue WHISPER -->
+  <rect x="372" y="424" width="152" height="34" rx="8" fill="#015942" filter="url(#sh)"/>
+  <text x="448" y="439" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Queue WHISPER job</text>
+  <text x="448" y="453" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">AI suggestion for EO (internal)</text>
+  <line x1="448" y1="414" x2="448" y2="424" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Arrow → Akvo RAG WHISPER -->
+  <line x1="524" y1="441" x2="548" y2="441" stroke="#2d6a4f" stroke-width="1.5" marker-end="url(#arr-m)"/>
+  <rect x="548" y="424" width="152" height="34" rx="8" fill="#2d6a4f" filter="url(#sh)"/>
+  <text x="624" y="439" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Akvo RAG (WHISPER)</text>
+  <text x="624" y="453" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">Generates EO suggestion</text>
+
+  <!-- Notify EOs via Socket.IO + Push -->
+  <rect x="372" y="468" width="152" height="34" rx="8" fill="#027E5D" filter="url(#sh)"/>
+  <text x="448" y="483" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Notify EOs</text>
+  <text x="448" y="497" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">Socket.IO + Push notification</text>
+  <line x1="448" y1="458" x2="448" y2="468" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Arrow → EO mobile -->
+  <line x1="524" y1="485" x2="724" y2="485" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="724" y="468" width="148" height="34" rx="8" fill="#014533" filter="url(#sh)"/>
+  <text x="798" y="483" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">EO receives alert</text>
+  <text x="798" y="497" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">Taps → opens chat screen</text>
+
+  <!-- WHISPER callback displayed -->
+  <rect x="724" y="512" width="148" height="34" rx="8" fill="#015942" filter="url(#sh)"/>
+  <text x="798" y="527" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Whisper suggestion shown</text>
+  <text x="798" y="541" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">"Spider mites — neem oil"</text>
+  <line x1="798" y1="502" x2="798" y2="512" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- EO replies -->
+  <rect x="724" y="556" width="148" height="34" rx="8" fill="#027E5D" filter="url(#sh)"/>
+  <text x="798" y="571" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">EO types reply + sends</text>
+  <text x="798" y="585" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">POST /api/messages</text>
+  <line x1="798" y1="546" x2="798" y2="556" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Arrow → Backend → Twilio → Farmer -->
+  <line x1="724" y1="573" x2="524" y2="573" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="372" y="556" width="152" height="34" rx="8" fill="#014533" filter="url(#sh)"/>
+  <text x="448" y="571" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Backend sends via Twilio</text>
+  <text x="448" y="585" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">delivery_status tracked</text>
+
+  <line x1="372" y1="573" x2="350" y2="573" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="196" y="556" width="152" height="34" rx="8" fill="#35987D" filter="url(#sh)"/>
+  <text x="272" y="571" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Twilio → Farmer</text>
+  <text x="272" y="585" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">WhatsApp delivered</text>
+
+  <line x1="196" y1="573" x2="174" y2="573" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="8" y="556" width="156" height="34" rx="8" fill="#027E5D" filter="url(#sh)"/>
+  <text x="86" y="571" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Farmer reads EO reply</text>
+  <text x="86" y="585" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.85)">Issue resolved ✓</text>
+
+  <!-- Divider -->
+  <line x1="0" y1="604" x2="880" y2="604" stroke="#B1D7CD" stroke-width="1.5"/>
+
+  <!-- ══════════════════════════════════════════════════
+       FLOW 3 — BROADCAST / WEATHER
+  ══════════════════════════════════════════════════ -->
+  <rect x="0" y="606" width="880" height="26" fill="#35987D"/>
+  <text x="16" y="623" font-size="11" font-weight="700" fill="#fff">FLOW 3 — Broadcast / Weather Advisory</text>
+
+  <!-- Two sub-flows side by side -->
+  <!-- Broadcast left -->
+  <rect x="8" y="640" width="420" height="26" rx="6" fill="#E6F2EF"/>
+  <text x="218" y="657" text-anchor="middle" font-size="10" font-weight="700" fill="#014533">3A — Admin Broadcast Campaign</text>
+
+  <!-- Broadcast steps -->
+  <rect x="8" y="674" width="184" height="30" rx="7" fill="#014533" filter="url(#sh)"/>
+  <text x="100" y="687" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">Admin selects groups</text>
+  <text x="100" y="699" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">POST /api/broadcast/messages</text>
+
+  <line x1="192" y1="689" x2="214" y2="689" stroke="#014533" stroke-width="1.5" marker-end="url(#arr-d)"/>
+
+  <rect x="216" y="674" width="200" height="30" rx="7" fill="#027E5D" filter="url(#sh)"/>
+  <text x="316" y="687" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">Send confirmation template</text>
+  <text x="316" y="699" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">Twilio template SID → farmer</text>
+
+  <!-- Farmer taps "Read Message" -->
+  <rect x="8" y="714" width="408" height="30" rx="7" fill="#E6F2EF" stroke="#027E5D" stroke-width="1"/>
+  <text x="212" y="729" text-anchor="middle" font-size="9.5" fill="#014533" font-weight="600">Farmer taps "Read Message" button (ButtonPayload: read_broadcast)</text>
+
+  <line x1="212" y1="704" x2="212" y2="714" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Backend sends actual message -->
+  <rect x="8" y="754" width="184" height="30" rx="7" fill="#015942" filter="url(#sh)"/>
+  <text x="100" y="767" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">Backend sends actual msg</text>
+  <text x="100" y="779" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">Update recipient → DELIVERED</text>
+
+  <line x1="100" y1="744" x2="100" y2="754" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <line x1="192" y1="769" x2="216" y2="769" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="216" y="754" width="200" height="30" rx="7" fill="#027E5D" filter="url(#sh)"/>
+  <text x="316" y="767" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">Farmer reads broadcast</text>
+  <text x="316" y="779" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">Delivery tracked per recipient</text>
+
+  <!-- Weather right side -->
+  <rect x="448" y="640" width="424" height="26" rx="6" fill="#E6F2EF"/>
+  <text x="660" y="657" text-anchor="middle" font-size="10" font-weight="700" fill="#014533">3B — Daily Weather Advisory (6 AM UTC)</text>
+
+  <rect x="448" y="674" width="184" height="30" rx="7" fill="#014533" filter="url(#sh)"/>
+  <text x="540" y="687" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">Celery scheduled task fires</text>
+  <text x="540" y="699" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">6:00 AM UTC · per ward</text>
+
+  <line x1="632" y1="689" x2="652" y2="689" stroke="#014533" stroke-width="1.5" marker-end="url(#arr-d)"/>
+
+  <rect x="654" y="674" width="218" height="30" rx="7" fill="#c47c00" filter="url(#sh)"/>
+  <text x="763" y="687" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">Google Weather API</text>
+  <text x="763" y="699" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">6-day forecast for ward lat/long</text>
+
+  <!-- Down to OpenAI -->
+  <line x1="763" y1="704" x2="763" y2="714" stroke="#c47c00" stroke-width="1.5" marker-end="url(#arr-o)"/>
+  <rect x="654" y="714" width="218" height="30" rx="7" fill="#c47c00" filter="url(#sh)"/>
+  <text x="763" y="727" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">OpenAI generates advisory</text>
+  <text x="763" y="739" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">EN + SW per crop type</text>
+
+  <!-- Down to send -->
+  <line x1="763" y1="744" x2="763" y2="754" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="654" y="754" width="218" height="30" rx="7" fill="#027E5D" filter="url(#sh)"/>
+  <text x="763" y="767" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">Two-stage Twilio delivery</text>
+  <text x="763" y="779" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">Template → confirm → advisory</text>
+
+  <rect x="448" y="754" width="196" height="30" rx="7" fill="#015942" filter="url(#sh)"/>
+  <text x="546" y="767" text-anchor="middle" font-size="9.5" font-weight="600" fill="#fff">Only to subscribed farmers</text>
+  <text x="546" y="779" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.85)">weather_subscribed = true</text>
+
+  <line x1="644" y1="769" x2="654" y2="769" stroke="#027E5D" stroke-width="1.5" marker-end="url(#arr-g)"/>
+
+  <!-- Divider between 3A and 3B -->
+  <line x1="440" y1="640" x2="440" y2="800" stroke="#B1D7CD" stroke-width="1.5"/>
+
+  <!-- ── Bottom legend ── -->
+  <rect x="0" y="808" width="880" height="1" fill="#B1D7CD"/>
+  <text x="24" y="836" font-size="9.5" fill="#555" font-weight="600">LEGEND</text>
+  <rect x="80" y="824" width="30" height="8" rx="2" fill="#027E5D"/>
+  <text x="116" y="835" font-size="9" fill="#555">Primary flow</text>
+  <rect x="200" y="824" width="30" height="8" rx="2" fill="#014533"/>
+  <text x="236" y="835" font-size="9" fill="#555">Backend action</text>
+  <rect x="330" y="824" width="30" height="8" rx="2" fill="#c47c00"/>
+  <text x="366" y="835" font-size="9" fill="#555">External AI / Weather</text>
+  <rect x="480" y="824" width="30" height="8" rx="2" fill="#35987D"/>
+  <text x="516" y="835" font-size="9" fill="#555">Twilio / Delivery</text>
+  <rect x="610" y="824" width="30" height="8" rx="2" fill="#2d6a4f"/>
+  <text x="646" y="835" font-size="9" fill="#555">Akvo RAG (external AI)</text>
+
+  <!-- WhatsApp webhook flow note -->
+  <rect x="24" y="848" width="832" height="56" rx="8" fill="#E6F2EF" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="440" y="866" text-anchor="middle" font-size="10" font-weight="700" fill="#014533">WhatsApp Webhook Decision Order (Flow 1 detail)</text>
+  <text x="40" y="884" font-size="9" fill="#555">① Voice transcription (Whisper)  →  ② Duplicate check  →  ③ Customer resolve  →  ④ 24h reconnection  →  ⑤ Deletion flow</text>
+  <text x="40" y="898" font-size="9" fill="#555">⑥ Data consent  →  ⑦ Onboarding  →  ⑧ Broadcast button  →  ⑨ Weather buttons  →  ⑩ Reconnect button  →  ⑪ Escalation  →  ⑫ AI REPLY</text>
+</svg>
+</div>
+</body>
+</html>

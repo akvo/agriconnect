@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriConnect — User Roles (Proposal)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 24px;
+    min-height: 100vh;
+  }
+  .header { text-align: center; margin-bottom: 28px; }
+  .logo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #027E5D;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    padding: 5px 14px;
+    border-radius: 100px;
+    margin-bottom: 12px;
+  }
+  h1 { font-size: 22px; font-weight: 700; color: #014533; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #777; }
+  .diagram-wrap {
+    background: #fff;
+    border: 1px solid #B1D7CD;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 4px 20px rgba(2,126,93,.07);
+    max-width: 720px;
+    width: 100%;
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .header { margin-bottom: 16px; }
+    .diagram-wrap { box-shadow: none; border: 1px solid #B1D7CD; padding: 16px; max-width: 170mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-pill">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    AgriConnect
+  </div>
+  <h1>User Roles</h1>
+  <p class="subtitle">Three actor types with distinct interfaces and access scopes</p>
+</div>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 664 298" xmlns="http://www.w3.org/2000/svg" width="100%"
+     style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <filter id="s"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#027E5D" flood-opacity="0.1"/></filter>
+    <linearGradient id="gf" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#027E5D"/>
+      <stop offset="100%" stop-color="#015942"/>
+    </linearGradient>
+    <linearGradient id="ge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#014533"/>
+      <stop offset="100%" stop-color="#013527"/>
+    </linearGradient>
+    <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#35987D"/>
+      <stop offset="100%" stop-color="#027E5D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ══════════════ FARMER ══════════════ -->
+  <rect x="8" y="8" width="202" height="282" rx="12" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#s)"/>
+  <!-- Header -->
+  <rect x="8" y="8" width="202" height="74" rx="12" fill="url(#gf)"/>
+  <rect x="8" y="58" width="202" height="24" fill="url(#gf)"/>
+  <text x="109" y="38" text-anchor="middle" font-size="26">🌾</text>
+  <text x="109" y="59" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Farmer</text>
+  <text x="109" y="75" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">via WhatsApp</text>
+
+  <!-- Interface tag -->
+  <rect x="28" y="90" width="162" height="22" rx="11" fill="#E6F2EF"/>
+  <text x="109" y="105" text-anchor="middle" font-size="9" font-weight="700" fill="#027E5D">📲  No login needed</text>
+
+  <!-- Capabilities -->
+  <text x="24" y="130" font-size="9" font-weight="700" fill="#014533" letter-spacing=".8">WHAT THEY DO</text>
+  <line x1="24" y1="134" x2="196" y2="134" stroke="#E6F2EF" stroke-width="1"/>
+
+  <!-- Cap rows -->
+  <circle cx="34" cy="150" r="4" fill="#027E5D"/>
+  <text x="44" y="154" font-size="9.5" fill="#333">Ask agricultural questions</text>
+
+  <circle cx="34" cy="170" r="4" fill="#027E5D"/>
+  <text x="44" y="174" font-size="9.5" fill="#333">Get AI-powered answers</text>
+
+  <circle cx="34" cy="190" r="4" fill="#027E5D"/>
+  <text x="44" y="194" font-size="9.5" fill="#333">Escalate to an expert</text>
+
+  <circle cx="34" cy="210" r="4" fill="#027E5D"/>
+  <text x="44" y="214" font-size="9.5" fill="#333">Receive broadcast messages</text>
+
+  <circle cx="34" cy="230" r="4" fill="#027E5D"/>
+  <text x="44" y="234" font-size="9.5" fill="#333">Subscribe to weather alerts</text>
+
+  <!-- Scope footer -->
+  <rect x="18" y="260" width="182" height="22" rx="8" fill="#E6F2EF"/>
+  <text x="109" y="274" text-anchor="middle" font-size="9" fill="#555">Auto-created on first message</text>
+
+  <!-- ══════════════ EXTENSION OFFICER ══════════════ -->
+  <rect x="231" y="8" width="202" height="282" rx="12" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#s)"/>
+  <rect x="231" y="8" width="202" height="74" rx="12" fill="url(#ge)"/>
+  <rect x="231" y="58" width="202" height="24" fill="url(#ge)"/>
+  <text x="332" y="38" text-anchor="middle" font-size="26">📱</text>
+  <text x="332" y="59" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Extension Officer</text>
+  <text x="332" y="75" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">via Mobile App</text>
+
+  <rect x="251" y="90" width="162" height="22" rx="11" fill="#E6F2EF"/>
+  <text x="332" y="105" text-anchor="middle" font-size="9" font-weight="700" fill="#027E5D">🔐  Email + password login</text>
+
+  <text x="247" y="130" font-size="9" font-weight="700" fill="#014533" letter-spacing=".8">WHAT THEY DO</text>
+  <line x1="247" y1="134" x2="419" y2="134" stroke="#E6F2EF" stroke-width="1"/>
+
+  <circle cx="257" cy="150" r="4" fill="#014533"/>
+  <text x="267" y="154" font-size="9.5" fill="#333">View &amp; reply to farmer tickets</text>
+
+  <circle cx="257" cy="170" r="4" fill="#014533"/>
+  <text x="267" y="174" font-size="9.5" fill="#333">Read AI whisper suggestions</text>
+
+  <circle cx="257" cy="190" r="4" fill="#014533"/>
+  <text x="267" y="194" font-size="9.5" fill="#333">Resolve conversations</text>
+
+  <circle cx="257" cy="210" r="4" fill="#014533"/>
+  <text x="267" y="214" font-size="9.5" fill="#333">Send bulk messages to groups</text>
+
+  <circle cx="257" cy="230" r="4" fill="#014533"/>
+  <text x="267" y="234" font-size="9.5" fill="#333">Track personal statistics</text>
+
+  <!-- Scope pyramid -->
+  <rect x="241" y="258" width="182" height="22" rx="8" fill="#E6F2EF"/>
+  <text x="332" y="272" text-anchor="middle" font-size="9" fill="#555">Scoped to assigned ward + descendants</text>
+
+  <!-- ══════════════ ADMINISTRATOR ══════════════ -->
+  <rect x="454" y="8" width="202" height="282" rx="12" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#s)"/>
+  <rect x="454" y="8" width="202" height="74" rx="12" fill="url(#ga)"/>
+  <rect x="454" y="58" width="202" height="24" fill="url(#ga)"/>
+  <text x="555" y="38" text-anchor="middle" font-size="26">🖥</text>
+  <text x="555" y="59" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Administrator</text>
+  <text x="555" y="75" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">via Web Dashboard</text>
+
+  <rect x="474" y="90" width="162" height="22" rx="11" fill="#E6F2EF"/>
+  <text x="555" y="105" text-anchor="middle" font-size="9" font-weight="700" fill="#027E5D">🔐  Email + password login</text>
+
+  <text x="470" y="130" font-size="9" font-weight="700" fill="#014533" letter-spacing=".8">WHAT THEY DO</text>
+  <line x1="470" y1="134" x2="642" y2="134" stroke="#E6F2EF" stroke-width="1"/>
+
+  <circle cx="480" cy="150" r="4" fill="#35987D"/>
+  <text x="490" y="154" font-size="9.5" fill="#333">Invite &amp; manage system users</text>
+
+  <circle cx="480" cy="170" r="4" fill="#35987D"/>
+  <text x="490" y="174" font-size="9.5" fill="#333">Configure AI service tokens</text>
+
+  <circle cx="480" cy="190" r="4" fill="#35987D"/>
+  <text x="490" y="194" font-size="9.5" fill="#333">Manage knowledge bases</text>
+
+  <circle cx="480" cy="210" r="4" fill="#35987D"/>
+  <text x="490" y="214" font-size="9.5" fill="#333">View system-wide analytics</text>
+
+  <circle cx="480" cy="230" r="4" fill="#35987D"/>
+  <text x="490" y="234" font-size="9.5" fill="#333">Create &amp; send broadcasts</text>
+
+  <rect x="464" y="258" width="182" height="22" rx="8" fill="#E6F2EF"/>
+  <text x="555" y="272" text-anchor="middle" font-size="9" fill="#555">Full system access · all areas</text>
+</svg>
+</div>
+
+</body>
+</html>

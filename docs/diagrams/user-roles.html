@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriConnect — User Roles</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .logo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #027E5D;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    padding: 6px 16px;
+    border-radius: 100px;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #014533;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #777;
+  }
+  .diagram-wrap {
+    background: #fff;
+    border: 1px solid #B1D7CD;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(2,126,93,.08);
+    max-width: 960px;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo-pill">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    AgriConnect
+  </div>
+  <h1>User Roles &amp; Capabilities</h1>
+  <p class="subtitle">Three actor types with distinct interfaces and access scopes</p>
+</div>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 880 720" xmlns="http://www.w3.org/2000/svg" width="100%" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="g-farmer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#027E5D"/>
+      <stop offset="100%" stop-color="#015942"/>
+    </linearGradient>
+    <linearGradient id="g-eo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#014533"/>
+      <stop offset="100%" stop-color="#013527"/>
+    </linearGradient>
+    <linearGradient id="g-admin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#35987D"/>
+      <stop offset="100%" stop-color="#027E5D"/>
+    </linearGradient>
+    <filter id="card-shadow">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#027E5D" flood-opacity="0.1"/>
+    </filter>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#027E5D"/>
+    </marker>
+  </defs>
+
+  <!-- ── Title band ── -->
+  <rect x="0" y="0" width="880" height="44" rx="10" fill="#E6F2EF"/>
+  <text x="440" y="27" text-anchor="middle" font-size="13" font-weight="700" fill="#014533" letter-spacing=".5">ACTOR COMPARISON — WHO USES WHAT</text>
+
+  <!-- ══════════════════════════════════════
+       COLUMN 1 — FARMER
+  ══════════════════════════════════════ -->
+  <!-- Card -->
+  <rect x="24" y="58" width="260" height="646" rx="14" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#card-shadow)"/>
+  <!-- Header -->
+  <rect x="24" y="58" width="260" height="80" rx="14" fill="url(#g-farmer)"/>
+  <rect x="24" y="112" width="260" height="26" fill="url(#g-farmer)"/>
+  <!-- Avatar circle -->
+  <circle cx="154" cy="88" r="22" fill="rgba(255,255,255,0.2)"/>
+  <text x="154" y="95" text-anchor="middle" font-size="22">🌾</text>
+  <text x="154" y="125" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">Farmer</text>
+
+  <!-- Interface badge -->
+  <rect x="54" y="155" width="200" height="28" rx="14" fill="#E6F2EF"/>
+  <text x="154" y="173" text-anchor="middle" font-size="10" font-weight="700" fill="#027E5D">📲  WhatsApp Only</text>
+
+  <!-- Scope badge -->
+  <rect x="54" y="191" width="200" height="22" rx="11" fill="#f0faf6" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="154" y="206" text-anchor="middle" font-size="9.5" fill="#555">No login required · auto-created</text>
+
+  <!-- Section: Capabilities -->
+  <text x="44" y="234" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">CAPABILITIES</text>
+  <line x1="44" y1="239" x2="264" y2="239" stroke="#E6F2EF" stroke-width="1"/>
+
+  <!-- Capability rows -->
+  <circle cx="58" cy="258" r="5" fill="#027E5D"/>
+  <text x="70" y="262" font-size="10" fill="#333">Send agricultural questions</text>
+
+  <circle cx="58" cy="280" r="5" fill="#027E5D"/>
+  <text x="70" y="284" font-size="10" fill="#333">Receive AI-generated answers</text>
+
+  <circle cx="58" cy="302" r="5" fill="#027E5D"/>
+  <text x="70" y="306" font-size="10" fill="#333">Escalate to a human expert</text>
+
+  <circle cx="58" cy="324" r="5" fill="#027E5D"/>
+  <text x="70" y="328" font-size="10" fill="#333">Subscribe to weather alerts</text>
+
+  <circle cx="58" cy="346" r="5" fill="#027E5D"/>
+  <text x="70" y="350" font-size="10" fill="#333">Receive broadcast messages</text>
+
+  <circle cx="58" cy="368" r="5" fill="#027E5D"/>
+  <text x="70" y="372" font-size="10" fill="#333">Request account deletion</text>
+
+  <!-- Section: Onboarding Profile -->
+  <text x="44" y="400" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">ONBOARDING PROFILE</text>
+  <line x1="44" y1="405" x2="264" y2="405" stroke="#E6F2EF" stroke-width="1"/>
+
+  <rect x="44" y="412" width="216" height="90" rx="8" fill="#f0faf6" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="56" y="428" font-size="9.5" fill="#555">Collected progressively via WhatsApp:</text>
+  <text x="56" y="446" font-size="9" fill="#014533">① Administrative area (ward)</text>
+  <text x="56" y="462" font-size="9" fill="#014533">② Crop type (Avocado / Potato / Dairy)</text>
+  <text x="56" y="478" font-size="9" fill="#555">③ Gender (optional)</text>
+  <text x="56" y="494" font-size="9" fill="#555">④ Birth year (optional)</text>
+
+  <!-- Section: Language -->
+  <text x="44" y="524" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">LANGUAGE SUPPORT</text>
+  <line x1="44" y1="529" x2="264" y2="529" stroke="#E6F2EF" stroke-width="1"/>
+
+  <rect x="44" y="537" width="100" height="36" rx="8" fill="#027E5D"/>
+  <text x="94" y="552" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">English (EN)</text>
+  <text x="94" y="567" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Detected on signup</text>
+
+  <rect x="160" y="537" width="100" height="36" rx="8" fill="#015942"/>
+  <text x="210" y="552" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Swahili (SW)</text>
+  <text x="210" y="567" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Keyword detected</text>
+
+  <!-- Section: Data stored -->
+  <text x="44" y="595" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">DATA STORED</text>
+  <line x1="44" y1="600" x2="264" y2="600" stroke="#E6F2EF" stroke-width="1"/>
+  <text x="44" y="616" font-size="9" fill="#555">phone_number · full_name · language</text>
+  <text x="44" y="632" font-size="9" fill="#555">profile_data (JSON) · onboarding_status</text>
+  <text x="44" y="648" font-size="9" fill="#555">Messages · Tickets · Ward assignment</text>
+  <text x="44" y="664" font-size="9" fill="#555">Weather subscription · Consent flags</text>
+
+  <!-- ══════════════════════════════════════
+       COLUMN 2 — EXTENSION OFFICER
+  ══════════════════════════════════════ -->
+  <rect x="310" y="58" width="260" height="646" rx="14" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#card-shadow)"/>
+  <rect x="310" y="58" width="260" height="80" rx="14" fill="url(#g-eo)"/>
+  <rect x="310" y="112" width="260" height="26" fill="url(#g-eo)"/>
+  <circle cx="440" cy="88" r="22" fill="rgba(255,255,255,0.15)"/>
+  <text x="440" y="95" text-anchor="middle" font-size="22">📱</text>
+  <text x="440" y="125" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">Extension Officer</text>
+
+  <rect x="340" y="155" width="200" height="28" rx="14" fill="#E6F2EF"/>
+  <text x="440" y="173" text-anchor="middle" font-size="10" font-weight="700" fill="#027E5D">📱  React Native Mobile App</text>
+
+  <rect x="340" y="191" width="200" height="22" rx="11" fill="#f0faf6" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="440" y="206" text-anchor="middle" font-size="9.5" fill="#555">Scope: assigned ward + descendants</text>
+
+  <text x="330" y="234" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">CAPABILITIES</text>
+  <line x1="330" y1="239" x2="550" y2="239" stroke="#E6F2EF" stroke-width="1"/>
+
+  <circle cx="344" cy="258" r="5" fill="#014533"/>
+  <text x="356" y="262" font-size="10" fill="#333">View open &amp; resolved tickets</text>
+
+  <circle cx="344" cy="280" r="5" fill="#014533"/>
+  <text x="356" y="284" font-size="10" fill="#333">Reply to farmers via WhatsApp</text>
+
+  <circle cx="344" cy="302" r="5" fill="#014533"/>
+  <text x="356" y="306" font-size="10" fill="#333">Read AI "whisper" suggestions</text>
+
+  <circle cx="344" cy="324" r="5" fill="#014533"/>
+  <text x="356" y="328" font-size="10" fill="#333">Resolve tickets (triggers auto-tag)</text>
+
+  <circle cx="344" cy="346" r="5" fill="#014533"/>
+  <text x="356" y="350" font-size="10" fill="#333">Create &amp; manage broadcast groups</text>
+
+  <circle cx="344" cy="368" r="5" fill="#014533"/>
+  <text x="356" y="372" font-size="10" fill="#333">View per-period personal statistics</text>
+
+  <circle cx="344" cy="390" r="5" fill="#014533"/>
+  <text x="356" y="394" font-size="10" fill="#333">Offline viewing (SQLite cache)</text>
+
+  <text x="330" y="416" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">ACCESS SCOPE</text>
+  <line x1="330" y1="421" x2="550" y2="421" stroke="#E6F2EF" stroke-width="1"/>
+
+  <!-- Scope diagram -->
+  <rect x="330" y="428" width="220" height="110" rx="8" fill="#f0faf6" stroke="#B1D7CD" stroke-width="1"/>
+  <!-- hierarchy lines -->
+  <text x="440" y="444" text-anchor="middle" font-size="9" fill="#555">Assigned to any level:</text>
+  <rect x="350" y="452" width="180" height="18" rx="4" fill="#014533"/>
+  <text x="440" y="465" text-anchor="middle" font-size="9" fill="#fff" font-weight="600">Region  →  all child wards</text>
+  <rect x="370" y="476" width="140" height="18" rx="4" fill="#027E5D"/>
+  <text x="440" y="489" text-anchor="middle" font-size="9" fill="#fff" font-weight="600">District  →  all child wards</text>
+  <rect x="390" y="500" width="100" height="18" rx="4" fill="#35987D"/>
+  <text x="440" y="513" text-anchor="middle" font-size="9" fill="#fff" font-weight="600">Ward  →  that ward only</text>
+
+  <text x="330" y="556" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">MOBILE APP FEATURES</text>
+  <line x1="330" y1="561" x2="550" y2="561" stroke="#E6F2EF" stroke-width="1"/>
+
+  <rect x="330" y="568" width="104" height="50" rx="6" fill="#E6F2EF"/>
+  <text x="382" y="583" text-anchor="middle" font-size="9" font-weight="600" fill="#014533">Real-time</text>
+  <text x="382" y="597" text-anchor="middle" font-size="9" fill="#555">Socket.IO</text>
+  <text x="382" y="611" text-anchor="middle" font-size="9" fill="#555">WebSocket</text>
+
+  <rect x="446" y="568" width="104" height="50" rx="6" fill="#E6F2EF"/>
+  <text x="498" y="583" text-anchor="middle" font-size="9" font-weight="600" fill="#014533">Push Alerts</text>
+  <text x="498" y="597" text-anchor="middle" font-size="9" fill="#555">FCM Firebase</text>
+  <text x="498" y="611" text-anchor="middle" font-size="9" fill="#555">Expo Notif.</text>
+
+  <rect x="330" y="626" width="104" height="50" rx="6" fill="#E6F2EF"/>
+  <text x="382" y="641" text-anchor="middle" font-size="9" font-weight="600" fill="#014533">Offline</text>
+  <text x="382" y="655" text-anchor="middle" font-size="9" fill="#555">SQLite v10</text>
+  <text x="382" y="669" text-anchor="middle" font-size="9" fill="#555">DAO pattern</text>
+
+  <rect x="446" y="626" width="104" height="50" rx="6" fill="#E6F2EF"/>
+  <text x="498" y="641" text-anchor="middle" font-size="9" font-weight="600" fill="#014533">Secure Auth</text>
+  <text x="498" y="655" text-anchor="middle" font-size="9" fill="#555">Keychain/store</text>
+  <text x="498" y="669" text-anchor="middle" font-size="9" fill="#555">JWT refresh</text>
+
+  <!-- ══════════════════════════════════════
+       COLUMN 3 — ADMINISTRATOR
+  ══════════════════════════════════════ -->
+  <rect x="596" y="58" width="260" height="646" rx="14" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#card-shadow)"/>
+  <rect x="596" y="58" width="260" height="80" rx="14" fill="url(#g-admin)"/>
+  <rect x="596" y="112" width="260" height="26" fill="url(#g-admin)"/>
+  <circle cx="726" cy="88" r="22" fill="rgba(255,255,255,0.2)"/>
+  <text x="726" y="95" text-anchor="middle" font-size="22">🖥</text>
+  <text x="726" y="125" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">Administrator</text>
+
+  <rect x="626" y="155" width="200" height="28" rx="14" fill="#E6F2EF"/>
+  <text x="726" y="173" text-anchor="middle" font-size="10" font-weight="700" fill="#027E5D">🌐  Next.js Web Dashboard</text>
+
+  <rect x="626" y="191" width="200" height="22" rx="11" fill="#f0faf6" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="726" y="206" text-anchor="middle" font-size="9.5" fill="#555">Scope: all areas · all data</text>
+
+  <text x="616" y="234" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">CAPABILITIES</text>
+  <line x1="616" y1="239" x2="836" y2="239" stroke="#E6F2EF" stroke-width="1"/>
+
+  <circle cx="630" cy="258" r="5" fill="#35987D"/>
+  <text x="642" y="262" font-size="10" fill="#333">Invite &amp; manage system users</text>
+
+  <circle cx="630" cy="280" r="5" fill="#35987D"/>
+  <text x="642" y="284" font-size="10" fill="#333">Manage all customers (CRUD)</text>
+
+  <circle cx="630" cy="302" r="5" fill="#35987D"/>
+  <text x="642" y="306" font-size="10" fill="#333">Configure AI service tokens</text>
+
+  <circle cx="630" cy="324" r="5" fill="#35987D"/>
+  <text x="642" y="328" font-size="10" fill="#333">Create &amp; manage knowledge bases</text>
+
+  <circle cx="630" cy="346" r="5" fill="#35987D"/>
+  <text x="642" y="350" font-size="10" fill="#333">Upload documents to KB</text>
+
+  <circle cx="630" cy="368" r="5" fill="#35987D"/>
+  <text x="642" y="372" font-size="10" fill="#333">View system-wide analytics</text>
+
+  <circle cx="630" cy="390" r="5" fill="#35987D"/>
+  <text x="642" y="394" font-size="10" fill="#333">Test AI via playground chat</text>
+
+  <circle cx="630" cy="412" r="5" fill="#35987D"/>
+  <text x="642" y="416" font-size="10" fill="#333">Trigger weather broadcasts</text>
+
+  <circle cx="630" cy="434" r="5" fill="#35987D"/>
+  <text x="642" y="438" font-size="10" fill="#333">Generate statistic API tokens</text>
+
+  <text x="616" y="462" font-size="10" font-weight="700" fill="#014533" letter-spacing=".5">ADMIN-ONLY FEATURES</text>
+  <line x1="616" y1="467" x2="836" y2="467" stroke="#E6F2EF" stroke-width="1"/>
+
+  <!-- Admin feature grid -->
+  <rect x="616" y="474" width="102" height="52" rx="8" fill="#014533"/>
+  <text x="667" y="493" text-anchor="middle" font-size="9" font-weight="600" fill="#fff">User</text>
+  <text x="667" y="507" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Invitation flow</text>
+  <text x="667" y="521" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Role assignment</text>
+
+  <rect x="728" y="474" width="102" height="52" rx="8" fill="#014533"/>
+  <text x="779" y="493" text-anchor="middle" font-size="9" font-weight="600" fill="#fff">AI Config</text>
+  <text x="779" y="507" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Service tokens</text>
+  <text x="779" y="521" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Active KB toggle</text>
+
+  <rect x="616" y="534" width="102" height="52" rx="8" fill="#027E5D"/>
+  <text x="667" y="553" text-anchor="middle" font-size="9" font-weight="600" fill="#fff">Analytics</text>
+  <text x="667" y="567" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Ticket tags chart</text>
+  <text x="667" y="581" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Crop distribution</text>
+
+  <rect x="728" y="534" width="102" height="52" rx="8" fill="#027E5D"/>
+  <text x="779" y="553" text-anchor="middle" font-size="9" font-weight="600" fill="#fff">Playground</text>
+  <text x="779" y="567" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Test AI responses</text>
+  <text x="779" y="581" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Custom prompts</text>
+
+  <rect x="616" y="594" width="214" height="52" rx="8" fill="#35987D"/>
+  <text x="723" y="613" text-anchor="middle" font-size="9" font-weight="600" fill="#fff">Broadcast Management</text>
+  <text x="723" y="629" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Create groups · Send campaigns</text>
+  <text x="723" y="643" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.8)">Weather advisory scheduling</text>
+
+  <!-- Auth note -->
+  <rect x="616" y="654" width="214" height="36" rx="8" fill="#f0faf6" stroke="#B1D7CD" stroke-width="1"/>
+  <text x="723" y="669" text-anchor="middle" font-size="9" fill="#555">Login via email + password</text>
+  <text x="723" y="683" text-anchor="middle" font-size="9" fill="#555">JWT Bearer · invitation or direct set</text>
+
+  <!-- ── Shared note ── -->
+  <rect x="24" y="714" width="832" height="0" rx="0" fill="none"/>
+</svg>
+</div>
+</body>
+</html>

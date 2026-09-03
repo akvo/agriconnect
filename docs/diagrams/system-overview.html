@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriConnect — System Overview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .logo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #027E5D;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    padding: 6px 16px;
+    border-radius: 100px;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #014533;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #777;
+  }
+  .diagram-wrap {
+    background: #fff;
+    border: 1px solid #B1D7CD;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(2,126,93,.08);
+    max-width: 960px;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo-pill">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    AgriConnect
+  </div>
+  <h1>System Overview</h1>
+  <p class="subtitle">Architecture of the AgriConnect agricultural extension platform</p>
+</div>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 880 680" xmlns="http://www.w3.org/2000/svg" width="100%" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#027E5D"/>
+    </marker>
+    <marker id="arr-gray" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#aaa"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#027E5D" flood-opacity="0.1"/>
+    </filter>
+    <linearGradient id="hdr-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#014533"/>
+      <stop offset="100%" stop-color="#027E5D"/>
+    </linearGradient>
+    <linearGradient id="client-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#013527"/>
+      <stop offset="100%" stop-color="#015942"/>
+    </linearGradient>
+    <linearGradient id="ext-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2d6a4f"/>
+      <stop offset="100%" stop-color="#40916c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ── Layer labels (left side) ── -->
+  <text x="10" y="105" font-size="10" fill="#027E5D" font-weight="700" letter-spacing="1" text-anchor="middle" transform="rotate(-90,10,105)">CLIENTS</text>
+  <text x="10" y="310" font-size="10" fill="#027E5D" font-weight="700" letter-spacing="1" text-anchor="middle" transform="rotate(-90,10,310)">BACKEND</text>
+  <text x="10" y="540" font-size="10" fill="#027E5D" font-weight="700" letter-spacing="1" text-anchor="middle" transform="rotate(-90,10,540)">EXTERNAL</text>
+
+  <!-- ════════════════════════════════════════
+       LAYER 1 — CLIENT APPLICATIONS
+  ════════════════════════════════════════ -->
+  <rect x="28" y="18" width="832" height="190" rx="14" fill="#E6F2EF" stroke="#B1D7CD" stroke-width="1.5"/>
+  <rect x="28" y="18" width="832" height="36" rx="14" fill="url(#client-grad)"/>
+  <rect x="28" y="36" width="832" height="18" fill="url(#client-grad)"/>
+  <text x="444" y="41" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" letter-spacing=".5">CLIENT LAYER</text>
+
+  <!-- Farmer / WhatsApp -->
+  <rect x="58" y="68" width="200" height="118" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="58" y="68" width="200" height="32" rx="10" fill="#027E5D"/>
+  <rect x="58" y="84" width="200" height="16" fill="#027E5D"/>
+  <text x="158" y="88" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">🌾  Farmer</text>
+  <text x="158" y="113" text-anchor="middle" font-size="10" fill="#014533" font-weight="600">Channel: WhatsApp only</text>
+  <text x="158" y="130" text-anchor="middle" font-size="10" fill="#555">Ask questions</text>
+  <text x="158" y="145" text-anchor="middle" font-size="10" fill="#555">Receive AI answers</text>
+  <text x="158" y="160" text-anchor="middle" font-size="10" fill="#555">Escalate to expert</text>
+  <text x="158" y="175" text-anchor="middle" font-size="10" fill="#555">Weather alerts</text>
+
+  <!-- Extension Officer / Mobile -->
+  <rect x="340" y="68" width="200" height="118" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="340" y="68" width="200" height="32" rx="10" fill="#027E5D"/>
+  <rect x="340" y="84" width="200" height="16" fill="#027E5D"/>
+  <text x="440" y="88" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">📱  Extension Officer</text>
+  <text x="440" y="113" text-anchor="middle" font-size="10" fill="#014533" font-weight="600">React Native / Expo Mobile App</text>
+  <text x="440" y="130" text-anchor="middle" font-size="10" fill="#555">View &amp; reply to tickets</text>
+  <text x="440" y="145" text-anchor="middle" font-size="10" fill="#555">Real-time chat (Socket.IO)</text>
+  <text x="440" y="160" text-anchor="middle" font-size="10" fill="#555">Send bulk messages</text>
+  <text x="440" y="175" text-anchor="middle" font-size="10" fill="#555">Offline-first + SQLite cache</text>
+
+  <!-- Admin / Web -->
+  <rect x="622" y="68" width="200" height="118" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="622" y="68" width="200" height="32" rx="10" fill="#027E5D"/>
+  <rect x="622" y="84" width="200" height="16" fill="#027E5D"/>
+  <text x="722" y="88" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">🖥  Administrator</text>
+  <text x="722" y="113" text-anchor="middle" font-size="10" fill="#014533" font-weight="600">Next.js 15 Web Dashboard</text>
+  <text x="722" y="130" text-anchor="middle" font-size="10" fill="#555">Manage users &amp; customers</text>
+  <text x="722" y="145" text-anchor="middle" font-size="10" fill="#555">Configure AI service tokens</text>
+  <text x="722" y="160" text-anchor="middle" font-size="10" fill="#555">Knowledge base management</text>
+  <text x="722" y="175" text-anchor="middle" font-size="10" fill="#555">Analytics &amp; broadcasts</text>
+
+  <!-- ════════════════════════════════════════
+       ARROWS: Clients → Backend
+  ════════════════════════════════════════ -->
+  <!-- Farmer → Backend -->
+  <line x1="158" y1="186" x2="158" y2="228" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <!-- EO Mobile → Backend -->
+  <line x1="440" y1="186" x2="440" y2="228" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <!-- Admin Web → Backend -->
+  <line x1="722" y1="186" x2="722" y2="228" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+
+  <!-- ════════════════════════════════════════
+       LAYER 2 — BACKEND
+  ════════════════════════════════════════ -->
+  <rect x="28" y="230" width="832" height="224" rx="14" fill="#f0faf6" stroke="#B1D7CD" stroke-width="1.5"/>
+  <rect x="28" y="230" width="832" height="36" rx="14" fill="url(#hdr-grad)"/>
+  <rect x="28" y="248" width="832" height="18" fill="url(#hdr-grad)"/>
+  <text x="444" y="253" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" letter-spacing=".5">BACKEND LAYER — FastAPI </text>
+
+  <!-- FastAPI REST API -->
+  <rect x="58" y="280" width="190" height="150" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="153" y="300" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">REST API</text>
+  <text x="153" y="316" text-anchor="middle" font-size="9.5" fill="#027E5D" font-weight="600">/api/* endpoints</text>
+  <line x1="78" y1="322" x2="228" y2="322" stroke="#E6F2EF" stroke-width="1"/>
+  <text x="153" y="338" text-anchor="middle" font-size="9" fill="#555">Auth · Customers · Tickets</text>
+  <text x="153" y="352" text-anchor="middle" font-size="9" fill="#555">Messages · KB · Broadcast</text>
+  <text x="153" y="366" text-anchor="middle" font-size="9" fill="#555">Whatsapp Webhook · Callbacks</text>
+  <text x="153" y="380" text-anchor="middle" font-size="9" fill="#555">Admin · Analytics · Devices</text>
+  <text x="153" y="394" text-anchor="middle" font-size="9" fill="#555">User Stats · Statistic API</text>
+  <text x="153" y="408" text-anchor="middle" font-size="9" fill="#555">Weather · Playground</text>
+
+  <!-- Socket.IO -->
+  <rect x="270" y="280" width="160" height="100" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="350" y="300" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Socket.IO</text>
+  <text x="350" y="316" text-anchor="middle" font-size="9.5" fill="#027E5D" font-weight="600">/ws endpoint</text>
+  <line x1="290" y1="322" x2="410" y2="322" stroke="#E6F2EF" stroke-width="1"/>
+  <text x="350" y="337" text-anchor="middle" font-size="9" fill="#555">Real-time events</text>
+  <text x="350" y="351" text-anchor="middle" font-size="9" fill="#555">message_received</text>
+  <text x="350" y="365" text-anchor="middle" font-size="9" fill="#555">ticket_resolved · whisper</text>
+
+  <!-- Celery -->
+  <rect x="270" y="395" width="160" height="50" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="350" y="414" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Celery Worker</text>
+  <text x="350" y="430" text-anchor="middle" font-size="9" fill="#555">Async tasks · Weather cron</text>
+  <text x="350" y="442" text-anchor="middle" font-size="9" fill="#555">Message delivery retries</text>
+
+  <!-- PostgreSQL -->
+  <rect x="450" y="280" width="160" height="80" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="530" y="302" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">PostgreSQL 17</text>
+  <text x="530" y="318" text-anchor="middle" font-size="9.5" fill="#027E5D" font-weight="600">Primary Database</text>
+  <text x="530" y="335" text-anchor="middle" font-size="9" fill="#555">Users · Customers · Messages</text>
+  <text x="530" y="349" text-anchor="middle" font-size="9" fill="#555">Tickets · KB · Broadcasts</text>
+
+  <!-- Redis -->
+  <rect x="450" y="375" width="160" height="70" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="530" y="397" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Redis</text>
+  <text x="530" y="413" text-anchor="middle" font-size="9.5" fill="#027E5D" font-weight="600">Celery Broker</text>
+  <text x="530" y="430" text-anchor="middle" font-size="9" fill="#555">Task queue</text>
+  <text x="530" y="444" text-anchor="middle" font-size="9" fill="#555">Retry scheduling</text>
+
+  <!-- Alembic -->
+  <rect x="630" y="280" width="200" height="70" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="730" y="302" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Alembic Migrations</text>
+  <text x="730" y="320" text-anchor="middle" font-size="9" fill="#555">Auto-run on startup</text>
+
+  <!-- JWT / Auth -->
+  <rect x="630" y="365" width="200" height="80" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="730" y="385" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Auth (JWT + bcrypt)</text>
+  <text x="730" y="402" text-anchor="middle" font-size="9" fill="#555">Access token 24h · Refresh 30d</text>
+  <text x="730" y="416" text-anchor="middle" font-size="9" fill="#555">Roles: ADMIN · EXTENSION_OFFICER</text>
+  <text x="730" y="430" text-anchor="middle" font-size="9" fill="#555">Admin scope · Ward scope</text>
+  <text x="730" y="443" text-anchor="middle" font-size="9" fill="#555">Invitation · Password reset</text>
+
+  <!-- ════════════════════════════════════════
+       ARROWS: Backend → External
+  ════════════════════════════════════════ -->
+  <line x1="200" y1="476" x2="200" y2="508" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <line x1="350" y1="476" x2="350" y2="508" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <line x1="530" y1="476" x2="530" y2="508" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <line x1="700" y1="476" x2="700" y2="508" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+
+  <!-- ════════════════════════════════════════
+       LAYER 3 — EXTERNAL SERVICES
+  ════════════════════════════════════════ -->
+  <rect x="28" y="510" width="832" height="150" rx="14" fill="#f7fdfb" stroke="#B1D7CD" stroke-width="1.5"/>
+  <rect x="28" y="510" width="832" height="36" rx="14" fill="url(#ext-grad)"/>
+  <rect x="28" y="528" width="832" height="18" fill="url(#ext-grad)"/>
+  <text x="444" y="533" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" letter-spacing=".5">EXTERNAL SERVICES</text>
+
+  <!-- Twilio -->
+  <rect x="48" y="556" width="148" height="88" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="122" y="576" text-anchor="middle" font-size="18">📞</text>
+  <text x="122" y="596" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Twilio</text>
+  <text x="122" y="612" text-anchor="middle" font-size="9" fill="#555">WhatsApp send/receive</text>
+  <text x="122" y="626" text-anchor="middle" font-size="9" fill="#555">Delivery status callbacks</text>
+  <text x="122" y="640" text-anchor="middle" font-size="9" fill="#555">Message templates</text>
+
+  <!-- OpenAI -->
+  <rect x="212" y="556" width="148" height="88" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="286" y="576" text-anchor="middle" font-size="18">🧠</text>
+  <text x="286" y="596" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">OpenAI</text>
+  <text x="286" y="612" text-anchor="middle" font-size="9" fill="#555">Whisper STT transcription</text>
+  <text x="286" y="626" text-anchor="middle" font-size="9" fill="#555">Onboarding extraction</text>
+  <text x="286" y="640" text-anchor="middle" font-size="9" fill="#555">Tagging · Moderation</text>
+
+  <!-- Akvo RAG -->
+  <rect x="376" y="556" width="148" height="88" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="576" text-anchor="middle" font-size="18">🔍</text>
+  <text x="450" y="596" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Akvo RAG</text>
+  <text x="450" y="612" text-anchor="middle" font-size="9" fill="#555">External AI service</text>
+  <text x="450" y="626" text-anchor="middle" font-size="9" fill="#555">KB-powered chat answers</text>
+  <text x="450" y="640" text-anchor="middle" font-size="9" fill="#555">Async job + callback</text>
+
+  <!-- Google Weather -->
+  <rect x="540" y="556" width="148" height="88" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="614" y="576" text-anchor="middle" font-size="18">🌤</text>
+  <text x="614" y="596" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Google Weather</text>
+  <text x="614" y="612" text-anchor="middle" font-size="9" fill="#555">6-day forecasts</text>
+  <text x="614" y="626" text-anchor="middle" font-size="9" fill="#555">Per-ward coordinates</text>
+  <text x="614" y="640" text-anchor="middle" font-size="9" fill="#555">Daily 6AM UTC schedule</text>
+
+  <!-- Firebase FCM -->
+  <rect x="704" y="556" width="148" height="88" rx="10" fill="#fff" stroke="#B1D7CD" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="778" y="576" text-anchor="middle" font-size="18">🔔</text>
+  <text x="778" y="596" text-anchor="middle" font-size="11" font-weight="700" fill="#014533">Firebase FCM</text>
+  <text x="778" y="612" text-anchor="middle" font-size="9" fill="#555">Push notifications (Android)</text>
+  <text x="778" y="626" text-anchor="middle" font-size="9" fill="#555">APNs (iOS)</text>
+  <text x="778" y="640" text-anchor="middle" font-size="9" fill="#555">Expo Notifications bridge</text>
+
+  <!-- ── Legend ── -->
+  <line x1="48" y1="662" x2="80" y2="662" stroke="#027E5D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="85" y="666" font-size="9" fill="#555">API / data connection</text>
+</svg>
+</div>
+</body>
+</html>
