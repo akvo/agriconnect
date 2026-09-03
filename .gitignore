@@ -41,3 +41,6 @@ notes/
 .agent/
 agent_docs/
 task.md
+
+# Claude Code local settings (personal, not shared with team)
+.claude/settings.local.json
