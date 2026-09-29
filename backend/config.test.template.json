@@ -7,6 +7,7 @@
     },
     "messenger": {
       "enabled": true,
+      "typing_indicator_enabled": false,
       "description": "Facebook Messenger messaging channel"
     }
   },

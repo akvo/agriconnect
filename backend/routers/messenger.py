@@ -590,10 +590,16 @@ async def handle_messenger_event(
                         status_code=200,
                     )
 
-            # Send typing indicator while AI is processing
-            messenger_service.send_typing_indicator(
-                recipient_psid=sender_id, is_typing=True
-            )
+            # Send typing indicator while AI is processing (if enabled)
+            if settings.messenger_typing_indicator_enabled:
+                try:
+                    messenger_service.send_typing_indicator(
+                        recipient_psid=sender_id, is_typing=True
+                    )
+                except Exception as e:
+                    logger.debug(
+                        f"Typing indicator skipped (non-critical): {e}"
+                    )
 
             # Get recent chat history for context
             reply_history_limit = settings.escalation_reply_history_limit

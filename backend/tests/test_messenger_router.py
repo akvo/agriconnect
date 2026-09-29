@@ -882,3 +882,104 @@ class TestMessengerRouter:
             )
             assert response.status_code == 403
             assert "disabled" in response.json()["detail"]
+
+    def test_typing_indicator_disabled_by_default(
+        self, client: TestClient, db_session: Session
+    ):
+        psid = "psid_type_disabled"
+        customer = Customer(
+            phone_number=f"messenger:{psid}",
+            onboarding_status=OnboardingStatus.COMPLETED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "messaging": [
+                        {
+                            "sender": {"id": psid},
+                            "recipient": {"id": "page_123"},
+                            "message": {
+                                "mid": "mid.type.dis",
+                                "text": "How do I plant tomatoes?",
+                            },
+                        }
+                    ]
+                }
+            ],
+        }
+
+        with (
+            patch.object(
+                settings, "messenger_typing_indicator_enabled", False
+            ),
+            patch(
+                "services.onboarding_service.OnboardingService"
+                ".needs_onboarding",
+                return_value=False,
+            ),
+            patch(
+                "routers.messenger.MessengerService.send_typing_indicator"
+            ) as mock_typing,
+        ):
+            response = client.post(
+                "/api/messenger/webhook",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200
+            assert mock_typing.call_count == 0
+
+    def test_typing_indicator_enabled_and_exception_safe(
+        self, client: TestClient, db_session: Session
+    ):
+        psid = "psid_type_enabled"
+        customer = Customer(
+            phone_number=f"messenger:{psid}",
+            onboarding_status=OnboardingStatus.COMPLETED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "messaging": [
+                        {
+                            "sender": {"id": psid},
+                            "recipient": {"id": "page_123"},
+                            "message": {
+                                "mid": "mid.type.en",
+                                "text": "How do I plant tomatoes?",
+                            },
+                        }
+                    ]
+                }
+            ],
+        }
+
+        with (
+            patch.object(
+                settings, "messenger_typing_indicator_enabled", True
+            ),
+            patch(
+                "services.onboarding_service.OnboardingService"
+                ".needs_onboarding",
+                return_value=False,
+            ),
+            patch(
+                "routers.messenger.MessengerService.send_typing_indicator",
+                side_effect=Exception("Meta Rate Limit"),
+            ) as mock_typing,
+        ):
+            response = client.post(
+                "/api/messenger/webhook",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200
+            assert mock_typing.call_count == 1

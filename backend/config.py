@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     messenger_enabled: bool = (
         _config.get("channels", {}).get("messenger", {}).get("enabled", False)
     )
+    messenger_typing_indicator_enabled: bool = (
+        _config.get("channels", {})
+        .get("messenger", {})
+        .get("typing_indicator_enabled", False)
+    )
 
     # Message limit
     message_limit: int = _config.get("message_limit")

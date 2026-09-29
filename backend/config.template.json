@@ -7,6 +7,7 @@
     },
     "messenger": {
       "enabled": false,
+      "typing_indicator_enabled": false,
       "description": "Facebook Messenger messaging channel (opt-in)"
     }
   },
