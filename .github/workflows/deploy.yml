@@ -3,7 +3,7 @@ name: Deploy to Test Cluster
 on:
   push:
     branches:
-      - tenant/com
+      - tenant/mhm-rmi
   workflow_dispatch:
 
 concurrency:
