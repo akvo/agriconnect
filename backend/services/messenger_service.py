@@ -157,18 +157,35 @@ class MessengerService:
             )
             return {"recipient_id": recipient_psid, "message_id": mock_mid}
 
-        url = (
-            f"{self.base_url}/me/messages"
-            f"?access_token={self.page_access_token}"
-        )
-        payload = {
-            "recipient": {"id": recipient_psid},
-            "message": {"text": text},
-        }
+        # Meta Messenger text length limit is 2000 characters
+        # Chunk text if necessary
+        chunks = [
+            text[i : i + 2000]  # noqa
+            for i in range(0, max(len(text), 1), 2000)
+        ]
+        last_response: Dict[str, Any] = {}
 
-        response = requests.post(url, json=payload, timeout=10)
-        response.raise_for_status()
-        return response.json()
+        for chunk in chunks:
+            url = (
+                f"{self.base_url}/me/messages"
+                f"?access_token={self.page_access_token}"
+            )
+            payload = {
+                "recipient": {"id": recipient_psid},
+                "messaging_type": "RESPONSE",
+                "message": {"text": chunk},
+            }
+
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code >= 400:
+                logger.error(
+                    f"Meta Graph API error ({response.status_code}): "
+                    f"{response.text}"
+                )
+            response.raise_for_status()
+            last_response = response.json()
+
+        return last_response
 
     def send_quick_replies(
         self,
@@ -199,13 +216,19 @@ class MessengerService:
         )
         payload = {
             "recipient": {"id": recipient_psid},
+            "messaging_type": "RESPONSE",
             "message": {
-                "text": text,
+                "text": text[:2000],
                 "quick_replies": quick_replies,
             },
         }
 
         response = requests.post(url, json=payload, timeout=10)
+        if response.status_code >= 400:
+            logger.error(
+                f"Meta Graph API error ({response.status_code}): "
+                f"{response.text}"
+            )
         response.raise_for_status()
         return response.json()
 
@@ -228,5 +251,10 @@ class MessengerService:
         }
 
         response = requests.post(url, json=payload, timeout=5)
+        if response.status_code >= 400:
+            logger.error(
+                f"Meta Graph API error ({response.status_code}): "
+                f"{response.text}"
+            )
         response.raise_for_status()
         return response.json()

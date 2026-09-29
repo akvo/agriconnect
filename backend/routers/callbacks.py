@@ -285,20 +285,20 @@ async def ai_callback(
                                     f"✓ AI answer sent via Messenger to {psid}"
                                 )
                             else:
-                                answer_response = (
-                                    whatsapp_service.send_message_with_tracking(
-                                        to_number=ai_message.customer.phone_number,
-                                        message_body=WhatsAppService.sanitize_whatsapp_content(
-                                            ai_response_text
-                                        ),
-                                        message_id=ai_message.id,
-                                        db=db,
-                                    )
+                                answer_response = whatsapp_service.send_message_with_tracking(
+                                    to_number=ai_message.customer.phone_number,
+                                    message_body=WhatsAppService.sanitize_whatsapp_content(
+                                        ai_response_text
+                                    ),
+                                    message_id=ai_message.id,
+                                    db=db,
                                 )
 
                                 # Update message with real Twilio SID
                                 ai_message.message_sid = answer_response["sid"]
-                                ai_message.delivery_status = DeliveryStatus.SENT
+                                ai_message.delivery_status = (
+                                    DeliveryStatus.SENT
+                                )
 
                                 logger.info(
                                     f"✓ AI answer sent successfully: {answer_response['sid']}"
@@ -368,10 +368,8 @@ async def ai_callback(
                                     )
 
                                     msgr_svc = MessengerService()
-                                    psid = (
-                                        ai_message.customer.phone_number.replace(
-                                            "messenger:", ""
-                                        )
+                                    psid = ai_message.customer.phone_number.replace(
+                                        "messenger:", ""
                                     )
                                     msgr_svc.send_quick_replies(
                                         recipient_psid=psid,
@@ -419,15 +417,22 @@ async def ai_callback(
                                 f"✓ AI message {ai_message.id} delivered and committed"
                             )
 
-                        except (TwilioRestException, ValueError) as e:
-                            # CRITICAL: Rollback on Twilio/validation failure
-                            logger.error(f"✗ WhatsApp delivery failed: {e}")
+                        except (
+                            TwilioRestException,
+                            ValueError,
+                            Exception,
+                        ) as e:
+                            # CRITICAL: Rollback on channel delivery failure
+                            logger.error(
+                                f"✗ Outbound delivery failed: {e}",
+                                exc_info=True,
+                            )
                             message_service.rollback_message(ai_message)
 
                             return {
                                 "status": "error",
                                 "job_id": payload.job_id,
-                                "error": f"WhatsApp delivery failed: {str(e)}",
+                                "error": f"Delivery failed: {str(e)}",
                             }
 
                     elif (
