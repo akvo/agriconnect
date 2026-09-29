@@ -194,6 +194,10 @@ class WhatsAppService:
                 "en": settings.whatsapp_broadcast_template_sid,
                 "sw": settings.whatsapp_broadcast_template_sid_sw,
             },
+            "ticket_auto_close": {
+                "en": settings.whatsapp_ticket_auto_close_template_sid,
+                "sw": settings.whatsapp_ticket_auto_close_template_sid_sw,
+            },
         }
 
         if template_type not in template_map:
