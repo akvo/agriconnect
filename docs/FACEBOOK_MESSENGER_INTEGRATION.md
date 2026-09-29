@@ -88,10 +88,17 @@ sequenceDiagram
         OnbSvc-->>Router: Next question / options
         Router->>MsgSvc: Send next onboarding prompt / quick replies
         MsgSvc-->>Meta: POST /v21.0/me/messages
+    else Escalation / Talk to Officer
+        User->>Router: Click "Talk to Officer" (payload="escalate")
+        Router->>CustSvc: Find/create open Ticket for farmer
+        Router->>Router: emit_message_received (WebSocket) & WHISPER AI job
+        Router->>MsgSvc: Send escalation confirmation with Extension Officer contacts
+        MsgSvc-->>Meta: POST /v21.0/me/messages
     else Normal Q&A / AI Advisory
         Router->>OnbSvc: Dispatch to FollowUpService / ExternalAIService
-        OnbSvc-->>Router: AI Answer
-        Router->>MsgSvc: Send response
+        OnbSvc-->>Router: AI Answer (with citations)
+        Router->>MsgSvc: Send answer + disclaimer
+        Router->>MsgSvc: Send Escalation Quick Reply ("Talk to Officer")
         MsgSvc-->>Meta: POST /v21.0/me/messages
     end
 ```
@@ -189,12 +196,12 @@ Responsible for communicating with Meta Graph API:
 
 ### 1.4 Multi-Channel Outbound Message Dispatching
 
-To prevent regression and eliminate Twilio errors when communicating with Messenger users across asynchronous callbacks:
+To prevent regression and eliminate Twilio errors when communicating with Messenger users across asynchronous callbacks, EO direct replies, and weather services:
 
-**Files**: `/backend/routers/callbacks.py` & `/backend/services/follow_up_service.py`
+**Files**: `/backend/routers/callbacks.py`, `/backend/routers/messages.py`, `/backend/services/follow_up_service.py`, & `/backend/services/weather_intent_service.py`
 
 * **Channel-Aware Routing Strategy**:
-  When dispatching an AI response or follow-up question to `customer.phone_number`:
+  When dispatching an AI response, EO manual reply, follow-up question, or weather alert/prompt to `customer.phone_number`:
   ```python
   if customer.phone_number.startswith("messenger:"):
       psid = customer.phone_number.replace("messenger:", "")
