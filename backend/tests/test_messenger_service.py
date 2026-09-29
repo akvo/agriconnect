@@ -2,7 +2,6 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 from unittest.mock import Mock, patch
 
 from services.messenger_service import MessengerService
@@ -34,21 +33,16 @@ class TestMessengerService:
     """
 
     def test_init_default_and_env(self):
-        with patch.dict(
-            os.environ,
-            {
-                "MESSENGER_PAGE_ACCESS_TOKEN": "test_page_token",
-                "MESSENGER_APP_SECRET": "test_secret",
-                "MESSENGER_GRAPH_API_VERSION": "v21.0",
-                "TESTING": "true",
-            },
-            clear=True,
-        ):
-            service = MessengerService()
-            assert service.page_access_token == "test_page_token"
-            assert service.app_secret == "test_secret"
-            assert service.api_version == "v21.0"
-            assert service.is_testing is True
+        service = MessengerService(
+            page_access_token="test_page_token",
+            app_secret="test_secret",
+            api_version="v21.0",
+            is_testing=True,
+        )
+        assert service.page_access_token == "test_page_token"
+        assert service.app_secret == "test_secret"
+        assert service.api_version == "v21.0"
+        assert service.is_testing is True
 
     def test_verify_signature_valid(self):
         secret = "my_app_secret_123"

@@ -2,6 +2,7 @@ import json
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -12,6 +13,15 @@ from tests.test_messenger_service import generate_signed_request
 
 class TestMessengerRouter:
     """Test suite for Facebook Messenger webhook and compliance endpoints."""
+
+    @pytest.fixture(autouse=True)
+    def setup_messenger_settings(self):
+        """Isolate tests from ambient environment variables."""
+        with (
+            patch.object(settings, "messenger_app_secret", ""),
+            patch.object(settings, "messenger_page_id", ""),
+        ):
+            yield
 
     def test_webhook_handshake_success(self, client: TestClient):
         response = client.get(
@@ -126,6 +136,92 @@ class TestMessengerRouter:
             assert response.status_code == 200
             assert response.json()["status"] == "ignored"
 
+    def test_webhook_post_ignores_unconfigured_page_id(
+        self, client: TestClient, db_session: Session
+    ):
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "id": "other_page_id",
+                    "messaging": [
+                        {
+                            "sender": {"id": "psid_other_page_1"},
+                            "recipient": {"id": "other_page_id"},
+                            "message": {
+                                "mid": "mid.12345",
+                                "text": "Hello other page",
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+        body = json.dumps(payload).encode("utf-8")
+        with (
+            patch.object(settings, "messenger_app_secret", ""),
+            patch.object(
+                settings, "messenger_page_id", "my_configured_page_id"
+            ),
+        ):
+            response = client.post(
+                "/api/messenger/webhook",
+                content=body,
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200
+            assert response.json()["status"] == "ignored"
+
+            customer = (
+                db_session.query(Customer)
+                .filter(Customer.phone_number == "messenger:psid_other_page_1")
+                .first()
+            )
+            assert customer is None
+
+    def test_webhook_post_accepts_configured_page_id(
+        self, client: TestClient, db_session: Session
+    ):
+        psid = "psid_configured_page_1"
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "id": "my_configured_page_id",
+                    "messaging": [
+                        {
+                            "sender": {"id": psid},
+                            "recipient": {"id": "my_configured_page_id"},
+                            "message": {
+                                "mid": "mid.configured.1",
+                                "text": "Habari AgriConnect",
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+        body = json.dumps(payload).encode("utf-8")
+        with (
+            patch.object(settings, "messenger_app_secret", ""),
+            patch.object(
+                settings, "messenger_page_id", "my_configured_page_id"
+            ),
+        ):
+            response = client.post(
+                "/api/messenger/webhook",
+                content=body,
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200
+
+            customer = (
+                db_session.query(Customer)
+                .filter(Customer.phone_number == f"messenger:{psid}")
+                .first()
+            )
+            assert customer is not None
+
     def test_webhook_post_onboarding_message(
         self, client: TestClient, db_session: Session
     ):
@@ -164,6 +260,53 @@ class TestMessengerRouter:
             )
             assert customer is not None
             assert customer.onboarding_status == OnboardingStatus.IN_PROGRESS
+
+    def test_webhook_post_ignores_duplicate_mid(
+        self, client: TestClient, db_session: Session
+    ):
+        psid = "psid_farmer_dup"
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "messaging": [
+                        {
+                            "sender": {"id": psid},
+                            "recipient": {"id": "page_id_1"},
+                            "message": {
+                                "mid": "mid.farmer.dup.1",
+                                "text": "Habari",
+                            },
+                        }
+                    ]
+                }
+            ],
+        }
+        body = json.dumps(payload).encode("utf-8")
+        with patch.object(settings, "messenger_app_secret", ""):
+            # First delivery
+            resp1 = client.post(
+                "/api/messenger/webhook",
+                content=body,
+                headers={"Content-Type": "application/json"},
+            )
+            assert resp1.status_code == 200
+
+            # Second delivery (retry)
+            resp2 = client.post(
+                "/api/messenger/webhook",
+                content=body,
+                headers={"Content-Type": "application/json"},
+            )
+            assert resp2.status_code == 200
+
+            # Verify only 1 message recorded in database
+            messages = (
+                db_session.query(Message)
+                .filter(Message.message_sid == "mid.farmer.dup.1")
+                .all()
+            )
+            assert len(messages) == 1
 
     def test_webhook_post_in_chat_deletion_flow(
         self, client: TestClient, db_session: Session
