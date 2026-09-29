@@ -79,6 +79,13 @@ async def verify_webhook(
 
     Meta requires raw plain-text challenge return with HTTP 200.
     """
+    if not settings.messenger_enabled:
+        logger.warning("✗ Meta Messenger channel is disabled in configuration")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Messenger channel is disabled",
+        )
+
     if hub_mode == "subscribe" and hub_verify_token:
         configured_token = settings.messenger_verify_token
         if hub_verify_token == configured_token:
@@ -100,6 +107,13 @@ async def handle_messenger_event(
     db: Session = Depends(get_db),
 ):
     """Handle incoming messages and events from Facebook Messenger."""
+    if not settings.messenger_enabled:
+        logger.warning("✗ Meta Messenger channel is disabled in configuration")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Messenger channel is disabled",
+        )
+
     raw_body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256")
 
@@ -647,6 +661,13 @@ async def meta_data_deletion_callback(
 
     Parses signed_request, deletes user data, and returns tracking URL.
     """
+    if not settings.messenger_enabled:
+        logger.warning("✗ Meta Messenger channel is disabled in configuration")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Messenger channel is disabled",
+        )
+
     form_data = {}
     try:
         form = await request.form()

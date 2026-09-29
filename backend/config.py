@@ -49,6 +49,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Channels configuration
+    whatsapp_enabled: bool = (
+        _config.get("channels", {}).get("whatsapp", {}).get("enabled", True)
+    )
+    messenger_enabled: bool = (
+        _config.get("channels", {}).get("messenger", {}).get("enabled", False)
+    )
+
     # Message limit
     message_limit: int = _config.get("message_limit")
 

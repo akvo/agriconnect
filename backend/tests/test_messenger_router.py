@@ -18,6 +18,7 @@ class TestMessengerRouter:
     def setup_messenger_settings(self):
         """Isolate tests from ambient environment variables."""
         with (
+            patch.object(settings, "messenger_enabled", True),
             patch.object(settings, "messenger_app_secret", ""),
             patch.object(settings, "messenger_page_id", ""),
         ):
@@ -850,3 +851,34 @@ class TestMessengerRouter:
             db_session.refresh(customer)
             assert customer.weather_subscribed is True
             assert mock_send.called
+
+    def test_webhook_handshake_disabled_channel(self, client: TestClient):
+        with patch.object(settings, "messenger_enabled", False):
+            response = client.get(
+                "/api/messenger/webhook",
+                params={
+                    "hub.mode": "subscribe",
+                    "hub.verify_token": settings.messenger_verify_token,
+                    "hub.challenge": "1158201244",
+                },
+            )
+            assert response.status_code == 403
+            assert "disabled" in response.json()["detail"]
+
+    def test_webhook_event_disabled_channel(self, client: TestClient):
+        with patch.object(settings, "messenger_enabled", False):
+            response = client.post(
+                "/api/messenger/webhook",
+                json={"object": "page", "entry": []},
+            )
+            assert response.status_code == 403
+            assert "disabled" in response.json()["detail"]
+
+    def test_data_deletion_disabled_channel(self, client: TestClient):
+        with patch.object(settings, "messenger_enabled", False):
+            response = client.post(
+                "/api/messenger/data-deletion",
+                json={"signed_request": "fake_signed_request"},
+            )
+            assert response.status_code == 403
+            assert "disabled" in response.json()["detail"]

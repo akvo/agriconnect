@@ -1,5 +1,15 @@
 {
   "message_limit": 10,
+  "channels": {
+    "whatsapp": {
+      "enabled": true,
+      "description": "WhatsApp messaging channel via Twilio / Meta API"
+    },
+    "messenger": {
+      "enabled": false,
+      "description": "Facebook Messenger messaging channel (opt-in)"
+    }
+  },
   "whatsapp": {
     "templates": {
       "confirmation": {
