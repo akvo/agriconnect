@@ -348,13 +348,61 @@ async def ai_callback(
                                             f"Failed to send confirmation template (non-critical): {e}"
                                         )
                                         # Template failure is non-fatal
+                            elif (
+                                is_messenger
+                                and settings.escalation_enabled
+                                and has_citations
+                            ):
+                                customer_lang = (
+                                    ai_message.customer.language_code
+                                )
+                                escalate_question = t(
+                                    "escalation.question", customer_lang
+                                )
+                                escalate_btn = t(
+                                    "escalation.button_escalate", customer_lang
+                                )
+                                try:
+                                    from services.messenger_service import (
+                                        MessengerService,
+                                    )
+
+                                    msgr_svc = MessengerService()
+                                    psid = (
+                                        ai_message.customer.phone_number.replace(
+                                            "messenger:", ""
+                                        )
+                                    )
+                                    msgr_svc.send_quick_replies(
+                                        recipient_psid=psid,
+                                        text=escalate_question,
+                                        options=[
+                                            {
+                                                "title": escalate_btn[:20],
+                                                "payload": (
+                                                    settings.whatsapp_escalate_button_payload
+                                                ),
+                                            }
+                                        ],
+                                    )
+                                    logger.info(
+                                        "✓ Escalation quick reply sent via "
+                                        f"Messenger to {psid}"
+                                    )
+                                except Exception as e:
+                                    logger.warning(
+                                        "Failed to send Messenger escalation "
+                                        f"quick reply (non-critical): {e}"
+                                    )
                             elif not settings.escalation_enabled:
                                 logger.info(
-                                    "Skipping confirmation template: escalation is disabled in configuration"
+                                    "Skipping confirmation template: "
+                                    "escalation is disabled in configuration"
                                 )
                             else:
                                 logger.info(
-                                    "Skipping confirmation template: no citations in AI response"
+                                    "Skipping confirmation template: no "
+                                    "citations in AI response"
                                 )
 
                             # CRITICAL: Only commit if WhatsApp send succeeded

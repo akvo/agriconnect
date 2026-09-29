@@ -23,18 +23,22 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from database import get_db
+from models.administrative import Administrative
 from models.message import (
     MediaType,
     Message,
     MessageFrom,
     MessageStatus,
 )
+from models.ticket import Ticket
 from schemas.callback import MessageType
+from services.administrative_service import AdministrativeService
 from services.customer_service import CustomerService
 from services.external_ai_service import get_external_ai_service
 from services.follow_up_service import get_follow_up_service
 from services.messenger_service import MessengerService
 from services.onboarding_service import get_onboarding_service
+from services.socketio_service import emit_message_received
 from utils.i18n import t
 
 router = APIRouter(prefix="/messenger", tags=["messenger"])
@@ -286,6 +290,291 @@ async def handle_messenger_event(
                         text=onboarding_response.message,
                     )
                 continue
+
+            # Handle Escalation Button / Quick Reply Response
+            escalate_payload = settings.whatsapp_escalate_button_payload
+            if text_body == escalate_payload or body_lower == "escalate":
+                if not settings.escalation_enabled:
+                    logger.info(
+                        f"Customer {phone_identifier} clicked 'escalate' "
+                        "button, but escalation feature is disabled in "
+                        "configuration"
+                    )
+                    return JSONResponse(
+                        content={
+                            "status": "ignored",
+                            "message": "Escalation feature is disabled",
+                        },
+                        status_code=200,
+                    )
+
+                logger.info(
+                    f"Customer {phone_identifier} clicked 'escalate' button"
+                )
+
+                # Find the previous question (latest customer message minus
+                # the current escalate message)
+                message = (
+                    db.query(Message)
+                    .filter(
+                        Message.customer_id == customer.id,
+                        Message.from_source == MessageFrom.CUSTOMER,
+                        Message.id != inbound_message.id,
+                    )
+                    .order_by(Message.created_at.desc())
+                    .first()
+                )
+
+                if not message:
+                    message = inbound_message
+
+                # Update message status to ESCALATED
+                message.status = MessageStatus.ESCALATED
+
+                # Find or create ticket
+                ticket = (
+                    db.query(Ticket)
+                    .filter(
+                        Ticket.customer_id == customer.id,
+                        Ticket.resolved_at.is_(None),
+                    )
+                    .first()
+                )
+
+                is_new_ticket = False
+                if not ticket:
+                    ticket = customer_service.create_ticket_for_customer(
+                        customer=customer, message_id=message.id
+                    )
+                    is_new_ticket = True
+
+                if ticket:
+                    chat_history_limit = settings.escalation_chat_history_limit
+                    chat_history = (
+                        db.query(Message)
+                        .filter(Message.customer_id == customer.id)
+                        .filter(Message.created_at <= message.created_at)
+                        .order_by(Message.created_at.desc())
+                        .limit(chat_history_limit)
+                        .all()
+                    )
+
+                    chats = []
+                    for msg in reversed(chat_history):
+                        if msg.from_source == MessageFrom.CUSTOMER:
+                            role = "user"
+                        elif msg.from_source in (
+                            MessageFrom.USER,
+                            MessageFrom.LLM,
+                        ):
+                            role = "assistant"
+                        else:
+                            continue
+                        chats.append({"role": role, "content": msg.body})
+
+                    chats.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "Based on this conversation, "
+                                "please give an answer with "
+                                "the context we have provided"
+                            ),
+                        }
+                    )
+
+                    if not os.getenv("TESTING") and not is_new_ticket:
+                        ai_service = get_external_ai_service(db)
+                        asyncio.create_task(
+                            ai_service.create_chat_job(
+                                message_id=message.id,
+                                message_type=MessageType.WHISPER.value,
+                                customer_id=customer.id,
+                                ticket_id=ticket.id,
+                                administrative_id=ticket.administrative_id,
+                                chats=chats,
+                                trace_id=f"whisper_t{ticket.id}_m{message.id}",
+                            )
+                        )
+
+                    ward_id = None
+                    national_adm = (
+                        db.query(Administrative)
+                        .filter(Administrative.parent_id.is_(None))
+                        .first()
+                    )
+                    if national_adm:
+                        ward_id = national_adm.id
+                    if (
+                        hasattr(customer, "customer_administrative")
+                        and len(customer.customer_administrative) > 0
+                    ):
+                        ward_id = customer.customer_administrative[
+                            0
+                        ].administrative_id
+
+                    sender_name = customer.phone_number
+                    if customer.full_name:
+                        sender_name = customer.full_name
+
+                    asyncio.create_task(
+                        emit_message_received(
+                            ticket_id=ticket.id,
+                            message_id=message.id,
+                            phone_number=customer.phone_number,
+                            body=message.body,
+                            from_source=MessageFrom.CUSTOMER,
+                            ts=message.created_at.isoformat(),
+                            administrative_id=ward_id,
+                            ticket_number=ticket.ticket_number,
+                            sender_name=sender_name,
+                            sender_user_id=None,
+                            customer_id=customer.id,
+                            media_url=message.media_url,
+                            media_type=(
+                                message.media_type.value
+                                if message.media_type
+                                else "TEXT"
+                            ),
+                        )
+                    )
+
+                ward_id = None
+                if (
+                    hasattr(customer, "customer_administrative")
+                    and len(customer.customer_administrative) > 0
+                ):
+                    ward_id = customer.customer_administrative[
+                        0
+                    ].administrative_id
+
+                eo_list = (
+                    AdministrativeService.get_extension_officers_for_area(
+                        db=db,
+                        administrative_id=ward_id,
+                        min_count=2,
+                        randomize=True,
+                    )
+                )
+
+                if eo_list:
+                    eo_contacts = "\n".join(
+                        [
+                            f"- {eo.full_name}: {eo.phone_number}"
+                            for eo in eo_list
+                        ]
+                    )
+                    confirmation_msg = t(
+                        "escalation.confirmed",
+                        lang,
+                        eo_contacts=eo_contacts,
+                    )
+                else:
+                    confirmation_msg = t(
+                        "escalation.confirmed_no_contacts",
+                        lang,
+                    )
+
+                messenger_service.send_message(
+                    recipient_psid=sender_id,
+                    text=confirmation_msg,
+                )
+                logger.info(
+                    "Sent escalation confirmation via Messenger to "
+                    f"{phone_identifier} with {len(eo_list)} EO contacts"
+                )
+                return JSONResponse(
+                    content={
+                        "status": "success",
+                        "message": "Escalation processed",
+                    },
+                    status_code=200,
+                )
+
+            # Handle Weather Subscription Responses
+            weather_yes_payload = settings.weather_yes_payload
+            weather_no_payload = settings.weather_no_payload
+            is_weather_yes = (
+                text_body == weather_yes_payload
+                or body_lower in ["1", "yes", "ndio", "ndiyo"]
+            )
+            is_weather_no = text_body == weather_no_payload or body_lower in [
+                "2",
+                "no",
+                "hapana",
+            ]
+
+            if (
+                customer.weather_subscription_asked
+                and customer.weather_subscribed is not True
+                and (is_weather_yes or is_weather_no)
+            ):
+                logger.info(
+                    f"Customer {phone_identifier} responded to weather "
+                    f"subscription: {'yes' if is_weather_yes else 'no'}"
+                )
+                from services.weather_subscription_service import (
+                    get_weather_subscription_service,
+                )
+
+                weather_service = get_weather_subscription_service(db)
+                if is_weather_yes:
+                    weather_service.subscribe(customer)
+                    response_msg = weather_service.get_confirmation_message(
+                        customer, subscribed=True, lang=lang
+                    )
+                else:
+                    weather_service.decline(customer)
+                    response_msg = weather_service.get_confirmation_message(
+                        customer, subscribed=False, lang=lang
+                    )
+
+                messenger_service.send_message(
+                    recipient_psid=sender_id, text=response_msg
+                )
+                return JSONResponse(
+                    content={
+                        "status": "success",
+                        "message": "Weather subscription processed",
+                    },
+                    status_code=200,
+                )
+
+            # Handle Weather Intent from Farmers
+            from services.weather_intent_service import (
+                get_weather_intent_service,
+            )
+
+            weather_intent_service = get_weather_intent_service(db)
+            existing_ticket = (
+                db.query(Ticket)
+                .filter(
+                    Ticket.customer_id == customer.id,
+                    Ticket.resolved_at.is_(None),
+                )
+                .first()
+            )
+            has_weather = weather_intent_service.has_weather_intent(text_body)
+            can_handle = weather_intent_service.can_handle(
+                customer, bool(existing_ticket)
+            )
+            if has_weather and can_handle:
+                logger.info(
+                    f"Weather intent detected from {phone_identifier}: "
+                    f"{text_body[:50]}..."
+                )
+                result = await weather_intent_service.handle_weather_intent(
+                    customer=customer,
+                    phone_number=phone_identifier,
+                )
+                if result.handled:
+                    return JSONResponse(
+                        content={
+                            "status": "success",
+                            "message": result.message,
+                        },
+                        status_code=200,
+                    )
 
             # Send typing indicator while AI is processing
             messenger_service.send_typing_indicator(

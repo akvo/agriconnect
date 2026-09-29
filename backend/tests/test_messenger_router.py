@@ -505,3 +505,348 @@ class TestMessengerRouter:
             )
             assert ai_msg is not None
             assert "Plant maize" in ai_msg.body
+
+    def test_ai_callback_sends_escalation_quick_reply_with_citations(
+        self, client: TestClient, db_session: Session
+    ):
+        psid = "psid_citations_test"
+        customer = Customer(
+            phone_number=f"messenger:{psid}",
+            full_name="Farmer Citations",
+            language="en",
+            onboarding_status=OnboardingStatus.COMPLETED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        farmer_msg = Message(
+            message_sid="mid_citations_query",
+            customer_id=customer.id,
+            body="How to treat avocado root rot?",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(farmer_msg)
+        db_session.commit()
+
+        callback_params = json.dumps(
+            {
+                "message_id": farmer_msg.id,
+                "message_type": 1,
+                "customer_id": customer.id,
+            }
+        )
+
+        payload = {
+            "job_id": "job_msgr_citations",
+            "status": "completed",
+            "stage": "final",
+            "job": "chat",
+            "output": {
+                "answer": "Apply phosphonate fungicide.",
+                "citations": [{"source": "Avocado Manual", "page": "12"}],
+            },
+            "error": None,
+            "callback_params": callback_params,
+            "trace_id": "trace_msgr_cit",
+            "token_count": 60,
+        }
+
+        with (
+            patch(
+                "services.messenger_service.MessengerService.send_message"
+            ) as mock_send_msg,
+            patch(
+                "services.messenger_service.MessengerService."
+                "send_quick_replies"
+            ) as mock_send_qr,
+        ):
+            mock_send_msg.return_value = {
+                "recipient_id": psid,
+                "message_id": "mid.msg.123",
+            }
+            mock_send_qr.return_value = {
+                "recipient_id": psid,
+                "message_id": "mid.qr.123",
+            }
+
+            response = client.post("/api/callback/ai", json=payload)
+            assert response.status_code == 200
+
+            assert mock_send_msg.called
+            assert mock_send_qr.called
+            qr_kwargs = mock_send_qr.call_args[1]
+            assert qr_kwargs["recipient_psid"] == psid
+            assert qr_kwargs["options"][0]["payload"] == "escalate"
+
+    def test_messenger_webhook_escalate_creates_ticket(
+        self, client: TestClient, db_session: Session
+    ):
+        from models.administrative import Administrative, AdministrativeLevel
+        from models.message import MessageStatus
+        from models.ticket import Ticket
+
+        # Create root administrative area
+        level = AdministrativeLevel(name="Country", level_index=1)
+        db_session.add(level)
+        db_session.commit()
+
+        root_adm = Administrative(
+            code="KEN",
+            name="Kenya",
+            level_id=level.id,
+            path="Kenya",
+            parent_id=None,
+        )
+        db_session.add(root_adm)
+        db_session.commit()
+
+        psid = "psid_escalate_test"
+        customer = Customer(
+            phone_number=f"messenger:{psid}",
+            full_name="Escalating Farmer",
+            language="en",
+            onboarding_status=OnboardingStatus.COMPLETED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Original farmer question
+        prev_msg = Message(
+            message_sid="mid_orig_q",
+            customer_id=customer.id,
+            body="My crop has yellow leaves",
+            from_source=MessageFrom.CUSTOMER,
+        )
+        db_session.add(prev_msg)
+        db_session.commit()
+
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "messaging": [
+                        {
+                            "sender": {"id": psid},
+                            "recipient": {"id": "page_123"},
+                            "message": {
+                                "mid": "mid.btn.escalate",
+                                "quick_reply": {"payload": "escalate"},
+                                "text": "Talk to Officer",
+                            },
+                        }
+                    ]
+                }
+            ],
+        }
+
+        with (
+            patch(
+                "services.messenger_service.MessengerService.send_message"
+            ) as mock_send,
+            patch("routers.messenger.emit_message_received") as mock_emit,
+        ):
+            mock_send.return_value = {
+                "recipient_id": psid,
+                "message_id": "mid.conf.123",
+            }
+            response = client.post(
+                "/api/messenger/webhook",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200
+
+            # Verify ticket created
+            ticket = (
+                db_session.query(Ticket)
+                .filter(Ticket.customer_id == customer.id)
+                .first()
+            )
+            assert ticket is not None
+
+            # Verify message marked as ESCALATED
+            assert prev_msg.status == MessageStatus.ESCALATED
+            assert mock_emit.called
+
+            # Verify confirmation sent
+            assert mock_send.called
+            confirmation_text = mock_send.call_args[1]["text"]
+            assert (
+                "transferred to extension service provider"
+                in confirmation_text
+            )
+
+    def test_messenger_webhook_escalate_ignored_when_disabled(
+        self, client: TestClient, db_session: Session
+    ):
+        psid = "psid_escalate_disabled"
+        customer = Customer(
+            phone_number=f"messenger:{psid}",
+            full_name="Escalating Farmer Disabled",
+            language="en",
+            onboarding_status=OnboardingStatus.COMPLETED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "messaging": [
+                        {
+                            "sender": {"id": psid},
+                            "recipient": {"id": "page_123"},
+                            "message": {
+                                "mid": "mid.btn.escalate.disabled",
+                                "quick_reply": {"payload": "escalate"},
+                                "text": "Talk to Officer",
+                            },
+                        }
+                    ]
+                }
+            ],
+        }
+
+        with patch.object(settings, "escalation_enabled", False):
+            response = client.post(
+                "/api/messenger/webhook",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200
+            assert response.json()["status"] == "ignored"
+
+    def test_messenger_webhook_weather_intent(
+        self, client: TestClient, db_session: Session
+    ):
+        from models.administrative import (
+            Administrative,
+            AdministrativeLevel,
+            CustomerAdministrative,
+        )
+        from services.weather_intent_service import WeatherIntentResult
+
+        # Create root and ward administrative area
+        level = AdministrativeLevel(name="Ward", level_index=4)
+        db_session.add(level)
+        db_session.commit()
+
+        ward_adm = Administrative(
+            code="W1",
+            name="Kiharu Ward",
+            level_id=level.id,
+            path="Kenya > Kiharu Ward",
+            parent_id=None,
+            lat=-0.71,
+            long=37.15,
+        )
+        db_session.add(ward_adm)
+        db_session.commit()
+
+        psid = "psid_weather_user"
+        customer = Customer(
+            phone_number=f"messenger:{psid}",
+            full_name="Weather Farmer",
+            language="en",
+            onboarding_status=OnboardingStatus.COMPLETED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        cust_adm = CustomerAdministrative(
+            customer_id=customer.id,
+            administrative_id=ward_adm.id,
+        )
+        db_session.add(cust_adm)
+        db_session.commit()
+
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "messaging": [
+                        {
+                            "sender": {"id": psid},
+                            "recipient": {"id": "page_123"},
+                            "message": {
+                                "mid": "mid.weather.query",
+                                "text": "weather today",
+                            },
+                        }
+                    ]
+                }
+            ],
+        }
+
+        with patch(
+            "services.weather_intent_service.WeatherIntentService."
+            "handle_weather_intent"
+        ) as mock_handle:
+            mock_handle.return_value = WeatherIntentResult(
+                handled=True,
+                message="Weather intent handled",
+                weather_message="Sunny, 25°C",
+            )
+            response = client.post(
+                "/api/messenger/webhook",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200
+            assert mock_handle.called
+
+    def test_messenger_webhook_weather_subscription_response(
+        self, client: TestClient, db_session: Session
+    ):
+        psid = "psid_sub_user"
+        customer = Customer(
+            phone_number=f"messenger:{psid}",
+            full_name="Subscribing Farmer",
+            language="en",
+            weather_subscription_asked=True,
+            weather_subscribed=None,
+            onboarding_status=OnboardingStatus.COMPLETED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        payload = {
+            "object": "page",
+            "entry": [
+                {
+                    "messaging": [
+                        {
+                            "sender": {"id": psid},
+                            "recipient": {"id": "page_123"},
+                            "message": {
+                                "mid": "mid.sub.yes",
+                                "quick_reply": {
+                                    "payload": settings.weather_yes_payload
+                                },
+                                "text": "Yes",
+                            },
+                        }
+                    ]
+                }
+            ],
+        }
+
+        with patch(
+            "services.messenger_service.MessengerService.send_message"
+        ) as mock_send:
+            mock_send.return_value = {
+                "recipient_id": psid,
+                "message_id": "mid.conf.sub",
+            }
+            response = client.post(
+                "/api/messenger/webhook",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.status_code == 200
+            assert response.json()["status"] == "success"
+
+            db_session.refresh(customer)
+            assert customer.weather_subscribed is True
+            assert mock_send.called
