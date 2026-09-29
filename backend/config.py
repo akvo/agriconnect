@@ -257,6 +257,39 @@ class Settings(BaseSettings):
         .get("button_payloads", {})
         .get("read_broadcast", "read_broadcast")
     )
+
+    # Stale ticket auto-close settings
+    ticket_auto_close_enabled: bool = _config.get(
+        "ticket_auto_close", {}
+    ).get("enabled", True)
+    ticket_auto_close_stale_hours: int = _config.get(
+        "ticket_auto_close", {}
+    ).get("stale_hours", 24)
+    whatsapp_ticket_auto_close_template_sid: str = (
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("ticket_auto_close", {})
+        .get("sid", "")
+    )
+    whatsapp_ticket_auto_close_template_sid_sw: str = (
+        _config.get("whatsapp", {})
+        .get("templates", {})
+        .get("ticket_auto_close", {})
+        .get("sid_sw", "")
+    )
+
+    # Role name of the human responder, e.g. "Health Worker" in health
+    officer_label: dict = _config.get(
+        "officer_label", {"en": "Extension Officer"}
+    )
+
+    def get_officer_label(self, language: str) -> str:
+        """Return the officer label for a language, falling back to en."""
+        return (
+            self.officer_label.get(language)
+            or self.officer_label.get("en")
+            or "Extension Officer"
+        )
     broadcast_batch_size: int = os.getenv(
         "BROADCAST_BATCH_SIZE",
         50,

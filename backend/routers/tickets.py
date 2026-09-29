@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, or_
 from datetime import datetime, timezone
 
+from config import settings
 from database import get_db
 from models.ticket import Ticket
 from models.customer import Customer
@@ -594,7 +595,13 @@ async def mark_ticket_resolved(
             )
 
             if message_template:
-                whatsapp.send_message(customer.phone_number, message_template)
+                whatsapp.send_message(
+                    customer.phone_number,
+                    message_template.replace(
+                        "{officer_label}",
+                        settings.get_officer_label(language),
+                    ),
+                )
     except Exception as e:
         logger.error(f"Failed to send ticket closure WhatsApp: {e}")
 

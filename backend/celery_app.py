@@ -45,6 +45,11 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.weather_tasks.retry_failed_weather_broadcasts",
         "schedule": crontab(minute="*/5"),
     },
+    # Auto-close unanswered escalations daily at 20:00 EAT (17:00 UTC)
+    "auto-close-stale-tickets": {
+        "task": "tasks.ticket_tasks.auto_close_stale_tickets",
+        "schedule": crontab(hour=17, minute=0),
+    },
 }
 
 # Auto-discover tasks - Celery will import them when needed

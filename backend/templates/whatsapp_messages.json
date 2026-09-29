@@ -4,7 +4,11 @@
     "sw": "Karibu AgriConnect! Tuko hapa kukusaidia kwa taarifa na msaada wa kilimo. Tunaweza kukusaidiaje leo?"
   },
   "ticket_closed": {
-    "en": "Your conversation with the extension officer has concluded. Send a new message to start another conversation.",
-    "sw": "Mawasiliano yako na afisa yamefungwa. Tuma ujumbe mpya kuendelea."
+    "en": "Your conversation with the {officer_label} has concluded. Send a new message to start another conversation.",
+    "sw": "Mawasiliano yako na {officer_label} yamefungwa. Tuma ujumbe mpya kuendelea."
+  },
+  "ticket_auto_closed": {
+    "en": "Your escalation could not be resolved because no {officer_label} was available. You can continue asking questions in this chat.",
+    "sw": "Ombi lako la msaada halikuweza kushughulikiwa kwa sababu hakuna {officer_label} aliyepatikana. Unaweza kuendelea kuuliza maswali kwenye mazungumzo haya."
   }
 }
