@@ -253,6 +253,39 @@ class TestShouldAskFollowUp:
         # Should NOT ask because follow-up was sent AFTER ticket resolved
         assert result is False
 
+    def test_should_not_ask_when_follow_up_disabled_in_config(
+        self, db_session: Session
+    ):
+        """Test that follow-up is NOT asked when follow_up_enabled is False"""
+        from config import settings
+
+        customer = Customer(
+            phone_number="+255712345689",
+            full_name="Test Farmer Disabled",
+            language=CustomerLanguage.EN,
+            onboarding_status=OnboardingStatus.COMPLETED,
+        )
+        db_session.add(customer)
+        db_session.commit()
+
+        # Regular message with no follow-up in history
+        msg1 = Message(
+            message_sid="msg_no_followup",
+            customer_id=customer.id,
+            body="Help me please",
+            from_source=MessageFrom.CUSTOMER,
+            message_type=None,
+        )
+        db_session.add(msg1)
+        db_session.commit()
+
+        chat_history = [msg1]
+
+        service = FollowUpService(db_session)
+        with patch.object(settings, "follow_up_enabled", False):
+            result = service.should_ask_follow_up(customer, chat_history)
+            assert result is False
+
 
 class TestFarmerContext:
     """Test farmer context extraction"""
@@ -349,15 +382,13 @@ class TestGenerateFollowUp:
         mock_response.content = "What type of crop is affected by this issue?"
 
         with patch.object(
-            service.openai_service,
-            "is_configured",
-            return_value=True
+            service.openai_service, "is_configured", return_value=True
         ):
             with patch.object(
                 service.openai_service,
                 "chat_completion",
                 new_callable=AsyncMock,
-                return_value=mock_response
+                return_value=mock_response,
             ):
                 result = await service.generate_follow_up_question(
                     customer=customer,
@@ -385,15 +416,13 @@ class TestGenerateFollowUp:
         mock_response.content = "Ni zao gani limeathirika?"
 
         with patch.object(
-            service.openai_service,
-            "is_configured",
-            return_value=True
+            service.openai_service, "is_configured", return_value=True
         ):
             with patch.object(
                 service.openai_service,
                 "chat_completion",
                 new_callable=AsyncMock,
-                return_value=mock_response
+                return_value=mock_response,
             ):
                 result = await service.generate_follow_up_question(
                     customer=customer,
@@ -418,9 +447,7 @@ class TestGenerateFollowUp:
         service = FollowUpService(db_session)
 
         with patch.object(
-            service.openai_service,
-            "is_configured",
-            return_value=False
+            service.openai_service, "is_configured", return_value=False
         ):
             result = await service.generate_follow_up_question(
                 customer=customer,
@@ -465,20 +492,18 @@ class TestAskFollowUp:
         mock_whatsapp_result = {"sid": "SM_FOLLOW_UP_123", "status": "sent"}
 
         with patch.object(
-            service.openai_service,
-            "is_configured",
-            return_value=True
+            service.openai_service, "is_configured", return_value=True
         ):
             with patch.object(
                 service.openai_service,
                 "chat_completion",
                 new_callable=AsyncMock,
-                return_value=mock_response
+                return_value=mock_response,
             ):
                 with patch.object(
                     service.whatsapp_service,
                     "send_message",
-                    return_value=mock_whatsapp_result
+                    return_value=mock_whatsapp_result,
                 ):
                     result = await service.ask_follow_up(
                         customer=customer,
@@ -528,15 +553,13 @@ class TestAskFollowUp:
 
         # Mock OpenAI to return None
         with patch.object(
-            service.openai_service,
-            "is_configured",
-            return_value=True
+            service.openai_service, "is_configured", return_value=True
         ):
             with patch.object(
                 service.openai_service,
                 "chat_completion",
                 new_callable=AsyncMock,
-                return_value=None
+                return_value=None,
             ):
                 result = await service.ask_follow_up(
                     customer=customer,

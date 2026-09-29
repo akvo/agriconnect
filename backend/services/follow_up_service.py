@@ -70,6 +70,7 @@ Muktadha wa mkulima:
 @dataclass
 class FarmerContext:
     """Context information about the farmer for personalized follow-ups."""
+
     name: Optional[str] = None
     language: str = "en"
     crop_type: Optional[str] = None
@@ -112,9 +113,7 @@ class FollowUpService:
         )
 
     def should_ask_follow_up(
-        self,
-        customer: Customer,
-        chat_history: List[Message]
+        self, customer: Customer, chat_history: List[Message]
     ) -> bool:
         """
         Determine if a follow-up question should be asked.
@@ -131,6 +130,14 @@ class FollowUpService:
         Returns:
             bool: True if follow-up should be asked
         """
+        # Check if follow-up feature is enabled in configuration
+        if not settings.follow_up_enabled:
+            logger.info(
+                f"[FollowUp] Feature disabled in config for customer "
+                f"{customer.id}, skipping"
+            )
+            return False
+
         # Find last FOLLOW_UP in chat history
         last_follow_up = None
         for msg in chat_history:
@@ -184,9 +191,7 @@ class FollowUpService:
         return False
 
     async def generate_follow_up_question(
-        self,
-        customer: Customer,
-        original_question: str
+        self, customer: Customer, original_question: str
     ) -> Optional[str]:
         """
         Generate a follow-up question using OpenAI.

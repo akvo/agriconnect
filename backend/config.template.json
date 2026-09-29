@@ -59,6 +59,12 @@
         "max_tokens": 500,
         "system_prompt": "You are a helpful agricultural assistant helping farmers get started with AgriConnect. Be friendly, concise, and practical."
       },
+      "follow_up": {
+        "enabled": true,
+        "temperature": 0.7,
+        "max_tokens": 150,
+        "description": "Ask contextual follow-up question before routing to external AI"
+      },
       "content_moderation": {
         "enabled": true,
         "auto_flag": true
