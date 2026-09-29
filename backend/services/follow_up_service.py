@@ -299,23 +299,41 @@ class FollowUpService:
         self.db.flush()
 
         try:
-            # Send via WhatsApp
-            result = self.whatsapp_service.send_message(
-                to_number=phone_number,
-                message_body=follow_up_text,
-            )
+            if phone_number.startswith("messenger:"):
+                psid = phone_number.replace("messenger:", "")
+                from services.messenger_service import MessengerService
 
-            # Update with real Twilio SID
-            follow_up_message.message_sid = result.get("sid", message_sid)
-            follow_up_message.delivery_status = DeliveryStatus.SENT
+                msgr_svc = MessengerService()
+                result = msgr_svc.send_message(
+                    recipient_psid=psid,
+                    text=follow_up_text,
+                )
+                follow_up_message.message_sid = result.get(
+                    "message_id", message_sid
+                )
+                follow_up_message.delivery_status = DeliveryStatus.SENT
+                logger.info(
+                    f"[FollowUp] Sent follow-up via Messenger to {psid}: "
+                    f"{follow_up_message.message_sid}"
+                )
+            else:
+                # Send via WhatsApp
+                result = self.whatsapp_service.send_message(
+                    to_number=phone_number,
+                    message_body=follow_up_text,
+                )
+
+                # Update with real Twilio SID
+                follow_up_message.message_sid = result.get("sid", message_sid)
+                follow_up_message.delivery_status = DeliveryStatus.SENT
+
+                logger.info(
+                    f"[FollowUp] Sent follow-up to {phone_number}: "
+                    f"{result.get('sid')}"
+                )
 
             self.db.commit()
             self.db.refresh(follow_up_message)
-
-            logger.info(
-                f"[FollowUp] Sent follow-up to {phone_number}: "
-                f"{result.get('sid')}"
-            )
             return follow_up_message
 
         except Exception as e:

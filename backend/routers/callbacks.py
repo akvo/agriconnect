@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -256,22 +257,52 @@ async def ai_callback(
                                 f"Sending AI answer to {ai_message.customer.phone_number}"
                             )
 
-                            answer_response = whatsapp_service.send_message_with_tracking(
-                                to_number=ai_message.customer.phone_number,
-                                message_body=WhatsAppService.sanitize_whatsapp_content(
-                                    ai_response_text
-                                ),
-                                message_id=ai_message.id,
-                                db=db,
-                            )
+                            if ai_message.customer.phone_number.startswith(
+                                "messenger:"
+                            ):
+                                psid = (
+                                    ai_message.customer.phone_number.replace(
+                                        "messenger:", ""
+                                    )
+                                )
+                                from services.messenger_service import (
+                                    MessengerService,
+                                )
 
-                            # Update message with real Twilio SID
-                            ai_message.message_sid = answer_response["sid"]
-                            ai_message.delivery_status = DeliveryStatus.SENT
+                                msgr_svc = MessengerService()
+                                msgr_res = msgr_svc.send_message(
+                                    recipient_psid=psid,
+                                    text=ai_response_text,
+                                )
+                                ai_message.message_sid = msgr_res.get(
+                                    "message_id",
+                                    f"mid.msgr.{uuid.uuid4().hex[:16]}",
+                                )
+                                ai_message.delivery_status = (
+                                    DeliveryStatus.SENT
+                                )
+                                logger.info(
+                                    f"✓ AI answer sent via Messenger to {psid}"
+                                )
+                            else:
+                                answer_response = (
+                                    whatsapp_service.send_message_with_tracking(
+                                        to_number=ai_message.customer.phone_number,
+                                        message_body=WhatsAppService.sanitize_whatsapp_content(
+                                            ai_response_text
+                                        ),
+                                        message_id=ai_message.id,
+                                        db=db,
+                                    )
+                                )
 
-                            logger.info(
-                                f"✓ AI answer sent successfully: {answer_response['sid']}"
-                            )
+                                # Update message with real Twilio SID
+                                ai_message.message_sid = answer_response["sid"]
+                                ai_message.delivery_status = DeliveryStatus.SENT
+
+                                logger.info(
+                                    f"✓ AI answer sent successfully: {answer_response['sid']}"
+                                )
 
                             # Step 2: Send confirmation template only if citations exist and escalation is enabled
                             # Citations indicate the response is from knowledge base
