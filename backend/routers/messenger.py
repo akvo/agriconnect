@@ -9,13 +9,16 @@ Handles:
 - Deletion status lookup (GET /api/messenger/data-deletion/status)
 """
 
+import asyncio
 import json
 import logging
+import os
 import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -26,6 +29,7 @@ from models.message import (
     MessageFrom,
     MessageStatus,
 )
+from schemas.callback import MessageType
 from services.customer_service import CustomerService
 from services.external_ai_service import get_external_ai_service
 from services.follow_up_service import get_follow_up_service
@@ -101,7 +105,10 @@ async def handle_messenger_event(
     if settings.messenger_app_secret and not (
         messenger_service.verify_signature(raw_body, signature)
     ):
-        logger.warning("✗ Invalid Messenger webhook signature")
+        logger.warning(
+            "✗ Invalid Messenger webhook signature. "
+            f"Signature header present: {bool(signature)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid webhook signature",
@@ -124,8 +131,30 @@ async def handle_messenger_event(
     processed_count = 0
 
     for entry in entries:
+        # Filter by Page ID if configured
+        if settings.messenger_page_id:
+            page_id = str(entry.get("id", ""))
+            if page_id and page_id != str(settings.messenger_page_id):
+                logger.info(
+                    "Ignoring Messenger event for unconfigured page: "
+                    f"{page_id}"
+                )
+                continue
+
         messaging_events = entry.get("messaging", [])
         for event in messaging_events:
+            # Filter by recipient ID if configured
+            if settings.messenger_page_id:
+                recipient_id = str(event.get("recipient", {}).get("id", ""))
+                if recipient_id and recipient_id != str(
+                    settings.messenger_page_id
+                ):
+                    logger.info(
+                        "Ignoring event for unconfigured recipient: "
+                        f"{recipient_id}"
+                    )
+                    continue
+
             # Skip echo messages and delivery/read receipts
             message_obj = event.get("message")
             if not message_obj or message_obj.get("is_echo"):
@@ -151,6 +180,19 @@ async def handle_messenger_event(
             if not text_body:
                 continue
 
+            # Extract message identifier & check deduplication
+            mid_val = message_obj.get(
+                "mid", f"mid.msgr.{uuid.uuid4().hex[:16]}"
+            )
+            existing_message = (
+                db.query(Message)
+                .filter(Message.message_sid == mid_val)
+                .first()
+            )
+            if existing_message:
+                logger.info(f"Skipping duplicate Messenger message: {mid_val}")
+                continue
+
             processed_count += 1
             phone_identifier = f"messenger:{sender_id}"
 
@@ -160,6 +202,27 @@ async def handle_messenger_event(
             )
             lang = customer.language_code or "sw"
             body_lower = text_body.lower()
+
+            # Record customer inbound message immediately for idempotency
+            inbound_message = Message(
+                message_sid=mid_val,
+                customer_id=customer.id,
+                body=text_body,
+                from_source=MessageFrom.CUSTOMER,
+                status=MessageStatus.PENDING,
+                media_type=MediaType.TEXT,
+            )
+            db.add(inbound_message)
+            try:
+                db.commit()
+                db.refresh(inbound_message)
+            except IntegrityError:
+                db.rollback()
+                logger.info(
+                    "Concurrent duplicate Messenger message ignored: "
+                    f"{mid_val}"
+                )
+                continue
 
             # Handle In-Chat Deletion Flow
             if customer.delete_requested:
@@ -195,22 +258,6 @@ async def handle_messenger_event(
                     content={"status": "delete_requested"}, status_code=200
                 )
 
-            # Record customer inbound message
-            mid_val = message_obj.get(
-                "mid", f"mid.msgr.{uuid.uuid4().hex[:16]}"
-            )
-            inbound_message = Message(
-                message_sid=mid_val,
-                customer_id=customer.id,
-                body=text_body,
-                from_source=MessageFrom.CUSTOMER,
-                status=MessageStatus.PENDING,
-                media_type=MediaType.TEXT,
-            )
-            db.add(inbound_message)
-            db.commit()
-            db.refresh(inbound_message)
-
             # Check Onboarding Flow
             onboarding_service = get_onboarding_service(db)
             if onboarding_service.needs_onboarding(customer):
@@ -240,32 +287,59 @@ async def handle_messenger_event(
                     )
                 continue
 
-            # Check Follow-Up or AI Q&A flow
-            follow_up_service = get_follow_up_service(db)
-            external_ai_service = get_external_ai_service(db)
-
             # Send typing indicator while AI is processing
             messenger_service.send_typing_indicator(
                 recipient_psid=sender_id, is_typing=True
             )
 
-            # Check if in active follow-up clarification
-            if follow_up_service.has_pending_follow_up(customer.id):
-                await follow_up_service.handle_farmer_reply(
-                    customer=customer, reply_text=text_body
+            # Get recent chat history for context
+            reply_history_limit = settings.escalation_reply_history_limit
+            chat_history = (
+                db.query(Message)
+                .filter(Message.customer_id == customer.id)
+                .filter(Message.created_at <= inbound_message.created_at)
+                .order_by(Message.created_at.desc())
+                .limit(reply_history_limit)
+                .all()
+            )
+
+            # Check if we should ask a follow-up question first
+            if settings.follow_up_enabled and not os.getenv("TESTING"):
+                follow_up_service = get_follow_up_service(db)
+                should_ask = follow_up_service.should_ask_follow_up(
+                    customer, chat_history
                 )
-            elif follow_up_service.should_ask_follow_up(
-                customer=customer, question=text_body
-            ):
-                await follow_up_service.ask_follow_up_question(
-                    customer=customer, question=text_body
-                )
-            else:
-                # Forward to External AI Service
-                await external_ai_service.submit_question(
-                    customer=customer,
-                    question=text_body,
-                    message_id=inbound_message.id,
+                if should_ask:
+                    follow_up_message = await follow_up_service.ask_follow_up(
+                        customer=customer,
+                        original_message=inbound_message,
+                        phone_number=phone_identifier,
+                    )
+                    if follow_up_message:
+                        continue
+
+            # Format chat history for External AI Service
+            chats = []
+            for msg in reversed(chat_history):
+                if msg.from_source == MessageFrom.CUSTOMER:
+                    role = "user"
+                elif msg.from_source in (MessageFrom.USER, MessageFrom.LLM):
+                    role = "assistant"
+                else:
+                    continue
+                chats.append({"role": role, "content": msg.body})
+
+            # Create AI chat job if not in test environment
+            if not os.getenv("TESTING"):
+                ai_service = get_external_ai_service(db)
+                asyncio.create_task(
+                    ai_service.create_chat_job(
+                        message_id=inbound_message.id,
+                        message_type=MessageType.REPLY.value,
+                        customer_id=customer.id,
+                        chats=chats,
+                        trace_id=f"reply_c{customer.id}_m{inbound_message.id}",
+                    )
                 )
 
     if processed_count == 0:

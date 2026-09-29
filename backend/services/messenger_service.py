@@ -43,26 +43,17 @@ class MessengerService:
         self.page_access_token = (
             page_access_token
             if page_access_token is not None
-            else os.getenv(
-                "MESSENGER_PAGE_ACCESS_TOKEN",
-                settings.messenger_page_access_token,
-            )
+            else settings.messenger_page_access_token
         )
         self.app_secret = (
             app_secret
             if app_secret is not None
-            else os.getenv(
-                "MESSENGER_APP_SECRET",
-                settings.messenger_app_secret,
-            )
+            else settings.messenger_app_secret
         )
         self.api_version = (
             api_version
             if api_version is not None
-            else os.getenv(
-                "MESSENGER_GRAPH_API_VERSION",
-                settings.messenger_graph_api_version,
-            )
+            else settings.messenger_graph_api_version
         )
         self.base_url = f"https://graph.facebook.com/{self.api_version}"
 
@@ -78,6 +69,9 @@ class MessengerService:
             return True
 
         if not signature_header or not signature_header.startswith("sha256="):
+            logger.warning(
+                f"Missing or malformed signature header: {signature_header}"
+            )
             return False
 
         if not self.app_secret:
@@ -93,7 +87,14 @@ class MessengerService:
         ).hexdigest()
 
         provided_sig = signature_header.split("sha256=")[1]
-        return hmac.compare_digest(expected_sig, provided_sig)
+        matches = hmac.compare_digest(expected_sig, provided_sig)
+        if not matches:
+            logger.warning(
+                "HMAC-SHA256 signature mismatch. Please verify that "
+                "MESSENGER_APP_SECRET in .env exactly matches the App Secret "
+                "in your Meta App settings (Basic Settings -> App Secret)."
+            )
+        return matches
 
     def parse_signed_request(
         self, signed_request: Optional[str]

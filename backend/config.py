@@ -425,6 +425,7 @@ class Settings(BaseSettings):
     )
 
     # Facebook Messenger Configuration
+    messenger_page_id: str = os.getenv("MESSENGER_PAGE_ID", "")
     messenger_verify_token: str = os.getenv(
         "MESSENGER_VERIFY_TOKEN", "agriconnect_messenger_verify_token"
     )

@@ -313,7 +313,16 @@ async def ai_callback(
                                 and len(payload.output.citations) > 0
                             )
 
-                            if settings.escalation_enabled and has_citations:
+                            is_messenger = (
+                                ai_message.customer.phone_number.startswith(
+                                    "messenger:"
+                                )
+                            )
+                            if (
+                                not is_messenger
+                                and settings.escalation_enabled
+                                and has_citations
+                            ):
                                 # Select template based on customer's language
                                 customer_lang = (
                                     ai_message.customer.language_code
