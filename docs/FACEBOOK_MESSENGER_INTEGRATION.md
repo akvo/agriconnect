@@ -40,7 +40,7 @@ There are two architectural paths for handling Facebook Messenger user identifie
 ## 5W1H Requirements Analysis
 
 - **Who**: Farmers and community users engaging with AgriConnect via Facebook Messenger; System Administrators; Meta Compliance Auditors.
-- **What**: 
+- **What**:
   - Webhook verification & incoming message ingestion (`GET` / `POST /api/messenger/webhook`).
   - Outbound messaging via Meta Graph Send API (`MessengerService`).
   - In-chat self-service account deletion trigger.
@@ -66,7 +66,7 @@ sequenceDiagram
     participant CustSvc as CustomerService
     participant OnbSvc as OnboardingService / AISvc
     participant MsgSvc as MessengerService
-    
+
     %% Handshake Flow
     Note over Meta,Router: Initial Webhook Handshake (GET /api/messenger/webhook)
     Meta->>Router: GET hub.mode=subscribe&hub.verify_token=...&hub.challenge=...
@@ -78,7 +78,7 @@ sequenceDiagram
     Meta->>Router: POST JSON entry[].messaging[] with X-Hub-Signature-256
     Router->>Router: Validate HMAC Signature & Deduplicate Message
     Router->>CustSvc: get_or_create_customer(phone_number="messenger:<PSID>")
-    
+
     alt User requests "delete" / "futa"
         Router->>CustSvc: Handle in-chat deletion confirmation / delete_customer()
         Router->>MsgSvc: Send deletion confirmation / success via Graph API
@@ -120,6 +120,7 @@ sequenceDiagram
 
 ```python
 # Facebook Messenger Configuration
+MESSENGER_PAGE_ID: str = os.getenv("MESSENGER_PAGE_ID", "")
 MESSENGER_VERIFY_TOKEN: str = os.getenv("MESSENGER_VERIFY_TOKEN", "agriconnect_messenger_verify_token")
 MESSENGER_PAGE_ACCESS_TOKEN: str = os.getenv("MESSENGER_PAGE_ACCESS_TOKEN", "")
 MESSENGER_APP_SECRET: str = os.getenv("MESSENGER_APP_SECRET", "")
