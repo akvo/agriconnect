@@ -27,6 +27,11 @@
         "sid": "HX8658667a944883b1ceab9205b83d407b",
         "sid_sw": "HX3b9f54d9b345b04f5798d655db7bbb25",
         "description": "Template send to confirm incoming broadcast message"
+      },
+      "ticket_auto_close": {
+        "sid": "HX80d21574503f41bec35ac361d4e0d392",
+        "sid_sw": "HX58b6da97bca601c750c3de7ee6ae8ac3",
+        "description": "Template sent when an escalation is auto-closed with no officer response. {{1}} = officer label"
       }
     },
     "button_payloads": {
@@ -40,6 +45,15 @@
     "chat_history_limit": 20,
     "reply_history_limit": 10,
     "description": "Number of recent messages to include in chat history for AI context"
+  },
+  "officer_label": {
+    "en": "Extension Officer",
+    "sw": "Afisa Ugani"
+  },
+  "ticket_auto_close": {
+    "enabled": true,
+    "stale_hours": 24,
+    "description": "Daily job (20:00 EAT) closing open tickets with no officer reply after stale_hours"
   },
   "openai": {
     "enabled": true,

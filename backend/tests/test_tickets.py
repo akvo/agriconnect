@@ -1858,3 +1858,53 @@ class TestTickets:
             "customer_mixed should appear in BOTH OPEN and RESOLVED lists "
             "(they have both open and resolved tickets)"
         )
+
+
+def test_resolve_ticket_message_uses_officer_label(
+    client, auth_headers_factory, db_session, administrative_data
+):
+    from unittest.mock import patch
+
+    from config import settings
+    from services.whatsapp_service import WhatsAppService
+
+    admin_headers, _ = auth_headers_factory(user_type="admin")
+    customer = Customer(
+        phone_number="+255100000099", full_name="Farmer L", language="en"
+    )
+    db_session.add(customer)
+    db_session.commit()
+    message = Message(
+        message_sid="SMTESTLABEL",
+        customer_id=customer.id,
+        body="Help",
+        from_source=MessageFrom.CUSTOMER,
+    )
+    db_session.add(message)
+    db_session.commit()
+    ticket = Ticket(
+        ticket_number="20251101009999",
+        administrative_id=administrative_data["ward_ngudu"].id,
+        customer_id=customer.id,
+        message_id=message.id,
+    )
+    db_session.add(ticket)
+    db_session.commit()
+
+    with patch.object(
+        settings, "officer_label", {"en": "Health Worker"}
+    ), patch.object(
+        WhatsAppService, "send_message", return_value={"sid": "SM1"}
+    ) as send_message:
+        response = client.patch(
+            f"/api/tickets/{ticket.id}",
+            json={"resolved_at": datetime.utcnow().isoformat()},
+            headers=admin_headers,
+        )
+
+    assert response.status_code == 200
+    _, body = send_message.call_args.args
+    assert body == (
+        "Your conversation with the Health Worker has concluded. "
+        "Send a new message to start another conversation."
+    )
