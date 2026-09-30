@@ -17,7 +17,7 @@ from services.administrative_service import AdministrativeService
 from services.whatsapp_service import WhatsAppService
 from services.socketio_service import (
     emit_message_received,
-    emit_ticket_resolved
+    emit_ticket_resolved,
 )
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -86,11 +86,7 @@ class MessageResponse(BaseModel):
 def _check_message_access(message: Message, user: User, db: Session) -> None:
     """Check if user has access to update the message. Raises 403 if not."""
     # Get the ticket associated with this message
-    ticket = (
-        db.query(Ticket)
-        .filter(Ticket.message_id == message.id)
-        .first()
-    )
+    ticket = db.query(Ticket).filter(Ticket.message_id == message.id).first()
 
     if not ticket:
         raise HTTPException(
@@ -223,11 +219,7 @@ async def update_message_status(
     _check_message_access(message, current_user, db)
 
     # Get associated ticket
-    ticket = (
-        db.query(Ticket)
-        .filter(Ticket.message_id == message.id)
-        .first()
-    )
+    ticket = db.query(Ticket).filter(Ticket.message_id == message.id).first()
 
     # Update message status
     message.status = status_update.status
@@ -253,11 +245,7 @@ async def update_message_status(
             )
 
     # Get media_type value as string
-    msg_media_type = (
-        message.media_type.value
-        if message.media_type
-        else "TEXT"
-    )
+    msg_media_type = message.media_type.value if message.media_type else "TEXT"
 
     return MessageResponse(
         id=message.id,
@@ -294,9 +282,7 @@ async def create_message(
     """
     # Get ticket
     ticket = (
-        db.query(Ticket)
-        .filter(Ticket.id == message_data.ticket_id)
-        .first()
+        db.query(Ticket).filter(Ticket.id == message_data.ticket_id).first()
     )
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -386,47 +372,69 @@ async def create_message(
                 f"{new_message.body}\n\n— _{current_user.full_name}_"
             )
 
-            # Check if this is a media message
-            if message_data.media_url and message_data.media_type == "IMAGE":
-                # Build full public URL for the media
-                web_domain = os.getenv("WEBDOMAIN", "http://localhost:8000")
-                # Ensure web_domain has a scheme
-                if not web_domain.startswith(("http://", "https://")):
-                    web_domain = f"https://{web_domain}"
-                # Ensure no double slashes when joining
-                media_path = message_data.media_url.lstrip("/")
-                full_media_url = f"{web_domain.rstrip('/')}/{media_path}"
+            if customer_phone.startswith("messenger:"):
+                from services.messenger_service import MessengerService
 
-                response = whatsapp_service.send_message_with_media(
-                    to_number=customer_phone,
-                    message_body=formatted_body,
-                    media_url=full_media_url,
+                messenger_service = MessengerService()
+                psid = customer_phone.replace("messenger:", "")
+                response = messenger_service.send_message(
+                    recipient_psid=psid,
+                    text=formatted_body,
                 )
                 print(
-                    f"WhatsApp image sent to {customer_phone}: "
-                    f"{response.get('sid')} (media: {full_media_url})"
+                    f"Messenger reply sent to {customer_phone}: "
+                    f"{response.get('message_id')}"
                 )
+                if response.get("message_id"):
+                    new_message.message_sid = response.get("message_id")
+                    db.commit()
+                    db.refresh(new_message)
             else:
-                response = whatsapp_service.send_message(
-                    to_number=customer_phone,
-                    message_body=formatted_body,
-                )
-                print(
-                    f"WhatsApp reply sent to {customer_phone}: "
-                    f"{response.get('sid')}"
-                )
+                # Check if this is a media message
+                if (
+                    message_data.media_url
+                    and message_data.media_type == "IMAGE"
+                ):
+                    # Build full public URL for the media
+                    web_domain = os.getenv(
+                        "WEBDOMAIN", "http://localhost:8000"
+                    )
+                    # Ensure web_domain has a scheme
+                    if not web_domain.startswith(("http://", "https://")):
+                        web_domain = f"https://{web_domain}"
+                    # Ensure no double slashes when joining
+                    media_path = message_data.media_url.lstrip("/")
+                    full_media_url = f"{web_domain.rstrip('/')}/{media_path}"
 
-            # Optional: Update message_sid with Twilio SID for tracking
-            # This helps correlate backend messages with Twilio messages
-            if response.get("sid"):
-                new_message.message_sid = response.get("sid")
-                db.commit()
-                db.refresh(new_message)
+                    response = whatsapp_service.send_message_with_media(
+                        to_number=customer_phone,
+                        message_body=formatted_body,
+                        media_url=full_media_url,
+                    )
+                    print(
+                        f"WhatsApp image sent to {customer_phone}: "
+                        f"{response.get('sid')} (media: {full_media_url})"
+                    )
+                else:
+                    response = whatsapp_service.send_message(
+                        to_number=customer_phone,
+                        message_body=formatted_body,
+                    )
+                    print(
+                        f"WhatsApp reply sent to {customer_phone}: "
+                        f"{response.get('sid')}"
+                    )
+
+                # Optional: Update message_sid with Twilio SID for tracking
+                if response.get("sid"):
+                    new_message.message_sid = response.get("sid")
+                    db.commit()
+                    db.refresh(new_message)
 
         except Exception as e:
             # Log error but don't fail the request
             # Message is already saved in DB and can be retried later
-            print(f"Failed to send WhatsApp reply: {e}")
+            print(f"Failed to send reply to {customer_phone}: {e}")
             # TODO: Implement retry queue or dead letter queue for failed sends
 
     # Emit WebSocket event for new message
@@ -461,9 +469,7 @@ async def create_message(
 
     # Get media_type value as string
     media_type_value = (
-        new_message.media_type.value
-        if new_message.media_type
-        else "TEXT"
+        new_message.media_type.value if new_message.media_type else "TEXT"
     )
 
     return MessageResponse(

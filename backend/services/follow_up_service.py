@@ -70,6 +70,7 @@ Muktadha wa mkulima:
 @dataclass
 class FarmerContext:
     """Context information about the farmer for personalized follow-ups."""
+
     name: Optional[str] = None
     language: str = "en"
     crop_type: Optional[str] = None
@@ -112,9 +113,7 @@ class FollowUpService:
         )
 
     def should_ask_follow_up(
-        self,
-        customer: Customer,
-        chat_history: List[Message]
+        self, customer: Customer, chat_history: List[Message]
     ) -> bool:
         """
         Determine if a follow-up question should be asked.
@@ -131,6 +130,14 @@ class FollowUpService:
         Returns:
             bool: True if follow-up should be asked
         """
+        # Check if follow-up feature is enabled in configuration
+        if not settings.follow_up_enabled:
+            logger.info(
+                f"[FollowUp] Feature disabled in config for customer "
+                f"{customer.id}, skipping"
+            )
+            return False
+
         # Find last FOLLOW_UP in chat history
         last_follow_up = None
         for msg in chat_history:
@@ -184,9 +191,7 @@ class FollowUpService:
         return False
 
     async def generate_follow_up_question(
-        self,
-        customer: Customer,
-        original_question: str
+        self, customer: Customer, original_question: str
     ) -> Optional[str]:
         """
         Generate a follow-up question using OpenAI.
@@ -299,23 +304,41 @@ class FollowUpService:
         self.db.flush()
 
         try:
-            # Send via WhatsApp
-            result = self.whatsapp_service.send_message(
-                to_number=phone_number,
-                message_body=follow_up_text,
-            )
+            if phone_number.startswith("messenger:"):
+                psid = phone_number.replace("messenger:", "")
+                from services.messenger_service import MessengerService
 
-            # Update with real Twilio SID
-            follow_up_message.message_sid = result.get("sid", message_sid)
-            follow_up_message.delivery_status = DeliveryStatus.SENT
+                msgr_svc = MessengerService()
+                result = msgr_svc.send_message(
+                    recipient_psid=psid,
+                    text=follow_up_text,
+                )
+                follow_up_message.message_sid = result.get(
+                    "message_id", message_sid
+                )
+                follow_up_message.delivery_status = DeliveryStatus.SENT
+                logger.info(
+                    f"[FollowUp] Sent follow-up via Messenger to {psid}: "
+                    f"{follow_up_message.message_sid}"
+                )
+            else:
+                # Send via WhatsApp
+                result = self.whatsapp_service.send_message(
+                    to_number=phone_number,
+                    message_body=follow_up_text,
+                )
+
+                # Update with real Twilio SID
+                follow_up_message.message_sid = result.get("sid", message_sid)
+                follow_up_message.delivery_status = DeliveryStatus.SENT
+
+                logger.info(
+                    f"[FollowUp] Sent follow-up to {phone_number}: "
+                    f"{result.get('sid')}"
+                )
 
             self.db.commit()
             self.db.refresh(follow_up_message)
-
-            logger.info(
-                f"[FollowUp] Sent follow-up to {phone_number}: "
-                f"{result.get('sid')}"
-            )
             return follow_up_message
 
         except Exception as e:

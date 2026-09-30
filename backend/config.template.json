@@ -1,5 +1,16 @@
 {
   "message_limit": 10,
+  "channels": {
+    "whatsapp": {
+      "enabled": true,
+      "description": "WhatsApp messaging channel via Twilio / Meta API"
+    },
+    "messenger": {
+      "enabled": true,
+      "typing_indicator_enabled": false,
+      "description": "Facebook Messenger messaging channel (opt-in)"
+    }
+  },
   "whatsapp": {
     "templates": {
       "confirmation": {
@@ -64,11 +75,17 @@
         "description": "Convert voice/audio to text (NOT related to WHISPER message type)"
       },
       "onboarding": {
-        "enabled": true,
+        "enabled": false,
         "model": "gpt-4o-mini",
         "temperature": 0.8,
         "max_tokens": 500,
         "system_prompt": "You are a helpful agricultural assistant helping farmers get started with AgriConnect. Be friendly, concise, and practical."
+      },
+      "follow_up": {
+        "enabled": false,
+        "temperature": 0.7,
+        "max_tokens": 150,
+        "description": "Ask contextual follow-up question before routing to external AI"
       },
       "content_moderation": {
         "enabled": true,
@@ -85,7 +102,7 @@
       "log_usage": true
     }
   },
-  "crop_types": ["Avocado", "Potato", "Dairy"],
+  "crop_types": [],
   "languages": [{ "code": "en", "name": "English" }],
   "age_groups": [
     { "label": "20-35", "min": 20, "max": 35 },
@@ -106,7 +123,7 @@
     ]
   },
   "onboarding": {
-    "enabled": true,
+    "enabled": false,
     "fields": [
       {
         "field_name": "language",

@@ -73,6 +73,8 @@
     "deleted": "Akaunti yako na data zote zinazohusiana zimefutwa. Ukitutumia ujumbe tena, akaunti mpya itaundwa."
   },
   "escalation": {
+    "question": "Je, ungependa kuunganishwa na afisa ugani kuhusu hili?",
+    "button_escalate": "Wasiliana na Afisa",
     "confirmed": "Tatizo lako limehamishwa kwa mtoa huduma wa ugani. Tafadhali subiri jibu kutoka kwao. Kwa masuala ya dharura tafadhali piga simu:\n{eo_contacts}",
     "confirmed_no_contacts": "Tatizo lako limehamishwa kwa mtoa huduma wa ugani. Tafadhali subiri jibu kutoka kwao."
   },

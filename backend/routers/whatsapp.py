@@ -4,7 +4,7 @@ import os
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, status
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -60,6 +60,13 @@ async def whatsapp_webhook(
     Flow 2: Regular message → Process normally
     Flow 3: Button "escalate" → Create ticket + WHISPER job (AI suggests to EO)
     """
+    if not settings.whatsapp_enabled:
+        logger.warning("✗ WhatsApp channel is disabled in configuration")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="WhatsApp channel is disabled",
+        )
+
     try:
         phone_number = From.replace("whatsapp:", "")
         media_url = None

@@ -18,9 +18,7 @@ class TestMessageEndpoints:
         """Setup test data before each test"""
         self.db = db_session
         self.client = client
-        self.pwd_context = CryptContext(
-            schemes=["bcrypt"], deprecated="auto"
-        )
+        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
         # Seed administrative data
         rows = [
@@ -734,8 +732,10 @@ class TestMessageEndpoints:
         # if it were to handle customer messages
 
         # The sender_name should be customer's full_name or phone_number
-        assert self.customer.full_name is not None or \
-            self.customer.phone_number is not None
+        assert (
+            self.customer.full_name is not None
+            or self.customer.phone_number is not None
+        )
 
     # ============ Image Upload Tests ============
 
@@ -745,11 +745,11 @@ class TestMessageEndpoints:
 
         # Create a simple valid JPEG file (minimal JPEG header)
         jpeg_content = (
-            b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01'
-            b'\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C'
-            + b'\x00' * 64
-            + b'\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00'
-            + b'\xff\xd9'
+            b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01"
+            b"\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C"
+            + b"\x00" * 64
+            + b"\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00"
+            + b"\xff\xd9"
         )
 
         response = self.client.post(
@@ -771,13 +771,13 @@ class TestMessageEndpoints:
 
         # Minimal valid PNG
         png_content = (
-            b'\x89PNG\r\n\x1a\n'
-            b'\x00\x00\x00\rIHDR'
-            b'\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02'
-            b'\x00\x00\x00\x90wS\xde'
-            b'\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05'
-            b'\x18\xd8N'
-            b'\x00\x00\x00\x00IEND\xaeB`\x82'
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02"
+            b"\x00\x00\x00\x90wS\xde"
+            b"\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05"
+            b"\x18\xd8N"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
         )
 
         response = self.client.post(
@@ -808,7 +808,7 @@ class TestMessageEndpoints:
         headers = self._get_auth_headers(self.eo_user)
 
         # Create content larger than 16MB
-        large_content = b'\xff\xd8\xff\xe0' + (b'\x00' * (17 * 1024 * 1024))
+        large_content = b"\xff\xd8\xff\xe0" + (b"\x00" * (17 * 1024 * 1024))
 
         response = self.client.post(
             "/api/messages/upload-image",
@@ -929,3 +929,35 @@ class TestMessageEndpoints:
 
         assert response.status_code == 400
         assert "Invalid media_type" in response.json()["detail"]
+
+    def test_create_message_for_messenger_customer(self):
+        """Test sending message to Messenger customer routes to Messenger."""
+        # Change customer phone to messenger format
+        self.customer.phone_number = "messenger:psid_eo_reply_123"
+        self.db.commit()
+
+        headers = self._get_auth_headers(self.eo_user)
+        payload = {
+            "ticket_id": self.ticket.id,
+            "body": "Here is the advice from Extension Officer.",
+            "from_source": MessageFrom.USER,
+        }
+
+        with patch(
+            "services.messenger_service.MessengerService.send_message"
+        ) as mock_msgr_send:
+            mock_msgr_send.return_value = {
+                "recipient_id": "psid_eo_reply_123",
+                "message_id": "mid.eo.reply.999",
+            }
+            response = self.client.post(
+                "/api/messages",
+                json=payload,
+                headers=headers,
+            )
+            assert response.status_code == 201
+
+            assert mock_msgr_send.called
+            call_kwargs = mock_msgr_send.call_args[1]
+            assert call_kwargs["recipient_psid"] == "psid_eo_reply_123"
+            assert "Here is the advice" in call_kwargs["text"]

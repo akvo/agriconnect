@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -256,22 +257,52 @@ async def ai_callback(
                                 f"Sending AI answer to {ai_message.customer.phone_number}"
                             )
 
-                            answer_response = whatsapp_service.send_message_with_tracking(
-                                to_number=ai_message.customer.phone_number,
-                                message_body=WhatsAppService.sanitize_whatsapp_content(
-                                    ai_response_text
-                                ),
-                                message_id=ai_message.id,
-                                db=db,
-                            )
+                            if ai_message.customer.phone_number.startswith(
+                                "messenger:"
+                            ):
+                                psid = (
+                                    ai_message.customer.phone_number.replace(
+                                        "messenger:", ""
+                                    )
+                                )
+                                from services.messenger_service import (
+                                    MessengerService,
+                                )
 
-                            # Update message with real Twilio SID
-                            ai_message.message_sid = answer_response["sid"]
-                            ai_message.delivery_status = DeliveryStatus.SENT
+                                msgr_svc = MessengerService()
+                                msgr_res = msgr_svc.send_message(
+                                    recipient_psid=psid,
+                                    text=ai_response_text,
+                                )
+                                ai_message.message_sid = msgr_res.get(
+                                    "message_id",
+                                    f"mid.msgr.{uuid.uuid4().hex[:16]}",
+                                )
+                                ai_message.delivery_status = (
+                                    DeliveryStatus.SENT
+                                )
+                                logger.info(
+                                    f"✓ AI answer sent via Messenger to {psid}"
+                                )
+                            else:
+                                answer_response = whatsapp_service.send_message_with_tracking(
+                                    to_number=ai_message.customer.phone_number,
+                                    message_body=WhatsAppService.sanitize_whatsapp_content(
+                                        ai_response_text
+                                    ),
+                                    message_id=ai_message.id,
+                                    db=db,
+                                )
 
-                            logger.info(
-                                f"✓ AI answer sent successfully: {answer_response['sid']}"
-                            )
+                                # Update message with real Twilio SID
+                                ai_message.message_sid = answer_response["sid"]
+                                ai_message.delivery_status = (
+                                    DeliveryStatus.SENT
+                                )
+
+                                logger.info(
+                                    f"✓ AI answer sent successfully: {answer_response['sid']}"
+                                )
 
                             # Step 2: Send confirmation template only if citations exist and escalation is enabled
                             # Citations indicate the response is from knowledge base
@@ -282,7 +313,16 @@ async def ai_callback(
                                 and len(payload.output.citations) > 0
                             )
 
-                            if settings.escalation_enabled and has_citations:
+                            is_messenger = (
+                                ai_message.customer.phone_number.startswith(
+                                    "messenger:"
+                                )
+                            )
+                            if (
+                                not is_messenger
+                                and settings.escalation_enabled
+                                and has_citations
+                            ):
                                 # Select template based on customer's language
                                 customer_lang = (
                                     ai_message.customer.language_code
@@ -308,13 +348,59 @@ async def ai_callback(
                                             f"Failed to send confirmation template (non-critical): {e}"
                                         )
                                         # Template failure is non-fatal
+                            elif (
+                                is_messenger
+                                and settings.escalation_enabled
+                                and has_citations
+                            ):
+                                customer_lang = (
+                                    ai_message.customer.language_code
+                                )
+                                escalate_question = t(
+                                    "escalation.question", customer_lang
+                                )
+                                escalate_btn = t(
+                                    "escalation.button_escalate", customer_lang
+                                )
+                                try:
+                                    from services.messenger_service import (
+                                        MessengerService,
+                                    )
+
+                                    msgr_svc = MessengerService()
+                                    psid = ai_message.customer.phone_number.replace(
+                                        "messenger:", ""
+                                    )
+                                    msgr_svc.send_quick_replies(
+                                        recipient_psid=psid,
+                                        text=escalate_question,
+                                        options=[
+                                            {
+                                                "title": escalate_btn[:20],
+                                                "payload": (
+                                                    settings.whatsapp_escalate_button_payload
+                                                ),
+                                            }
+                                        ],
+                                    )
+                                    logger.info(
+                                        "✓ Escalation quick reply sent via "
+                                        f"Messenger to {psid}"
+                                    )
+                                except Exception as e:
+                                    logger.warning(
+                                        "Failed to send Messenger escalation "
+                                        f"quick reply (non-critical): {e}"
+                                    )
                             elif not settings.escalation_enabled:
                                 logger.info(
-                                    "Skipping confirmation template: escalation is disabled in configuration"
+                                    "Skipping confirmation template: "
+                                    "escalation is disabled in configuration"
                                 )
                             else:
                                 logger.info(
-                                    "Skipping confirmation template: no citations in AI response"
+                                    "Skipping confirmation template: no "
+                                    "citations in AI response"
                                 )
 
                             # CRITICAL: Only commit if WhatsApp send succeeded
@@ -331,15 +417,22 @@ async def ai_callback(
                                 f"✓ AI message {ai_message.id} delivered and committed"
                             )
 
-                        except (TwilioRestException, ValueError) as e:
-                            # CRITICAL: Rollback on Twilio/validation failure
-                            logger.error(f"✗ WhatsApp delivery failed: {e}")
+                        except (
+                            TwilioRestException,
+                            ValueError,
+                            Exception,
+                        ) as e:
+                            # CRITICAL: Rollback on channel delivery failure
+                            logger.error(
+                                f"✗ Outbound delivery failed: {e}",
+                                exc_info=True,
+                            )
                             message_service.rollback_message(ai_message)
 
                             return {
                                 "status": "error",
                                 "job_id": payload.job_id,
-                                "error": f"WhatsApp delivery failed: {str(e)}",
+                                "error": f"Delivery failed: {str(e)}",
                             }
 
                     elif (
