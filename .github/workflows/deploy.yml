@@ -3,13 +3,11 @@ name: Deploy to Test Cluster
 on:
   push:
     branches:
-      - tenant/mhm-rmi
+      - main
   workflow_dispatch:
 
 concurrency:
-  # per-branch/tenant: each tenant deploys to its own namespace, so a tenant
-  # deploy must not serialize behind main (agriconnect2) or other tenants.
-  group: deploy-to-test-${{ github.ref_name }}
+  group: deploy-to-test
   cancel-in-progress: false
 
 jobs:
@@ -21,7 +19,7 @@ jobs:
   check-app-changes:
     name: Check for App Changes
     runs-on: ubuntu-latest
-    environment: mhm-rmi
+    environment: Test
     outputs:
       app-changed: ${{ steps.filter.outputs.app }}
     steps:
@@ -39,7 +37,7 @@ jobs:
   build-mobile:
     name: Build Mobile App (APK)
     runs-on: ubuntu-latest
-    environment: mhm-rmi
+    environment: Test
     needs: [run-tests, check-app-changes]
     if: needs.check-app-changes.outputs.app-changed == 'true' || github.event_name == 'workflow_dispatch'
     steps:
@@ -90,7 +88,7 @@ jobs:
   build-push:
     name: Build and Push to Registry
     runs-on: ubuntu-latest
-    environment: mhm-rmi
+    environment: Test
     needs: [run-tests]
     if: always() && needs.run-tests.result == 'success'
     steps:
@@ -107,18 +105,10 @@ jobs:
           path: composite-actions
           ref: 0.0.10
 
-      - name: Make composite image tags slash-safe (tenant branch)
-        # branch tenant/com has a slash; composite tags images with the ref.
-        # Sanitize the version arg ($3) in the helpers so tags become tenant-com.<sha>.
-        run: |
-          sed -i 's#^image_version=.*#image_version="$(echo "${3}" | tr "/" "-")"#' \
-            composite-actions/helpers/general/build.sh \
-            composite-actions/helpers/general/push.sh
-
       - name: Prepare Frontend Build
         run: |
           mv src/frontend/next.config.prod.mjs src/frontend/next.config.mjs
-          echo 'WEBDOMAIN=com.agriconnect.akvotest.org' >> src/frontend/.env
+          echo 'WEBDOMAIN=${{ secrets.WEBDOMAIN }}' >> src/frontend/.env
         shell: bash
 
       - name: Node Operations
@@ -130,7 +120,7 @@ jobs:
       - name: Docker Build Nginx
         uses: ./composite-actions/.github/actions/docker-build
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "nginx"
           dockerfile-location: "nginx"
           cluster-name: "test"
@@ -138,7 +128,7 @@ jobs:
       - name: Docker Build Frontend
         uses: ./composite-actions/.github/actions/docker-build
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "frontend"
           dockerfile-location: "frontend"
           cluster-name: "test"
@@ -146,7 +136,7 @@ jobs:
       - name: Docker Build Backend
         uses: ./composite-actions/.github/actions/docker-build
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "backend"
           dockerfile-location: "backend/Dockerfile"
           cluster-name: "test"
@@ -154,7 +144,7 @@ jobs:
       - name: Docker Build Celery Worker
         uses: ./composite-actions/.github/actions/docker-build
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "celery-worker"
           dockerfile-location: "backend/Dockerfile"
           cluster-name: "test"
@@ -162,7 +152,7 @@ jobs:
       - name: Docker Build Celery Beat
         uses: ./composite-actions/.github/actions/docker-build
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "celery-beat"
           dockerfile-location: "backend/Dockerfile"
           cluster-name: "test"
@@ -170,7 +160,7 @@ jobs:
       - name: Docker Push Nginx
         uses: ./composite-actions/.github/actions/docker-push
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "nginx"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
           cluster-name: "test"
@@ -178,7 +168,7 @@ jobs:
       - name: Docker Push Frontend
         uses: ./composite-actions/.github/actions/docker-push
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "frontend"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
           cluster-name: "test"
@@ -186,7 +176,7 @@ jobs:
       - name: Docker Push Backend
         uses: ./composite-actions/.github/actions/docker-push
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "backend"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
           cluster-name: "test"
@@ -194,7 +184,7 @@ jobs:
       - name: Docker Push Celery Worker
         uses: ./composite-actions/.github/actions/docker-push
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "celery-worker"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
           cluster-name: "test"
@@ -202,7 +192,7 @@ jobs:
       - name: Docker Push Celery Beat
         uses: ./composite-actions/.github/actions/docker-push
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           service-name: "celery-beat"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_REGISTRY }}
           cluster-name: "test"
@@ -211,7 +201,7 @@ jobs:
     name: Rollout to the server
     needs: build-push
     runs-on: ubuntu-latest
-    environment: mhm-rmi
+    environment: Test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -226,58 +216,52 @@ jobs:
           path: composite-actions
           ref: 0.0.10
 
-      - name: Make composite rollout tag slash-safe (tenant branch)
-        # must match the tag built/pushed by build-push (sanitized ref)
-        run: |
-          sed -i 's#:"${3}" --namespace=#:"$(echo "${3}" | tr "/" "-")" --namespace=#' \
-            composite-actions/helpers/general/k8s-rollout.sh
-
       - name: Rollout Nginx
         uses: ./composite-actions/.github/actions/k8s-rollout
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           deployment-name: "nginx-deployment"
           container-name: "nginx"
           cluster-name: "test"
-          namespace-name: "mhm-rmi-agriconnect-namespace"
+          namespace-name: "agriconnect2-namespace"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
 
       - name: Rollout Backend
         uses: ./composite-actions/.github/actions/k8s-rollout
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           deployment-name: "backend-deployment"
           container-name: "backend"
           cluster-name: "test"
-          namespace-name: "mhm-rmi-agriconnect-namespace"
+          namespace-name: "agriconnect2-namespace"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
 
       - name: Rollout Celery Worker
         uses: ./composite-actions/.github/actions/k8s-rollout
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           deployment-name: "celery-worker-deployment"
           container-name: "celery-worker"
           cluster-name: "test"
-          namespace-name: "mhm-rmi-agriconnect-namespace"
+          namespace-name: "agriconnect2-namespace"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
 
       - name: Rollout Celery Beat
         uses: ./composite-actions/.github/actions/k8s-rollout
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           deployment-name: "celery-beat-deployment"
           container-name: "celery-beat"
           cluster-name: "test"
-          namespace-name: "mhm-rmi-agriconnect-namespace"
+          namespace-name: "agriconnect2-namespace"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}
 
       - name: Rollout Frontend
         uses: ./composite-actions/.github/actions/k8s-rollout
         with:
-          app-name: "mhm-rmi-agriconnect"
+          app-name: "agriconnect2"
           deployment-name: "frontend-deployment"
           container-name: "frontend"
           cluster-name: "test"
-          namespace-name: "mhm-rmi-agriconnect-namespace"
+          namespace-name: "agriconnect2-namespace"
           gcloud-sa: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_K8S }}

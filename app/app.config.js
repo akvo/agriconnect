@@ -1,19 +1,19 @@
 const IS_TEST = process.env.APP_VARIANT === "test";
 
 const getPackageName = () => {
-  if (IS_TEST) return "com.akvo.comhydroponics.test";
-  return "com.akvo.comhydroponics";
+  if (IS_TEST) return "com.akvo.agriconnect.test";
+  return "com.akvo.agriconnect";
 };
 
 const getAppName = () => {
-  if (IS_TEST) return "CoM Hydroponics (Test)";
-  return "CoM Hydroponics";
+  if (IS_TEST) return "AgriConnect (Test)";
+  return "AgriConnect";
 };
 
 module.exports = {
   expo: {
     name: getAppName(),
-    slug: "com-hydroponics-mobile",
+    slug: "agriconnect",
     version: "1.4.1",
     owner: "akvo",
     orientation: "portrait",
@@ -86,7 +86,7 @@ module.exports = {
     platforms: ["android", "web"],
     extra: {
       eas: {
-        projectId: "7e9f4622-d223-4d99-a005-5b96293bd978",
+        projectId: "bd031b01-b8a5-47d7-9678-0307138fec19",
       },
     },
   },
