@@ -191,6 +191,14 @@ Create a `.env` file based on `.env.example` with the following key variables:
 - `BROADCAST_BATCH_SIZE` - Recipients per batch (default: 50)
 - `BROADCAST_RETRY_INTERVALS` - Retry intervals in minutes (default: 5,15,60)
 
+**Facebook Messenger (Opt-in Channel):**
+- `MESSENGER_PAGE_ID` - Facebook Page ID
+- `MESSENGER_VERIFY_TOKEN` - Webhook verification token
+- `MESSENGER_PAGE_ACCESS_TOKEN` - Meta Page Access Token
+- `MESSENGER_APP_SECRET` - Meta App Secret for SHA-256 HMAC signature validation
+- `MESSENGER_GRAPH_API_VERSION` - Meta Graph API version (default: `v21.0`)
+- Channel toggle in `config.json` under `channels.messenger.enabled` (default: `false`)
+
 **Weather Broadcast:**
 - `GOOGLEWEATHER` - Google Weather API key for weather forecasts
 - Enable in `config.json`:
@@ -210,6 +218,7 @@ See `.env.example` for complete configuration options.
 
 Additional documentation is available in the `docs/` directory:
 
+- **[Facebook Messenger Integration](docs/FACEBOOK_MESSENGER_INTEGRATION.md)**: Facebook Messenger webhook ingestion, HMAC validation, channel routing, and configuration guide
 - **[Broadcast API Core Implementation](docs/BROADCAST_API_CORE_IMPLEMENTATION.md)**: Broadcast messaging system architecture and implementation guide
 - **[Broadcast API Twilio Integration](docs/BROADCAST_API_TWILIO_INTEGRATION.md)**: Twilio WhatsApp integration and Celery task queue setup
 - **[Weather Subscription](docs/WEATHER_SUBSCRIPTION.md)**: Weather broadcast feature, subscription flow, and intent detection

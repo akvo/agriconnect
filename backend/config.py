@@ -49,6 +49,19 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Channels configuration
+    whatsapp_enabled: bool = (
+        _config.get("channels", {}).get("whatsapp", {}).get("enabled", True)
+    )
+    messenger_enabled: bool = (
+        _config.get("channels", {}).get("messenger", {}).get("enabled", False)
+    )
+    messenger_typing_indicator_enabled: bool = (
+        _config.get("channels", {})
+        .get("messenger", {})
+        .get("typing_indicator_enabled", False)
+    )
+
     # Message limit
     message_limit: int = _config.get("message_limit")
 
@@ -457,7 +470,20 @@ class Settings(BaseSettings):
         "forecast_days", 6
     )
 
-    # Statistic API Token (for external applications like Streamlit dashboards)
+    # Facebook Messenger Configuration
+    messenger_page_id: str = os.getenv("MESSENGER_PAGE_ID", "")
+    messenger_verify_token: str = os.getenv(
+        "MESSENGER_VERIFY_TOKEN", "agriconnect_messenger_verify_token"
+    )
+    messenger_page_access_token: str = os.getenv(
+        "MESSENGER_PAGE_ACCESS_TOKEN", ""
+    )
+    messenger_app_secret: str = os.getenv("MESSENGER_APP_SECRET", "")
+    messenger_graph_api_version: str = os.getenv(
+        "MESSENGER_GRAPH_API_VERSION", "v21.0"
+    )
+
+    # Statistics API Token
     statistic_api_token: str = os.getenv("STATISTIC_API_TOKEN", "")
 
     @property

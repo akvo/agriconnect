@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from models.administrative import Administrative, AdministrativeLevel
 from models.customer import Customer
+from services.messenger_service import MessengerService
 from services.weather_broadcast_service import get_weather_broadcast_service
 from services.weather_subscription_service import (
     get_weather_subscription_service,
@@ -44,6 +45,7 @@ class WeatherIntentService:
     def __init__(self, db: Session):
         self.db = db
         self.whatsapp_service = WhatsAppService()
+        self.messenger_service = MessengerService()
         self.weather_broadcast_service = get_weather_broadcast_service()
         self.weather_subscription_service = get_weather_subscription_service(
             db
@@ -110,16 +112,20 @@ class WeatherIntentService:
 
         while current:
             # Skip country level - causes wrong weather API results
-            level = self.db.query(AdministrativeLevel).filter(
-                AdministrativeLevel.id == current.level_id
-            ).first()
-            if level and level.name != 'country':
+            level = (
+                self.db.query(AdministrativeLevel)
+                .filter(AdministrativeLevel.id == current.level_id)
+                .first()
+            )
+            if level and level.name != "country":
                 path_parts.append(current.name)
             if not current.parent_id:
                 break
-            current = self.db.query(Administrative).filter(
-                Administrative.id == current.parent_id
-            ).first()
+            current = (
+                self.db.query(Administrative)
+                .filter(Administrative.id == current.parent_id)
+                .first()
+            )
 
         # Keep bottom-up order (Ward, District, Region)
         # So farmer sees their local area first
@@ -145,7 +151,7 @@ class WeatherIntentService:
         if not settings.weather_intent_enabled:
             lang = customer.language_code
             unavailable_msg = t("weather.service_unavailable", lang)
-            self.whatsapp_service.send_message(phone_number, unavailable_msg)
+            self._send_channel_message(phone_number, unavailable_msg)
             logger.info(
                 f"Weather intent disabled, sent unavailable message to "
                 f"{phone_number}"
@@ -204,10 +210,8 @@ class WeatherIntentService:
             )
 
         # Send weather message
-        self.whatsapp_service.send_message(phone_number, weather_message)
-        logger.info(
-            f"Weather message sent to {phone_number} for {location}"
-        )
+        self._send_channel_message(phone_number, weather_message)
+        logger.info(f"Weather message sent to {phone_number} for {location}")
 
         # Show subscription buttons if broadcasts enabled and not subscribed
         if (
@@ -223,6 +227,16 @@ class WeatherIntentService:
             message="Weather intent handled",
             weather_message=weather_message,
         )
+
+    def _send_channel_message(self, phone_number: str, message: str) -> None:
+        """Send message via appropriate channel (WhatsApp or Messenger)."""
+        if phone_number.startswith("messenger:"):
+            psid = phone_number.replace("messenger:", "")
+            self.messenger_service.send_message(
+                recipient_psid=psid, text=message
+            )
+        else:
+            self.whatsapp_service.send_message(phone_number, message)
 
     def _send_subscription_buttons(
         self,
@@ -240,22 +254,41 @@ class WeatherIntentService:
             area_name: Name of the administrative area
             lang: Language code ("en" or "sw")
         """
-        self.whatsapp_service.send_interactive_buttons(
-            to_number=phone_number,
-            body_text=t(
-                "weather_subscription.question", lang
-            ).replace("{area_name}", area_name),
-            buttons=[
-                {
-                    "id": settings.weather_yes_payload,
-                    "title": t("weather_subscription.button_yes", lang),
-                },
-                {
-                    "id": settings.weather_no_payload,
-                    "title": t("weather_subscription.button_no", lang),
-                },
-            ],
+        question_text = t("weather_subscription.question", lang).replace(
+            "{area_name}", area_name
         )
+
+        if phone_number.startswith("messenger:"):
+            psid = phone_number.replace("messenger:", "")
+            self.messenger_service.send_quick_replies(
+                recipient_psid=psid,
+                text=question_text,
+                options=[
+                    {
+                        "title": t("weather_subscription.button_yes", lang),
+                        "payload": settings.weather_yes_payload,
+                    },
+                    {
+                        "title": t("weather_subscription.button_no", lang),
+                        "payload": settings.weather_no_payload,
+                    },
+                ],
+            )
+        else:
+            self.whatsapp_service.send_interactive_buttons(
+                to_number=phone_number,
+                body_text=question_text,
+                buttons=[
+                    {
+                        "id": settings.weather_yes_payload,
+                        "title": t("weather_subscription.button_yes", lang),
+                    },
+                    {
+                        "id": settings.weather_no_payload,
+                        "title": t("weather_subscription.button_no", lang),
+                    },
+                ],
+            )
 
         # Mark as asked so button responses work
         if not customer.weather_subscription_asked:

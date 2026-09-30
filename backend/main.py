@@ -16,6 +16,7 @@ from routers import (
     devices,
     knowledge_base,
     messages,
+    messenger,
     service_tokens,
     whatsapp,
     tickets,
@@ -112,6 +113,7 @@ app.include_router(document.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(service_tokens.router, prefix="/api")
 app.include_router(whatsapp.router, prefix="/api")
+app.include_router(messenger.router, prefix="/api")
 app.include_router(tickets.router, prefix="/api")
 app.include_router(storage.router)
 app.include_router(crop_types.router, prefix="/api")

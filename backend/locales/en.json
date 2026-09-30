@@ -73,6 +73,8 @@
     "deleted": "Your account and all associated data have been deleted. If you message us again, a new account will be created."
   },
   "escalation": {
+    "question": "Would you like to speak with an extension officer about this?",
+    "button_escalate": "Talk to Officer",
     "confirmed": "Your issue has been transferred to extension service provider. Please wait for a response from them. For urgent issues please call:\n{eo_contacts}",
     "confirmed_no_contacts": "Your issue has been transferred to extension service provider. Please wait for a response from them."
   },

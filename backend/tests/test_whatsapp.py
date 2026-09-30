@@ -26,6 +26,7 @@ class TestWhatsAppWebhook:
 
         # Get the created administrative area
         from models.administrative import Administrative
+
         admin = (
             db_session.query(Administrative)
             .filter(Administrative.code == "NATIONAL")
@@ -325,3 +326,19 @@ class TestWhatsAppWebhook:
         response = client.get("/api/whatsapp/status")
         assert response.status_code == 200
         assert response.json()["status"] == "WhatsApp service is running"
+
+    def test_webhook_disabled_channel(self, client: TestClient):
+        from unittest.mock import patch
+        from config import settings
+
+        with patch.object(settings, "whatsapp_enabled", False):
+            response = client.post(
+                "/api/whatsapp/webhook",
+                data={
+                    "From": "whatsapp:+255123456789",
+                    "Body": "Hello",
+                    "MessageSid": "SM_TEST_DISABLED",
+                },
+            )
+            assert response.status_code == 403
+            assert "disabled" in response.json()["detail"]
