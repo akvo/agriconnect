@@ -338,56 +338,56 @@ sequenceDiagram
 
 ## 5. Level of Effort (LoE) Estimation (Realistic Engineering Standard)
 
-Rather than assuming an unbuffered "best-case" scenario, this estimate applies a **Realistic Engineering Standard** that incorporates real-world constraints:
-* **Productive Capacity:** Calculated on an average of **5–6 focused engineering hours per working day** (30h/week), with the remainder absorbed by PR review cycles (Akvo 1–3 review limit), staging deployments, and team coordination.
-* **Effort Columns:** Structured into direct development effort (**Dev LoE**, including unit testing) and **QA & Review** (security audits, data isolation verification, and staging validation).
-* **Risk & Latency Buffer:** Accounts for external vendor lag (Meta WABA/template approval turnaround) and edge-case debugging across the legacy codebase.
+Rather than assuming an unbuffered "best-case" or an overly conservative scenario, this estimate applies an **Average Realistic Engineering Standard** (with slight optimism, leveraging AI-assisted pairing, familiar tech stacks, and existing branch assets):
+* **Productive Capacity:** Calculated on an average of **5–6 focused engineering hours per working day** (30h/week), with peer reviews adhering to Akvo's 1–3 review cycle standard (~15–20% of dev time).
+* **Leveraging Existing Codebases:** Takes into account that the Akvo RAG Monorepo (PR #163) and dynamic onboarding (`tenant/com`, `tenant/mhm-rmi`) are already implemented on working branches and require integration/consolidation rather than development from scratch.
+* **Effort Columns:** Structured into direct development effort (**Dev LoE**, including unit testing) and **QA & Review** (staging deployment, code review, and integration validation).
 
 ---
 
 ### Step 0: Shared Technical Debt Resolution (Required for BOTH Options)
 *Prerequisite baseline cleanup before expanding to new sectors.*
 
-| Task ID | Story / Task Description | Dev LoE | QA & Review | Total Realistic LoE |
+| Task ID | Story / Task Description | Dev LoE | QA & Review | Total Average Realistic |
 | :--- | :--- | :---: | :---: | :---: |
-| **RAG-01** | Connect Akvo RAG Monorepo PR #163 & update akvo-rag deployment manifests | 20h | 4h | **24h (~0.8 wk)** |
-| **RAG-02** | Develop KB migration & ingestion script (download, folderize by KB name/ID, re-upload to MinIO & trigger full vector ingestion pipeline) & verify callback | 20h | 4h | **24h (~0.8 wk)** |
-| **CORE-01** | Consolidate `tenant/com` & `tenant/mhm-rmi` dynamic onboarding into `main` | 14h | 3h | **17h (~0.6 wk)** |
-| **CORE-02** | Decouple weather service, ag escalation questions, and generalize models (unify `UserType` to General User Type & decouple `Customer.crop_type`) | 10h | 2h | **12h (~0.4 wk)** |
-| **FE-01** | Generalize user/officer UI, dynamic analytics charts (replace hardcoded crop matrix), and clean mobile SQLite/Context crop references | 14h | 3h | **17h (~0.6 wk)** |
-| **Subtotal** | **Baseline Technical Debt Cleanup** | **78h** | **16h** | **94h (~3.1 calendar weeks)** |
+| **RAG-01** | Connect Akvo RAG Monorepo PR #163 & update akvo-rag deployment manifests | 12h | 3h | **15h (~0.5 wk / 2.5 days)** |
+| **RAG-02** | Develop KB migration & ingestion script (download, folderize by KB name/ID, re-upload to MinIO & trigger full vector ingestion pipeline) & verify callback | 10h | 2h | **12h (~0.4 wk / 2 days)** |
+| **CORE-01** | Consolidate `tenant/com` & `tenant/mhm-rmi` dynamic onboarding into `main` | 8h | 2h | **10h (~0.3 wk / 1.5 days)** |
+| **CORE-02** | Decouple weather service, ag escalation questions, and generalize models (unify `UserType` to General User Type & decouple `Customer.crop_type`) | 8h | 2h | **10h (~0.3 wk / 1.5 days)** |
+| **FE-01** | Generalize user/officer UI, dynamic analytics charts (replace hardcoded crop matrix), and clean mobile SQLite/Context crop references | 10h | 3h | **13h (~0.4 wk / 2 days)** |
+| **Subtotal** | **Baseline Technical Debt Cleanup** | **48h** | **12h** | **60h (~2.0 calendar weeks)** |
 
 ---
 
 ### Option 1: Shared Multi-Tenant Implementation
 
-| Task ID | Story / Task Description | Dev LoE | QA & Review | Total Realistic LoE |
+| Task ID | Story / Task Description | Dev LoE | QA & Review | Total Average Realistic |
 | :--- | :--- | :---: | :---: | :---: |
-| **SMT-01** | DB schema refactor: `tenants`, `tenant_channels`, `tenant_configs`, `tenant_id` | 18h | 3h | **21h (~0.7 wk)** |
-| **SMT-02** | Runtime `TenantContext` & replace global `Settings` (~29 modules) | 28h | 5h | **33h (~1.1 wks)** |
-| **SMT-03** | Edge tenant resolver for WhatsApp/Twilio webhooks (destination address) | 14h | 3h | **17h (~0.6 wk)** |
-| **SMT-04** | Dynamic channel vault (encrypted Twilio credentials & outbound routing) | 16h | 3h | **19h (~0.6 wk)** |
-| **SMT-05** | Universal mobile app bootstrap (dynamic terminology & SQLite session wipe) | 20h | 4h | **24h (~0.8 wk)** |
-| **SMT-06** | Cross-tenant data isolation test suite & leak regression tests | 16h | 4h | **20h (~0.7 wk)** |
-| **SMT-07** | Admin console / API for tenant provisioning & channel setup | 18h | 3h | **21h (~0.7 wk)** |
-| **Subtotal** | **Option 1 Implementation** | **130h** | **25h** | **155h (~5.2 calendar weeks)** |
-| **TOTAL** | **Step 0 + Option 1 Delivery** | **208h** | **41h** | **249h (~8.3 calendar weeks / ~2.0 months)** |
+| **SMT-01** | DB schema refactor: `tenants`, `tenant_channels`, `tenant_configs`, `tenant_id` | 12h | 3h | **15h (~0.5 wk)** |
+| **SMT-02** | Runtime `TenantContext` & replace global `Settings` (~29 modules) | 18h | 4h | **22h (~0.7 wk)** |
+| **SMT-03** | Edge tenant resolver for WhatsApp/Twilio webhooks (destination address) | 8h | 2h | **10h (~0.3 wk)** |
+| **SMT-04** | Dynamic channel vault (encrypted Twilio credentials & outbound routing) | 10h | 2h | **12h (~0.4 wk)** |
+| **SMT-05** | Universal mobile app bootstrap (dynamic terminology & SQLite session wipe) | 12h | 3h | **15h (~0.5 wk)** |
+| **SMT-06** | Cross-tenant data isolation test suite & leak regression tests | 10h | 3h | **13h (~0.4 wk)** |
+| **SMT-07** | Admin console / API for tenant provisioning & channel setup | 12h | 3h | **15h (~0.5 wk)** |
+| **Subtotal** | **Option 1 Implementation** | **82h** | **20h** | **102h (~3.4 calendar weeks)** |
+| **TOTAL** | **Step 0 + Option 1 Delivery** | **130h** | **32h** | **162h (~5.4 calendar weeks / ~1.3 months)** |
 
 ---
 
 ### Option 2: Independent Deployment Implementation (with Centralized Akvo RAG)
 
-| Task ID | Story / Task Description | Dev LoE | QA & Review | Total Realistic LoE |
+| Task ID | Story / Task Description | Dev LoE | QA & Review | Total Average Realistic |
 | :--- | :--- | :---: | :---: | :---: |
-| **IND-01** | Standardize unified configuration schema (`config.json` + `.env`) on `main` | 12h | 2h | **14h (~0.5 wk)** |
-| **IND-02** | Develop interactive Tenant Provisioning CLI (`./provision_tenant.sh`) | 20h | 4h | **24h (~0.8 wk)** |
-| **IND-03** | Docker Compose modularization & multi-instance port/domain mapping | 14h | 3h | **17h (~0.6 wk)** |
-| **IND-04** | Centralized CI/CD pipeline (GitHub Actions for bulk & selective deployments)| 22h | 4h | **26h (~0.9 wk)** |
-| **IND-05** | Rolling update automation, health check gates, and rollback scripts | 16h | 3h | **19h (~0.6 wk)** |
-| **IND-06** | Universal mobile app host switching / dynamic server configuration | 12h | 3h | **15h (~0.5 wk)** |
-| **IND-07** | Centralized monitoring & logging aggregator (Prometheus/Grafana/Loki) | 14h | 3h | **17h (~0.6 wk)** |
-| **Subtotal** | **Option 2 Implementation** | **110h** | **22h** | **132h (~4.4 calendar weeks)** |
-| **TOTAL** | **Step 0 + Option 2 Delivery** | **188h** | **38h** | **226h (~7.5 calendar weeks / ~1.8 months)** |
+| **IND-01** | Standardize unified configuration schema (`config.json` + `.env`) on `main` | 8h | 2h | **10h (~0.3 wk)** |
+| **IND-02** | Develop interactive Tenant Provisioning CLI (`./provision_tenant.sh`) | 12h | 3h | **15h (~0.5 wk)** |
+| **IND-03** | Docker Compose modularization & multi-instance port/domain mapping | 8h | 2h | **10h (~0.3 wk)** |
+| **IND-04** | Centralized CI/CD pipeline (GitHub Actions for bulk & selective deployments)| 14h | 3h | **17h (~0.6 wk)** |
+| **IND-05** | Rolling update automation, health check gates, and rollback scripts | 10h | 2h | **12h (~0.4 wk)** |
+| **IND-06** | Universal mobile app host switching / dynamic server configuration | 8h | 2h | **10h (~0.3 wk)** |
+| **IND-07** | Centralized monitoring & logging aggregator (Prometheus/Grafana/Loki) | 8h | 2h | **10h (~0.3 wk)** |
+| **Subtotal** | **Option 2 Implementation** | **68h** | **16h** | **84h (~2.8 calendar weeks)** |
+| **TOTAL** | **Step 0 + Option 2 Delivery** | **116h** | **28h** | **144h (~4.8 calendar weeks / ~1.2 months)** |
 
 ---
 
@@ -396,8 +396,8 @@ Rather than assuming an unbuffered "best-case" scenario, this estimate applies a
 To reach final consensus between engineering and product leadership, the following decisions must be made:
 
 1. **Architecture Path Selection:**
-   - Choose **Option 1 (Shared Multi-Tenancy)** if the long-term goal is a low-maintenance SaaS platform and the team can commit to the ~8.3-week timeline for deep database/core refactoring.
-   - Choose **Option 2 (Independent Deployments + Centralized RAG)** if faster time-to-market (~7.5 weeks) and sovereign physical isolation are prioritized without touching core database schemas.
+   - Choose **Option 1 (Shared Multi-Tenancy)** if the long-term goal is a low-maintenance SaaS platform and the team can commit to the ~5.4-week timeline for deep database/core refactoring.
+   - Choose **Option 2 (Independent Deployments + Centralized RAG)** if faster time-to-market (~4.8 weeks) and sovereign physical isolation are prioritized without touching core database schemas.
 2. **Channel Onboarding Strategy:**
    - Will Akvo register partner numbers under Akvo's master Twilio account (via subaccounts), or will partners be required to bring their own pre-configured Twilio/Meta accounts?
 3. **Template Creation Automation:**
@@ -410,7 +410,7 @@ To reach final consensus between engineering and product leadership, the followi
 ## 7. Recommended Action Plan
 
 ```
-[Phase 0: Technical Debt & RAG Integration]  (Weeks 1 – 3.1)
+[Phase 0: Technical Debt & RAG Integration]  (Weeks 1 – 2.0)
 ├── Update akvo-rag deployment manifests & infrastructure
 ├── Merge Akvo RAG Monorepo PR #163 into staging
 ├── Develop KB migration script (download, folderize, re-upload & re-run ingestion pipeline)
@@ -419,14 +419,14 @@ To reach final consensus between engineering and product leadership, the followi
 └── Extract weather & ag-specific escalation questions behind feature flags
                          │
                          ▼
-[Phase 1: Architecture Decision Gate] (End of Week 3.1)
+[Phase 1: Architecture Decision Gate] (End of Week 2.0)
 ├── Finalize choice between Option 1 vs Option 2
 └── Conduct Twilio Content API spike for template automation
                          │
         ┌────────────────┴────────────────┐
         ▼                                 ▼
 [Track A: Option 1 (Shared Multi-Tenant)] [Track B: Option 2 (Independent Deploy)]
-├── Weeks 4 – 8.5 (~5.2 weeks)            ├── Weeks 4 – 7.5 (~4.4 weeks)
+├── Weeks 3 – 5.5 (~3.4 weeks)            ├── Weeks 3 – 5.0 (~2.8 weeks)
 ├── TenantContext & Schema Refactor       ├── Provisioning CLI Tooling
 ├── Edge Webhook Routing & Channel Vault  ├── Centralized CI/CD Bulk Pipeline
 └── Universal Mobile App Terminology      └── Multi-Host Monitoring Setup
