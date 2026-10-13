@@ -141,23 +141,23 @@ In this model, all partner organizations share a **single application deployment
 ```mermaid
 flowchart TD
     subgraph Citizens["Citizens & Field Users"]
-        C_AGRI["Farmer (Kenya)"] -->|+254...| TW_KENYA["Twilio / Meta (Kenya WABA)"]
-        C_WATER["Caretaker (Mali)"] -->|+223...| TW_MALI["Twilio / Meta (Mali WABA)"]
-        C_HEALTH["Patient (Sudan)"] -->|+249...| TW_SUDAN["Twilio / Meta (Sudan WABA)"]
+        C_AGRI["Farmer (Kenya)"] -->|"1. Send WhatsApp (+254...)"| TW_KENYA["Twilio / Meta (Kenya WABA)"]
+        C_WATER["Caretaker (Mali)"] -->|"1. Send WhatsApp (+223...)"| TW_MALI["Twilio / Meta (Mali WABA)"]
+        C_HEALTH["Patient (Sudan)"] -->|"1. Send WhatsApp (+249...)"| TW_SUDAN["Twilio / Meta (Sudan WABA)"]
     end
 
     subgraph Edge["Shared Edge & Routing Layer"]
-        TW_KENYA -->|Webhook POST| RES["Tenant Resolver<br/>(Lookup by Destination Address)"]
-        TW_MALI -->|Webhook POST| RES
-        TW_SUDAN -->|Webhook POST| RES
+        TW_KENYA -->|"2. Webhook POST"| RES["Tenant Resolver<br/>(Lookup by Destination Address)"]
+        TW_MALI -->|"2. Webhook POST"| RES
+        TW_SUDAN -->|"2. Webhook POST"| RES
     end
 
     subgraph Core_Platform["Akvo Connect Platform (Shared Cluster)"]
-        RES -->|Inject TenantContext| API["FastAPI Backend Cluster"]
+        RES -->|"3. Inject TenantContext"| API["FastAPI Backend Cluster"]
         
-        STAFF["Staff Mobile / Web"] -->|JWT with tenant_id| API
+        STAFF["Staff Mobile / Web"] -->|"3b. Auth (JWT with tenant_id)"| API
         
-        API --> DB[("PostgreSQL 17<br/>Shared DB with tenant_id<br/>Scoped Query Helpers")]
+        API -->|"4. Scoped Query/Write"| DB[("PostgreSQL 17<br/>Shared DB with tenant_id<br/>Scoped Query Helpers")]
     end
 
     subgraph Akvo_RAG["Akvo RAG Monorepo (PR #163)"]
@@ -167,14 +167,25 @@ flowchart TD
         MINIO[("MinIO S3 Storage<br/>bucket: tenant-{id}-kb")]
         VDB[("Vector DB (Qdrant / Chroma)<br/>Payload Filter: tenant_id")]
         
-        RAG_API --> REDIS_RPC --> VKB
-        VKB --> MINIO & VDB
+        RAG_API -->|"6. Enqueue RPC"| REDIS_RPC --> VKB
+        VKB -->|"7. Vector & Document Lookup"| MINIO & VDB
     end
 
-    API -->|"POST chat_url (Bearer token)"| RAG_API
-    RAG_API -.->|"Callback /api/callback/ai"| API
-    API -->|Outbound reply via Tenant Credentials| Citizens
+    API -->|"5. POST /chat (Bearer token & kb_ids)"| RAG_API
+    RAG_API -.->|"8. Webhook Callback (/api/callback/ai)"| API
+    API -->|"9. Outbound reply via Tenant Credentials"| Citizens
 ```
+
+##### Architectural Execution Flow by Step (Option 1):
+1. **Step 1 (Inbound Citizen Messaging):** A citizen (e.g., farmer, water caretaker, or patient) sends an SMS or WhatsApp message to their local organization's dedicated phone number (`+254...`, `+223...`, `+249...`).
+2. **Step 2 (Channel Inbound Webhook):** The communications provider (Twilio or Meta WhatsApp Business API) receives the message and triggers an HTTP POST webhook to the platform's shared edge routing layer.
+3. **Step 3 (Tenant Resolution & Context Injection):** The **Tenant Resolver** inspects the inbound destination address (`To`), maps it to the registered organization in the `tenant_channels` registry, initializes an active `TenantContext(tenant_id)`, and forwards the request to the FastAPI application cluster. *(In parallel, **Step 3b** allows field staff to authenticate via mobile/web dashboards using JWTs carrying their assigned `tenant_id`)*.
+4. **Step 4 (Scoped State & Ticket Persistence):** The backend queries and persists citizen profiles, message histories, and tickets in PostgreSQL 17 using tenant-scoped query helpers (`WHERE tenant_id = ...`) to prevent cross-tenant data bleed.
+5. **Step 5 (Centralized AI Inference Request):** The backend calls the shared Akvo RAG service (`POST /chat`) using the tenant's Bearer token (retrieved with <1ms latency from the 5-minute In-Memory TTL cache) and authorized `knowledge_base_ids`.
+6. **Step 6 (RPC Queuing & Dispatch):** The Akvo RAG API dispatches the task into Redis RPC queues (`MCPQueueDispatcher`) for background worker consumption.
+7. **Step 7 (Vector Search & Knowledge Retrieval):** `vector-kb-mcp` worker processes query MinIO S3 storage and the Vector DB (Qdrant/Chroma), applying hard payload filters strictly isolated to the tenant's knowledge bases.
+8. **Step 8 (Asynchronous Webhook Callback):** Once RAG inference is generated, the Akvo RAG cluster sends an asynchronous callback to the platform's callback endpoint (`/api/callback/ai`).
+9. **Step 9 (Outbound Response Delivery):** The backend delivers the AI advisory response or escalation update back to the citizen via WhatsApp using the tenant's outbound credentials.
 
 #### User Workflow (Option 1: Shared Multitenancy)
 
@@ -234,6 +245,50 @@ In this model, each tenant runs as an **isolated, dedicated AgriConnect applicat
 > **Centralized AI Architecture:**  
 > Rather than duplicating the heavy Akvo RAG infrastructure (MinIO S3, Redis queues, Vector DB, embedding workers) for every tenant, **a single centralized Akvo RAG cluster** serves all tenant deployments. Each dedicated AgriConnect instance connects to the shared Akvo RAG service using its own unique `access_token` (managed in the `service_tokens` table) and accesses only its authorized `knowledge_base_ids`.
 
+#### Tenant Configuration Management Strategy in Option 2
+
+To maintain distinct configurations for multiple tenants without code duplication or maintaining long-lived tenant branches (`tenant/com`, `tenant/mhm-rmi`), Option 2 adopts a **3-Tier Configuration & GitOps Model**:
+
+1. **Tier 1: Machine & Infrastructure Bootstrap (`.env` per Deployment Instance)**
+   * Stored securely on the host filesystem per tenant container (e.g., `/opt/akvoconnect/tenants/{tenant_slug}/.env`).
+   * Limited strictly to parameters required *before* database connectivity:
+     * Instance Domain & Subdomain (e.g., `mali.akvoconnect.org`).
+     * Dedicated PostgreSQL credentials (`DATABASE_URL`).
+     * Dedicated Redis broker URL (`REDIS_URL`).
+     * Master Encryption Key (`MASTER_ENCRYPTION_KEY` for Fernet channel token decryption).
+     * Server runtime environment (`ENVIRONMENT=production`, `PORT=8000`).
+
+2. **Tier 2: External Services & Business Configurations (Dedicated PostgreSQL DB Tables)**
+   * Each tenant's dedicated database manages runtime configurations and external credentials dynamically without touching server environment files:
+     * **`service_tokens` Table (External AI Integration):** Already implemented in the database schema. Stores `service_name="akvo-rag"`, `access_token`, `chat_url`, `upload_url`, `kb_url`, and `document_url`. Accessed via `ExternalAIService` with the existing 5-minute In-Memory TTL Cache (< 1ms lookup latency). Tokens can be rotated dynamically via API/Admin Console without restarting containers.
+     * **`tenant_channels` Table:** Stores dedicated Twilio/Meta credentials (`account_sid`, `auth_token`, `waba_id`, `phone_number`, template SIDs) encrypted at-rest.
+     * **`tenant_configs` JSONB Table:** Holds sector business rules (`sector: "water"`), dynamic onboarding forms (pumps vs. crops), sector escalation questions, officer/beneficiary terminology (`officer_label`), and feature toggles (`enable_photo_diagnostics: true`).
+   * **Hot-Reloading without Downtime:** Partner admins can update templates, AI service tokens, or terminology via their instance's Admin UI/API with instant zero-downtime hot-reloading (via the 5-minute In-Memory TTL Cache), without editing files on the server or restarting Docker containers.
+
+3. **Tier 3: Centralized Deployment Inventory (GitOps / CI/CD Inventory)**
+   * A centralized private repository or CI/CD inventory tracks all tenant instances:
+     ```yaml
+     # deployments/inventory/tenants.yml
+     tenants:
+       - slug: kenya-agri
+         domain: kenya.akvoconnect.org
+         channel: stable
+         sector: agriculture
+       - slug: mali-water
+         domain: mali.akvoconnect.org
+         channel: stable
+         sector: water
+       - slug: sudan-health
+         domain: sudan.akvoconnect.org
+         channel: beta
+         sector: health
+     ```
+   * **Upgrades without Config Overwrite:** When GitHub Actions deploys a new release of `main`, it pulls the new container image, runs database migrations (`alembic upgrade head`), and performs a rolling container restart. Because tenant configuration is decoupled into the host `.env` and PostgreSQL persistent volume, application code upgrades never overwrite tenant-specific settings.
+
+4. **Automated Tenant Initialization (CLI):**
+   * New tenants are initialized using `./provision_tenant.sh --tenant=mali-water --sector=water`.
+   * The CLI interactively prompts for domain and DB/Redis credentials, registers the service token with Centralized Akvo RAG, seeds the dedicated DB with the sector blueprint (`tenant_configs`) and `service_tokens`, and registers the instance in the CI/CD inventory.
+
 #### Architecture Diagram (Option 2: Independent Deployment + Centralized Akvo RAG)
 
 ```mermaid
@@ -244,22 +299,22 @@ flowchart TD
     end
 
     subgraph CICD["Centralized Release Pipeline (CI/CD)"]
-        CODE --> PIPELINE["GitHub Actions / Centralized Pipeline<br/>• Bulk Deployment to all instances<br/>• Selective Deployment<br/>• Rolling Updates & Rollback"]
+        CODE -->|"1a. Push/Merge release"| PIPELINE["GitHub Actions / Centralized Pipeline<br/>• Bulk Deployment to all instances<br/>• Selective Deployment<br/>• Rolling Updates & Rollback"]
     end
 
     subgraph Tenant_A["Tenant 1 Deployment (Kenya Agri)"]
-        APP_A["FastAPI Backend<br/>(kenya.akvoconnect.org)"] --> DB_A[("Dedicated PostgreSQL")]
-        TW_A["Dedicated Twilio Account"] --> APP_A
+        TW_A["Dedicated Twilio (+254...)"] -->|"4. Direct Webhook POST"| APP_A["FastAPI Backend<br/>(kenya.akvoconnect.org)"]
+        APP_A -->|"5. Local Query/Write"| DB_A[("Dedicated PostgreSQL")]
     end
 
     subgraph Tenant_B["Tenant 2 Deployment (Mali Water)"]
-        APP_B["FastAPI Backend<br/>(mali.akvoconnect.org)"] --> DB_B[("Dedicated PostgreSQL")]
-        TW_B["Dedicated Twilio Account"] --> APP_B
+        TW_B["Dedicated Twilio (+223...)"] -->|"4. Direct Webhook POST"| APP_B["FastAPI Backend<br/>(mali.akvoconnect.org)"]
+        APP_B -->|"5. Local Query/Write"| DB_B[("Dedicated PostgreSQL")]
     end
 
     subgraph Tenant_C["Tenant 3 Deployment (Sudan Health)"]
-        APP_C["FastAPI Backend<br/>(sudan.akvoconnect.org)"] --> DB_C[("Dedicated PostgreSQL")]
-        TW_C["Dedicated Twilio Account"] --> APP_C
+        TW_C["Dedicated Twilio (+249...)"] -->|"4. Direct Webhook POST"| APP_C["FastAPI Backend<br/>(sudan.akvoconnect.org)"]
+        APP_C -->|"5. Local Query/Write"| DB_C[("Dedicated PostgreSQL")]
     end
 
     subgraph Shared_AI["Centralized Akvo RAG Cluster (PR #163)"]
@@ -269,23 +324,47 @@ flowchart TD
         RAG_MINIO[("MinIO S3 Storage")]
         RAG_VDB[("Vector DB (Qdrant / Chroma)")]
         
-        RAG_API --> RAG_REDIS --> RAG_WORKER
-        RAG_WORKER --> RAG_MINIO & RAG_VDB
+        RAG_API -->|"7a. Enqueue RPC"| RAG_REDIS --> RAG_WORKER
+        RAG_WORKER -->|"7b. Vector & Doc Lookup"| RAG_MINIO & RAG_VDB
     end
 
-    %% CLI and CI/CD Connections
-    CLI -->|Generate config & provision| Tenant_A & Tenant_B & Tenant_C
-    PIPELINE -->|Deploy container updates| Tenant_A & Tenant_B & Tenant_C
+    %% Step 1b & 2: Provisioning & Deployments
+    CLI -->|"1b. Provision instance (bootstrap .env & seed DB)"| Tenant_A & Tenant_B & Tenant_C
+    PIPELINE -->|"2. Rolling container updates"| Tenant_A & Tenant_B & Tenant_C
 
-    %% Centralized AI Connections with Token Isolation
-    APP_A -->|Bearer Token A + KB IDs A| RAG_API
-    APP_B -->|Bearer Token B + KB IDs B| RAG_API
-    APP_C -->|Bearer Token C + KB IDs C| RAG_API
+    %% Step 3: End User Message (represented to Twilio accounts)
+    CITIZEN_A["Farmer (Kenya)"] -->|"3. Send WhatsApp"| TW_A
+    CITIZEN_B["Caretaker (Mali)"] -->|"3. Send WhatsApp"| TW_B
+    CITIZEN_C["Patient (Sudan)"] -->|"3. Send WhatsApp"| TW_C
 
-    RAG_API -.->|Callback /api/callback/ai| APP_A
-    RAG_API -.->|Callback /api/callback/ai| APP_B
-    RAG_API -.->|Callback /api/callback/ai| APP_C
+    %% Step 6 & 8: Centralized AI Calls with Token Isolation
+    APP_A -->|"6. POST /chat (Bearer Token A)"| RAG_API
+    APP_B -->|"6. POST /chat (Bearer Token B)"| RAG_API
+    APP_C -->|"6. POST /chat (Bearer Token C)"| RAG_API
+
+    RAG_API -.->|"8. Callback /api/callback/ai"| APP_A
+    RAG_API -.->|"8. Callback /api/callback/ai"| APP_B
+    RAG_API -.->|"8. Callback /api/callback/ai"| APP_C
+
+    %% Step 9: Outbound Replies
+    APP_A -->|"9. Outbound reply"| CITIZEN_A
+    APP_B -->|"9. Outbound reply"| CITIZEN_B
+    APP_C -->|"9. Outbound reply"| CITIZEN_C
 ```
+
+##### Architectural Execution Flow by Step (Option 2):
+* **Provisioning & Deployment Lifecycle (DevOps & Management):**
+  * **Step 1a (Code Release):** Application code and generic feature updates are merged into the `main` branch of the unified `agriconnect` repository.
+  * **Step 1b (Automated Tenant Provisioning):** DevOps runs the interactive provisioning CLI (`./provision_tenant.sh --tenant={name} --sector={sector}`). The CLI generates the container bootstrap `.env`, initializes the dedicated PostgreSQL database volume, registers the access token with Centralized Akvo RAG, and seeds the `service_tokens` and `tenant_configs` (JSONB) tables.
+  * **Step 2 (Automated Rolling Updates):** GitHub Actions detects registered instances in the deployment inventory and executes automated rolling deployments with health checks and zero-downtime container restarts.
+* **Daily Operational Inbound & AI Advisory Lifecycle:**
+  * **Step 3 (Citizen Inbound Message):** A citizen sends a WhatsApp inquiry to the organization's dedicated phone number.
+  * **Step 4 (Direct Inbound Webhook):** Twilio forwards the webhook directly to the tenant's dedicated subdomain (e.g., `https://mali.akvoconnect.org/api/whatsapp/webhook`), completely eliminating the need for an edge tenant resolution proxy.
+  * **Step 5 (Local Database Persistence):** The dedicated FastAPI backend reads and writes citizen records, message logs, and tickets into its physically separate PostgreSQL database.
+  * **Step 6 (Centralized AI Request):** The instance calls the Centralized Akvo RAG service (`POST /chat`) using the specific `access_token` stored in its dedicated `service_tokens` table (cached with a 5-minute TTL).
+  * **Step 7a & 7b (Centralized RAG Retrieval):** Akvo RAG routes the job through its Redis RPC queues to `vector-kb-mcp` workers, performing semantic vector searches across MinIO and Qdrant scoped to the tenant's authorized `knowledge_base_ids`.
+  * **Step 8 (Instance Webhook Callback):** The Akvo RAG cluster returns the synthesized response to the calling instance's callback webhook (`https://mali.akvoconnect.org/api/callback/ai`).
+  * **Step 9 (Outbound Response Delivery):** The dedicated FastAPI backend dispatches the advisory answer back to the citizen via its dedicated Twilio account.
 
 #### User Workflow (Option 2: Independent Deployment)
 
@@ -304,7 +383,7 @@ sequenceDiagram
     CLI->>Admin: Prompt: Twilio SID, WhatsApp Number, Domain, DB Password
     CLI->>CentralRAG: Provision new Service Token & KB ID for 'agri-kenya'
     CentralRAG-->>CLI: Return access_token & kb_ids
-    CLI->>AppInstance: Generate docker-compose.yml, .env (with service_token), seed DB
+    CLI->>AppInstance: Generate docker-compose.yml, bootstrap .env, seed DB (service_tokens & tenant_configs)
     CLI->>CICD: Register new target instance in inventory
 
     Note over Admin,CICD: 2. Release & Maintenance Workflow
@@ -324,7 +403,7 @@ sequenceDiagram
 1. **Akvo DevOps / Platform Admin (Automated Instance Provisioning):**
    * Runs the interactive CLI tool: `./provision_tenant.sh --tenant=agri-kenya`.
    * The CLI interactively prompts for tenant domain (`kenya.akvoconnect.org`), Twilio account SID/token, WhatsApp phone number, and DB credentials.
-   * The CLI contacts the Centralized Akvo RAG service to provision an authorized `access_token` and `kb_ids`, generates the dedicated `.env` and `docker-compose.override.yml`, runs database migrations, and adds the host to the centralized deployment inventory.
+   * The CLI contacts the Centralized Akvo RAG service to provision an authorized `access_token` and `kb_ids`, seeds the `service_tokens` table and `tenant_configs` into the dedicated PostgreSQL database, generates the dedicated bootstrap `.env` and `docker-compose.override.yml`, runs database migrations, and adds the host to the centralized deployment inventory.
 2. **Citizen / End-User (Direct Inbound Advisory):**
    * A citizen messages the dedicated organization phone number (+254...).
    * Twilio routes the webhook directly to the dedicated subdomain (`https://kenya.akvoconnect.org/api/whatsapp/webhook`).
