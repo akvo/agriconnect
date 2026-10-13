@@ -220,7 +220,7 @@ response = await client.post(self.token.chat_url, data=form_data, files=files, h
   "message_id": 1042,
   "customer_id": 55,
   "ticket_id": 312,
-  "answer": "Berdasarkan foto Anda, braket tuas pompa Afridev mengalami keretakan pada pin engsel (fulcrum pin).\n\nLangkah perbaikan:\n1. Gunakan kunci pas 17mm untuk membuka baut penahan.\n2. Lepaskan tuas dan periksa keausan bushing.\n3. Ganti dengan pin fulcrum baru (Part #AF-04).",
+  "answer": "Based on your photo, the Afridev handpump handle bracket has a fracture on the fulcrum pin.\n\nRepair steps:\n1. Use a 17mm wrench to loosen the retaining bolts.\n2. Remove the handle and inspect bushing wear.\n3. Replace with a new fulcrum pin (Part #AF-04).",
   "media_references": [
     {
       "type": "diagram",
