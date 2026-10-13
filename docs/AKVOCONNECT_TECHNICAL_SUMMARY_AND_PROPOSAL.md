@@ -108,7 +108,23 @@ Beyond the high-level onboarding and escalation notes, an in-depth codebase audi
 | **2.2 Twilio & Channel Management** | How to securely manage separate credentials per tenant? | Encrypted credential vault in database; provider abstraction layer; Twilio subaccounts. |
 | **2.3 WhatsApp Number Registration** | How can partner-owned WhatsApp numbers be onboarded without friction? | Standardized Onboarding Playbook (Meta Embedded Signup or Twilio Senders API). |
 | **2.4 WhatsApp Template Management** | How to manage independent template IDs across tenants? | Store template IDs per tenant channel; explore programmatic template submission via Twilio API. |
-| **2.5 Tenant Configuration** | How to store workflows, terminology, and sector settings? | Standardized JSON configuration schema stored in database (`tenant_configs`), loaded via runtime `TenantContext`. |
+| **2.5 Migrating `config.json` to Database (Decided)** | Should we keep `config.json` or migrate to DB? | **Decision: Fully migrate runtime tenant configuration to PostgreSQL (`tenant_configs` JSONB).** Global infrastructure settings stay in `.env`, while all tenant-specific workflows, hierarchies, and channel settings live in the DB. `config.json` is preserved solely as an initial seed blueprint. |
+
+> [!IMPORTANT]
+> **Architectural Decision: Retiring Runtime `config.json` in Favor of PostgreSQL JSONB**
+> Following architectural evaluation, **we will NOT maintain `config.json` as the runtime configuration source**. Instead, configuration is partitioned into two distinct tiers:
+> 1. **Machine & Infrastructure Tier (`.env` only):**
+>    - Parameters required before database connection: `DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY` (for Fernet token encryption in DB), and `ENVIRONMENT`.
+> 2. **Tenant & Business Tier (PostgreSQL Tables):**
+>    - `tenants`: Core identity (`slug`, `name`, `sector`, `is_active`).
+>    - `tenant_channels`: Phone numbers, encrypted Twilio tokens, WABA IDs, and WhatsApp template SIDs.
+>    - `tenant_configs`: JSONB schema storing administrative hierarchy, dynamic onboarding fields, officer terminology (`officer_labels`), sector feature toggles, and RAG knowledge base assignments.
+> 3. **High-Performance In-Memory TTL Cache (5 Minutes):**
+>    - To eliminate repeated database queries on every WhatsApp webhook, the backend leverages the proven **5-minute In-Memory TTL Cache** pattern (already running in `service_token_service.py`). Lookups take **< 1ms**.
+> 4. **Zero-Downtime Hot Reloading:**
+>    - Updating templates or terminology no longer requires server restarts (`docker compose restart`). Changes in the database take effect immediately on next cache expiration or on update trigger.
+> 5. **Repurposing `config.json`:**
+>    - `config.json` is renamed to `config.blueprint.json`, used strictly as default template values during initial database seeding.
 
 ---
 
@@ -333,7 +349,7 @@ sequenceDiagram
 | **Infrastructure Cost** | ✅ **Highly Cost-Efficient.** Efficient resource pooling. Small pilot tenants consume virtually zero incremental compute/RAM. | ⚠️ **Moderate Cost.** Heavy AI, MinIO, and Vector DB resources are centralized in one Akvo RAG cluster (saving significant compute/RAM). Only the lightweight FastAPI/PostgreSQL stack is duplicated per tenant. |
 | **Release & Deployment Complexity** | ✅ **Single Deploy.** One deployment automatically delivers updates, bug fixes, and features to all organizations simultaneously. | ⚠️ **Requires Centralized Pipeline.** Requires sophisticated CI/CD tooling for bulk/selective updates, rolling rollouts, and multi-host monitoring. |
 | **Partner Data Residency Compliance** | ⚠️ **Complex.** Hard to satisfy contracts requiring data to physically reside within specific geographic boundaries in a shared DB. | ✅ **Native Compliance.** Each instance can easily be deployed in any cloud region or on partner-managed sovereign infrastructure. |
-| **Tenant Onboarding Speed** | ✅ **Instant & Zero Infra Overhead.** Onboarding a new tenant is purely a database record insertion (`tenants`, `tenant_channels`). Active in seconds/minutes via API or Admin form without provisioning new servers, containers, or DNS/SSL. | ⚠️ **Requires Infra Provisioning.** Even with CLI automation, onboarding requires allocating new container ports, spinning up dedicated DB/FastAPI containers, running fresh Alembic migrations, configuring new DNS subdomains, and generating SSL certificates. |
+| **Tenant Onboarding & Config Management** | ✅ **Database-driven (Zero Infra Overhead).** <br>• Konfigurasi runtime dipindahkan sepenuhnya dari `config.json` ke PostgreSQL (`tenant_configs` JSONB).<br>• Onboarding murni penambahan record database via API atau Admin Console wizard.<br>• Hot-reloading instan via In-Memory TTL Cache (zero server restart saat ubah config). | ⚠️ **File-based + Infra Overhead.** <br>• Konfigurasi tetap berupa file fisik `config.json` lokal per instance.<br>• Setiap tenant baru membutuhkan provisi container baru, database baru, Nginx subdomain, SSL Certbot, dan migrasi DB awal (~15–30 menit per tenant). |
 | **Noisy Neighbor Risk** | ⚠️ **Present.** A massive broadcast campaign by one tenant could saturate shared Celery/Redis queues and database connections. | ✅ **Zero.** Performance issues or queue backlogs on one tenant never impact other organizations. |
 
 ## 5. Level of Effort (LoE) Estimation (Realistic Engineering Standard)
@@ -404,6 +420,11 @@ To reach final consensus between engineering and product leadership, the followi
    - Conduct a spike on the Twilio Content API to verify whether WhatsApp templates can be programmatically submitted and synced during tenant onboarding to eliminate manual dashboard steps.
 4. **Mobile App Distribution:**
    - Confirm the single universal app strategy with dynamic login-time terminology (Option A) versus maintaining separate white-label EAS build profiles (Option B).
+5. **Decision Reached: Migrate Runtime `config.json` to PostgreSQL:**
+   - **Confirmed:** Runtime configuration will be migrated entirely from static `config.json` to PostgreSQL (`tenant_configs` JSONB and `tenant_channels`).
+   - Machine infrastructure settings remain in `.env` (`DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY`).
+   - In-memory TTL caching (5 minutes) eliminates database load and enables instant hot-reloading (zero server restarts when updating templates or settings).
+   - `config.json` is repurposed as `config.blueprint.json` strictly for initial database seeding templates.
 
 ---
 
