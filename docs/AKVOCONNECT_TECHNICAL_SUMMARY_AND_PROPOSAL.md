@@ -305,16 +305,19 @@ flowchart TD
     subgraph Tenant_A["Tenant 1 Deployment (Kenya Agri)"]
         TW_A["Dedicated Twilio (+254...)"] -->|"4. Direct Webhook POST"| APP_A["FastAPI Backend<br/>(kenya.akvoconnect.org)"]
         APP_A -->|"5. Local Query/Write"| DB_A[("Dedicated PostgreSQL")]
+        STAFF_A["Extension Officers (Kenya)<br/>Universal App: kenya.akvoconnect.org"] -->|"5b. Direct API / WebSocket"| APP_A
     end
 
     subgraph Tenant_B["Tenant 2 Deployment (Mali Water)"]
         TW_B["Dedicated Twilio (+223...)"] -->|"4. Direct Webhook POST"| APP_B["FastAPI Backend<br/>(mali.akvoconnect.org)"]
         APP_B -->|"5. Local Query/Write"| DB_B[("Dedicated PostgreSQL")]
+        STAFF_B["Water Technicians (Mali)<br/>Universal App: mali.akvoconnect.org"] -->|"5b. Direct API / WebSocket"| APP_B
     end
 
     subgraph Tenant_C["Tenant 3 Deployment (Sudan Health)"]
         TW_C["Dedicated Twilio (+249...)"] -->|"4. Direct Webhook POST"| APP_C["FastAPI Backend<br/>(sudan.akvoconnect.org)"]
         APP_C -->|"5. Local Query/Write"| DB_C[("Dedicated PostgreSQL")]
+        STAFF_C["Health Workers (Sudan)<br/>Universal App: sudan.akvoconnect.org"] -->|"5b. Direct API / WebSocket"| APP_C
     end
 
     subgraph Shared_AI["Centralized Akvo RAG Cluster (PR #163)"]
@@ -361,10 +364,29 @@ flowchart TD
   * **Step 3 (Citizen Inbound Message):** A citizen sends a WhatsApp inquiry to the organization's dedicated phone number.
   * **Step 4 (Direct Inbound Webhook):** Twilio forwards the webhook directly to the tenant's dedicated subdomain (e.g., `https://mali.akvoconnect.org/api/whatsapp/webhook`), completely eliminating the need for an edge tenant resolution proxy.
   * **Step 5 (Local Database Persistence):** The dedicated FastAPI backend reads and writes citizen records, message logs, and tickets into its physically separate PostgreSQL database.
+  * **Step 5b (Field Staff Operations via Mobile App):** Field officers and technicians open the mobile app and connect directly to their dedicated tenant backend (`mali.akvoconnect.org`). The app fetches the instance's sector blueprint, dynamically rendering appropriate labels (*Caretaker*, *Water Point*) and ticketing queues.
   * **Step 6 (Centralized AI Request):** The instance calls the Centralized Akvo RAG service (`POST /chat`) using the specific `access_token` stored in its dedicated `service_tokens` table (cached with a 5-minute TTL).
   * **Step 7a & 7b (Centralized RAG Retrieval):** Akvo RAG routes the job through its Redis RPC queues to `vector-kb-mcp` workers, performing semantic vector searches across MinIO and Qdrant scoped to the tenant's authorized `knowledge_base_ids`.
   * **Step 8 (Instance Webhook Callback):** The Akvo RAG cluster returns the synthesized response to the calling instance's callback webhook (`https://mali.akvoconnect.org/api/callback/ai`).
   * **Step 9 (Outbound Response Delivery):** The dedicated FastAPI backend dispatches the advisory answer back to the citizen via its dedicated Twilio account.
+
+#### Mobile Application Management Strategy in Option 2
+
+In an independent deployment model where each tenant has its own isolated backend instance and domain (e.g., `kenya.akvoconnect.org`, `mali.akvoconnect.org`), managing the mobile application requires a clear distribution and connection strategy:
+
+1. **Recommended Approach: Universal Single App with Dynamic Instance Discovery**
+   * **Single Store Listing:** Only one universal application ("Akvo Connect") is published to Google Play Store and Apple App Store, built directly from the `app/` codebase on `main`.
+   * **Host Connection Modes:**
+     * **Mode A (Auth / Email Domain Discovery):** When the officer logs in (e.g., `officer@unicef-mali.org`), a lightweight Akvo directory lookup resolves the email domain to `https://mali.akvoconnect.org` and configures the app's base API URL.
+     * **Mode B (Instance QR / Deep Link):** Tenant administrators can provide officers with an onboarding deep-link or QR code (e.g., `akvoconnect://connect?host=mali.akvoconnect.org`) that sets the target backend endpoint with one tap.
+     * **Mode C (Manual Server Selector):** A hidden or initial configuration screen allowing officers to type their organization's subdomain.
+   * **Dynamic UI & Terminology:** Once authenticated against the dedicated instance, the mobile app fetches `/api/v1/config/profile` from that backend. The app's theme, terminology labels (e.g., "Farmer" vs. "Caretaker", "Crops" vs. "Water Point"), and active feature modules are rendered dynamically.
+   * **Local SQLite Isolation & Switching:** The mobile app's single-connection SQLite architecture stores data locally for offline ticket handling. If an officer logs out or switches accounts/organizations, the app executes `forceClearDatabase()` (already established in `app/contexts/AuthContext.tsx`) to purge cached customer data and prevent data mixing.
+
+2. **Alternative Approach: Multi-Flavor / White-Label Builds (EAS Build Matrix)**
+   * If a partner strictly demands their own branded application on Google Play (custom app icon, custom splash screen, distinct name):
+   * The single codebase uses Expo Application Services (`eas.json`) build profiles and environment variables (`APP_VARIANT`) defined in `app/app.config.js` to compile individual APKs/AABs per tenant with pre-configured backend URLs.
+   * *Tradeoff:* Requires managing separate Play Store developer accounts, review cycles, and updates for every partner organization.
 
 #### User Workflow (Option 2: Independent Deployment)
 
@@ -431,12 +453,25 @@ sequenceDiagram
 | **Tenant Onboarding & Config Management** | ✅ **Database-driven (Zero Infra Overhead).** <br>• Runtime configuration is fully migrated from `config.json` to PostgreSQL (`tenant_configs` JSONB).<br>• Tenant onboarding is purely a database record addition via API or Admin Console wizard.<br>• Instant zero-downtime hot-reloading via In-Memory TTL Cache (no server restarts when config changes). | ⚠️ **File-based + Infra Overhead.** <br>• Configuration remains a local physical `config.json` file per instance.<br>• Every new tenant requires provisioning new containers, new database, Nginx subdomain, SSL Certbot certificates, and initial DB migrations (~15–30 minutes per tenant). |
 | **Noisy Neighbor Risk** | ⚠️ **Present.** A massive broadcast campaign by one tenant could saturate shared Celery/Redis queues and database connections. | ✅ **Zero.** Performance issues or queue backlogs on one tenant never impact other organizations. |
 
-## 5. Level of Effort (LoE) Estimation (Realistic Engineering Standard)
+## 5. Level of Effort (LoE) Estimation (Deep-Down Codebase Analysis)
 
-Rather than assuming an unbuffered "best-case" or an overly conservative scenario, this estimate applies an **Average Realistic Engineering Standard** (with slight optimism, leveraging AI-assisted pairing, familiar tech stacks, and existing branch assets):
-* **Productive Capacity:** Calculated on an average of **5–6 focused engineering hours per working day** (30h/week), with peer reviews adhering to Akvo's 1–3 review cycle standard (~15–20% of dev time).
-* **Leveraging Existing Codebases:** Takes into account that the Akvo RAG Monorepo (PR #163) and dynamic onboarding (`tenant/com`, `tenant/mhm-rmi`) are already implemented on working branches and require integration/consolidation rather than development from scratch.
-* **Effort Columns:** Structured into direct development effort (**Dev LoE**, including unit testing) and **QA & Review** (staging deployment, code review, and integration validation).
+Following a granular audit of the actual repository code (`backend/`, `frontend/`, and `app/`), git history (`tenant/com`, `tenant/mhm-rmi`, `main`), and existing data models, the required effort is significantly lower than initial high-level assumptions. Many features previously thought to require greenfield development are already partially or fully implemented in the codebase:
+
+### Key Codebase Realities Identified:
+1. **`tenant/com` and `tenant/mhm-rmi` are already merged into `main`:**
+   * Git inspection confirms commit `40f7c71` (`tenant/com`) and commit `d45952e` (`tenant/mhm-rmi`) are already merged ancestors of `main` (tagged `1.16.0`).
+   * Dynamic onboarding field extraction, multi-language questions, configurable administrative hierarchies, and crop lists are already actively present in `backend/config.template.json`. `CORE-01` is therefore ~80% complete; it only requires config auditing and smoke testing.
+2. **`Customer` model has no `crop_type` column:**
+   * In `backend/models/customer.py`, customer attributes are already stored in a generic JSON column (`profile_data = Column(JSON, nullable=True)`).
+   * `customer.crop_type` is merely a Python `@property` helper reading `profile_data.get("crop_type")`. Decoupling sector-specific fields requires zero database schema migrations for `customers`.
+3. **Weather and Follow-up are already largely decoupled:**
+   * `weather_intent_enabled` is already a dedicated boolean toggle in `config.py` and `weather_intent_service.py`.
+   * Follow-up questions in `follow_up_service.py` only need their prompt constants moved into `config.json` (where OpenAI onboarding prompts are already configured).
+4. **Mobile App and Frontend already use dynamic category endpoints:**
+   * In `app/services/api.ts` and `frontend/src/components/customers/EditCustomerModal.js`, categories are already dynamically retrieved via `/crop-types/` (`api.getCropTypes()`). The frontend is not statically hardcoded to specific agricultural crops.
+   * `app/contexts/AuthContext.tsx` already implements `forceClearDatabase()` for local SQLite data wiping upon account/organization switching.
+5. **Database-backed service tokens already exist:**
+   * `backend/models/service_token.py` and `ServiceTokenService` already store external AI credentials, chat URLs, and KB URLs in PostgreSQL, providing an established pattern for storing credentials dynamically.
 
 ---
 
@@ -445,12 +480,12 @@ Rather than assuming an unbuffered "best-case" or an overly conservative scenari
 
 | Task ID | Story / Task Description | Dev LoE | QA & Review | Total Average Realistic |
 | :--- | :--- | :---: | :---: | :---: |
-| **RAG-01** | Connect Akvo RAG Monorepo PR #163 & update akvo-rag deployment manifests | 12h | 3h | **15h (~0.5 wk / 2.5 days)** |
-| **RAG-02** | Develop KB migration & ingestion script (download, folderize by KB name/ID, re-upload to MinIO & trigger full vector ingestion pipeline) & verify callback | 10h | 2h | **12h (~0.4 wk / 2 days)** |
-| **CORE-01** | Consolidate `tenant/com` & `tenant/mhm-rmi` dynamic onboarding into `main` | 8h | 2h | **10h (~0.3 wk / 1.5 days)** |
-| **CORE-02** | Decouple weather service, ag escalation questions, and generalize models (unify `UserType` to General User Type & decouple `Customer.crop_type`) | 8h | 2h | **10h (~0.3 wk / 1.5 days)** |
-| **FE-01** | Generalize user/officer UI, dynamic analytics charts (replace hardcoded crop matrix), and clean mobile SQLite/Context crop references | 10h | 3h | **13h (~0.4 wk / 2 days)** |
-| **Subtotal** | **Baseline Technical Debt Cleanup** | **48h** | **12h** | **60h (~2.0 calendar weeks)** |
+| **RAG-01** | Connect Akvo RAG Monorepo PR #163 & update akvo-rag deployment manifests (PR is ready; merge, configure staging & smoke test) | 4h | 1h | **5h (~1 day)** |
+| **RAG-02** | Develop KB migration & ingestion script (leverage existing `POST /kb` and `POST /documents` upload endpoints) & verify callback | 4h | 1h | **5h (~1 day)** |
+| **CORE-01** | Audit & finalize `tenant/com` & `tenant/mhm-rmi` dynamic logic on `main` (logic is already merged; audit configs, run test suite) | 2h | 1h | **3h (~0.5 day)** |
+| **CORE-02** | Decouple ag escalation prompt in `follow_up_service.py` into `config.json` & verify weather flags (`Customer.profile_data` is already generic JSON) | 3h | 1h | **4h (~0.5 day)** |
+| **FE-01** | Generalize UI category labels in frontend analytics & mobile broadcast filter pills (mobile already calls `/crop-types/` dynamically) | 4h | 1h | **5h (~1 day)** |
+| **Subtotal** | **Baseline Technical Debt Cleanup** | **17h** | **5h** | **22h (~0.7 calendar week / ~3.5 working days)** |
 
 ---
 
@@ -458,15 +493,15 @@ Rather than assuming an unbuffered "best-case" or an overly conservative scenari
 
 | Task ID | Story / Task Description | Dev LoE | QA & Review | Total Average Realistic |
 | :--- | :--- | :---: | :---: | :---: |
-| **SMT-01** | DB schema refactor: `tenants`, `tenant_channels`, `tenant_configs`, `tenant_id` | 12h | 3h | **15h (~0.5 wk)** |
-| **SMT-02** | Runtime `TenantContext` & replace global `Settings` (~29 modules) | 18h | 4h | **22h (~0.7 wk)** |
-| **SMT-03** | Edge tenant resolver for WhatsApp/Twilio webhooks (destination address) | 8h | 2h | **10h (~0.3 wk)** |
-| **SMT-04** | Dynamic channel vault (encrypted Twilio credentials & outbound routing) | 10h | 2h | **12h (~0.4 wk)** |
-| **SMT-05** | Universal mobile app bootstrap (dynamic terminology & SQLite session wipe) | 12h | 3h | **15h (~0.5 wk)** |
-| **SMT-06** | Cross-tenant data isolation test suite & leak regression tests | 10h | 3h | **13h (~0.4 wk)** |
-| **SMT-07** | Admin console / API for tenant provisioning & channel setup | 12h | 3h | **15h (~0.5 wk)** |
-| **Subtotal** | **Option 1 Implementation** | **82h** | **20h** | **102h (~3.4 calendar weeks)** |
-| **TOTAL** | **Step 0 + Option 1 Delivery** | **130h** | **32h** | **162h (~5.4 calendar weeks / ~1.3 months)** |
+| **SMT-01** | DB schema refactor: add `tenant_id` to core models (`users`, `customers`, `tickets`, `messages`) & Alembic migrations | 8h | 2h | **10h (~1.5 days)** |
+| **SMT-02** | Runtime `TenantContext` dependency injection & replace global `Settings` direct module imports across routers | 12h | 3h | **15h (~2.5 days)** |
+| **SMT-03** | Edge tenant resolver for inbound WhatsApp/Twilio webhooks (match `To` phone number to tenant channel) | 4h | 1h | **5h (~1 day)** |
+| **SMT-04** | Dynamic channel vault (store encrypted Twilio credentials in `tenant_channels` & dynamic client instantiation) | 6h | 2h | **8h (~1.3 days)** |
+| **SMT-05** | Universal mobile app bootstrap (fetch dynamic terminology from `/api/v1/config/profile` & execute `forceClearDatabase()`) | 6h | 2h | **8h (~1.3 days)** |
+| **SMT-06** | Cross-tenant data isolation test suite & leak regression fixtures | 6h | 2h | **8h (~1.3 days)** |
+| **SMT-07** | Admin console / API for tenant provisioning & channel setup | 8h | 2h | **10h (~1.5 days)** |
+| **Subtotal** | **Option 1 Implementation** | **50h** | **14h** | **64h (~2.1 calendar weeks)** |
+| **TOTAL** | **Step 0 + Option 1 Delivery** | **67h** | **19h** | **86h (~2.8 calendar weeks / ~0.7 month)** |
 
 ---
 
@@ -474,15 +509,15 @@ Rather than assuming an unbuffered "best-case" or an overly conservative scenari
 
 | Task ID | Story / Task Description | Dev LoE | QA & Review | Total Average Realistic |
 | :--- | :--- | :---: | :---: | :---: |
-| **IND-01** | Standardize unified configuration schema (`config.json` + `.env`) on `main` | 8h | 2h | **10h (~0.3 wk)** |
-| **IND-02** | Develop interactive Tenant Provisioning CLI (`./provision_tenant.sh`) | 12h | 3h | **15h (~0.5 wk)** |
-| **IND-03** | Docker Compose modularization & multi-instance port/domain mapping | 8h | 2h | **10h (~0.3 wk)** |
-| **IND-04** | Centralized CI/CD pipeline (GitHub Actions for bulk & selective deployments)| 14h | 3h | **17h (~0.6 wk)** |
-| **IND-05** | Rolling update automation, health check gates, and rollback scripts | 10h | 2h | **12h (~0.4 wk)** |
-| **IND-06** | Universal mobile app host switching / dynamic server configuration | 8h | 2h | **10h (~0.3 wk)** |
-| **IND-07** | Centralized monitoring & logging aggregator (Prometheus/Grafana/Loki) | 8h | 2h | **10h (~0.3 wk)** |
-| **Subtotal** | **Option 2 Implementation** | **68h** | **16h** | **84h (~2.8 calendar weeks)** |
-| **TOTAL** | **Step 0 + Option 2 Delivery** | **116h** | **28h** | **144h (~4.8 calendar weeks / ~1.2 months)** |
+| **IND-01** | Standardize unified configuration template (`config.template.json` + `.env.example` machine variables) | 3h | 1h | **4h (~0.5 day)** |
+| **IND-02** | Develop interactive Tenant Provisioning CLI (`./provision_tenant.sh` for directory, config, and DB seed) | 6h | 2h | **8h (~1.3 days)** |
+| **IND-03** | Docker Compose modularization & multi-instance port/domain mapping via `./dc.sh` | 4h | 1h | **5h (~1 day)** |
+| **IND-04** | Centralized CI/CD pipeline (GitHub Actions workflow dispatch for bulk and selective instance deployments) | 8h | 2h | **10h (~1.5 days)** |
+| **IND-05** | Rolling update automation, health check verification gates, and rollback scripts | 4h | 1h | **5h (~1 day)** |
+| **IND-06** | Universal mobile app host switching (domain lookup / QR deep link `akvoconnect://connect?host=...`) | 5h | 1h | **6h (~1 day)** |
+| **IND-07** | Centralized monitoring & logging aggregator (Promtail / Loki / Grafana container dashboard) | 5h | 1h | **6h (~1 day)** |
+| **Subtotal** | **Option 2 Implementation** | **35h** | **9h** | **44h (~1.5 calendar weeks)** |
+| **TOTAL** | **Step 0 + Option 2 Delivery** | **52h** | **14h** | **66h (~2.2 calendar weeks / ~0.5 month)** |
 
 ---
 
@@ -491,8 +526,8 @@ Rather than assuming an unbuffered "best-case" or an overly conservative scenari
 To reach final consensus between engineering and product leadership, the following decisions must be made:
 
 1. **Architecture Path Selection:**
-   - Choose **Option 1 (Shared Multi-Tenancy)** if the long-term goal is a low-maintenance SaaS platform and the team can commit to the ~5.4-week timeline for deep database/core refactoring.
-   - Choose **Option 2 (Independent Deployments + Centralized RAG)** if faster time-to-market (~4.8 weeks) and sovereign physical isolation are prioritized without touching core database schemas.
+   - Choose **Option 1 (Shared Multi-Tenancy)** if the long-term goal is a unified SaaS platform and the team can commit to **~2.8 calendar weeks** (~86h total) for database/core refactoring.
+   - Choose **Option 2 (Independent Deployments + Centralized RAG)** if faster time-to-market (**~2.2 calendar weeks** / ~66h total) and sovereign physical isolation are prioritized without touching core database schemas.
 2. **Channel Onboarding Strategy:**
    - Will Akvo register partner numbers under Akvo's master Twilio account (via subaccounts), or will partners be required to bring their own pre-configured Twilio/Meta accounts?
 3. **Template Creation Automation:**
@@ -510,23 +545,22 @@ To reach final consensus between engineering and product leadership, the followi
 ## 7. Recommended Action Plan
 
 ```
-[Phase 0: Technical Debt & RAG Integration]  (Weeks 1 – 2.0)
-├── Update akvo-rag deployment manifests & infrastructure
-├── Merge Akvo RAG Monorepo PR #163 into staging
-├── Develop KB migration script (download, folderize, re-upload & re-run ingestion pipeline)
-├── Decouple agriculture models (unify UserType to General User Type & Customer.crop_type)
-├── Consolidate tenant/com & tenant/mhm-rmi dynamic logic into main
-└── Extract weather & ag-specific escalation questions behind feature flags
+[Phase 0: Technical Debt & RAG Integration]  (Weeks 1 – 0.7)
+├── Merge Akvo RAG Monorepo PR #163 into staging & configure deployment
+├── Develop KB migration script (leverage existing upload API to folderize & ingest KBs)
+├── Decouple ag prompts in follow_up_service.py into config.json
+├── Audit & finalize merged tenant/com & tenant/mhm-rmi dynamic configs on main
+└── Generalize frontend analytics crop matrix & mobile filter pill titles
                          │
                          ▼
-[Phase 1: Architecture Decision Gate] (End of Week 2.0)
+[Phase 1: Architecture Decision Gate] (End of Week 0.7)
 ├── Finalize choice between Option 1 vs Option 2
 └── Conduct Twilio Content API spike for template automation
                          │
         ┌────────────────┴────────────────┐
         ▼                                 ▼
 [Track A: Option 1 (Shared Multi-Tenant)] [Track B: Option 2 (Independent Deploy)]
-├── Weeks 3 – 5.5 (~3.4 weeks)            ├── Weeks 3 – 5.0 (~2.8 weeks)
+├── Total Timeline: ~2.8 calendar weeks   ├── Total Timeline: ~2.2 calendar weeks
 ├── TenantContext & Schema Refactor       ├── Provisioning CLI Tooling
 ├── Edge Webhook Routing & Channel Vault  ├── Centralized CI/CD Bulk Pipeline
 └── Universal Mobile App Terminology      └── Multi-Host Monitoring Setup
