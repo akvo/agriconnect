@@ -473,6 +473,14 @@ Following a granular audit of the actual repository code (`backend/`, `frontend/
 5. **Database-backed service tokens already exist:**
    * `backend/models/service_token.py` and `ServiceTokenService` already store external AI credentials, chat URLs, and KB URLs in PostgreSQL, providing an established pattern for storing credentials dynamically.
 
+### Assumptions & Velocity Standard:
+* **Staffing Basis:** Estimated for **1 Dedicated Full-Stack Developer** executing sequentially.
+* **Vibe Coding / AI Acceleration:** Assumes the developer actively utilizes modern AI pair-programming tools (Cursor, Copilot, Antigravity) for rapid boilerplate generation, CLI/shell scaffolding, GitHub Actions YAML drafting, and automated unit test mocks (accelerating implementation by 2x–3x compared to manual traditional coding).
+* **Productive Capacity:** Calculated on an average of **5–6 focused engineering hours per working day** (30 productive hours/calendar week), excluding meetings and context switching.
+* **QA & Peer Review:** Budgeted at ~15–20% of dev time per Akvo's 1–3 review cycle standard (peer code review, staging deploy, and integration validation).
+* **Contingency & Bug Buffer (15%–20%):** Explicitly added across each track to protect against unforeseen blockers, third-party API flakiness (Twilio webhook latency, Meta template delays, MinIO RAG ingestion retries), and native mobile OS edge cases. This provides leadership with a high-confidence, guaranteed delivery target (*Buffered Commitment*).
+* **Parallel Staffing Potential:** If 2 developers work in parallel (e.g., Dev A on Backend/CLI and Dev B on Mobile/DevOps), the calendar timeline can be compressed by **~40–50%** (e.g., Option 2 completed in ~1.3–1.5 calendar weeks).
+
 ---
 
 ### Step 0: Shared Technical Debt Resolution (Required for BOTH Options)
@@ -485,7 +493,9 @@ Following a granular audit of the actual repository code (`backend/`, `frontend/
 | **CORE-01** | Audit & finalize `tenant/com` & `tenant/mhm-rmi` dynamic logic on `main` (logic is already merged; audit configs, run test suite) | 2h | 1h | **3h (~0.5 day)** |
 | **CORE-02** | Decouple ag escalation prompt in `follow_up_service.py` into `config.json` & verify weather flags (`Customer.profile_data` is already generic JSON) | 3h | 1h | **4h (~0.5 day)** |
 | **FE-01** | Generalize UI category labels in frontend analytics & mobile broadcast filter pills (mobile already calls `/crop-types/` dynamically) | 4h | 1h | **5h (~1 day)** |
-| **Subtotal** | **Baseline Technical Debt Cleanup** | **17h** | **5h** | **22h (~0.7 calendar week / ~3.5 working days)** |
+| **Subtotal** | **Baseline Technical Debt Cleanup (Base)** | **17h** | **5h** | **22h (~0.7 calendar week / ~3.5 working days)** |
+| **BUFFER** | **Unforeseen Bug & Third-Party Integration Buffer (~18%)** | **3h** | **1h** | **4h (~0.5 working day)** |
+| **TOTAL STEP 0** | **Baseline Technical Debt (Buffered Commitment)** | **20h** | **6h** | **26h (~0.9 calendar week / ~4.5 working days)** |
 
 ---
 
@@ -493,15 +503,17 @@ Following a granular audit of the actual repository code (`backend/`, `frontend/
 
 | Task ID | Story / Task Description | Dev LoE | QA & Review | Total Average Realistic |
 | :--- | :--- | :---: | :---: | :---: |
-| **SMT-01** | DB schema refactor: add `tenant_id` to core models (`users`, `customers`, `tickets`, `messages`) & Alembic migrations | 8h | 2h | **10h (~1.5 days)** |
+| **SMT-01** | DB schema refactor: create `tenants`, `tenant_channels`, `tenant_configs` tables, add `tenant_id` to core models (`users`, `customers`, `tickets`, `messages`) & Alembic migrations | 8h | 2h | **10h (~1.5 days)** |
 | **SMT-02** | Runtime `TenantContext` dependency injection & replace global `Settings` direct module imports across routers | 12h | 3h | **15h (~2.5 days)** |
 | **SMT-03** | Edge tenant resolver for inbound WhatsApp/Twilio webhooks (match `To` phone number to tenant channel) | 4h | 1h | **5h (~1 day)** |
 | **SMT-04** | Dynamic channel vault (store encrypted Twilio credentials in `tenant_channels` & dynamic client instantiation) | 6h | 2h | **8h (~1.3 days)** |
 | **SMT-05** | Universal mobile app bootstrap (fetch dynamic terminology from `/api/v1/config/profile` & execute `forceClearDatabase()`) | 6h | 2h | **8h (~1.3 days)** |
 | **SMT-06** | Cross-tenant data isolation test suite & leak regression fixtures | 6h | 2h | **8h (~1.3 days)** |
 | **SMT-07** | Admin console / API for tenant provisioning & channel setup | 8h | 2h | **10h (~1.5 days)** |
-| **Subtotal** | **Option 1 Implementation** | **50h** | **14h** | **64h (~2.1 calendar weeks)** |
-| **TOTAL** | **Step 0 + Option 1 Delivery** | **67h** | **19h** | **86h (~2.8 calendar weeks / ~0.7 month)** |
+| **Subtotal** | **Option 1 Implementation (Base)** | **50h** | **14h** | **64h (~2.1 calendar weeks)** |
+| **BUFFER** | **Cross-Tenant Schema & Data Leak Risk Buffer (20%)** | **10h** | **3h** | **13h (~2.5 working days)** |
+| **TOTAL OPTION 1**| **Option 1 Implementation (Buffered Commitment)** | **60h** | **17h** | **77h (~2.6 calendar weeks)** |
+| **GRAND TOTAL** | **Step 0 + Option 1 Delivery (Base / Buffered)** | **67h / 80h** | **19h / 23h** | **86h Base (~2.8 wks) / 103h Buffered (~3.4 wks)** |
 
 ---
 
@@ -510,14 +522,16 @@ Following a granular audit of the actual repository code (`backend/`, `frontend/
 | Task ID | Story / Task Description | Dev LoE | QA & Review | Total Average Realistic |
 | :--- | :--- | :---: | :---: | :---: |
 | **IND-01** | Standardize unified configuration template (`config.template.json` + `.env.example` machine variables) | 3h | 1h | **4h (~0.5 day)** |
-| **IND-02** | Develop interactive Tenant Provisioning CLI (`./provision_tenant.sh` for directory, config, and DB seed) | 6h | 2h | **8h (~1.3 days)** |
+| **IND-02** | Develop interactive Tenant Provisioning CLI (`./provision_tenant.sh` for input validation, directory scaffolding, config/env interpolation, DB setup, Alembic migrations & seeder execution) | 8h | 2h | **10h (~1.5 days)** |
 | **IND-03** | Docker Compose modularization & multi-instance port/domain mapping via `./dc.sh` | 4h | 1h | **5h (~1 day)** |
 | **IND-04** | Centralized CI/CD pipeline (GitHub Actions workflow dispatch for bulk and selective instance deployments) | 8h | 2h | **10h (~1.5 days)** |
 | **IND-05** | Rolling update automation, health check verification gates, and rollback scripts | 4h | 1h | **5h (~1 day)** |
 | **IND-06** | Universal mobile app host switching (domain lookup / QR deep link `akvoconnect://connect?host=...`) | 5h | 1h | **6h (~1 day)** |
 | **IND-07** | Centralized monitoring & logging aggregator (Promtail / Loki / Grafana container dashboard) | 5h | 1h | **6h (~1 day)** |
-| **Subtotal** | **Option 2 Implementation** | **35h** | **9h** | **44h (~1.5 calendar weeks)** |
-| **TOTAL** | **Step 0 + Option 2 Delivery** | **52h** | **14h** | **66h (~2.2 calendar weeks / ~0.5 month)** |
+| **Subtotal** | **Option 2 Implementation (Base)** | **37h** | **9h** | **46h (~1.5 calendar weeks)** |
+| **BUFFER** | **Multi-Instance Container & Port Routing Buffer (15%)** | **5h** | **2h** | **7h (~1.2 working days)** |
+| **TOTAL OPTION 2**| **Option 2 Implementation (Buffered Commitment)** | **42h** | **11h** | **53h (~1.8 calendar weeks)** |
+| **GRAND TOTAL** | **Step 0 + Option 2 Delivery (Base / Buffered)** | **54h / 62h** | **14h / 17h** | **68h Base (~2.3 wks) / 79h Buffered (~2.6 wks)** |
 
 ---
 
@@ -526,8 +540,8 @@ Following a granular audit of the actual repository code (`backend/`, `frontend/
 To reach final consensus between engineering and product leadership, the following decisions must be made:
 
 1. **Architecture Path Selection:**
-   - Choose **Option 1 (Shared Multi-Tenancy)** if the long-term goal is a unified SaaS platform and the team can commit to **~2.8 calendar weeks** (~86h total) for database/core refactoring.
-   - Choose **Option 2 (Independent Deployments + Centralized RAG)** if faster time-to-market (**~2.2 calendar weeks** / ~66h total) and sovereign physical isolation are prioritized without touching core database schemas.
+   - Choose **Option 1 (Shared Multi-Tenancy)** if the long-term goal is a unified SaaS platform and the team can commit to **~2.8–3.4 calendar weeks** (86h base / 103h buffered safe commitment) for database/core refactoring.
+   - Choose **Option 2 (Independent Deployments + Centralized RAG)** if faster time-to-market (**~2.3–2.6 calendar weeks** / 68h base / 79h buffered safe commitment) and sovereign physical isolation are prioritized without touching core database schemas.
 2. **Channel Onboarding Strategy:**
    - Will Akvo register partner numbers under Akvo's master Twilio account (via subaccounts), or will partners be required to bring their own pre-configured Twilio/Meta accounts?
 3. **Template Creation Automation:**
@@ -545,7 +559,7 @@ To reach final consensus between engineering and product leadership, the followi
 ## 7. Recommended Action Plan
 
 ```
-[Phase 0: Technical Debt & RAG Integration]  (Weeks 1 – 0.7)
+[Phase 0: Technical Debt & RAG Integration]  (Weeks 1 – 0.9)
 ├── Merge Akvo RAG Monorepo PR #163 into staging & configure deployment
 ├── Develop KB migration script (leverage existing upload API to folderize & ingest KBs)
 ├── Decouple ag prompts in follow_up_service.py into config.json
@@ -553,14 +567,14 @@ To reach final consensus between engineering and product leadership, the followi
 └── Generalize frontend analytics crop matrix & mobile filter pill titles
                          │
                          ▼
-[Phase 1: Architecture Decision Gate] (End of Week 0.7)
+[Phase 1: Architecture Decision Gate] (End of Week 0.9)
 ├── Finalize choice between Option 1 vs Option 2
 └── Conduct Twilio Content API spike for template automation
                          │
         ┌────────────────┴────────────────┐
         ▼                                 ▼
 [Track A: Option 1 (Shared Multi-Tenant)] [Track B: Option 2 (Independent Deploy)]
-├── Total Timeline: ~2.8 calendar weeks   ├── Total Timeline: ~2.2 calendar weeks
+├── Base: ~2.8 wks | Safe Buffer: ~3.4 wks ├── Base: ~2.3 wks | Safe Buffer: ~2.6 wks
 ├── TenantContext & Schema Refactor       ├── Provisioning CLI Tooling
 ├── Edge Webhook Routing & Channel Vault  ├── Centralized CI/CD Bulk Pipeline
 └── Universal Mobile App Terminology      └── Multi-Host Monitoring Setup
